@@ -8,11 +8,11 @@ Install, update & uninstall (Pre-Alpha)
 ---------------------------------------
 
 Manually install `liburing`_ C library - simple example, use your own way to install.
+
 .. code-block:: text
 
     cd /tmp
 
-    # Download latest version.
     wget https://git.kernel.dk/cgit/liburing/snapshot/liburing-0.3.tar.bz2
 
     tar -xjvf liburing-0.3.tar.bz2
@@ -25,6 +25,7 @@ Manually install `liburing`_ C library - simple example, use your own way to ins
 
 
 Use `pip`_ to install Python wrapper:
+
 .. code-block:: text
 
     pip install liburing
