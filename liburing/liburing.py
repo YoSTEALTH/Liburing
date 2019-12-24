@@ -72,6 +72,10 @@ def io_uring_queue_init_params(entries, ring, p):
             ring:       io_uring
             p:          io_uring_params     # p = parameter
             return:     int
+
+        Note
+            Raises exception on error, or zero on success. On success, `ring` contains the
+            necessary information to read/write to the rings.
     '''
 
 
@@ -85,8 +89,8 @@ def io_uring_queue_init(entries, ring, flags, value=None):
             return:     int
 
         Note
-            Returns -1 on error, or zero on success. On success, `ring` contains the necessary
-            information to read/write to the rings.
+            Raises exception on error, or zero on success. On success, `ring` contains the
+            necessary information to read/write to the rings.
     '''
 
 
@@ -107,8 +111,8 @@ def io_uring_queue_mmap(fd, p, ring):
             For users that want to specify `sq_thread_cpu` or `sq_thread_idle`, this interface
             is a convenient helper for mmap()ing the rings.
 
-            Returns -1 on error, or zero on success.  On success, `ring` contains the necessary
-            information to read/write to the rings.
+            Raises exception on error, or zero on success. On success, `ring` contains the
+            necessary information to read/write to the rings.
     '''
 
 
@@ -151,7 +155,7 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sigmask):
             ring:       io_uring
             cqe_ptr:    io_uring_cqe        # cq = completion queue
             wait_nr:    int
-            ts:         _kernel_timespec     # ts = timespec
+            ts:         _kernel_timespec    # ts = timespec
             sigmask:    sigset_t
             return:     int
 
@@ -177,7 +181,7 @@ def io_uring_wait_cqe_timeout(ring, cqe_ptr, ts):
         Type
             ring:       io_uring
             cqe_ptr:    io_uring_cqe        # cq = completion queue
-            ts:         _kernel_timespec     # ts = timespec
+            ts:         _kernel_timespec    # ts = timespec
             return:     int
 
         Note
@@ -242,6 +246,9 @@ def io_uring_register_buffers(ring, iovecs, nr_iovecs):
             iovecs:     iovec       # const struct iovec *iovecs
             nr_iovecs:  int
             return:     int
+
+        Note
+            Raises exception on error, or zero on success.
     '''
 
 
@@ -251,6 +258,9 @@ def io_uring_unregister_buffers(ring):
         Type
             ring:       io_uring
             return:     int
+
+        Note
+            Raises exception on error, or zero on success.
     '''
 
 
@@ -266,6 +276,9 @@ def io_uring_register_files(ring, files, nr_files):
             files:      int         # const int *files
             nr_files:   int         # number of files
             return:     int
+
+        Note
+            Raises exception on error, or zero on success.
     '''
 
 
@@ -275,6 +288,9 @@ def io_uring_unregister_files(ring):
         Type
             ring:       io_uring
             return:     int
+
+        Note
+            Raises exception on error, or zero on success.
     '''
 
 
@@ -297,7 +313,7 @@ def io_uring_register_files_update(ring, off, files, nr_files):
             Register an update for an existing file set. The updates will start at `off` in the
             original array, and `nr_files` is the number of files we'll update.
 
-            Returns number of files updated on success, -ERROR on failure.
+            Returns number of files updated on success, raises exception on failure.
     '''
 
 
@@ -308,6 +324,9 @@ def io_uring_register_eventfd(ring, fd):
             ring:       io_uring
             fd:         int
             return:     int
+
+        Note
+            Raises exception on error, or zero on success.
     '''
 
 
@@ -317,4 +336,7 @@ def io_uring_unregister_eventfd(ring):
         Type
             ring:       io_uring
             return:     int
+
+        Note
+            Raises exception on error, or zero on success.
     '''
