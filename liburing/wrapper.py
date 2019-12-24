@@ -1,4 +1,4 @@
-import errno
+import os
 import ctypes
 import functools
 
@@ -45,9 +45,11 @@ def cwrap(restype, *argtypes, error_check=None):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             if error_check:
-                if no := lib_fun(*args, **kwargs):  # noqa
-                    raise OSError(no, errno.errorcode.get(no, ''))
-                return no
+                no = lib_fun(*args, **kwargs)
+                if no < 0:  # error
+                    raise OSError(-no, os.strerror(-no))
+                else:  # success or value
+                    return no
             else:
                 return lib_fun(*args, **kwargs)
         return wrapper
