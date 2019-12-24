@@ -5,10 +5,10 @@ with open('README.rst', 'r') as file:
 
 setup(name='liburing',
       author='STEALTH',
-      version='0.0.6',
+      version='0.0.7',
       description=('This is a light-weight python wrapper around liburing library,'
                    'which is a helper to setup and tear-down io_uring instances.'),
-      python_requires='>=3.8',
+      python_requires='>=3.6',
       long_description=long_description,
       long_description_content_type="text/x-rst",
       packages=find_packages(),
@@ -24,5 +24,7 @@ setup(name='liburing',
                    # 'Development Status :: 5 - Production/Stable',
                    # 'Development Status :: 6 - Mature',
                    # 'Development Status :: 7 - Inactive',
+                   'Programming Language :: Python :: 3.6',
+                   'Programming Language :: Python :: 3.7',
                    'Programming Language :: Python :: 3.8',
                    'Topic :: Software Development :: Libraries :: Python Modules'])
