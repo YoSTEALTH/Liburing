@@ -15,10 +15,10 @@ setup(name='liburing',
       url='https://github.com/YoSTEALTH/Liburing',
       # Info: https://pypi.python.org/pypi?%3Aaction=list_classifiers
       classifiers=['License :: Public Domain',
-                   'Operating System :: POSIX :: Linux'
+                   'Operating System :: POSIX :: Linux',
                    'Intended Audience :: Developers',
-                   'Development Status :: 1 - Planning',
-                   # 'Development Status :: 2 - Pre-Alpha',
+                   # 'Development Status :: 1 - Planning',
+                   'Development Status :: 2 - Pre-Alpha',
                    # 'Development Status :: 3 - Alpha',
                    # 'Development Status :: 4 - Beta',
                    # 'Development Status :: 5 - Production/Stable',
