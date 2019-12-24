@@ -223,14 +223,14 @@ def io_uring_get_sqe(ring):
     '''
         Type
             ring:       io_uring
-            return:     io_uring_sqe
+            return:     Optional[io_uring_sqe]
 
         Note
             Return an sqe to fill. Application must later call `io_uring_submit()`
             when it's ready to tell the kernel about it. The caller may call this
             function multiple times before calling `io_uring_submit()`.
 
-            Returns a vacant sqe, or NULL if we're full.
+            Returns a vacant sqe, or None if we're full.
     '''
 
 
@@ -264,22 +264,44 @@ def io_uring_unregister_buffers(ring):
     '''
 
 
-@cwrap(ctypes.c_int,
-       ctypes.POINTER(io_uring),
-       ctypes.POINTER(ctypes.c_int),
-       ctypes.c_uint,
-       error_check=True)
-def io_uring_register_files(ring, files, nr_files):
-    '''
+def io_uring_register_file(ring, fd):
+    ''' Register 1 file
+
         Type
             ring:       io_uring
-            files:      int         # const int *files
-            nr_files:   int         # number of files
+            fd:         int
             return:     int
 
         Note
             Raises exception on error, or zero on success.
     '''
+    files = (ctypes.c_int * 1)(fd)
+    return io_uring_register_files(ring, files, 1)
+
+
+@cwrap(ctypes.c_int,
+       ctypes.POINTER(io_uring),
+       ctypes.POINTER(ctypes.c_int),
+       ctypes.c_uint,
+       error_check=True,
+       rewrap=True)
+def io_uring_register_files(ring, files, nr_files):
+    '''
+        Type
+            ring:       io_uring
+            files:      List[int]   # const int *files
+            nr_files:   int         # number of files
+            return:     int
+
+        Example
+            >>> io_uring_register_files(ring, [fd1, fd2], nr_files)
+
+        Note
+            Raises exception on error, or zero on success.
+    '''
+    files = (ctypes.c_int * len(files))(*files)
+    return ring, files, nr_files
+    # note: ^ these return values are being re-wrapped back into `@cwrap()`
 
 
 @cwrap(ctypes.c_int, ctypes.POINTER(io_uring), error_check=True)
@@ -299,7 +321,8 @@ def io_uring_unregister_files(ring):
        ctypes.c_uint,
        ctypes.POINTER(ctypes.c_int),
        ctypes.c_uint,
-       error_check=True)
+       error_check=True,
+       rewrap=True)
 def io_uring_register_files_update(ring, off, files, nr_files):
     '''
         Type
@@ -309,12 +332,18 @@ def io_uring_register_files_update(ring, off, files, nr_files):
             nr_files:   int             # number of files
             return:     int
 
+        Example
+            >>> io_uring_register_files_update(ring, off, [fd1, fd2], nr_files)
+
         Note
             Register an update for an existing file set. The updates will start at `off` in the
             original array, and `nr_files` is the number of files we'll update.
 
             Returns number of files updated on success, raises exception on failure.
     '''
+    files = (ctypes.c_int * len(files))(*files)
+    return ring, off, files, nr_files
+    # note: ^ these return values are being re-wrapped back into `@cwrap()`
 
 
 @cwrap(ctypes.c_int, ctypes.POINTER(io_uring), ctypes.c_int, error_check=True)
