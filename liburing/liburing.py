@@ -275,8 +275,7 @@ def io_uring_register_file(ring, fd):
         Note
             Raises exception on error, or zero on success.
     '''
-    files = (ctypes.c_int * 1)(fd)
-    return io_uring_register_files(ring, files, 1)
+    return io_uring_register_files(ring, [fd], 1)
 
 
 @cwrap(ctypes.c_int,
@@ -294,7 +293,7 @@ def io_uring_register_files(ring, files, nr_files):
             return:     int
 
         Example
-            >>> io_uring_register_files(ring, [fd1, fd2], nr_files)
+            >>> io_uring_register_files(ring, [fd1, fd2], 2)
 
         Note
             Raises exception on error, or zero on success.
@@ -327,7 +326,7 @@ def io_uring_register_files_update(ring, off, files, nr_files):
     '''
         Type
             ring:       io_uring
-            off:        int
+            off:        int             # offset
             files:      List[int]       # int *files
             nr_files:   int             # number of files
             return:     int
