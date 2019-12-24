@@ -31,7 +31,7 @@ def cwrap(restype, *argtypes, error_check=None):
             # or
 
             >>> @cwrap(ctypes.c_int, ctypes.c_uint, ctypes.c_uint, ctypes.c_uint)
-            >>> def io_uring_queue_init(entries: any, ring: io_uring, flags: int) -> int:
+            >>> def io_uring_queue_init(entries: int, ring: io_uring, flags: int) -> int:
             ...     pass
 
         Note
@@ -44,13 +44,9 @@ def cwrap(restype, *argtypes, error_check=None):
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if error_check:
-                no = lib_fun(*args, **kwargs)
-                if no < 0:  # error
-                    raise OSError(-no, os.strerror(-no))
-                else:  # success or value
-                    return no
-            else:
-                return lib_fun(*args, **kwargs)
+            no = lib_fun(*args, **kwargs)
+            if error_check and no < 0:  # error
+                raise OSError(-no, os.strerror(-no))
+            return no  # success or value
         return wrapper
     return decorate
