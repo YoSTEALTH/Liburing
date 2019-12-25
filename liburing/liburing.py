@@ -264,26 +264,11 @@ def io_uring_unregister_buffers(ring):
     '''
 
 
-def io_uring_register_file(ring, fd):
-    ''' Register 1 file
-
-        Type
-            ring:       io_uring
-            fd:         int
-            return:     int
-
-        Note
-            Raises exception on error, or zero on success.
-    '''
-    return io_uring_register_files(ring, [fd], 1)
-
-
 @cwrap(ctypes.c_int,
        ctypes.POINTER(io_uring),
        ctypes.POINTER(ctypes.c_int),
        ctypes.c_uint,
-       error_check=True,
-       rewrap=True)
+       error_check=True)  # , rewrap=True)
 def io_uring_register_files(ring, files, nr_files):
     '''
         Type
@@ -293,14 +278,18 @@ def io_uring_register_files(ring, files, nr_files):
             return:     int
 
         Example
-            >>> io_uring_register_files(ring, [fd1, fd2], 2)
+            >>> ring = liburing.io_uring()
+            >>> files = (ctypes.c_int * 2)(fd1, fd2)
+            >>> nr_files = len(files)
+            >>> io_uring_register_files(ring, files, nr_files)
+            0
 
         Note
             Raises exception on error, or zero on success.
     '''
-    files = (ctypes.c_int * len(files))(*files)
-    return ring, files, nr_files
-    # note: ^ these return values are being re-wrapped back into `@cwrap()`
+    # files = (ctypes.c_int * len(files))(*files)
+    # return ring, files, nr_files
+    # # note: ^ these return values are being re-wrapped back into `@cwrap()`
 
 
 @cwrap(ctypes.c_int, ctypes.POINTER(io_uring), error_check=True)
@@ -320,8 +309,7 @@ def io_uring_unregister_files(ring):
        ctypes.c_uint,
        ctypes.POINTER(ctypes.c_int),
        ctypes.c_uint,
-       error_check=True,
-       rewrap=True)
+       error_check=True)  # , rewrap=True)
 def io_uring_register_files_update(ring, off, files, nr_files):
     '''
         Type
@@ -332,7 +320,11 @@ def io_uring_register_files_update(ring, off, files, nr_files):
             return:     int
 
         Example
-            >>> io_uring_register_files_update(ring, off, [fd1, fd2], nr_files)
+            >>> ring = liburing.io_uring()
+            >>> off = 0
+            >>> files = (ctypes.c_int * 2)(fd1, fd2)
+            >>> nr_files = len(files)
+            >>> io_uring_register_files_update(ring, off, files, nr_files)
 
         Note
             Register an update for an existing file set. The updates will start at `off` in the
@@ -340,9 +332,9 @@ def io_uring_register_files_update(ring, off, files, nr_files):
 
             Returns number of files updated on success, raises exception on failure.
     '''
-    files = (ctypes.c_int * len(files))(*files)
-    return ring, off, files, nr_files
-    # note: ^ these return values are being re-wrapped back into `@cwrap()`
+    # files = (ctypes.c_int * len(files))(*files)
+    # return ring, off, files, nr_files
+    # # note: ^ these return values are being re-wrapped back into `@cwrap()`
 
 
 @cwrap(ctypes.c_int, ctypes.POINTER(io_uring), ctypes.c_int, error_check=True)
@@ -368,3 +360,38 @@ def io_uring_unregister_eventfd(ring):
         Note
             Raises exception on error, or zero on success.
     '''
+
+
+# Custom functions added
+# ----------------------
+def io_uring_register_file(ring, fd):
+    ''' Register 1 file
+
+        Type
+            ring:       io_uring
+            fd:         int
+            return:     int
+
+        Example
+            >>> io_uring_register_file(ring, fd)
+            0
+
+        Note
+            Raises exception on error, or zero on success.
+
+        TODO
+            - Is this function needed ???
+    '''
+    return io_uring_register_files(ring, [fd], 1)
+
+
+def io_uring_files(*fds):
+    '''
+        Type
+            *fds:   int
+            return: c_int_Array_*
+
+        Example
+            >>> files = io_uring_files(1, 2, 3)
+    '''
+    return (ctypes.c_int * len(fds))(*fds)
