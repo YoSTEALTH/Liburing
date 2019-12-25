@@ -392,6 +392,6 @@ def io_uring_files(*fds):
             return: c_int_Array_*
 
         Example
-            >>> files = io_uring_files(1, 2, 3)
+            >>> files = io_uring_files(fd1, fd2, fd3, ...)
     '''
     return (ctypes.c_int * len(fds))(*fds)
