@@ -32,9 +32,9 @@ def test_file(tmpdir):
     fd1 = os.open(os.path.join(tmpdir, '1.txt'), os.O_CREAT)
     fd2 = os.open(os.path.join(tmpdir, '2.txt'), os.O_CREAT)
     try:
-        files = liburing.io_uring_files(fd1, fd2)
+        files = liburing.files_fds(fd1, fd2)
         # register file
-        assert liburing.io_uring_register_files(ring, files, 2) == 0
+        assert liburing.io_uring_register_files(ring, files, len(files)) == 0
         # unregister all file(s)
         assert liburing.io_uring_unregister_files(ring) == 0
     finally:
@@ -53,9 +53,9 @@ def test_file_polling_io(tmpdir):
     fd1 = os.open(os.path.join(tmpdir, '1.txt'), os.O_CREAT)
     fd2 = os.open(os.path.join(tmpdir, '2.txt'), os.O_CREAT)
     try:
-        files = liburing.io_uring_files(fd1, fd2)
+        files = liburing.files_fds(fd1, fd2)
         # register file
-        assert liburing.io_uring_register_files(ring, files, 2) == 0
+        assert liburing.io_uring_register_files(ring, files, len(files)) == 0
         # unregister all file(s)
         assert liburing.io_uring_unregister_files(ring) == 0
     finally:
