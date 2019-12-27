@@ -60,21 +60,6 @@ class io_uring(ctypes.Structure):
 
 # Library interface ('liburing.h')
 # --------------------------------
-@cwrap(ctypes.c_int, ctypes.POINTER(io_uring))
-def io_uring_ring_dontfork(ring):
-    '''
-        Type
-            ring:       io_uring
-            return:     int
-
-        Note
-            Ensure that the mmap'ed rings aren't available to a child after a `fork(2)`.
-            This uses `madvise(..., MADV_DONTFORK)` on the mmap'ed ranges.
-
-            Added in version `liburing.so.1.0.4`
-    '''
-
-
 @cwrap(ctypes.c_int,
        ctypes.c_uint,
        ctypes.POINTER(io_uring),
@@ -145,8 +130,7 @@ def io_uring_queue_exit(ring):
        ctypes.POINTER(ctypes.POINTER(io_uring_cqe)),
        ctypes.c_uint)
 def io_uring_peek_batch_cqe(ring, cqes, count):
-    ''' Completion queue entry
-
+    '''
         Type
             ring:       io_uring
             cqes:       io_uring_cqe    # cq = completion queue
@@ -166,8 +150,7 @@ def io_uring_peek_batch_cqe(ring, cqes, count):
        ctypes.POINTER(_kernel_timespec),
        ctypes.POINTER(sigset_t))
 def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sigmask):
-    ''' Completion queue entry
-
+    '''
         Type
             ring:       io_uring
             cqe_ptr:    io_uring_cqe        # cq = completion queue
