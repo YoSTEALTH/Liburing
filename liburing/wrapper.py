@@ -45,18 +45,16 @@ def cwrap(restype, *argtypes, error_check=None, rewrap=None):
     def decorate(func):
         try:
             lib_fun = getattr(lib, func.__name__)
-            # lib_fun = getattr(lib, func.__name__)
             lib_fun.restype = restype
             lib_fun.argtypes = argtypes
         except AttributeError:
             @functools.wraps(func)
             def error(*args, **kwargs):
                 _ = (f'`{func.__name__}()` does not exist in {lib._name!r} version being used.')
-                raise FunctionNotFound(_)
+                raise FunctionNotFoundError(_)
             return error
-            # Function does not exist yet in `liburing.so` version user is using.
-            # Lets ignore the error on start up and only raise error when user tries to call
-            # the function itself.
+            # If a function does not exist in `liburing.so`(version) lets ignore the error
+            # on start up and only raise error when user tries to call the function itself.
         else:
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
@@ -68,5 +66,5 @@ def cwrap(restype, *argtypes, error_check=None, rewrap=None):
     return decorate
 
 
-class FunctionNotFound(Exception):
+class FunctionNotFoundError(Exception):
     __module__ = Exception.__module__
