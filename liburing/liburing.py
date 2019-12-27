@@ -177,7 +177,8 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sigmask):
        ctypes.POINTER(ctypes.POINTER(io_uring_cqe)),
        ctypes.POINTER(_kernel_timespec))
 def io_uring_wait_cqe_timeout(ring, cqe_ptr, ts):
-    '''
+    ''' Completion queue entry timeout
+
         Type
             ring:       io_uring
             cqe_ptr:    io_uring_cqe        # cq = completion queue
@@ -220,7 +221,8 @@ def io_uring_submit_and_wait(ring, wait_nr):
 
 @cwrap(io_uring_sqe, ctypes.POINTER(io_uring))
 def io_uring_get_sqe(ring):
-    '''
+    ''' Submission queue entry
+
         Type
             ring:       io_uring
             return:     Optional[io_uring_sqe]
@@ -385,13 +387,13 @@ def io_uring_register_file(ring, fd):
     return io_uring_register_files(ring, [fd], 1)
 
 
-def io_uring_files(*fds):
+def files_fds(*fds):
     '''
         Type
             *fds:   int
             return: c_int_Array_*
 
         Example
-            >>> files = io_uring_files(fd1, fd2, fd3, ...)
+            >>> files = files_fds(fd1, fd2, fd3, ...)
     '''
     return (ctypes.c_int * len(fds))(*fds)
