@@ -67,11 +67,13 @@ def io_uring_ring_dontfork(ring):
             ring:       io_uring
             return:     int
 
+        Version
+            0.0.8
+            liburing.so.1.0.4
+
         Note
             Ensure that the mmap'ed rings aren't available to a child after a `fork(2)`.
             This uses `madvise(..., MADV_DONTFORK)` on the mmap'ed ranges.
-
-            Added in version `liburing.so.1.0.4`
     '''
 
 
@@ -95,7 +97,7 @@ def io_uring_queue_init_params(entries, ring, p):
 
 
 @cwrap(ctypes.c_int, ctypes.c_uint, ctypes.POINTER(io_uring), ctypes.c_uint, error_check=True)
-def io_uring_queue_init(entries, ring, flags, value=None):
+def io_uring_queue_init(entries, ring, flags):
     '''
         Type
             entries:    int
