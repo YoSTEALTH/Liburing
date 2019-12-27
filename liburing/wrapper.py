@@ -43,15 +43,30 @@ def cwrap(restype, *argtypes, error_check=None, rewrap=None):
             - `error_check` raises appropriate exception for -errno values
     '''
     def decorate(func):
-        lib_fun = getattr(lib, func.__name__)
-        lib_fun.restype = restype
-        lib_fun.argtypes = argtypes
-
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            no = lib_fun(*args, **kwargs) if not rewrap else lib_fun(*func(*args, **kwargs))
-            if error_check and no < 0:  # error
-                raise OSError(-no, os.strerror(-no))
-            return no  # success or value
-        return wrapper
+        try:
+            lib_fun = getattr(lib, func.__name__)
+            # lib_fun = getattr(lib, func.__name__)
+            lib_fun.restype = restype
+            lib_fun.argtypes = argtypes
+        except AttributeError:
+            @functools.wraps(func)
+            def error(*args, **kwargs):
+                _ = (f'`{func.__name__}()` does not exist in {lib._name!r} version being used.')
+                raise FunctionNotFound(_)
+            return error
+            # Function does not exist yet in `liburing.so` version user is using.
+            # Lets ignore the error on start up and only raise error when user tries to call
+            # the function itself.
+        else:
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                no = lib_fun(*args, **kwargs) if not rewrap else lib_fun(*func(*args, **kwargs))
+                if error_check and no < 0:  # error
+                    raise OSError(-no, os.strerror(-no))
+                return no  # success or value
+            return wrapper
     return decorate
+
+
+class FunctionNotFound(Exception):
+    __module__ = Exception.__module__
