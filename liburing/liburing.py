@@ -238,7 +238,7 @@ def io_uring_submit_and_wait(ring, wait_nr):
     '''
 
 
-@cwrap(io_uring_sqe, ctypes.POINTER(io_uring))
+@cwrap(ctypes.POINTER(io_uring_sqe), ctypes.POINTER(io_uring))
 def io_uring_get_sqe(ring):
     ''' Submission queue entry
 
