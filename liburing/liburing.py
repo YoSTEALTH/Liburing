@@ -6,23 +6,23 @@ from .io_uring import io_uring_sqe, io_uring_cqe, io_uring_params
 # C internals
 # -----------
 class sigset_t(ctypes.Structure):
-    _fields_ = [('val', ctypes.c_uint * (1024 // (8 * ctypes.sizeof(ctypes.c_uint))))]
+    _fields_ = ('val', ctypes.c_uint * (1024 // (8 * ctypes.sizeof(ctypes.c_uint)))),
 
 
 class iovec(ctypes.Structure):
-    _fields_ = [('iov_base', ctypes.c_void_p), ('iov_len', ctypes.c_size_t)]
+    _fields_ = ('iov_base', ctypes.c_void_p), ('iov_len', ctypes.c_size_t)
 
 
-class _kernel_timespec(ctypes.Structure):
-    _fields_ = [('tv_sec',  ctypes.c_longlong),  # int64_t
-                ('tv_nsec', ctypes.c_longlong)]  # long long
+class kernel_timespec(ctypes.Structure):
+    _fields_ = (('tv_sec',  ctypes.c_longlong),  # int64_t
+                ('tv_nsec', ctypes.c_longlong))  # long long
 
 
 # Library interface to `io_uring`
 # -----------------------------
 class io_uring_sq(ctypes.Structure):
     ''' submission queue (sq) '''
-    _fields_ = [('khead',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
+    _fields_ = (('khead',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
                 ('ktail',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
                 ('kring_mask',    ctypes.POINTER(ctypes.c_uint)),  # unsigned *
                 ('kring_entries', ctypes.POINTER(ctypes.c_uint)),  # unsigned *
@@ -35,12 +35,12 @@ class io_uring_sq(ctypes.Structure):
                 ('sqe_tail',      ctypes.c_uint),                  # unsigned
 
                 ('ring_sz',       ctypes.c_size_t),                # size_t
-                ('ring_ptr',      ctypes.c_void_p)]                # void *
+                ('ring_ptr',      ctypes.c_void_p))                # void *
 
 
 class io_uring_cq(ctypes.Structure):
     ''' completion queue (cq) '''
-    _fields_ = [('khead',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
+    _fields_ = (('khead',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
                 ('ktail',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
                 ('kring_mask',    ctypes.POINTER(ctypes.c_uint)),  # unsigned *
                 ('kring_entries', ctypes.POINTER(ctypes.c_uint)),  # unsigned *
@@ -48,14 +48,14 @@ class io_uring_cq(ctypes.Structure):
                 ('cqes',          ctypes.POINTER(io_uring_cqe)),   # struct io_uring_cqe *
 
                 ('ring_sz',       ctypes.c_size_t),                # size_t
-                ('ring_ptr',      ctypes.c_void_p)]                # void *
+                ('ring_ptr',      ctypes.c_void_p))                # void *
 
 
 class io_uring(ctypes.Structure):
-    _fields_ = [('sq',      io_uring_sq),    # struct
+    _fields_ = (('sq',      io_uring_sq),    # struct
                 ('cq',      io_uring_cq),    # struct
                 ('flags',   ctypes.c_uint),  # unsigned
-                ('ring_fd', ctypes.c_int)]   # int
+                ('ring_fd', ctypes.c_int))   # int
 
 
 # Library interface ('liburing.h')
@@ -165,7 +165,7 @@ def io_uring_peek_batch_cqe(ring, cqes, count):
        ctypes.POINTER(io_uring),
        ctypes.POINTER(ctypes.POINTER(io_uring_cqe)),
        ctypes.c_uint,
-       ctypes.POINTER(_kernel_timespec),
+       ctypes.POINTER(kernel_timespec),
        ctypes.POINTER(sigset_t))
 def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sigmask):
     ''' Wait completion queue entry
@@ -174,7 +174,7 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sigmask):
             ring:       io_uring
             cqe_ptr:    io_uring_cqe        # cq = completion queue
             wait_nr:    int
-            ts:         _kernel_timespec    # ts = timespec
+            ts:         kernel_timespec    # ts = timespec
             sigmask:    sigset_t
             return:     int
 
@@ -194,14 +194,14 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sigmask):
 @cwrap(ctypes.c_int,
        ctypes.POINTER(io_uring),
        ctypes.POINTER(ctypes.POINTER(io_uring_cqe)),
-       ctypes.POINTER(_kernel_timespec))
+       ctypes.POINTER(kernel_timespec))
 def io_uring_wait_cqe_timeout(ring, cqe_ptr, ts):
     ''' Completion queue entry timeout
 
         Type
             ring:       io_uring
             cqe_ptr:    io_uring_cqe        # cq = completion queue
-            ts:         _kernel_timespec    # ts = timespec
+            ts:         kernel_timespec    # ts = timespec
             return:     int
 
         Note
