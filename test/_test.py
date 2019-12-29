@@ -49,13 +49,15 @@ def test_file(tmpdir):
 # TODO: Working on
 def test_file_2(tmpdir):
     ring = liburing.io_uring()
-    ts = liburing.kernel_timespec(1, 0)
+    # ts = liburing.kernel_timespec(1, 0)
     # assert liburing.io_uring_queue_init(1, ring, liburing.IORING_SETUP_IOPOLL) == 0
     assert liburing.io_uring_queue_init(1, ring, 0) == 0
     fd = os.open(os.path.join(tmpdir, '1.txt'), os.O_RDWR | os.O_CREAT)
     os.write(fd, b'test1tt2t3t5t6t6t8')
     cqe = ctypes.pointer(liburing.io_uring_cqe())  # completion queue
     try:
+        print('cqe:', cqe)
+
         # get an sqe and fill in a READV operation
         sqe = liburing.io_uring_get_sqe(ring)
 
@@ -71,9 +73,11 @@ def test_file_2(tmpdir):
             raise ValueError(f'submit got {result}, wanted 1')
 
         # wait for the sqe to complete
-        no = liburing.io_uring_wait_cqes(ring, cqe, 1, ts, None)
+        no = liburing.io_uring_wait_cqes(ring, cqe, 1, None, None)
         if no:
             raise OSError(-no, os.strerror(-no))
+
+        print('cqe:', cqe)
 
         assert b'test1' == buffer
     finally:
