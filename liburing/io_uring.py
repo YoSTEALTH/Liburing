@@ -178,5 +178,5 @@ class io_uring_params(ctypes.Structure):
 
 
 class io_uring_files_update(ctypes.Structure):
-    _fields_ = (('offset', ctypes.c_uint32),                    # __u32
-                ('fds',    ctypes.POINTER(ctypes.c_int32)))     # __s32 *
+    _fields_ = (('offset', ctypes.c_uint32),    # __u32
+                ('fds',    ctypes.c_int32))     # __s32 *
