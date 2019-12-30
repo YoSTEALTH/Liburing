@@ -22,14 +22,14 @@ class kernel_timespec(ctypes.Structure):
 # -----------------------------
 class io_uring_sq(ctypes.Structure):
     ''' submission queue (sq) '''
-    _fields_ = (('khead',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('ktail',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('kring_mask',    ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('kring_entries', ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('kflags',        ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('kdropped',      ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('array',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('sqes',          ctypes.POINTER(io_uring_sqe)),   # struct io_uring_sqe *
+    _fields_ = (('khead',         ctypes.c_uint),  # unsigned *
+                ('ktail',         ctypes.c_uint),  # unsigned *
+                ('kring_mask',    ctypes.c_uint),  # unsigned *
+                ('kring_entries', ctypes.c_uint),  # unsigned *
+                ('kflags',        ctypes.c_uint),  # unsigned *
+                ('kdropped',      ctypes.c_uint),  # unsigned *
+                ('array',         ctypes.c_uint),  # unsigned *
+                ('sqes',          io_uring_sqe),   # struct io_uring_sqe *
 
                 ('sqe_head',      ctypes.c_uint),                  # unsigned
                 ('sqe_tail',      ctypes.c_uint),                  # unsigned
@@ -40,12 +40,12 @@ class io_uring_sq(ctypes.Structure):
 
 class io_uring_cq(ctypes.Structure):
     ''' completion queue (cq) '''
-    _fields_ = (('khead',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('ktail',         ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('kring_mask',    ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('kring_entries', ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('koverflow',     ctypes.POINTER(ctypes.c_uint)),  # unsigned *
-                ('cqes',          ctypes.POINTER(io_uring_cqe)),   # struct io_uring_cqe *
+    _fields_ = (('khead',         ctypes.c_uint),  # unsigned *
+                ('ktail',         ctypes.c_uint),  # unsigned *
+                ('kring_mask',    ctypes.c_uint),  # unsigned *
+                ('kring_entries', ctypes.c_uint),  # unsigned *
+                ('koverflow',     ctypes.c_uint),  # unsigned *
+                ('cqes',          io_uring_cqe),   # struct io_uring_cqe *
 
                 ('ring_sz',       ctypes.c_size_t),                # size_t
                 ('ring_ptr',      ctypes.c_void_p))                # void *
