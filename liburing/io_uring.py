@@ -1,4 +1,3 @@
-import enum
 import ctypes
 
 
@@ -57,35 +56,31 @@ IORING_UNREGISTER_EVENTFD = 5
 IORING_REGISTER_FILES_UPDATE = 6
 
 
-class OP(enum.IntEnum):
-    IORING_OP_NOP = enum.auto()
-    IORING_OP_READV = enum.auto()
-    IORING_OP_WRITEV = enum.auto()
-    IORING_OP_FSYNC = enum.auto()
-    IORING_OP_READ_FIXED = enum.auto()
-    IORING_OP_WRITE_FIXED = enum.auto()
-    IORING_OP_POLL_ADD = enum.auto()
-    IORING_OP_POLL_REMOVE = enum.auto()
-    IORING_OP_SYNC_FILE_RANGE = enum.auto()
-    IORING_OP_SENDMSG = enum.auto()
-    IORING_OP_RECVMSG = enum.auto()
-    IORING_OP_TIMEOUT = enum.auto()
-    IORING_OP_TIMEOUT_REMOVE = enum.auto()
-    IORING_OP_ACCEPT = enum.auto()
-    IORING_OP_ASYNC_CANCEL = enum.auto()
-    IORING_OP_LINK_TIMEOUT = enum.auto()
-    IORING_OP_CONNECT = enum.auto()
-    IORING_OP_FALLOCATE = enum.auto()
-    IORING_OP_OPENAT = enum.auto()
-    IORING_OP_CLOSE = enum.auto()
-    IORING_OP_FILES_UPDATE = enum.auto()
-    IORING_OP_STATX = enum.auto()
+IORING_OP_NOP = 0
+IORING_OP_READV = 1
+IORING_OP_WRITEV = 2
+IORING_OP_FSYNC = 3
+IORING_OP_READ_FIXED = 4
+IORING_OP_WRITE_FIXED = 5
+IORING_OP_POLL_ADD = 6
+IORING_OP_POLL_REMOVE = 7
+IORING_OP_SYNC_FILE_RANGE = 8
+IORING_OP_SENDMSG = 9
+IORING_OP_RECVMSG = 10
+IORING_OP_TIMEOUT = 11
+IORING_OP_TIMEOUT_REMOVE = 12
+IORING_OP_ACCEPT = 13
+IORING_OP_ASYNC_CANCEL = 14
+IORING_OP_LINK_TIMEOUT = 15
+IORING_OP_CONNECT = 16
+IORING_OP_FALLOCATE = 17
+IORING_OP_OPENAT = 18
+IORING_OP_CLOSE = 19
+IORING_OP_FILES_UPDATE = 20
+IORING_OP_STATX = 21
 
-    # this goes last = , obviously
-    IORING_OP_LAST = enum.auto()
-
-
-globals().update(OP.__members__)
+# this goes last = , obviously
+IORING_OP_LAST = 22
 
 
 # Internally used
