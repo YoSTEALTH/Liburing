@@ -1,5 +1,5 @@
 import ctypes
-from . import iovec, IORING_OP_READV
+from . import iovec, IORING_OP_READV, IORING_OP_WRITEV
 ''' Note
         Prep functions are mainly for test and example usage only! You as a developer would have
         to write better function/library based on these example.
@@ -19,16 +19,20 @@ def iovec_array(*buffers):
     return (iovec * len(buffers))(*buffers)
 
 
-def iovec_read(buffer):
+def iovec_read(*buffers):
     '''
         Example
-            >>> data = bytearray(5)
-            >>> iovec_read(data)
+            >>> one = bytearray(5)
+            >>> two = bytearray(5)
+            >>> iovec_read(one, two)
     '''
-    length = len(buffer)
-    arr_t1 = (ctypes.c_char * length)
-    arr_p1 = ctypes.cast(arr_t1.from_buffer(buffer), ctypes.c_void_p)
-    return iovec(arr_p1, length)
+    hold = []
+    for buffer in buffers:
+        length = len(buffer)
+        calc = (ctypes.c_char * length)
+        base = ctypes.cast(calc.from_buffer(buffer), ctypes.c_void_p)
+        hold.append(iovec(base, length))
+    return (iovec * len(hold))(*hold)
 
 
 def iovec_write(*data):
@@ -37,13 +41,12 @@ def iovec_write(*data):
     '''
     hold = []
     for buf in data:
-        length = len(buf)
-        arr_p1 = ctypes.cast(ctypes.c_char_p(buf), ctypes.c_void_p)
-        hold.append(iovec(arr_p1, length))
+        base = ctypes.cast(ctypes.c_char_p(buf), ctypes.c_void_p)
+        hold.append(iovec(base, len(buf)))
     return (iovec * len(hold))(*hold)
 
 
-def io_uring_prep_rw(op, sqe, fd, addr, _len, offset):
+def io_uring_prep_rw(op, sqe, fd, addr, len_, offset):
     '''
         Type
             op:         int
@@ -56,24 +59,19 @@ def io_uring_prep_rw(op, sqe, fd, addr, _len, offset):
     '''
     sqe = sqe.contents
 
-    # help(sqe)
-    # print(len(sqe))
-    # print('contents:', sqe)
-    # print('addr:', addr.iov_base)
-    # print('contents:', sqe.iov_base, sqe.iov_len)
-    # print('contents:', sqe.contents)
-    # print('contents:', sqe.contents.addr, addr)
-    # print()
-    # help(sqe.contents)
+    # print('sqe:', sqe)
+    # print('here:', dir(sqe))
+    # print('addr:', addr)
+    # print('sqe.addr:', sqe.addr, addr.iov_base)
+    # print('fd:', sqe.fd)
 
     sqe.opcode = op
     sqe.flags = 0
     sqe.ioprio = 0
     sqe.fd = fd
     sqe.off = offset
-    sqe.addr = addr.iov_base        # (unsigned long) addr; iovec address
-    # sqe.addr = addr     # (unsigned long) addr; iovec address
-    sqe.len = _len
+    sqe.addr = ctypes.addressof(addr)    # (unsigned long) addr;
+    sqe.len = len_
     sqe.rw_flags = 0
     sqe.user_data = 0
     sqe.__pad2[0] = sqe.__pad2[1] = sqe.__pad2[2] = 0
@@ -92,6 +90,19 @@ def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset):
     io_uring_prep_rw(IORING_OP_READV, sqe, fd, iovecs, nr_vecs, offset)
 
 
+def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset):
+    '''
+        Type
+            sqe:        io_uring_sqe
+            fd:         int
+            iovecs:     iovec           # const struct iovec
+            nr_vecs:    int             # unsigned
+            offset:     int             # off_t
+            return:     None            # static inline void
+    '''
+    io_uring_prep_rw(IORING_OP_WRITEV, sqe, fd, iovecs, nr_vecs, offset)
+
+
 def io_uring_cqe_seen(ring, cqe):
     '''
         Type
@@ -104,7 +115,10 @@ def io_uring_cqe_seen(ring, cqe):
             been processed by the application.
     '''
     # TODO: `cqe` will also be true atm! investigate to make sure it results what it should.
-    if cqe:
+    # print('here here:', cqe.contents)
+    # print('here here:', dir(cqe))
+    # print('here here:', cqe)
+    if cqe.contents:
         io_uring_cq_advance(ring, 1)
 
 
@@ -121,10 +135,22 @@ def io_uring_cq_advance(ring, nr):
     if nr:
         cq = ring.cq
 
+        # print('khead:', cq.khead)
+        # print('dir:', dir(cq.khead))
+        # print('content:', cq.khead.contents)
+
+        # cq.khead.contents += ctypes.c_uint(nr)
+        # cq.khead.contents = ctypes.c_uint(cq.khead.contents) + ctypes.c_uint(nr)
+
+        # print('cq:', dir(cq))
+
         # Ensure that the kernel only sees the new value of the head
         # index after the CQEs have been read.
         io_uring_smp_store_release(cq.khead, cq.khead + nr)
+        # io_uring_smp_store_release(cq.khead, *cq.khead + ctypes.c_uint(nr))
+        # io_uring_smp_store_release(cq.khead, *cq.khead + ctypes.c_uint(nr))
 
 
-def io_uring_smp_store_release():
+def io_uring_smp_store_release(p, v):
     # leads me to having to write https://github.com/axboe/liburing/blob/master/src/include/liburing/barrier.h#L49
+    pass
