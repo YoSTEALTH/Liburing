@@ -1,4 +1,5 @@
 import os
+import ctypes
 import pytest
 import liburing
 import liburing.prep
@@ -63,6 +64,10 @@ def test_file_write_read(tmpdir):
         # submit both writes
         assert liburing.io_uring_submit(ring) == 2
 
+        # wait for the sqe to complete
+        cqe = ctypes.pointer(liburing.io_uring_cqe())
+        assert liburing.io_uring_wait_cqes(ring, cqe, 2, None, None) == 0
+
         # read "hello"
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.prep.io_uring_prep_readv(sqe, fd, vecs_read[0], 1, 0)
@@ -73,6 +78,11 @@ def test_file_write_read(tmpdir):
 
         # submit both reads
         assert liburing.io_uring_submit(ring) == 2
+
+        # wait for the sqe to complete
+        cqe = ctypes.pointer(liburing.io_uring_cqe())
+        assert liburing.io_uring_wait_cqes(ring, cqe, 2, None, None) == 0
+
         assert hello == b'hello'
         assert world == b'world'
     finally:
