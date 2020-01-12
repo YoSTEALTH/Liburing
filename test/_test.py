@@ -46,6 +46,7 @@ def test_file_registration(tmpdir):
 def test_file_write_read(tmpdir):
     fd = os.open(os.path.join(tmpdir, '1.txt'), os.O_RDWR | os.O_CREAT, 0o660)
     ring = liburing.io_uring()
+    cqe = ctypes.POINTER(liburing.io_uring_cqe)
     # prepare for writing and reading
     vecs_write = liburing.prep.iovec_write(b'hello', b'world')
     hello = bytearray(5)
@@ -56,17 +57,18 @@ def test_file_write_read(tmpdir):
         assert liburing.io_uring_queue_init(2, ring, 0) == 0
 
         sqe = liburing.io_uring_get_sqe(ring)
+        liburing.prep.io_uring_prep_fsync(sqe, fd)
         liburing.prep.io_uring_prep_writev(sqe, fd, vecs_write[0], 1, 0)
 
         sqe = liburing.io_uring_get_sqe(ring)
+        liburing.prep.io_uring_prep_fsync(sqe, fd, liburing.IORING_FSYNC_DATASYNC)
         liburing.prep.io_uring_prep_writev(sqe, fd, vecs_write[1], 1, 5)
 
         # submit both writes
         assert liburing.io_uring_submit(ring) == 2
 
         # wait for the sqe to complete
-        cqe = ctypes.pointer(liburing.io_uring_cqe())
-        assert liburing.io_uring_wait_cqes(ring, cqe, 2, None, None) == 0
+        assert liburing.io_uring_wait_cqes(ring, cqe(), 2, None, None) == 0
 
         # read "hello"
         sqe = liburing.io_uring_get_sqe(ring)
@@ -80,8 +82,7 @@ def test_file_write_read(tmpdir):
         assert liburing.io_uring_submit(ring) == 2
 
         # wait for the sqe to complete
-        cqe = ctypes.pointer(liburing.io_uring_cqe())
-        assert liburing.io_uring_wait_cqes(ring, cqe, 2, None, None) == 0
+        assert liburing.io_uring_wait_cqes(ring, cqe(), 2, None, None) == 0
 
         assert hello == b'hello'
         assert world == b'world'
