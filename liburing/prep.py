@@ -1,5 +1,6 @@
 import ctypes
-from . import iovec, IORING_OP_READV, IORING_OP_WRITEV
+from . import (iovec, IORING_OP_READV, IORING_OP_WRITEV, IORING_OP_WRITE_FIXED,
+               IORING_OP_READ_FIXED, IORING_OP_FSYNC)
 ''' Note
         Prep functions are mainly for test and example usage only! You as a developer would have
         to write better function/library based on these example.
@@ -57,20 +58,17 @@ def io_uring_prep_rw(op, sqe, fd, addr, len_, offset):
             offset:     int                 # __u64
             return:     None                # static inline void
     '''
+    # if addr:
+    #     addr = ctypes.addressof(addr) if getattr(addr, 'iov_base', None) else addr
+    # print('dir:', dir(sqe))
     sqe = sqe.contents
-
-    # print('sqe:', sqe)
-    # print('here:', dir(sqe))
-    # print('addr:', addr)
-    # print('sqe.addr:', sqe.addr, addr.iov_base)
-    # print('fd:', sqe.fd)
 
     sqe.opcode = op
     sqe.flags = 0
     sqe.ioprio = 0
     sqe.fd = fd
     sqe.off = offset
-    sqe.addr = ctypes.addressof(addr)    # (unsigned long) addr;
+    sqe.addr = ctypes.addressof(addr) if addr and getattr(addr, 'iov_base', None) else addr
     sqe.len = len_
     sqe.rw_flags = 0
     sqe.user_data = 0
@@ -90,6 +88,29 @@ def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset):
     io_uring_prep_rw(IORING_OP_READV, sqe, fd, iovecs, nr_vecs, offset)
 
 
+def io_uring_prep_read_fixed(sqe, fd, buf, nbytes, offset, buf_index):
+    '''
+        Type
+            sqe:        io_uring_sqe
+            fd:         int
+            buf:        int             # vecs_read[index].iov_base
+            nbytes:     int             # vecs_read[index].iov_len
+            offset:     int             # off_t
+            buf_index:  int             # index
+            return:     None            # static inline void
+
+        Example
+            >>> hello = bytearray(5)
+            >>> world = bytearray(5)
+            >>> vecs_read = iovec_read(hello, world)
+            >>> base = vecs_read[0].iov_base
+            >>> len_ = vecs_read[0].iov_len
+            >>> io_uring_prep_write_fixed(sqe, fd, base, len_, 0, 0)  # reads b'hello'
+    '''
+    io_uring_prep_rw(IORING_OP_READ_FIXED, sqe, fd, buf, nbytes, offset)
+    sqe.contents.buf_index = buf_index
+
+
 def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset):
     '''
         Type
@@ -101,6 +122,28 @@ def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset):
             return:     None            # static inline void
     '''
     io_uring_prep_rw(IORING_OP_WRITEV, sqe, fd, iovecs, nr_vecs, offset)
+
+
+def io_uring_prep_write_fixed(sqe, fd, buf, nbytes, offset, buf_index):
+    '''
+        Type
+            sqe:        io_uring_sqe
+            fd:         int
+            buf:        int             # vecs_write[index].iov_base
+            nbytes:     int             # vecs_write[index].iov_len
+            offset:     int             # off_t
+            buf_index:  int             # index
+            return:     None            # static inline void
+
+        Example
+            >>> vecs_write = iovec_write(b'hello', b'world')
+            >>> base = vecs_write[0].iov_base
+            >>> len_ = vecs_write[0].iov_len
+            >>> io_uring_prep_write_fixed(sqe, fd, base, len_, 0, 0)  # writes b'hello'
+    '''
+    io_uring_prep_rw(IORING_OP_WRITE_FIXED, sqe, fd, buf, nbytes, offset)
+    sqe.contents.buf_index = buf_index
+    # __print(sqe)
 
 
 def io_uring_cqe_seen(ring, cqe):
@@ -154,3 +197,32 @@ def io_uring_cq_advance(ring, nr):
 def io_uring_smp_store_release(p, v):
     # leads me to having to write https://github.com/axboe/liburing/blob/master/src/include/liburing/barrier.h#L49
     pass
+
+
+def io_uring_prep_fsync(sqe, fd, fsync_flags=0):
+    '''
+        Type
+            sqe:            io_uring_sqe
+            fd:             int
+            fsync_flags:    int
+            return:         None
+
+        Example
+            >>> io_uring_prep_fsync(sqe, fd)                            # fsync
+            >>> io_uring_prep_fsync(sqe, fd, IORING_FSYNC_DATASYNC)     # data sync only
+    '''
+    io_uring_prep_rw(IORING_OP_FSYNC, sqe, fd, 0, 0, 0)
+    sqe.contents.fsync_flags = fsync_flags
+
+    # print('here:')
+    # __print(sqe)
+
+
+def __print(sqe):
+    name = sqe.__class__.__name__
+    print(f'{name}:\n{(len(name)+1)*"="}')
+    for i in dir(sqe.contents):
+        if not i.endswith('_'):
+            attr = getattr(sqe.contents, i)
+            print(f'{i}:', attr)
+    print()
