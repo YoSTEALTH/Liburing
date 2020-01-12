@@ -53,8 +53,8 @@ def cwrap(restype, *argtypes, error_check=None, rewrap=None):
                 _ = (f'`{func.__name__}()` does not exist in {lib._name!r} version being used.')
                 raise FunctionNotFoundError(_)
             return error
-            # If a function does not exist in `liburing.so`(version) lets ignore the error
-            # on start up and only raise error when user tries to call the function itself.
+            # If a function does not exist in 'liburing.so' version lets ignore the error
+            # on startup and only raise error when user tries to call the function itself.
         else:
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
