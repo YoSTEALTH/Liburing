@@ -43,7 +43,7 @@ def test_file_registration(tmpdir):
         liburing.io_uring_queue_exit(ring)
 
 
-def test_file_write_read(tmpdir):
+def test_files_write_read_fsync(tmpdir):
     fd = os.open(os.path.join(tmpdir, '1.txt'), os.O_RDWR | os.O_CREAT, 0o660)
     ring = liburing.io_uring()
     cqe = ctypes.POINTER(liburing.io_uring_cqe)
@@ -54,18 +54,22 @@ def test_file_write_read(tmpdir):
     vecs_read = liburing.prep.iovec_read(hello, world)
     try:
         # initialization
-        assert liburing.io_uring_queue_init(2, ring, 0) == 0
+        assert liburing.io_uring_queue_init(3, ring, 0) == 0
 
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.prep.io_uring_prep_fsync(sqe, fd)
         liburing.prep.io_uring_prep_writev(sqe, fd, vecs_write[0], 1, 0)
 
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.prep.io_uring_prep_fsync(sqe, fd, liburing.IORING_FSYNC_DATASYNC)
         liburing.prep.io_uring_prep_writev(sqe, fd, vecs_write[1], 1, 5)
 
+        # fsync data only
+        sqe = liburing.io_uring_get_sqe(ring)
+        liburing.prep.io_uring_prep_fsync(sqe, fd, liburing.IORING_FSYNC_DATASYNC)
+        sqe.contents.user_data = 1
+        sqe.contents.flags = liburing.IOSQE_IO_DRAIN
+
         # submit both writes
-        assert liburing.io_uring_submit(ring) == 2
+        assert liburing.io_uring_submit(ring) == 3
 
         # wait for the sqe to complete
         assert liburing.io_uring_wait_cqes(ring, cqe(), 2, None, None) == 0
