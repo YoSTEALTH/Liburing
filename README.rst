@@ -24,7 +24,7 @@ Manually install `liburing`_ C library - simple example, use your own way to ins
     sudo make install
 
 
-Use `pip`_ to install Python wrapper:
+Use `pip`_ to install, upgrade & uninstall Python wrapper:
 
 .. code-block:: text
 
