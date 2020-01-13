@@ -1,7 +1,6 @@
 import os
 import pytest
 import liburing
-import liburing.prep
 
 
 # Setup init & exit
