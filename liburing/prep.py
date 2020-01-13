@@ -1,52 +1,16 @@
 import ctypes
-from . import (iovec, IORING_OP_READV, IORING_OP_WRITEV, IORING_OP_WRITE_FIXED,
-               IORING_OP_READ_FIXED, IORING_OP_FSYNC)
+from .io_uring import (IORING_OP_READV, IORING_OP_WRITEV, IORING_OP_WRITE_FIXED,
+                       IORING_OP_READ_FIXED, IORING_OP_FSYNC)
 ''' Note
-        Prep functions are mainly for test and example usage only! You as a developer would have
-        to write better function/library based on these example.
+        Prep functions are mainly for test and example usage! You as a developer could
+        write better function/library based on these example.
 '''
+__all__ = ('io_uring_prep_rw', 'io_uring_prep_readv', 'io_uring_prep_writev',
+           'io_uring_prep_fsync')
 
 
-def iovec_array(*buffers):
-    '''
-        Example
-            >>> one = iovec_read(bytearray(5))
-            >>> two = iovec_read(bytearray(5))
-            >>> files = iovec_array(one, two)
-            >>> files[0].iov_base
-            >>> files[0].iov_len
-            ...
-    '''
-    return (iovec * len(buffers))(*buffers)
-
-
-def iovec_read(*buffers):
-    '''
-        Example
-            >>> one = bytearray(5)
-            >>> two = bytearray(5)
-            >>> iovec_read(one, two)
-    '''
-    hold = []
-    for buffer in buffers:
-        length = len(buffer)
-        calc = (ctypes.c_char * length)
-        base = ctypes.cast(calc.from_buffer(buffer), ctypes.c_void_p)
-        hold.append(iovec(base, length))
-    return (iovec * len(hold))(*hold)
-
-
-def iovec_write(*data):
-    '''
-        >>> iovec_write(b'hello', b'world')
-    '''
-    hold = []
-    for buf in data:
-        base = ctypes.cast(ctypes.c_char_p(buf), ctypes.c_void_p)
-        hold.append(iovec(base, len(buf)))
-    return (iovec * len(hold))(*hold)
-
-
+# Liburing prep functions Python friendly
+# ---------------------------------------
 def io_uring_prep_rw(op, sqe, fd, addr, len_, offset):
     '''
         Type
@@ -88,6 +52,50 @@ def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset):
     io_uring_prep_rw(IORING_OP_READV, sqe, fd, iovecs, nr_vecs, offset)
 
 
+def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset):
+    '''
+        Type
+            sqe:        io_uring_sqe
+            fd:         int
+            iovecs:     iovec           # const struct iovec
+            nr_vecs:    int             # unsigned
+            offset:     int             # off_t
+            return:     None            # static inline void
+    '''
+    io_uring_prep_rw(IORING_OP_WRITEV, sqe, fd, iovecs, nr_vecs, offset)
+
+
+def io_uring_prep_fsync(sqe, fd, fsync_flags=0):
+    '''
+        Type
+            sqe:            io_uring_sqe
+            fd:             int
+            fsync_flags:    int
+            return:         None
+
+        Example
+            >>> io_uring_prep_fsync(sqe, fd)                            # fsync
+            >>> io_uring_prep_fsync(sqe, fd, IORING_FSYNC_DATASYNC)     # data sync only
+
+            # single
+            >>> io_uring_prep_writev(...)
+            >>> sqe = liburing.io_uring_get_sqe(ring)
+            >>> io_uring_prep_fsync(sqe, fd)
+            >>> io_uring_submit(ring)
+
+            # multiple
+            >>> io_uring_prep_writev(...)
+            >>> io_uring_prep_writev(...)
+            >>> sqe = liburing.io_uring_get_sqe(ring)
+            >>> io_uring_prep_fsync(sqe, fd)
+            >>> sqe.contents.user_data = 1
+            >>> sqe.contents.flags = liburing.IOSQE_IO_DRAIN
+    '''
+    io_uring_prep_rw(IORING_OP_FSYNC, sqe, fd, 0, 0, 0)
+    sqe.contents.fsync_flags = fsync_flags
+
+
+# TODO: needs testing
 def io_uring_prep_read_fixed(sqe, fd, buf, nbytes, offset, buf_index):
     '''
         Type
@@ -111,19 +119,7 @@ def io_uring_prep_read_fixed(sqe, fd, buf, nbytes, offset, buf_index):
     sqe.contents.buf_index = buf_index
 
 
-def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset):
-    '''
-        Type
-            sqe:        io_uring_sqe
-            fd:         int
-            iovecs:     iovec           # const struct iovec
-            nr_vecs:    int             # unsigned
-            offset:     int             # off_t
-            return:     None            # static inline void
-    '''
-    io_uring_prep_rw(IORING_OP_WRITEV, sqe, fd, iovecs, nr_vecs, offset)
-
-
+# TODO: needs testing
 def io_uring_prep_write_fixed(sqe, fd, buf, nbytes, offset, buf_index):
     '''
         Type
@@ -146,6 +142,7 @@ def io_uring_prep_write_fixed(sqe, fd, buf, nbytes, offset, buf_index):
     # __print(sqe)
 
 
+# TODO: broken
 def io_uring_cqe_seen(ring, cqe):
     '''
         Type
@@ -165,6 +162,7 @@ def io_uring_cqe_seen(ring, cqe):
         io_uring_cq_advance(ring, 1)
 
 
+# TODO: broken
 def io_uring_cq_advance(ring, nr):
     '''
         Type
@@ -194,35 +192,7 @@ def io_uring_cq_advance(ring, nr):
         # io_uring_smp_store_release(cq.khead, *cq.khead + ctypes.c_uint(nr))
 
 
+# TODO: broken
 def io_uring_smp_store_release(p, v):
     # leads me to having to write https://github.com/axboe/liburing/blob/master/src/include/liburing/barrier.h#L49
     pass
-
-
-def io_uring_prep_fsync(sqe, fd, fsync_flags=0):
-    '''
-        Type
-            sqe:            io_uring_sqe
-            fd:             int
-            fsync_flags:    int
-            return:         None
-
-        Example
-            >>> io_uring_prep_fsync(sqe, fd)                            # fsync
-            >>> io_uring_prep_fsync(sqe, fd, IORING_FSYNC_DATASYNC)     # data sync only
-    '''
-    io_uring_prep_rw(IORING_OP_FSYNC, sqe, fd, 0, 0, 0)
-    sqe.contents.fsync_flags = fsync_flags
-
-    # print('here:')
-    # __print(sqe)
-
-
-def __print(sqe):
-    name = sqe.__class__.__name__
-    print(f'{name}:\n{(len(name)+1)*"="}')
-    for i in dir(sqe.contents):
-        if not i.endswith('_'):
-            attr = getattr(sqe.contents, i)
-            print(f'{i}:', attr)
-    print()
