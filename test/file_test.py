@@ -1,7 +1,6 @@
 import os
 import ctypes
 import liburing
-import liburing.prep
 
 
 def test_file_registration(tmpdir):
@@ -24,26 +23,26 @@ def test_files_write_read_fsync(tmpdir):
     ring = liburing.io_uring()
     cqe = ctypes.POINTER(liburing.io_uring_cqe)  # cqe (completion queue entry)
     # prepare for writing
-    vecs_write = liburing.prep.iovec_write(b'hello', b'world')
+    vecs_write = liburing.iovec_write(b'hello', b'world')
     # prepare for reading
     hello = bytearray(5)  # buffer holder for reading
     world = bytearray(5)
-    vecs_read = liburing.prep.iovec_read(hello, world)
+    vecs_read = liburing.iovec_read(hello, world)
     try:
         # initialization
         assert liburing.io_uring_queue_init(3, ring, 0) == 0
 
         # write "hello"
         sqe = liburing.io_uring_get_sqe(ring)  # get sqe (submission queue entry) to fill
-        liburing.prep.io_uring_prep_writev(sqe, fd, vecs_write[0], 1, 0)
+        liburing.io_uring_prep_writev(sqe, fd, vecs_write[0], 1, 0)
 
         # write "world"
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.prep.io_uring_prep_writev(sqe, fd, vecs_write[1], 1, 5)
+        liburing.io_uring_prep_writev(sqe, fd, vecs_write[1], 1, 5)
 
         # fsync data only
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.prep.io_uring_prep_fsync(sqe, fd, liburing.IORING_FSYNC_DATASYNC)
+        liburing.io_uring_prep_fsync(sqe, fd, liburing.IORING_FSYNC_DATASYNC)
         sqe.contents.user_data = 1
         sqe.contents.flags = liburing.IOSQE_IO_DRAIN
 
@@ -55,11 +54,11 @@ def test_files_write_read_fsync(tmpdir):
 
         # read "hello"
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.prep.io_uring_prep_readv(sqe, fd, vecs_read[0], 1, 0)
+        liburing.io_uring_prep_readv(sqe, fd, vecs_read[0], 1, 0)
 
         # read "world"
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.prep.io_uring_prep_readv(sqe, fd, vecs_read[1], 1, 5)
+        liburing.io_uring_prep_readv(sqe, fd, vecs_read[1], 1, 5)
 
         # submit both reads
         assert liburing.io_uring_submit(ring) == 2
