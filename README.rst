@@ -1,7 +1,7 @@
 Liburing
 ========
 
-This is a light-weight python wrapper around liburing library, which is a helper to setup and tear-down io_uring instances.
+This is a python wrapper around liburing library, which is a helper to setup and tear-down io_uring instances.
 
 
 Install, update & uninstall (Pre-Alpha)
