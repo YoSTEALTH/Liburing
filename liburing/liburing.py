@@ -1,21 +1,7 @@
 import ctypes
+from .helper import iovec, sigset_t, kernel_timespec
 from .wrapper import cwrap
 from .io_uring import io_uring_sqe, io_uring_cqe, io_uring_params
-
-
-# C internals
-# -----------
-class sigset_t(ctypes.Structure):
-    _fields_ = ('val', ctypes.c_uint * (1024 // (8 * ctypes.sizeof(ctypes.c_uint)))),
-
-
-class iovec(ctypes.Structure):
-    _fields_ = ('iov_base', ctypes.c_void_p), ('iov_len', ctypes.c_size_t)
-
-
-class kernel_timespec(ctypes.Structure):
-    _fields_ = (('tv_sec',  ctypes.c_longlong),  # int64_t
-                ('tv_nsec', ctypes.c_longlong))  # long long
 
 
 # Library interface to `io_uring`
@@ -385,34 +371,40 @@ def io_uring_unregister_eventfd(ring):
 
 # Custom functions added
 # ----------------------
-def io_uring_register_file(ring, fd):
-    ''' Register 1 file
+# def io_uring_register_file(ring, fd):
+#     ''' Register 1 file
 
-        Type
-            ring:       io_uring
-            fd:         int
-            return:     int
+#         Type
+#             ring:       io_uring
+#             fd:         int
+#             return:     int
 
-        Example
-            >>> io_uring_register_file(ring, fd)
-            0
+#         Example
+#             >>> io_uring_register_file(ring, fd)
+#             0
 
-        Note
-            Raises exception on error, or zero on success.
+#         Note
+#             Raises exception on error, or zero on success.
 
-        TODO
-            - Is this function needed ???
-    '''
-    return io_uring_register_files(ring, [fd], 1)
+#         TODO
+#             - Is this function needed ???
+#     '''
+#     return io_uring_register_files(ring, [fd], 1)
 
 
-def files_fds(*fds):
-    '''
-        Type
-            *fds:   int
-            return: c_int_Array_*
+# TODO: is this needed???
+# @cwrap(ctypes.c_int,
+#        ctypes.POINTER(io_uring),
+#        ctypes.POINTER(ctypes.POINTER(io_uring_cqe)),
+#        ctypes.c_uint,
+#        ctypes.c_uint,
+#        ctypes.POINTER(sigset_t))
+# def __io_uring_get_cqe(ring, cqe_ptr, submit, wait_nr, sigmask):
+#     '''
+#         Note
+#             Helper for the peek/wait single cqe functions. Exported because of that,
+#             but probably shouldn't be used directly in an application.
+#     '''
 
-        Example
-            >>> files = files_fds(fd1, fd2, fd3, ...)
-    '''
-    return (ctypes.c_int * len(fds))(*fds)
+
+# io_uring_get_cqe = __io_uring_get_cqe
