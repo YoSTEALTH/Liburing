@@ -66,8 +66,7 @@ def io_uring_ring_dontfork(ring):
 @cwrap(ctypes.c_int,
        ctypes.c_uint,
        ctypes.POINTER(io_uring),
-       ctypes.POINTER(io_uring_params),
-       error_check=True)
+       ctypes.POINTER(io_uring_params))
 def io_uring_queue_init_params(entries, ring, p):
     '''
         Type
@@ -82,7 +81,7 @@ def io_uring_queue_init_params(entries, ring, p):
     '''
 
 
-@cwrap(ctypes.c_int, ctypes.c_uint, ctypes.POINTER(io_uring), ctypes.c_uint, error_check=True)
+@cwrap(ctypes.c_int, ctypes.c_uint, ctypes.POINTER(io_uring), ctypes.c_uint)
 def io_uring_queue_init(entries, ring, flags):
     '''
         Type
@@ -100,8 +99,7 @@ def io_uring_queue_init(entries, ring, flags):
 @cwrap(ctypes.c_int,
        ctypes.c_int,
        ctypes.POINTER(io_uring_params),
-       ctypes.POINTER(io_uring),
-       error_check=True)
+       ctypes.POINTER(io_uring))
 def io_uring_queue_mmap(fd, p, ring):
     '''
         Type
@@ -241,11 +239,7 @@ def io_uring_get_sqe(ring):
     '''
 
 
-@cwrap(ctypes.c_int,
-       ctypes.POINTER(io_uring),
-       ctypes.POINTER(iovec),
-       ctypes.c_uint,
-       error_check=True)
+@cwrap(ctypes.c_int, ctypes.POINTER(io_uring), ctypes.POINTER(iovec), ctypes.c_uint)
 def io_uring_register_buffers(ring, iovecs, nr_iovecs):
     '''
         Type
@@ -259,7 +253,7 @@ def io_uring_register_buffers(ring, iovecs, nr_iovecs):
     '''
 
 
-@cwrap(ctypes.c_int, ctypes.POINTER(io_uring), error_check=True)
+@cwrap(ctypes.c_int, ctypes.POINTER(io_uring))
 def io_uring_unregister_buffers(ring):
     '''
         Type
@@ -271,11 +265,7 @@ def io_uring_unregister_buffers(ring):
     '''
 
 
-@cwrap(ctypes.c_int,
-       ctypes.POINTER(io_uring),
-       ctypes.POINTER(ctypes.c_int),
-       ctypes.c_uint,
-       error_check=True)  # , rewrap=True)
+@cwrap(ctypes.c_int, ctypes.POINTER(io_uring), ctypes.POINTER(ctypes.c_int), ctypes.c_uint)
 def io_uring_register_files(ring, files, nr_files):
     '''
         Type
@@ -299,7 +289,7 @@ def io_uring_register_files(ring, files, nr_files):
     # # note: ^ these return values are being re-wrapped back into `@cwrap()`
 
 
-@cwrap(ctypes.c_int, ctypes.POINTER(io_uring), error_check=True)
+@cwrap(ctypes.c_int, ctypes.POINTER(io_uring))
 def io_uring_unregister_files(ring):
     '''
         Type
@@ -315,8 +305,7 @@ def io_uring_unregister_files(ring):
        ctypes.POINTER(io_uring),
        ctypes.c_uint,
        ctypes.POINTER(ctypes.c_int),
-       ctypes.c_uint,
-       error_check=True)  # , rewrap=True)
+       ctypes.c_uint)
 def io_uring_register_files_update(ring, off, files, nr_files):
     '''
         Type
@@ -344,7 +333,7 @@ def io_uring_register_files_update(ring, off, files, nr_files):
     # # note: ^ these return values are being re-wrapped back into `@cwrap()`
 
 
-@cwrap(ctypes.c_int, ctypes.POINTER(io_uring), ctypes.c_int, error_check=True)
+@cwrap(ctypes.c_int, ctypes.POINTER(io_uring), ctypes.c_int)
 def io_uring_register_eventfd(ring, fd):
     '''
         Type
@@ -357,7 +346,7 @@ def io_uring_register_eventfd(ring, fd):
     '''
 
 
-@cwrap(ctypes.c_int, ctypes.POINTER(io_uring), error_check=True)
+@cwrap(ctypes.c_int, ctypes.POINTER(io_uring))
 def io_uring_unregister_eventfd(ring):
     '''
         Type

@@ -43,10 +43,14 @@ def cwrap(restype, *argtypes, error_check=None, rewrap=None):
             - `error_check` raises appropriate exception for -errno values
     '''
     def decorate(func):
+        nonlocal error_check
         try:
             lib_fun = getattr(lib, func.__name__)
             lib_fun.restype = restype
             lib_fun.argtypes = argtypes
+            # enable `error_check` to be `True` if not set, as all value < 0 will be error
+            if error_check is None and restype is ctypes.c_int:
+                error_check = True
         except AttributeError:
             @functools.wraps(func)
             def error(*args, **kwargs):
