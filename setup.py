@@ -5,8 +5,8 @@ with open('README.rst', 'r') as file:
 
 setup(name='liburing',
       author='STEALTH',
-      version='0.0.8',
-      description=('This is a light-weight python wrapper around liburing library,'
+      version='0.0.9',
+      description=('This is a python wrapper around liburing library,'
                    'which is a helper to setup and tear-down io_uring instances.'),
       python_requires='>=3.6',
       long_description=long_description,
