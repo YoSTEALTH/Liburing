@@ -1,6 +1,6 @@
 WARNING
 =========
-This project will be moved from using ``ctypes`` to ``cython``. Which means redoing this whole project. C library(liburing) doesn't expose enough critical functions to be called directly in ``ctypes``.
+Correction, this project will be moved from using ``ctypes`` to ``cffi``. C library(liburing) doesn't expose enough critical functions to be called directly in ``ctypes``. With the help of ``cffi`` look like those functions can be accessed. Will start to upload new files once i have properly tested the basics to make sure.
 
 
 Liburing
