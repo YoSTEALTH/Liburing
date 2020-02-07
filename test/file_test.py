@@ -8,8 +8,8 @@ def test_file_registration(tmpdir):
     fd1 = os.open(os.path.join(tmpdir, '1.txt'), os.O_CREAT)
     fd2 = os.open(os.path.join(tmpdir, '2.txt'), os.O_CREAT)
     try:
-        files = liburing.ffi.new('int[]', [fd1, fd2])
-        assert liburing.io_uring_register_files(ring, files, len(files)) == 0
+        fds = liburing.files(fd1, fd2)
+        assert liburing.io_uring_register_files(ring, fds, len(fds)) == 0
         assert liburing.io_uring_unregister_files(ring) == 0
     finally:
         os.close(fd1)
