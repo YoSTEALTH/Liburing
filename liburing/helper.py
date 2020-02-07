@@ -1,6 +1,14 @@
 from ._liburing import ffi, lib
 
-__all__ = ('io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec', 'sigmask')
+__all__ = ('files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec', 'sigmask')
+
+
+def files(*fds):
+    '''
+        Example
+            >>> fds = files(fd1, fd2, ...)
+    '''
+    return ffi.new('int[]', fds)
 
 
 def io_uring():
