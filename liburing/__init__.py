@@ -1,5 +1,6 @@
 from ._liburing import ffi, lib  # noqa
 from ._liburing.lib import *  # noqa
+from .wrapper import *  # noqa - initialization
 from .helper import *  # noqa 
 from .prep import *  # noqa 
 # note:
