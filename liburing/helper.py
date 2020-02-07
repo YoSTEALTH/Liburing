@@ -1,60 +1,118 @@
-import ctypes
+from ._liburing import ffi, lib
+
+__all__ = ('io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec', 'sigmask')
 
 
-__all__ = ('iovec', 'sigset_t', 'kernel_timespec', 'iovec_read', 'iovec_write', 'files_fds')
-
-
-# C internals
-# -----------
-class iovec(ctypes.Structure):
-    _fields_ = ('iov_base', ctypes.c_void_p), ('iov_len', ctypes.c_size_t)
-
-
-class sigset_t(ctypes.Structure):
-    _fields_ = ('val', ctypes.c_uint * (1024 // (8 * ctypes.sizeof(ctypes.c_uint)))),
-
-
-class kernel_timespec(ctypes.Structure):
-    _fields_ = (('tv_sec',  ctypes.c_longlong),  # int64_t
-                ('tv_nsec', ctypes.c_longlong))  # long long
-
-
-# Python helper functions
-# -----------------------
-def iovec_read(*buffers):
+def io_uring():
     '''
         Example
-            >>> one = bytearray(5)
-            >>> two = bytearray(5)
-            >>> iovec_read(one, two)
+            >>> ring = io_uring()
     '''
-    hold = []
-    for buffer in buffers:
-        length = len(buffer)
-        calc = (ctypes.c_char * length)
-        base = ctypes.cast(calc.from_buffer(buffer), ctypes.c_void_p)
-        hold.append(iovec(base, length))
-    return (iovec * len(hold))(*hold)
+    return ffi.new('struct io_uring *')
 
 
-def iovec_write(*data):
+def io_uring_cqe():
+    ''' completion queue entry
+
+        Example
+            >>> cqe = io_uring_cqe()
     '''
-        >>> iovec_write(b'hello', b'world')
-    '''
-    hold = []
-    for buf in data:
-        base = ctypes.cast(ctypes.c_char_p(buf), ctypes.c_void_p)
-        hold.append(iovec(base, len(buf)))
-    return (iovec * len(hold))(*hold)
+    return ffi.new('struct io_uring_cqe *')
 
 
-def files_fds(*fds):
+def io_uring_cqes():
+    #
+    return ffi.new('struct io_uring_cqe **')
+
+
+def iovec(*buffers):
     '''
+        # single read
+        >>> data = bytearray(5)
+        >>> iov = iovec(data)
+
+        # multiple reads
+        >>> one = bytearray(5)
+        >>> two = bytearray(5)
+        >>> iovs = iovec(one, two)
+
+        # single write
+        >>> data = bytearray(b'hello)
+        >>> iov = iovec(data)
+
+        # multiple writes
+        >>> one = bytearray(b'hello')
+        >>> two = bytearray(b'world)
+        >>> iovs = iovec(one, two)
+    '''
+    iovs = ffi.new('struct iovec *')
+    for i, buffer in enumerate(buffers):
+        iovs[i].iov_base = ffi.from_buffer(buffer)
+        iovs[i].iov_len = len(buffer)
+    return iovs
+
+
+def timespec(seconds=0, nanoseconds=0):
+    ''' Kernel Timespec
+
         Type
-            *fds:   int
-            return: c_int_Array_*
+            seconds:        int
+            nanoseconds:    int
+            return:         struct __kernel_timespec
 
         Example
-            >>> files = files_fds(fd1, fd2, fd3, ...)
+            >>> timespec()
+            >>> timespec(None)
+            fii.NULL
+
+            >>> timespec(1, 2)
+            ts
+
+        Usage
+            >>> io_uring_wait_cqes(..., ts=timespec(1, 2), ...)
+            >>> io_uring_wait_cqes(..., ts=timespec(), ...)
+            >>> io_uring_wait_cqes(..., ts=timespec(None), ...)
     '''
-    return (ctypes.c_int * len(fds))(*fds)
+    if not seconds or nanoseconds:
+        ts = ffi.new('struct __kernel_timespec[1]')
+        ts[0].tv_sec = seconds or 0
+        ts[0].tv_nsec = nanoseconds or 0
+        return ts
+    else:
+        return ffi.NULL
+
+
+# TODO: needs testing
+def sigmask(mask=None):
+    ''' Signal Mask
+
+        Type
+            mask:   Optional[int]
+            return: Union[ffi.NULL, sigset_t]
+
+        Example
+            >>> sigmask()  # None for as is.
+            # or
+            >>> import signal
+            >>> sigmask(signal.SIG_BLOCK)
+
+        Note
+            SIG_BLOCK
+                The set of blocked signals is the union of the current set and the mask argument.
+            SIG_UNBLOCK
+                The signals in mask are removed from the current set of blocked signals.
+                It is permissible to attempt to unblock a signal which is not blocked.
+            SIG_SETMASK
+                The set of blocked signals is set to the mask argument.
+
+        Warning: TODO
+            - could there be a leak if `sigset` isn't being removed using `sigdelset` ???
+            - maybe need to create a `with sigmask():` and have it add and clean on exit ???
+    '''
+    if mask is None:
+        return ffi.NULL
+    else:
+        sigset = ffi.new('sigset_t *')
+        lib.sigemptyset(sigset)
+        lib.sigaddset(sigset, mask)
+        return sigset
