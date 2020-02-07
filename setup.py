@@ -1,25 +1,31 @@
 from setuptools import setup, find_packages
+from version import versioning
+
 
 with open('README.rst', 'r') as file:
     long_description = file.read()
 
-setup(name='liburing',
+package = 'liburing'
+
+setup(url='https://github.com/YoSTEALTH/Liburing',
+      name=package,
       author='STEALTH',
-      version='0.0.9',
-      description=('This is a python wrapper around liburing library,'
+      version=versioning(package),  # version number is auto generated.
+      packages=find_packages(),
+      description=('This is a Python wrapper around liburing C library,'
                    'which is a helper to setup and tear-down io_uring instances.'),
+      cffi_modules=['builder.py:ffi'],
+      setup_requires=['cffi'],
       python_requires='>=3.6',
+      install_requires=['cffi'],
       long_description=long_description,
       long_description_content_type="text/x-rst",
-      packages=find_packages(),
-      url='https://github.com/YoSTEALTH/Liburing',
-      # Info: https://pypi.python.org/pypi?%3Aaction=list_classifiers
       classifiers=['License :: Public Domain',
-                   'Operating System :: POSIX :: Linux',
+                   'Operating System :: POSIX :: Linux'
                    'Intended Audience :: Developers',
                    # 'Development Status :: 1 - Planning',
-                   'Development Status :: 2 - Pre-Alpha',
-                   # 'Development Status :: 3 - Alpha',
+                   # 'Development Status :: 2 - Pre-Alpha',
+                   'Development Status :: 3 - Alpha',
                    # 'Development Status :: 4 - Beta',
                    # 'Development Status :: 5 - Production/Stable',
                    # 'Development Status :: 6 - Mature',

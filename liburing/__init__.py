@@ -1,10 +1,13 @@
-from .liburing import *  # noqa
-from .io_uring import *  # noqa
-from .helper import *  # noqa
-from .prep import *  # noqa
-''' This is a python wrapper around liburing library,
+from ._liburing import ffi, lib  # noqa
+from ._liburing.lib import *  # noqa
+from .helper import *  # noqa 
+from .prep import *  # noqa 
+# note:
+#   - `.prep` module functions will override `lib` functions for better user experience.
+#   - `lib` and `ffi` is provided for those that like to tinker with cffi.
+'''
+    This is a Python wrapper around liburing C library,
     which is a helper to setup and tear-down io_uring instances.
 '''
-# enables `help(liburing)` to display everything
-__all__ = [i for i in locals().keys() if not i.startswith(('_', 'cwrap'))]
-__version__ = '0.0.9'
+__liburing__ = '0.3.0'
+__version__ = '2020.2.6'
