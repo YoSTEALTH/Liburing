@@ -1,8 +1,3 @@
-WARNING
-=========
-Correction, this project will be moved from using ``ctypes`` to ``cffi``. C library(liburing) doesn't expose enough critical functions to be called directly in ``ctypes``. With the help of ``cffi`` look like those functions can be accessed. Will start to upload new files once i have properly tested the basics to make sure.
-
-
 Liburing
 ========
 
@@ -11,23 +6,6 @@ This is a python wrapper around liburing library, which is a helper to setup and
 
 Install, update & uninstall (Pre-Alpha)
 ---------------------------------------
-
-Manually install `liburing`_ C library - simple example, use your own way to install.
-
-.. code-block:: text
-
-    cd /tmp
-
-    wget https://git.kernel.dk/cgit/liburing/snapshot/liburing-0.3.tar.bz2
-
-    tar -xjvf liburing-0.3.tar.bz2
-
-    cd liburing-0.3
-
-    ./configure && make
-
-    sudo make install
-
 
 Use `pip`_ to install, upgrade & uninstall Python wrapper:
 
@@ -48,6 +26,7 @@ Free, No limit what so ever. `Read more`_
 TODO
 ----
 
+    - Add more liburing functions
     - 'Development Status :: 3 - Alpha',
     - 'Development Status :: 4 - Beta',
     - 'Development Status :: 5 - Production/Stable',
