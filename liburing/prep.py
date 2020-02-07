@@ -1,8 +1,5 @@
 from ._liburing import lib
-from .wrapper import trap_error  # noqa - this import is only here to intlization
 from .helper import timespec, sigmask
-
-__all__ = ('io_uring_queue_init_params', 'io_uring_queue_init', 'io_uring_wait_cqes')
 
 
 # Library interface
