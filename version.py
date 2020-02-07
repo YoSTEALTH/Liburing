@@ -16,7 +16,7 @@ def parse_version(line):
             '2020.2.3'
     '''
     if line:
-        # remove ', ", ' '
+        # remove ', ", " ", '\n'
         line = line.replace(b'"', b'').replace(b"'", b'').replace(b' ', b'').replace(b'\n', b'')
         # e.g `__version__=2020.2.3`
         _, _, version = line.partition(b'=')
@@ -46,7 +46,7 @@ def versioning(package, revision=''):
 
         Note
             - Auto generates date as version number, sets it in `setup(version='2020.2.3')` also
-            - replaces `__init__.py` file `__version__` line with `__version__ = '2020.2.3'`
+            replaces `__init__.py` file `__version__` line with `__version__ = '2020.2.3'`
             - only generates version if `python3 setup.py sdist` else uses the old version.
 
         Version
@@ -67,7 +67,7 @@ def versioning(package, revision=''):
             old_version = None
 
         # Generate new version only if setup is built with "sdist"
-        if 'sdist' in sys.argv:  # TOOD: could account for 'bdist', ... ?
+        if 'sdist' in sys.argv:  # TODO: could account for 'bdist', ... ?
             # e.g '2020.2.3', '2020.2.3v1', ...
             version = time.strftime('%Y.%-m.%-d', time.localtime()) + revision
             new_version = f'__version__ = {version!r}\n'.encode()
@@ -87,15 +87,3 @@ def versioning(package, revision=''):
             version = parse_version(old_version)
 
     return version
-
-
-if __name__ == '__main__':
-    # Test
-    def test_parse_line():
-        assert parse_version(b"__version__ = '2020.2.3'\n") == '2020.2.3'
-        assert parse_version(b'__version__= "2020.2.3"\n') == '2020.2.3'
-        assert parse_version(b"__version__ = '1.2.3'\n") == '1.2.3'
-        assert parse_version(b"__version__ = None\n") == ''
-        assert parse_version(b"__version__ = ''\n") == ''
-        assert parse_version(None) == ''
-        assert parse_version(b"") == ''
