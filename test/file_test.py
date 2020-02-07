@@ -44,7 +44,7 @@ def test_files_write_read(tmpdir):
 
         cqes = liburing.io_uring_cqes()
         # wait for cqe (completion queue entry)
-        liburing.io_uring_wait_cqes(ring, cqes, 0)  # liburing.io_uring_wait_cqes(ring, cqes, 2)
+        liburing.io_uring_wait_cqes(ring, cqes, 2)
 
         # clear old query ?
         cqe = liburing.io_uring_cqe()
