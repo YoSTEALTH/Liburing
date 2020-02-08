@@ -81,7 +81,7 @@ def timespec(seconds=0, nanoseconds=0):
             >>> io_uring_wait_cqes(..., ts=timespec(), ...)
             >>> io_uring_wait_cqes(..., ts=timespec(None), ...)
     '''
-    if not seconds or nanoseconds:
+    if seconds or nanoseconds:
         ts = ffi.new('struct __kernel_timespec[1]')
         ts[0].tv_sec = seconds or 0
         ts[0].tv_nsec = nanoseconds or 0
