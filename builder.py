@@ -6,10 +6,10 @@ __all__ = ('ffi',)
 ffi = cffi.FFI()
 
 # Python callback in C
-ffi.cdef('''
-    /* `lib.trap_error` callback */
-    extern "Python" int trap_error(int);
-''')
+# ffi.cdef('''
+#     /* `lib.trap_error` callback */
+#     extern "Python" int trap_error(int);
+# ''')
 
 
 # Install from source files.
