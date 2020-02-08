@@ -3,6 +3,10 @@ Liburing
 
 This is a python wrapper around liburing library, which is a helper to setup and tear-down io_uring instances.
 
+Read how to use `Liburing`_(pdf)
+
+Requires Linux 5.1+
+
 
 Install, update & uninstall (Alpha)
 -----------------------------------
@@ -36,4 +40,4 @@ TODO
 
 .. _pip: https://pip.pypa.io/en/stable/quickstart/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
-.. _liburing: https://git.kernel.dk/cgit/liburing/
+.. _Liburing: https://kernel.dk/io_uring.pdf
