@@ -4,8 +4,8 @@ Liburing
 This is a python wrapper around liburing library, which is a helper to setup and tear-down io_uring instances.
 
 
-Install, update & uninstall (Pre-Alpha)
----------------------------------------
+Install, update & uninstall (Alpha)
+-----------------------------------
 
 Use `pip`_ to install, upgrade & uninstall Python wrapper:
 
