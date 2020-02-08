@@ -11,4 +11,4 @@ from .interface import *  # noqa
     which is a helper to setup and tear-down io_uring instances.
 '''
 __liburing__ = '0.3.0'
-__version__ = '2020.2.7'
+__version__ = '2020.2.8'
