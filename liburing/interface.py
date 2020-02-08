@@ -1,4 +1,5 @@
 from ._liburing import lib
+from .wrapper import trap_error
 from .helper import timespec, sigmask
 
 
@@ -8,28 +9,28 @@ def io_uring_queue_init_params(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_queue_init_params(*args, **kwargs))
+    return trap_error(lib.io_uring_queue_init_params(*args, **kwargs))
 
 
 def io_uring_queue_init(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_queue_init(*args, **kwargs))
+    return trap_error(lib.io_uring_queue_init(*args, **kwargs))
 
 
 def io_uring_queue_mmap(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_queue_mmap(*args, **kwargs))
+    return trap_error(lib.io_uring_queue_mmap(*args, **kwargs))
 
 
 def io_uring_peek_batch_cqe(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_peek_batch_cqe(*args, **kwargs))
+    return trap_error(lib.io_uring_peek_batch_cqe(*args, **kwargs))
 
 
 def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=None, sm=None):
@@ -52,70 +53,70 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=None, sm=None):
     '''
     ts = timespec(ts)
     sm = sigmask(sm)
-    return lib.trap_error(lib.io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sm))
+    return trap_error(lib.io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sm))
 
 
 def io_uring_submit(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_submit(*args, **kwargs))
+    return trap_error(lib.io_uring_submit(*args, **kwargs))
 
 
 def io_uring_submit_and_wait(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_submit_and_wait(*args, **kwargs))
+    return trap_error(lib.io_uring_submit_and_wait(*args, **kwargs))
 
 
 def io_uring_register_buffers(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_register_buffers(*args, **kwargs))
+    return trap_error(lib.io_uring_register_buffers(*args, **kwargs))
 
 
 def io_uring_unregister_buffers(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_unregister_buffers(*args, **kwargs))
+    return trap_error(lib.io_uring_unregister_buffers(*args, **kwargs))
 
 
 def io_uring_register_files(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_register_files(*args, **kwargs))
+    return trap_error(lib.io_uring_register_files(*args, **kwargs))
 
 
 def io_uring_unregister_files(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_unregister_files(*args, **kwargs))
+    return trap_error(lib.io_uring_unregister_files(*args, **kwargs))
 
 
 def io_uring_register_files_update(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_register_files_update(*args, **kwargs))
+    return trap_error(lib.io_uring_register_files_update(*args, **kwargs))
 
 
 def io_uring_register_eventfd(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_register_eventfd(*args, **kwargs))
+    return trap_error(lib.io_uring_register_eventfd(*args, **kwargs))
 
 
 def io_uring_unregister_eventfd(*args, **kwargs):
     '''
         ...
     '''
-    return lib.trap_error(lib.io_uring_unregister_eventfd(*args, **kwargs))
+    return trap_error(lib.io_uring_unregister_eventfd(*args, **kwargs))
 
 
 # TODO:
@@ -128,8 +129,8 @@ def io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr):
             Return an IO completion, waiting for 'wait_nr' completions if one isn't
             readily available. Returns 0 with cqe_ptr filled in on success, `-errno` on
             failure.
-     '''
-    return lib.trap_error(lib.io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr))
+    '''
+    return trap_error(lib.io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr))
 
 
 def io_uring_peek_cqe(ring, cqe_ptr):
@@ -137,8 +138,8 @@ def io_uring_peek_cqe(ring, cqe_ptr):
         Note
             Return an IO completion, if one is readily available. Returns 0 with
             cqe_ptr filled in on success, `-errno` on failure.
-     '''
-    return lib.trap_error(lib.io_uring_peek_cqe(ring, cqe_ptr))
+    '''
+    return trap_error(lib.io_uring_peek_cqe(ring, cqe_ptr))
 
 
 def io_uring_wait_cqe(ring, cqe_ptr):
@@ -146,5 +147,5 @@ def io_uring_wait_cqe(ring, cqe_ptr):
         Note
             Return an IO completion, waiting for it if necessary. Returns 0 with
             cqe_ptr filled in on success, `-errno` on failure.
-     '''
-    return lib.trap_error(lib.io_uring_wait_cqe(ring, cqe_ptr))
+    '''
+    return trap_error(lib.io_uring_wait_cqe(ring, cqe_ptr))
