@@ -21,7 +21,7 @@ setup(url='https://github.com/YoSTEALTH/Liburing',
       long_description=long_description,
       long_description_content_type="text/x-rst",
       classifiers=['License :: Public Domain',
-                   'Operating System :: POSIX :: Linux'
+                   'Operating System :: POSIX :: Linux',
                    'Intended Audience :: Developers',
                    # 'Development Status :: 1 - Planning',
                    # 'Development Status :: 2 - Pre-Alpha',
