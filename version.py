@@ -4,6 +4,8 @@ import os.path
 
 __all__ = ('versioning', 'parse_version')
 
+# TODO: This module will be moved into its own project and included in `setup_requires`
+
 
 def parse_version(line):
     '''
@@ -87,3 +89,13 @@ def versioning(package, revision=''):
             version = parse_version(old_version)
 
     return version
+
+
+def test_parse_line():
+    assert parse_version(b"__version__ = '2020.2.3'\n") == '2020.2.3'
+    assert parse_version(b'__version__= "2020.2.3"\n') == '2020.2.3'
+    assert parse_version(b"__version__ = '1.2.3'\n") == '1.2.3'
+    assert parse_version(b"__version__ = None\n") == ''
+    assert parse_version(b"__version__ = ''\n") == ''
+    assert parse_version(None) == ''
+    assert parse_version(b"") == ''
