@@ -3,7 +3,7 @@ Liburing
 
 This is a python wrapper around liburing library, which is a helper to setup and tear-down io_uring instances.
 
-Read how to use `Liburing`_(pdf)
+Read how to use `Liburing`_ (pdf)
 
 Requires Linux 5.1+
 
