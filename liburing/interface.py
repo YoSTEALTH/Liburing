@@ -116,3 +116,35 @@ def io_uring_unregister_eventfd(*args, **kwargs):
         ...
     '''
     return lib.trap_error(lib.io_uring_unregister_eventfd(*args, **kwargs))
+
+
+# TODO:
+# #define io_uring_for_each_cqe(ring, head, cqe)
+
+
+def io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr):
+    '''
+        Note
+            Return an IO completion, waiting for 'wait_nr' completions if one isn't
+            readily available. Returns 0 with cqe_ptr filled in on success, `-errno` on
+            failure.
+     '''
+    return lib.trap_error(lib.io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr))
+
+
+def io_uring_peek_cqe(ring, cqe_ptr):
+    '''
+        Note
+            Return an IO completion, if one is readily available. Returns 0 with
+            cqe_ptr filled in on success, `-errno` on failure.
+     '''
+    return lib.trap_error(lib.io_uring_peek_cqe(ring, cqe_ptr))
+
+
+def io_uring_wait_cqe(ring, cqe_ptr):
+    '''
+        Note
+            Return an IO completion, waiting for it if necessary. Returns 0 with
+            cqe_ptr filled in on success, `-errno` on failure.
+     '''
+    return lib.trap_error(lib.io_uring_wait_cqe(ring, cqe_ptr))
