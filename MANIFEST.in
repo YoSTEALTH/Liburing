@@ -1,2 +1,3 @@
 include builder.py
 include version.py
+recursive-include src *.h
