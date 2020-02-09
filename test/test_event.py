@@ -32,6 +32,11 @@ def test_event(tmpdir):
 
         cqe = liburing.io_uring_cqe()
         liburing.io_uring_cqe_seen(ring, cqe)
+
+        # confirm
+        content = os.read(fd, 100)
+        assert content == data
+        assert len(content) == vecs[0].iov_len
     finally:
         os.close(fd)
         liburing.io_uring_queue_exit(ring)
