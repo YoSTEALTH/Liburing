@@ -118,8 +118,10 @@ ffi.cdef('''
 
     #define LIBURING_UDATA_TIMEOUT ...
 
-    // TODO: parsing Error
-    // #define io_uring_for_each_cqe(ring, head, cqe);
+    /*
+     * SKIPPING - use *peak* or *wait* functions
+     * #define io_uring_for_each_cqe(ring, head, cqe);
+     */
 
     /*
      * Must be called after io_uring_for_each_cqe()
