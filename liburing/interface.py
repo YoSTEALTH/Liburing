@@ -5,32 +5,32 @@ from .helper import timespec, sigmask
 
 # Library interface
 # -----------------
-def io_uring_queue_init_params(*args, **kwargs):
+def io_uring_queue_init_params(entries, ring, p):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_queue_init_params(*args, **kwargs))
+    return trap_error(lib.io_uring_queue_init_params(entries, ring, p))
 
 
-def io_uring_queue_init(*args, **kwargs):
+def io_uring_queue_init(entries, ring, flags):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_queue_init(*args, **kwargs))
+    return trap_error(lib.io_uring_queue_init(entries, ring, flags))
 
 
-def io_uring_queue_mmap(*args, **kwargs):
+def io_uring_queue_mmap(fd, p, ring):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_queue_mmap(*args, **kwargs))
+    return trap_error(lib.io_uring_queue_mmap(fd, p, ring))
 
 
-def io_uring_peek_batch_cqe(*args, **kwargs):
+def io_uring_peek_batch_cqe(ring, cqes, count):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_peek_batch_cqe(*args, **kwargs))
+    return trap_error(lib.io_uring_peek_batch_cqe(ring, cqes, count))
 
 
 def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=None, sm=None):
@@ -56,67 +56,74 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=None, sm=None):
     return trap_error(lib.io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sm))
 
 
-def io_uring_submit(*args, **kwargs):
+def io_uring_wait_cqe_timeout(ring, cqe_ptr, ts):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_submit(*args, **kwargs))
+    return trap_error(lib.io_uring_wait_cqe_timeout(ring, cqe_ptr, ts))
 
 
-def io_uring_submit_and_wait(*args, **kwargs):
+def io_uring_submit(ring):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_submit_and_wait(*args, **kwargs))
+    return trap_error(lib.io_uring_submit(ring))
 
 
-def io_uring_register_buffers(*args, **kwargs):
+def io_uring_submit_and_wait(ring, wait_nr):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_register_buffers(*args, **kwargs))
+    return trap_error(lib.io_uring_submit_and_wait(ring, wait_nr))
 
 
-def io_uring_unregister_buffers(*args, **kwargs):
+def io_uring_register_buffers(ring, iovecs, nr_iovecs):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_unregister_buffers(*args, **kwargs))
+    return trap_error(lib.io_uring_register_buffers(ring, iovecs, nr_iovecs))
 
 
-def io_uring_register_files(*args, **kwargs):
+def io_uring_unregister_buffers(ring):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_register_files(*args, **kwargs))
+    return trap_error(lib.io_uring_unregister_buffers(ring))
 
 
-def io_uring_unregister_files(*args, **kwargs):
+def io_uring_register_files(ring, files, nr_files):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_unregister_files(*args, **kwargs))
+    return trap_error(lib.io_uring_register_files(ring, files, nr_files))
 
 
-def io_uring_register_files_update(*args, **kwargs):
+def io_uring_unregister_files(ring):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_register_files_update(*args, **kwargs))
+    return trap_error(lib.io_uring_unregister_files(ring))
 
 
-def io_uring_register_eventfd(*args, **kwargs):
+def io_uring_register_files_update(ring, off, files, nr_files):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_register_eventfd(*args, **kwargs))
+    return trap_error(lib.io_uring_register_files_update(ring, off, files, nr_files))
 
 
-def io_uring_unregister_eventfd(*args, **kwargs):
+def io_uring_register_eventfd(ring, fd):
     '''
         ...
     '''
-    return trap_error(lib.io_uring_unregister_eventfd(*args, **kwargs))
+    return trap_error(lib.io_uring_register_eventfd(ring, fd))
+
+
+def io_uring_unregister_eventfd(ring):
+    '''
+        ...
+    '''
+    return trap_error(lib.io_uring_unregister_eventfd(ring))
 
 
 # TODO:
