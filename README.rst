@@ -5,7 +5,18 @@ This is a python wrapper around liburing library, which is a helper to setup and
 
 Read how to use `Liburing`_ (pdf)
 
-Requires Linux 5.1+
+
+Requires
+--------
+
+    - Linux 5.1+
+    - Python 3.6+
+
+
+Includes
+--------
+
+    - liburing 0.3.0
 
 
 Install, update & uninstall (Alpha)
@@ -30,13 +41,11 @@ Free, No limit what so ever. `Read more`_
 TODO
 ----
 
-    - Add more liburing functions
-    - 'Development Status :: 3 - Alpha',
+    - liburing 0.4.0 when its released.
     - 'Development Status :: 4 - Beta',
     - 'Development Status :: 5 - Production/Stable',
-    - Needs testing.
-    - Create more test
-    - Create example
+    - create more test
+    - create example
 
 .. _pip: https://pip.pypa.io/en/stable/quickstart/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
