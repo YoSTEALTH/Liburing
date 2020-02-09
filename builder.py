@@ -16,7 +16,12 @@ ffi.cdef('''
     typedef ... socklen_t;
     typedef ... igset_t;
     typedef ... mode_t;
-    typedef ... __u64;
+
+    typedef unsigned char       __u8;
+    typedef unsigned short      __u16;
+    typedef int                 __s32;
+    typedef unsigned int        __u32;
+    typedef unsigned long long  __u64;
 
     /*
      * typedef ... off_t;
@@ -32,6 +37,7 @@ ffi.cdef('''
     struct __sigset_t { ...; };
     typedef struct __sigset_t sigset_t;
 
+    /* `sigmask` */
     int sigemptyset(sigset_t *set);
     int sigaddset(sigset_t *set, int signum);
 
@@ -52,7 +58,42 @@ ffi.cdef('''
      * Library interface to io_uring
      * note: can get with using ...; as all the fields are populated by C function
      */
-    struct io_uring { ... ; };
+    // struct io_uring { ... ; };
+    struct io_uring_sq {
+        unsigned *khead;
+        unsigned *ktail;
+        unsigned *kring_mask;
+        unsigned *kring_entries;
+        unsigned *kflags;
+        unsigned *kdropped;
+        unsigned *array;
+        struct io_uring_sqe *sqes;
+
+        unsigned sqe_head;
+        unsigned sqe_tail;
+
+        size_t ring_sz;
+        void *ring_ptr;
+    };
+
+    struct io_uring_cq {
+        unsigned *khead;
+        unsigned *ktail;
+        unsigned *kring_mask;
+        unsigned *kring_entries;
+        unsigned *koverflow;
+        struct io_uring_cqe *cqes;
+
+        size_t ring_sz;
+        void *ring_ptr;
+    };
+
+    struct io_uring {
+        struct io_uring_sq sq;
+        struct io_uring_cq cq;
+        unsigned flags;
+        int ring_fd;
+    };
 
     /*
      * Library interface
@@ -250,14 +291,45 @@ ffi.cdef('''
 
 # compat.h
 ffi.cdef('''
-    //
-    typedef ... __kernel_rwf_t;
+    /* TypeError: struct io_uring_sqe: field 'io_uring_sqe.rw_flags' is of an opaque type
+     * typedef ... __kernel_rwf_t;
+     */
+     typedef int __kernel_rwf_t;
 ''')
 
 # io_uring.h
 ffi.cdef('''
     /* IO submission data structure (Submission Queue Entry) */
-    struct io_uring_sqe { ...; };
+    // struct io_uring_sqe { ...; };
+    struct io_uring_sqe {
+        __u8    opcode;     /* type of operation for this sqe */
+        __u8    flags;      /* IOSQE_ flags */
+        __u16   ioprio;     /* ioprio for the request */
+        __s32   fd;         /* file descriptor to do IO on */
+        union {
+            __u64   off;    /* offset into file */
+            __u64   addr2;
+        };
+        __u64   addr;       /* pointer to buffer or iovecs */
+        __u32   len;        /* buffer size or number of iovecs */
+        union {
+            __kernel_rwf_t  rw_flags;
+            __u32           fsync_flags;
+            __u16           poll_events;
+            __u32           sync_range_flags;
+            __u32           msg_flags;
+            __u32           timeout_flags;
+            __u32           accept_flags;
+            __u32           cancel_flags;
+            __u32           open_flags;
+            __u32           statx_flags;
+        };
+        __u64   user_data;      /* data to be passed back at completion time */
+        union {
+            __u16   buf_index;  /* index into fixed buffers, if used */
+            __u64   __pad2[3];
+        };
+    };
 
     /* sqe->flags */
     #define IOSQE_FIXED_FILE    ...
@@ -307,7 +379,12 @@ ffi.cdef('''
     #define IORING_TIMEOUT_ABS      ...
 
     /* IO completion data structure (Completion Queue Entry) */
-    struct io_uring_cqe { ...; };
+    // struct io_uring_cqe { ...; };
+    struct io_uring_cqe {
+        __u64   user_data;  /* sqe->data submission passed back */
+        __s32   res;        /* result code for this event */
+        __u32   flags;
+    };
 
     /* Magic offsets for the application to mmap the data it needs */
     #define IORING_OFF_SQ_RING      ...
@@ -315,20 +392,50 @@ ffi.cdef('''
     #define IORING_OFF_SQES         ...
 
     /* Filled with the offset for mmap(2) */
-    struct io_sqring_offsets { ...; };
+    // struct io_sqring_offsets { ...; };
+    struct io_sqring_offsets {
+        __u32 head;
+        __u32 tail;
+        __u32 ring_mask;
+        __u32 ring_entries;
+        __u32 flags;
+        __u32 dropped;
+        __u32 array;
+        __u32 resv1;
+        __u64 resv2;
+    };
 
     /* sq_ring->flags */
     #define IORING_SQ_NEED_WAKEUP   ...
 
-    struct io_cqring_offsets { ...; };
+    // struct io_cqring_offsets { ...; };
+    struct io_cqring_offsets {
+        __u32 head;
+        __u32 tail;
+        __u32 ring_mask;
+        __u32 ring_entries;
+        __u32 overflow;
+        __u32 cqes;
+        __u64 resv[2];
+    };
 
     /* io_uring_enter(2) flags */
     #define IORING_ENTER_GETEVENTS      ...
     #define IORING_ENTER_SQ_WAKEUP      ...
 
     /* Passed in for io_uring_setup(2). Copied back with updated info on success */
-    struct io_uring_params { ...; };
-
+    // struct io_uring_params { ...; };
+    struct io_uring_params {
+        __u32 sq_entries;
+        __u32 cq_entries;
+        __u32 flags;
+        __u32 sq_thread_cpu;
+        __u32 sq_thread_idle;
+        __u32 features;
+        __u32 resv[4];
+        struct io_sqring_offsets sq_off;
+        struct io_cqring_offsets cq_off;
+    };
 
     /* io_uring_params->features flags */
     #define IORING_FEAT_SINGLE_MMAP     ...
@@ -344,5 +451,9 @@ ffi.cdef('''
     #define IORING_UNREGISTER_EVENTFD       ...
     #define IORING_REGISTER_FILES_UPDATE    ...
 
-    struct io_uring_files_update { ...; };
+    // struct io_uring_files_update { ...; };
+    struct io_uring_files_update {
+        __u32 offset;
+        __s32 *fds;
+    };
 ''')
