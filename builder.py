@@ -7,7 +7,7 @@ ffi = cffi.FFI()
 
 # Install from source files.
 ffi.set_source('liburing._liburing',
-               '#include <liburing.h>',
+               '#include "liburing.h"',
                sources=['src/queue.c', 'src/register.c', 'src/setup.c', 'src/syscall.c'],
                include_dirs=['src/include'])
 
