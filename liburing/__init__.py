@@ -10,4 +10,4 @@ from .helper import *  # noqa
     which is a helper to setup and tear-down io_uring instances.
 '''
 __liburing__ = '0.3.0'
-__version__ = '2020.2.8'
+__version__ = '2020.2.9'
