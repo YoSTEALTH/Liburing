@@ -1,5 +1,5 @@
 from ._liburing import lib
-from .callback import trap_error
+from .wrapper import trap_error
 from .helper import timespec, sigmask
 
 
