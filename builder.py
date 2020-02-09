@@ -5,13 +5,6 @@ __all__ = ('ffi',)
 
 ffi = cffi.FFI()
 
-# Python callback in C
-# ffi.cdef('''
-#     /* `lib.trap_error` callback */
-#     extern "Python" int trap_error(int);
-# ''')
-
-
 # Install from source files.
 ffi.set_source('liburing._liburing',
                '#include <liburing.h>',
@@ -26,16 +19,16 @@ ffi.cdef('''
     typedef ... __u64;
 
     /*
-        typedef ... off_t;
-        TypeError: 'off_t' is opaque - meaning system or gcc doesn't support it
-    */
+     * typedef ... off_t;
+     * TypeError: 'off_t' is opaque - meaning system or gcc doesn't support it
+     */
     typedef long int __off_t;
     typedef __off_t off_t;
 
     /*
-        typedef ... sigset_t;
-        TypeError: initializer for ctype 'sigset_t *' must be a cdata pointer, not NoneType
-    */
+     * typedef ... sigset_t;
+     * TypeError: initializer for ctype 'sigset_t *' must be a cdata pointer, not NoneType
+     */
     struct __sigset_t { ...; };
     typedef struct __sigset_t sigset_t;
 
@@ -353,7 +346,3 @@ ffi.cdef('''
 
     struct io_uring_files_update { ...; };
 ''')
-
-
-if __name__ == '__main__':
-    ffi.compile(verbose=True, tmpdir='./build')

@@ -126,8 +126,8 @@ def io_uring_unregister_eventfd(ring):
     return trap_error(lib.io_uring_unregister_eventfd(ring))
 
 
-# Peek or Wait
-# ------------
+# Peek & Wait
+# -----------
 def io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr):
     '''
         Note
