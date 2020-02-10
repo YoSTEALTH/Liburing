@@ -1,5 +1,4 @@
 include LICENSE.txt
 include README.rst
 include builder.py
-include version.py
 recursive-include src *.h
