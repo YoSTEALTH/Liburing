@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages
-from version import versioning
+from datestamp import stamp
 
 
 with open('README.rst', 'r') as file:
@@ -10,12 +10,12 @@ package = 'liburing'
 setup(url='https://github.com/YoSTEALTH/Liburing',
       name=package,
       author='STEALTH',
-      version=versioning(package),  # version number is auto generated.
+      version=stamp(package),  # version number is auto generated.
       packages=find_packages(),
       description=('This is a Python wrapper around liburing C library,'
                    'which is a helper to setup and tear-down io_uring instances.'),
       cffi_modules=['builder.py:ffi'],
-      setup_requires=['cffi'],
+      setup_requires=['datestamp', 'cffi'],
       python_requires='>=3.6',
       install_requires=['cffi'],
       long_description=long_description,
