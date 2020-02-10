@@ -15,7 +15,6 @@ setup(url='https://github.com/YoSTEALTH/Liburing',
       description=('This is a Python wrapper around liburing C library,'
                    'which is a helper to setup and tear-down io_uring instances.'),
       cffi_modules=['builder.py:ffi'],
-      setup_requires=['datestamp', 'cffi'],
       python_requires='>=3.6',
       install_requires=['cffi'],
       long_description=long_description,
