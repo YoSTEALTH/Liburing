@@ -12,7 +12,7 @@ setup(url='https://github.com/YoSTEALTH/Liburing',
       author='STEALTH',
       version=stamp(package),  # version number is auto generated.
       packages=find_packages(),
-      description=('This is a Python wrapper around liburing C library,'
+      description=('This is a Python + CFFI wrapper around Liburing C library, '
                    'which is a helper to setup and tear-down io_uring instances.'),
       cffi_modules=['builder.py:ffi'],
       python_requires='>=3.6',

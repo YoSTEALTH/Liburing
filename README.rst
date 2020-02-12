@@ -1,7 +1,7 @@
 Liburing
 ========
 
-This is a python wrapper around liburing library, which is a helper to setup and tear-down io_uring instances.
+This is a Python + CFFI wrapper around Liburing C library, which is a helper to setup and tear-down io_uring instances.
 
 Read how to use `Liburing`_ (pdf)
 
