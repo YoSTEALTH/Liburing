@@ -52,8 +52,13 @@ def iovec(*buffers):
         >>> one = bytearray(b'hello')
         >>> two = bytearray(b'world)
         >>> iovs = iovec(one, two)
+
+        # get length
+        >>> iov = iovec(bytearray(5), bytearray(5))
+        >>> len(iov)
+        2
     '''
-    iovs = ffi.new('struct iovec *')
+    iovs = ffi.new(f'struct iovec[{len(buffers)}]')
     for i, buffer in enumerate(buffers):
         iovs[i].iov_base = ffi.from_buffer(buffer)
         iovs[i].iov_len = len(buffer)
