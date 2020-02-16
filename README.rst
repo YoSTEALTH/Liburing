@@ -9,7 +9,7 @@ Read how to use `Liburing`_ (pdf)
 Requires
 --------
 
-    - Linux 5.1+
+    - Linux 5.5+
     - Python 3.6+
 
 
