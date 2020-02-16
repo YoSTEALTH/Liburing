@@ -6,9 +6,9 @@ from platform import uname
 platform = uname()
 # e.g. `5.4.18-1-MANJARO` -> `(5, 4, 18)`
 release = tuple(map(int, platform.release.split('-')[0].split('.')))
-# Check to make sure Liburing is only installed on Linux 5.1+
-if platform.system != 'Linux' or release <= (5, 1, 0):
-    raise RuntimeError('"Liburing" is only supported to run on Linux 5.1+')
+# check to make sure Liburing is only installed on Linux 5.1+
+if platform.system != 'Linux' or release <= (5, 5, 0):
+    raise RuntimeError('"Liburing" is only supported to run on Linux 5.5+')
 
 
 with open('README.rst', 'r') as file:
