@@ -1,6 +1,10 @@
 from ._liburing import ffi, lib
 
-__all__ = ('files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec', 'sigmask')
+__all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec',
+           'sigmask')
+
+
+NULL = ffi.NULL
 
 
 def files(*fds):
@@ -78,13 +82,17 @@ def timespec(seconds=0, nanoseconds=0):
             >>> timespec(None)
             fii.NULL
 
-            >>> timespec(1, 2)
+            >>> timespec(1, 1000000)
             ts
 
         Usage
             >>> io_uring_wait_cqes(..., ts=timespec(1, 2), ...)
             >>> io_uring_wait_cqes(..., ts=timespec(), ...)
             >>> io_uring_wait_cqes(..., ts=timespec(None), ...)
+
+        Note
+            - 1 nanosecond  = 0.000_000_001 second.
+            - 1 millisecond = 0.001         second.
     '''
     if seconds or nanoseconds:
         ts = ffi.new('struct __kernel_timespec[1]')
@@ -92,7 +100,7 @@ def timespec(seconds=0, nanoseconds=0):
         ts[0].tv_nsec = nanoseconds or 0
         return ts
     else:
-        return ffi.NULL
+        return NULL
 
 
 # TODO: needs testing
@@ -123,7 +131,7 @@ def sigmask(mask=None):
             - maybe need to create a `with sigmask():` and have it add and clean on exit ???
     '''
     if mask is None:
-        return ffi.NULL
+        return NULL
     else:
         sigset = ffi.new('sigset_t *')
         lib.sigemptyset(sigset)
