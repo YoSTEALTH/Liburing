@@ -33,11 +33,11 @@ def test_files_write_read(tmpdir):
 
         # write "hello"
         sqe = liburing.io_uring_get_sqe(ring)  # get sqe (submission queue entry) to fill
-        liburing.io_uring_prep_writev(sqe, fd, vec_one, 1, 0)
+        liburing.io_uring_prep_writev(sqe, fd, vec_one, len(vec_one), 0)
 
         # write "world"
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_writev(sqe, fd, vec_two, 1, 5)
+        liburing.io_uring_prep_writev(sqe, fd, vec_two, len(vec_two), 5)
 
         # submit both writes
         assert liburing.io_uring_submit(ring) == 2
@@ -52,11 +52,11 @@ def test_files_write_read(tmpdir):
 
         # read "world"
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_readv(sqe, fd, vec_one, 1, 5)
+        liburing.io_uring_prep_readv(sqe, fd, vec_one, len(vec_one), 5)
 
         # read "hello"
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_readv(sqe, fd, vec_two, 1, 0)
+        liburing.io_uring_prep_readv(sqe, fd, vec_two, len(vec_two), 0)
 
         # submit both reads
         assert liburing.io_uring_submit(ring) == 2
