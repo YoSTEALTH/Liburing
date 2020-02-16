@@ -41,7 +41,7 @@ def test_socket():
                 print('res:', cqe.res)
                 print('user_data:', cqe.user_data)
 
-                # Error
+                # Error: OSError: [Errno 22] Invalid argument
                 assert cqe.res >= 0
 
                 liburing.io_uring_cqe_seen(ring, cqe)
