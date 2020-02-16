@@ -11,17 +11,25 @@ ffi.set_source('liburing._liburing',
                sources=['src/queue.c', 'src/register.c', 'src/setup.c', 'src/syscall.c'],
                include_dirs=['src/include'])
 
+
+# Socket
+ffi.cdef('''
+    /* Socket */
+    struct sockaddr { ...; };
+    typedef int... socklen_t;
+''')
+
+
 # Custom types
 ffi.cdef('''
-    typedef ... socklen_t;
     typedef ... igset_t;
     typedef ... mode_t;
 
-    typedef unsigned char       __u8;
-    typedef unsigned short      __u16;
-    typedef int                 __s32;
-    typedef unsigned int        __u32;
-    typedef unsigned long long  __u64;
+    typedef int...  __u8;
+    typedef int...  __u16;
+    typedef int...  __s32;
+    typedef int...  __u32;
+    typedef int...  __u64;
 
     /*
      * typedef ... off_t;
@@ -46,6 +54,7 @@ ffi.cdef('''
         size_t iov_len;     // number of bytes to transfer
     };
 ''')
+
 
 # liburing.h
 ffi.cdef('''
@@ -138,6 +147,7 @@ ffi.cdef('''
     extern int io_uring_register_eventfd(struct io_uring *ring, int fd);
     extern int io_uring_unregister_eventfd(struct io_uring *ring);
 ''')
+
 
 # helper & prep functions
 ffi.cdef('''
@@ -289,6 +299,7 @@ ffi.cdef('''
                                         struct io_uring_cqe **cqe_ptr);
 ''')
 
+
 # compat.h
 ffi.cdef('''
     /* TypeError: struct io_uring_sqe: field 'io_uring_sqe.rw_flags' is of an opaque type
@@ -296,6 +307,7 @@ ffi.cdef('''
      */
      typedef int __kernel_rwf_t;
 ''')
+
 
 # io_uring.h
 ffi.cdef('''
