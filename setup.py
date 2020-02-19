@@ -1,22 +1,19 @@
 from setuptools import setup, find_packages
+from distutils.version import LooseVersion
 from datestamp import stamp
 from platform import uname
 
-
-linux_version = (5, 5, 0)  # linux version
+package = 'liburing'
 platform = uname()
-# e.g. `5.4.18-1-MANJARO` -> `(5, 4, 18)`
-release = tuple(map(int, platform.release.split('-')[0].split('.')))
-# check to make sure Liburing is only installed on supported Linux version.
-if platform.system != 'Linux' or release < linux_version:
-    _ = f'"Liburing" is only supported to run on Linux {".".join(map(str, linux_version))}+'
-    raise RuntimeError(_)
+required = '5.5'
 
+# check to make sure `package` is only installed on supported Linux version.
+if platform.system != 'Linux' or LooseVersion(platform.release) < LooseVersion(required):
+    _ = f'"{package.title()}" only supported to run on Linux {required}+'
+    raise RuntimeError(_)
 
 with open('README.rst', 'r') as file:
     long_description = file.read()
-
-package = 'liburing'
 
 setup(url='https://github.com/YoSTEALTH/Liburing',
       name=package,
