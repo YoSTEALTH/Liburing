@@ -1,7 +1,7 @@
 from ._liburing import ffi, lib
 
 __all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec',
-           'sigmask')
+           'sigmask', 'sockaddr')
 
 
 NULL = ffi.NULL
@@ -137,3 +137,13 @@ def sigmask(mask=None):
         lib.sigemptyset(sigset)
         lib.sigaddset(sigset, mask)
         return sigset
+
+
+def sockaddr():
+    '''
+        Example
+            >>> sock_addr, sock_len = sockaddr()
+    '''
+    addr = ffi.new(f'struct sockaddr[1]')
+    len_ = ffi.new(f'socklen_t[1]', [ffi.sizeof(sockaddr)])
+    return addr, len_
