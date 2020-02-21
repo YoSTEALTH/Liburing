@@ -262,8 +262,6 @@ ffi.cdef('''
                                             int flags,
                                             mode_t mode);
     static inline void io_uring_prep_close(struct io_uring_sqe *sqe, int fd);
-
-    struct statx;
     static inline void io_uring_prep_statx(struct io_uring_sqe *sqe,
                                            int dfd,
                                            const char *path,
