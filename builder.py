@@ -26,7 +26,7 @@ ffi.cdef('''
 # Custom types
 ffi.cdef('''
     typedef ... igset_t;
-    typedef ... mode_t;
+    typedef int... mode_t;
 
     typedef int...  __u8;
     typedef int...  __u16;
