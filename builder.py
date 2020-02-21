@@ -7,7 +7,10 @@ ffi = cffi.FFI()
 
 # Install from source files.
 ffi.set_source('liburing._liburing',
-               '#include "liburing.h"',
+               '''
+                   #include <fcntl.h>       /* statx(2) - Definition of AT_* constants */
+                   #include "liburing.h"
+               ''',
                sources=['src/queue.c', 'src/register.c', 'src/setup.c', 'src/syscall.c'],
                include_dirs=['src/include'])
 
@@ -29,6 +32,7 @@ ffi.cdef('''
     typedef int...  __u16;
     typedef int...  __s32;
     typedef int...  __u32;
+    typedef int...  __s64;
     typedef int...  __u64;
 
     /*
@@ -468,4 +472,79 @@ ffi.cdef('''
         __u32 offset;
         __s32 *fds;
     };
+''')
+
+
+# statx(2)
+ffi.cdef('''
+    /* man page @ http://man7.org/linux/man-pages/man2/statx.2.html */
+
+    struct statx_timestamp {
+        __s64 tv_sec;    /* Seconds since the Epoch (UNIX time) */
+        __u32 tv_nsec;   /* Nanoseconds since tv_sec */
+    };
+
+    struct statx {
+        __u32 stx_mask;             /* Mask of bits indicating filled fields */
+        __u32 stx_blksize;          /* Block size for filesystem I/O */
+        __u64 stx_attributes;       /* Extra file attribute indicators */
+        __u32 stx_nlink;            /* Number of hard links */
+        __u32 stx_uid;              /* User ID of owner */
+        __u32 stx_gid;              /* Group ID of owner */
+        __u16 stx_mode;             /* File type and mode */
+        __u64 stx_ino;              /* Inode number */
+        __u64 stx_size;             /* Total size in bytes */
+        __u64 stx_blocks;           /* Number of 512B blocks allocated */
+        __u64 stx_attributes_mask;  /* Mask to show what's supported in stx_attributes */
+
+        /* The following fields are file timestamps */
+        struct statx_timestamp stx_atime;  /* Last access */
+        struct statx_timestamp stx_btime;  /* Creation */
+        struct statx_timestamp stx_ctime;  /* Last status change */
+        struct statx_timestamp stx_mtime;  /* Last modification */
+
+        /*
+         * If this file represents a device, then the next two fields contain the ID of the device
+         */
+        __u32 stx_rdev_major;  /* Major ID */
+        __u32 stx_rdev_minor;  /* Minor ID */
+
+        /*
+         * The next two fields contain the ID of the devicecontaining the filesystem
+         * where the file resides
+         */
+        __u32 stx_dev_major;   /* Major ID */
+        __u32 stx_dev_minor;   /* Minor ID */
+    };
+
+    /* Flags */
+    #define AT_EMPTY_PATH           ...
+    #define AT_NO_AUTOMOUNT         ...
+    #define AT_SYMLINK_NOFOLLOW     ...
+    #define AT_STATX_SYNC_AS_STAT   ...
+    #define AT_STATX_FORCE_SYNC     ...
+    #define AT_STATX_DONT_SYNC      ...
+
+    /* Mask */
+    #define STATX_TYPE              ...     /* Want stx_mode & S_IFMT */
+    #define STATX_MODE              ...     /* Want stx_mode & ~S_IFMT */
+    #define STATX_NLINK             ...     /* Want stx_nlink */
+    #define STATX_UID               ...     /* Want stx_uid */
+    #define STATX_GID               ...     /* Want stx_gid */
+    #define STATX_ATIME             ...     /* Want stx_atime */
+    #define STATX_MTIME             ...     /* Want stx_mtime */
+    #define STATX_CTIME             ...     /* Want stx_ctime */
+    #define STATX_INO               ...     /* Want stx_ino */
+    #define STATX_SIZE              ...     /* Want stx_size */
+    #define STATX_BLOCKS            ...     /* Want stx_blocks */
+    #define STATX_BASIC_STATS       ...     /* [All of the above] */
+    #define STATX_BTIME             ...     /* Want stx_btime */
+    #define STATX_ALL               ...     /* [All currently available fields] */
+
+    /* `stx_attributes` flags */
+    #define STATX_ATTR_COMPRESSED   ...
+    #define STATX_ATTR_IMMUTABLE    ...
+    #define STATX_ATTR_APPEND       ...
+    #define STATX_ATTR_NODUMP       ...
+    #define STATX_ATTR_ENCRYPTED    ...
 ''')
