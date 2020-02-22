@@ -12,7 +12,7 @@ def io_uring_queue_init_params(entries, ring, p):
     return trap_error(lib.io_uring_queue_init_params(entries, ring, p))
 
 
-def io_uring_queue_init(entries, ring, flags):
+def io_uring_queue_init(entries, ring, flags=0):
     '''
         ...
     '''
@@ -154,3 +154,15 @@ def io_uring_wait_cqe(ring, cqe_ptr):
             cqe_ptr filled in on success, `-errno` on failure.
     '''
     return trap_error(lib.io_uring_wait_cqe(ring, cqe_ptr))
+
+
+# Prep Functions
+# --------------
+def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=0):
+    lib.io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset)
+    sqe.rw_flags = flags
+
+
+def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=0):
+    lib.io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset)
+    sqe.rw_flags = flags
