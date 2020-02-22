@@ -26,12 +26,10 @@ def test_event(tmpdir):
             try:
                 assert liburing.io_uring_peek_cqe(ring, cqes) == 0
             except BlockingIOError:
-                print('waiting')
-                # could `await task(...)` here.
+                print('waiting event')
             else:
                 cqe = liburing.io_uring_cqe()
                 liburing.io_uring_cqe_seen(ring, cqe)
-                print('task done')
                 break
 
         # confirm
