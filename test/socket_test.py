@@ -3,6 +3,7 @@ import liburing
 
 
 def test_socket_timeout():
+    print()
     ring = liburing.io_uring()
 
     # socket
@@ -14,9 +15,7 @@ def test_socket_timeout():
 
     # prepare
     fd = server.fileno()
-    addr = liburing.ffi.new('struct sockaddr *')
-    addrlen = liburing.ffi.new('socklen_t *', liburing.ffi.sizeof(addr))
-    print()
+    addr, addrlen = liburing.sockaddr()
     try:
         # initialization
         assert liburing.io_uring_queue_init(32, ring, 0) == 0
