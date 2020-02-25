@@ -1,7 +1,7 @@
 Liburing
 ========
 
-This is a Python + CFFI wrapper around Liburing C library, which is a helper to setup and tear-down io_uring instances.
+This is a Python + CFFI wrapper around Liburing C library, which is a helper to setup and tear-down ``io_uring`` instances.
 
 Read how to use `Liburing`_ (pdf)
 
@@ -42,9 +42,9 @@ TODO
 ----
 
     - create more test
-    - 'Development Status :: 4 - Beta',
+    - Development Status :: 4 - Beta
     - create example
-    - 'Development Status :: 5 - Production/Stable',
+    - Development Status :: 5 - Production/Stable
     
 
 .. _pip: https://pip.pypa.io/en/stable/quickstart/
