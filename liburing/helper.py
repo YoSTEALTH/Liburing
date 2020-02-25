@@ -146,5 +146,5 @@ def sockaddr():
             >>> sock_addr, sock_len = sockaddr()
     '''
     addr = ffi.new('struct sockaddr[1]')
-    len_ = ffi.new('socklen_t[1]', [ffi.sizeof(sockaddr)])
+    len_ = ffi.new('socklen_t[1]', [ffi.sizeof(addr)])
     return addr, len_
