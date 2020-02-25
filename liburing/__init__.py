@@ -9,5 +9,7 @@ from .helper import *  # noqa
     This is a Python wrapper around liburing C library,
     which is a helper to setup and tear-down io_uring instances.
 '''
-__liburing__ = '0.3.0'
-__version__ = '2020.2.10'
+# enables `help(liburing)` to display everything
+__all__ = [i for i in locals().keys() if not i.startswith('_')]
+__liburing__ = '0.4.0'
+__version__ = '2020.2.25'
