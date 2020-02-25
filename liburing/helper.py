@@ -140,7 +140,8 @@ def sigmask(mask=None):
 
 
 def sockaddr():
-    '''
+    ''' Socket Address
+
         Example
             >>> sock_addr, sock_len = sockaddr()
     '''
