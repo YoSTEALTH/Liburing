@@ -1,9 +1,11 @@
+/* SPDX-License-Identifier: MIT */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "liburing/compat.h"
 #include "liburing/io_uring.h"
@@ -96,6 +98,38 @@ int io_uring_queue_mmap(int fd, struct io_uring_params *p, struct io_uring *ring
 	return ret;
 }
 
+/*
+ * Ensure that the mmap'ed rings aren't available to a child after a fork(2).
+ * This uses madvise(..., MADV_DONTFORK) on the mmap'ed ranges.
+ */
+int io_uring_ring_dontfork(struct io_uring *ring)
+{
+	size_t len;
+	int ret;
+
+	if (!ring->sq.ring_ptr || !ring->sq.sqes || !ring->cq.ring_ptr)
+		return -EINVAL;
+
+	len = *ring->sq.kring_entries * sizeof(struct io_uring_sqe);
+	ret = madvise(ring->sq.sqes, len, MADV_DONTFORK);
+	if (ret == -1)
+		return -errno;
+
+	len = ring->sq.ring_sz;
+	ret = madvise(ring->sq.ring_ptr, len, MADV_DONTFORK);
+	if (ret == -1)
+		return -errno;
+
+	if (ring->cq.ring_ptr != ring->sq.ring_ptr) {
+		len = ring->cq.ring_sz;
+		ret = madvise(ring->cq.ring_ptr, len, MADV_DONTFORK);
+		if (ret == -1)
+			return -errno;
+	}
+
+	return 0;
+}
+
 int io_uring_queue_init_params(unsigned entries, struct io_uring *ring,
 			       struct io_uring_params *p)
 {
@@ -134,4 +168,36 @@ void io_uring_queue_exit(struct io_uring *ring)
 	munmap(sq->sqes, *sq->kring_entries * sizeof(struct io_uring_sqe));
 	io_uring_unmap_rings(sq, cq);
 	close(ring->ring_fd);
+}
+
+struct io_uring_probe *io_uring_get_probe_ring(struct io_uring *ring)
+{
+	struct io_uring_probe *probe;
+	int r;
+
+	size_t len = sizeof(*probe) + 256 * sizeof(struct io_uring_probe_op);
+	probe = malloc(len);
+	memset(probe, 0, len);
+	r = io_uring_register_probe(ring, probe, 256);
+	if (r < 0)
+		goto fail;
+
+	return probe;
+fail:
+	free(probe);
+	return NULL;
+}
+
+struct io_uring_probe *io_uring_get_probe(void)
+{
+	struct io_uring ring;
+	struct io_uring_probe* probe = NULL;
+
+	int r = io_uring_queue_init(2, &ring, 0);
+	if (r < 0)
+		return NULL;
+
+	probe = io_uring_get_probe_ring(&ring);
+	io_uring_queue_exit(&ring);
+	return probe;
 }
