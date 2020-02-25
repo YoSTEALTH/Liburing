@@ -25,9 +25,6 @@ ffi.cdef('''
 
 # Custom types
 ffi.cdef('''
-    typedef ... igset_t;
-    typedef int... mode_t;
-
     typedef int...  __u8;
     typedef int...  __u16;
     typedef int...  __s32;
@@ -35,15 +32,13 @@ ffi.cdef('''
     typedef int...  __s64;
     typedef int...  __u64;
 
-    /*
-     * typedef ... off_t;
-     * TypeError: 'off_t' is opaque - meaning system or gcc doesn't support it
-     */
-    typedef long int __off_t;
-    typedef __off_t off_t;
+    typedef int...  off_t;
+    typedef int...  mode_t;
+    typedef ...     igset_t;
+    typedef int...  __aligned_u64;
+    typedef int...  __kernel_rwf_t;
 
     /*
-     * typedef ... sigset_t;
      * TypeError: initializer for ctype 'sigset_t *' must be a cdata pointer, not NoneType
      */
     struct __sigset_t { ...; };
@@ -57,21 +52,25 @@ ffi.cdef('''
         void * iov_base;    // starting address
         size_t iov_len;     // number of bytes to transfer
     };
-''')
 
-
-# liburing.h
-ffi.cdef('''
     struct __kernel_timespec {
         int64_t     tv_sec;
         long long   tv_nsec;
     };
 
+    struct open_how {
+        uint64_t    flags;
+        uint64_t    mode;
+        uint64_t    resolve;
+    };
+''')
+
+
+# liburing.h
+ffi.cdef('''
     /*
      * Library interface to io_uring
-     * note: can get with using ...; as all the fields are populated by C function
      */
-    // struct io_uring { ... ; };
     struct io_uring_sq {
         unsigned *khead;
         unsigned *ktail;
@@ -111,6 +110,17 @@ ffi.cdef('''
     /*
      * Library interface
      */
+
+     /*
+     * return an allocated io_uring_probe structure, or NULL if probe fails (for
+     * example, if it is not available). The caller is responsible for freeing it
+     */
+    extern struct io_uring_probe *io_uring_get_probe_ring(struct io_uring *ring);
+    /* same as io_uring_get_probe_ring, but takes care of ring init and teardown */
+    extern struct io_uring_probe *io_uring_get_probe(void);
+
+    static inline int io_uring_opcode_supported(struct io_uring_probe *p, int op);
+
     extern int io_uring_queue_init_params(unsigned entries,
                                           struct io_uring *ring,
                                           struct io_uring_params *p);
@@ -120,6 +130,7 @@ ffi.cdef('''
     extern int io_uring_queue_mmap(int fd,
                                    struct io_uring_params *p,
                                    struct io_uring *ring);
+    extern int io_uring_ring_dontfork(struct io_uring *ring);
     extern void io_uring_queue_exit(struct io_uring *ring);
     unsigned io_uring_peek_batch_cqe(struct io_uring *ring,
                                      struct io_uring_cqe **cqes,
@@ -150,6 +161,11 @@ ffi.cdef('''
                                               unsigned nr_files);
     extern int io_uring_register_eventfd(struct io_uring *ring, int fd);
     extern int io_uring_unregister_eventfd(struct io_uring *ring);
+    extern int io_uring_register_probe(struct io_uring *ring,
+                                       struct io_uring_probe *p,
+                                       unsigned nr);
+    extern int io_uring_register_personality(struct io_uring *ring);
+    extern int io_uring_unregister_personality(struct io_uring *ring, int id);
 ''')
 
 
@@ -164,7 +180,7 @@ ffi.cdef('''
      *                               igset_t *sigmask);
      */
 
-    #define LIBURING_UDATA_TIMEOUT ...
+    #define LIBURING_UDATA_TIMEOUT      ...
 
     /*
      * SKIPPING - use *peak* or *wait* functions
@@ -186,7 +202,7 @@ ffi.cdef('''
      * Command prep helpers
      */
     static inline void io_uring_sqe_set_data(struct io_uring_sqe *sqe, void *data);
-    static inline void *io_uring_cqe_get_data(struct io_uring_cqe *cqe);
+    static inline void *io_uring_cqe_get_data(const struct io_uring_cqe *cqe);
     static inline void io_uring_sqe_set_flags(struct io_uring_sqe *sqe, unsigned flags);
     static inline void io_uring_prep_rw(int op,
                                         struct io_uring_sqe *sqe,
@@ -250,7 +266,8 @@ ffi.cdef('''
                                              socklen_t addrlen);
     static inline void io_uring_prep_files_update(struct io_uring_sqe *sqe,
                                                   int *fds,
-                                                  unsigned nr_fds);
+                                                  unsigned nr_fds,
+                                                  int offset);
     static inline void io_uring_prep_fallocate(struct io_uring_sqe *sqe,
                                                int fd,
                                                int mode,
@@ -262,12 +279,51 @@ ffi.cdef('''
                                             int flags,
                                             mode_t mode);
     static inline void io_uring_prep_close(struct io_uring_sqe *sqe, int fd);
+    static inline void io_uring_prep_read(struct io_uring_sqe *sqe,
+                                          int fd,
+                                          void *buf,
+                                          unsigned nbytes,
+                                          off_t offset);
+    static inline void io_uring_prep_write(struct io_uring_sqe *sqe,
+                                           int fd,
+                                           const void *buf,
+                                           unsigned nbytes,
+                                           off_t offset);
+    /* struct statx; - added full struct */
     static inline void io_uring_prep_statx(struct io_uring_sqe *sqe,
                                            int dfd,
                                            const char *path,
                                            int flags,
                                            unsigned mask,
                                            struct statx *statxbuf);
+    static inline void io_uring_prep_fadvise(struct io_uring_sqe *sqe,
+                                             int fd,
+                                             off_t offset,
+                                             off_t len,
+                                             int advice);
+    static inline void io_uring_prep_madvise(struct io_uring_sqe *sqe,
+                                             void *addr,
+                                             off_t length,
+                                             int advice);
+    static inline void io_uring_prep_send(struct io_uring_sqe *sqe,
+                                          int sockfd,
+                                          const void *buf,
+                                          size_t len,
+                                          int flags);
+    static inline void io_uring_prep_recv(struct io_uring_sqe *sqe,
+                                          int sockfd,
+                                          void *buf,
+                                          size_t len,
+                                          int flags);
+    static inline void io_uring_prep_openat2(struct io_uring_sqe *sqe,
+                                             int dfd,
+                                             const char *path,
+                                             struct open_how *how);
+    struct epoll_event;
+    static inline void io_uring_prep_epoll_ctl(struct io_uring_sqe *sqe,
+                                               int epfd,
+                                               int fd, int op,
+                                               struct epoll_event *ev);
     static inline unsigned io_uring_sq_ready(struct io_uring *ring);
     static inline unsigned io_uring_sq_space_left(struct io_uring *ring);
     static inline unsigned io_uring_cq_ready(struct io_uring *ring);
@@ -302,19 +358,11 @@ ffi.cdef('''
 ''')
 
 
-# compat.h
-ffi.cdef('''
-    /* TypeError: struct io_uring_sqe: field 'io_uring_sqe.rw_flags' is of an opaque type
-     * typedef ... __kernel_rwf_t;
-     */
-     typedef int __kernel_rwf_t;
-''')
-
-
 # io_uring.h
 ffi.cdef('''
-    /* IO submission data structure (Submission Queue Entry) */
-    // struct io_uring_sqe { ...; };
+    /*
+     * IO submission data structure (Submission Queue Entry)
+     */
     struct io_uring_sqe {
         __u8    opcode;     /* type of operation for this sqe */
         __u8    flags;      /* IOSQE_ flags */
@@ -337,26 +385,44 @@ ffi.cdef('''
             __u32           cancel_flags;
             __u32           open_flags;
             __u32           statx_flags;
+            __u32           fadvise_advice;
         };
-        __u64   user_data;      /* data to be passed back at completion time */
+        __u64   user_data;  /* data to be passed back at completion time */
         union {
-            __u16   buf_index;  /* index into fixed buffers, if used */
-            __u64   __pad2[3];
+            struct {
+                __u16       buf_index;      /* index into fixed buffers, if used */
+                __u16       personality;    /* personality to use, if used */
+            };
+            __u64           __pad2[3];
         };
     };
 
-    /* sqe->flags */
-    #define IOSQE_FIXED_FILE    ...
-    #define IOSQE_IO_DRAIN      ...
-    #define IOSQE_IO_LINK       ...
-    #define IOSQE_IO_HARDLINK   ...
-    #define IOSQE_ASYNC         ...
+    enum {
+        IOSQE_FIXED_FILE_BIT,
+        IOSQE_IO_DRAIN_BIT,
+        IOSQE_IO_LINK_BIT,
+        IOSQE_IO_HARDLINK_BIT,
+        IOSQE_ASYNC_BIT,
+    };
 
-    /* io_uring_setup() flags */
-    #define IORING_SETUP_IOPOLL     ...
-    #define IORING_SETUP_SQPOLL     ...
-    #define IORING_SETUP_SQ_AFF     ...
-    #define IORING_SETUP_CQSIZE     ...
+    /*
+     * sqe->flags
+     */
+    #define IOSQE_FIXED_FILE        ...     /* use fixed fileset */
+    #define IOSQE_IO_DRAIN          ...     /* issue after inflight IO */
+    #define IOSQE_IO_LINK           ...     /* links next sqe */
+    #define IOSQE_IO_HARDLINK       ...     /* like LINK, but stronger */
+    #define IOSQE_ASYNC             ...     /* always go async */
+
+    /*
+     * io_uring_setup() flags
+     */
+    #define IORING_SETUP_IOPOLL     ...     /* io_context is polled */
+    #define IORING_SETUP_SQPOLL     ...     /* SQ poll thread */
+    #define IORING_SETUP_SQ_AFF     ...     /* sq_thread_cpu is valid */
+    #define IORING_SETUP_CQSIZE     ...     /* app defines CQ size */
+    #define IORING_SETUP_CLAMP      ...     /* clamp SQ/CQ ring sizes */
+    #define IORING_SETUP_ATTACH_WQ  ...     /* attach to existing wq */
 
     enum {
         IORING_OP_NOP,
@@ -381,32 +447,48 @@ ffi.cdef('''
         IORING_OP_CLOSE,
         IORING_OP_FILES_UPDATE,
         IORING_OP_STATX,
+        IORING_OP_READ,
+        IORING_OP_WRITE,
+        IORING_OP_FADVISE,
+        IORING_OP_MADVISE,
+        IORING_OP_SEND,
+        IORING_OP_RECV,
+        IORING_OP_OPENAT2,
+        IORING_OP_EPOLL_CTL,
 
         /* this goes last, obviously */
         IORING_OP_LAST,
     };
 
-    /* sqe->fsync_flags */
+    /*
+     * sqe->fsync_flags
+     */
     #define IORING_FSYNC_DATASYNC   ...
 
-    /* sqe->timeout_flags */
+    /*
+     * sqe->timeout_flags
+     */
     #define IORING_TIMEOUT_ABS      ...
 
-    /* IO completion data structure (Completion Queue Entry) */
-    // struct io_uring_cqe { ...; };
+    /*
+     * IO completion data structure (Completion Queue Entry)
+     */
     struct io_uring_cqe {
         __u64   user_data;  /* sqe->data submission passed back */
         __s32   res;        /* result code for this event */
         __u32   flags;
     };
 
-    /* Magic offsets for the application to mmap the data it needs */
+    /*
+     * Magic offsets for the application to mmap the data it needs
+     */
     #define IORING_OFF_SQ_RING      ...
     #define IORING_OFF_CQ_RING      ...
     #define IORING_OFF_SQES         ...
 
-    /* Filled with the offset for mmap(2) */
-    // struct io_sqring_offsets { ...; };
+    /*
+     * Filled with the offset for mmap(2)
+     */
     struct io_sqring_offsets {
         __u32 head;
         __u32 tail;
@@ -419,10 +501,11 @@ ffi.cdef('''
         __u64 resv2;
     };
 
-    /* sq_ring->flags */
-    #define IORING_SQ_NEED_WAKEUP   ...
+    /*
+     * sq_ring->flags
+     */
+    #define IORING_SQ_NEED_WAKEUP       ...     /* needs io_uring_enter wakeup */
 
-    // struct io_cqring_offsets { ...; };
     struct io_cqring_offsets {
         __u32 head;
         __u32 tail;
@@ -433,12 +516,15 @@ ffi.cdef('''
         __u64 resv[2];
     };
 
-    /* io_uring_enter(2) flags */
+    /*
+     * io_uring_enter(2) flags
+     */
     #define IORING_ENTER_GETEVENTS      ...
     #define IORING_ENTER_SQ_WAKEUP      ...
 
-    /* Passed in for io_uring_setup(2). Copied back with updated info on success */
-    // struct io_uring_params { ...; };
+    /*
+     * Passed in for io_uring_setup(2). Copied back with updated info on success
+     */
     struct io_uring_params {
         __u32 sq_entries;
         __u32 cq_entries;
@@ -446,17 +532,24 @@ ffi.cdef('''
         __u32 sq_thread_cpu;
         __u32 sq_thread_idle;
         __u32 features;
-        __u32 resv[4];
+        __u32 wq_fd;
+        __u32 resv[3];
         struct io_sqring_offsets sq_off;
         struct io_cqring_offsets cq_off;
     };
 
-    /* io_uring_params->features flags */
-    #define IORING_FEAT_SINGLE_MMAP     ...
-    #define IORING_FEAT_NODROP          ...
-    #define IORING_FEAT_SUBMIT_STABLE   ...
+    /*
+     * io_uring_params->features flags
+     */
+    #define IORING_FEAT_SINGLE_MMAP         ...
+    #define IORING_FEAT_NODROP              ...
+    #define IORING_FEAT_SUBMIT_STABLE       ...
+    #define IORING_FEAT_RW_CUR_POS          ...
+    #define IORING_FEAT_CUR_PERSONALITY     ...
 
-    /* io_uring_register(2) opcodes and arguments */
+    /*
+     * io_uring_register(2) opcodes and arguments
+     */
     #define IORING_REGISTER_BUFFERS         ...
     #define IORING_UNREGISTER_BUFFERS       ...
     #define IORING_REGISTER_FILES           ...
@@ -464,11 +557,32 @@ ffi.cdef('''
     #define IORING_REGISTER_EVENTFD         ...
     #define IORING_UNREGISTER_EVENTFD       ...
     #define IORING_REGISTER_FILES_UPDATE    ...
+    #define IORING_REGISTER_EVENTFD_ASYNC   ...
+    #define IORING_REGISTER_PROBE           ...
+    #define IORING_REGISTER_PERSONALITY     ...
+    #define IORING_UNREGISTER_PERSONALITY   ...
 
-    // struct io_uring_files_update { ...; };
     struct io_uring_files_update {
         __u32 offset;
-        __s32 *fds;
+        __u32 resv;
+        __aligned_u64 /* __s32 * */ fds;
+    };
+
+    #define IO_URING_OP_SUPPORTED           ...
+
+    struct io_uring_probe_op {
+        __u8 op;
+        __u8 resv;
+        __u16 flags;    /* IO_URING_OP_* flags */
+        __u32 resv2;
+    };
+
+    struct io_uring_probe {
+        __u8 last_op;   /* last opcode supported */
+        __u8 ops_len;   /* length of ops[] array below */
+        __u16 resv;
+        __u32 resv2[3];
+        struct io_uring_probe_op ops[0];
     };
 ''')
 
