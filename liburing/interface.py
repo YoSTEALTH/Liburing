@@ -244,6 +244,24 @@ def io_uring_wait_cqe(ring, cqe_ptr):
 # --------------
 def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=0):
     '''
+        Type
+            fd:         int
+            iovecs:     iovec
+            nr_vecs:    int
+            offset:     int
+            flags:      int
+            return:     None
+
+        Example
+            >>> fd = os.open(...)
+            >>> buffer = bytearray(5)
+            >>> iov = iovec(buffer)
+            >>> sqe = io_uring_get_sqe(ring)
+            >>> io_uring_prep_readv(sqe, fd, iov, len(iov), 0, os.RWF_NOWAIT)
+            ...
+            >>> buffer
+            b'hello'
+
         Note
             - Liburing C library does not provide much needed `flags` parameter
     '''
@@ -253,6 +271,14 @@ def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=0):
 
 def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=0):
     '''
+        Type
+            fd:         int
+            iovecs:     iovec
+            nr_vecs:    int
+            offset:     int
+            flags:      int
+            return:     None
+
         Note
             - Liburing C library does not provide much needed `flags` parameter
     '''
