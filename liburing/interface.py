@@ -238,3 +238,23 @@ def io_uring_wait_cqe(ring, cqe_ptr):
             cqe_ptr filled in on success, `-errno` on failure.
     '''
     return trap_error(lib.io_uring_wait_cqe(ring, cqe_ptr))
+
+
+# Prep Functions
+# --------------
+def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=0):
+    '''
+        Note
+            - Liburing C library does not provide much needed `flags` parameter
+    '''
+    lib.io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset)
+    sqe.rw_flags = flags
+
+
+def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=0):
+    '''
+        Note
+            - Liburing C library does not provide much needed `flags` parameter
+    '''
+    lib.io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset)
+    sqe.rw_flags = flags
