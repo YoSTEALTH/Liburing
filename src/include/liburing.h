@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef LIB_URING_H
 #define LIB_URING_H
 
@@ -13,13 +14,8 @@ extern "C" {
 #include "liburing/compat.h"
 #include "liburing/io_uring.h"
 #include "liburing/barrier.h"
+#include "custom.h" // manually added to prevent build errors.
 
-#ifndef CONFIG_HAVE_KERNEL_TIMESPEC
-struct __kernel_timespec {
-	int64_t		tv_sec;
-	long long	tv_nsec;
-};
-#endif
 
 /*
  * Library interface to io_uring
@@ -63,12 +59,29 @@ struct io_uring {
 /*
  * Library interface
  */
+
+/*
+ * return an allocated io_uring_probe structure, or NULL if probe fails (for
+ * example, if it is not available). The caller is responsible for freeing it
+ */
+extern struct io_uring_probe *io_uring_get_probe_ring(struct io_uring *ring);
+/* same as io_uring_get_probe_ring, but takes care of ring init and teardown */
+extern struct io_uring_probe *io_uring_get_probe(void);
+
+static inline int io_uring_opcode_supported(struct io_uring_probe *p, int op)
+{
+	if (op > p->last_op)
+		return 0;
+	return (p->ops[op].flags & IO_URING_OP_SUPPORTED) != 0;
+}
+
 extern int io_uring_queue_init_params(unsigned entries, struct io_uring *ring,
 	struct io_uring_params *p);
 extern int io_uring_queue_init(unsigned entries, struct io_uring *ring,
 	unsigned flags);
 extern int io_uring_queue_mmap(int fd, struct io_uring_params *p,
 	struct io_uring *ring);
+extern int io_uring_ring_dontfork(struct io_uring *ring);
 extern void io_uring_queue_exit(struct io_uring *ring);
 unsigned io_uring_peek_batch_cqe(struct io_uring *ring,
 	struct io_uring_cqe **cqes, unsigned count);
@@ -92,6 +105,10 @@ extern int io_uring_register_files_update(struct io_uring *ring, unsigned off,
 					int *files, unsigned nr_files);
 extern int io_uring_register_eventfd(struct io_uring *ring, int fd);
 extern int io_uring_unregister_eventfd(struct io_uring *ring);
+extern int io_uring_register_probe(struct io_uring *ring,
+					struct io_uring_probe *p, unsigned nr);
+extern int io_uring_register_personality(struct io_uring *ring);
+extern int io_uring_unregister_personality(struct io_uring *ring, int id);
 
 /*
  * Helper for the peek/wait single cqe functions. Exported because of that,
@@ -149,7 +166,7 @@ static inline void io_uring_sqe_set_data(struct io_uring_sqe *sqe, void *data)
 	sqe->user_data = (unsigned long) data;
 }
 
-static inline void *io_uring_cqe_get_data(struct io_uring_cqe *cqe)
+static inline void *io_uring_cqe_get_data(const struct io_uring_cqe *cqe)
 {
 	return (void *) (uintptr_t) cqe->user_data;
 }
@@ -293,9 +310,10 @@ static inline void io_uring_prep_connect(struct io_uring_sqe *sqe, int fd,
 }
 
 static inline void io_uring_prep_files_update(struct io_uring_sqe *sqe,
-					      int *fds, unsigned nr_fds)
+					      int *fds, unsigned nr_fds,
+					      int offset)
 {
-	io_uring_prep_rw(IORING_OP_FILES_UPDATE, sqe, -1, fds, nr_fds, 0);
+	io_uring_prep_rw(IORING_OP_FILES_UPDATE, sqe, -1, fds, nr_fds, offset);
 }
 
 static inline void io_uring_prep_fallocate(struct io_uring_sqe *sqe, int fd,
@@ -317,6 +335,18 @@ static inline void io_uring_prep_close(struct io_uring_sqe *sqe, int fd)
 	io_uring_prep_rw(IORING_OP_CLOSE, sqe, fd, NULL, 0, 0);
 }
 
+static inline void io_uring_prep_read(struct io_uring_sqe *sqe, int fd,
+				      void *buf, unsigned nbytes, off_t offset)
+{
+	io_uring_prep_rw(IORING_OP_READ, sqe, fd, buf, nbytes, offset);
+}
+
+static inline void io_uring_prep_write(struct io_uring_sqe *sqe, int fd,
+				       const void *buf, unsigned nbytes, off_t offset)
+{
+	io_uring_prep_rw(IORING_OP_WRITE, sqe, fd, buf, nbytes, offset);
+}
+
 struct statx;
 static inline void io_uring_prep_statx(struct io_uring_sqe *sqe, int dfd,
 				const char *path, int flags, unsigned mask,
@@ -327,9 +357,54 @@ static inline void io_uring_prep_statx(struct io_uring_sqe *sqe, int dfd,
 	sqe->statx_flags = flags;
 }
 
+static inline void io_uring_prep_fadvise(struct io_uring_sqe *sqe, int fd,
+					 off_t offset, off_t len, int advice)
+{
+	io_uring_prep_rw(IORING_OP_FADVISE, sqe, fd, NULL, len, offset);
+	sqe->fadvise_advice = advice;
+}
+
+static inline void io_uring_prep_madvise(struct io_uring_sqe *sqe, void *addr,
+					 off_t length, int advice)
+{
+	io_uring_prep_rw(IORING_OP_MADVISE, sqe, -1, addr, length, 0);
+	sqe->fadvise_advice = advice;
+}
+
+static inline void io_uring_prep_send(struct io_uring_sqe *sqe, int sockfd,
+				      const void *buf, size_t len, int flags)
+{
+	io_uring_prep_rw(IORING_OP_SEND, sqe, sockfd, buf, len, 0);
+	sqe->msg_flags = flags;
+}
+
+static inline void io_uring_prep_recv(struct io_uring_sqe *sqe, int sockfd,
+				      void *buf, size_t len, int flags)
+{
+	io_uring_prep_rw(IORING_OP_RECV, sqe, sockfd, buf, len, 0);
+	sqe->msg_flags = flags;
+}
+
+static inline void io_uring_prep_openat2(struct io_uring_sqe *sqe, int dfd,
+					const char *path, struct open_how *how)
+{
+	io_uring_prep_rw(IORING_OP_OPENAT2, sqe, dfd, path, sizeof(*how),
+				(uint64_t) (uintptr_t) how);
+}
+
+struct epoll_event;
+static inline void io_uring_prep_epoll_ctl(struct io_uring_sqe *sqe, int epfd,
+					   int fd, int op,
+					   struct epoll_event *ev)
+{
+	io_uring_prep_rw(IORING_OP_EPOLL_CTL, sqe, epfd, ev, op, fd);
+}
+
 static inline unsigned io_uring_sq_ready(struct io_uring *ring)
 {
-	return ring->sq.sqe_tail - ring->sq.sqe_head;
+	if (!(ring->flags & IORING_SETUP_SQPOLL))
+		return ring->sq.sqe_tail - ring->sq.sqe_head;
+	return ring->sq.sqe_tail - *ring->sq.khead;
 }
 
 static inline unsigned io_uring_sq_space_left(struct io_uring *ring)
