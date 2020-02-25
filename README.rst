@@ -33,6 +33,15 @@ Use `pip`_ to install, upgrade & uninstall Python wrapper:
     pip uninstall liburing
 
 
+To find out all the functions and definitions:
+
+.. code-block:: text
+    
+    import liburing
+
+    help(liburing)
+
+
 License
 -------
 Free, Public Domain (CC0). `Read more`_
