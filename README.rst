@@ -16,7 +16,7 @@ Requires
 Includes
 --------
 
-    - liburing 0.3.0
+    - liburing 0.4.0 + bug fixes.
 
 
 Install, update & uninstall (Alpha)
@@ -35,17 +35,17 @@ Use `pip`_ to install, upgrade & uninstall Python wrapper:
 
 License
 -------
-Free, No limit what so ever. `Read more`_
+Free, Public Domain (CC0). `Read more`_
 
 
 TODO
 ----
 
-    - liburing 0.4.0 when its released.
-    - 'Development Status :: 4 - Beta',
-    - 'Development Status :: 5 - Production/Stable',
     - create more test
+    - 'Development Status :: 4 - Beta',
     - create example
+    - 'Development Status :: 5 - Production/Stable',
+    
 
 .. _pip: https://pip.pypa.io/en/stable/quickstart/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
