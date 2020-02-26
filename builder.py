@@ -111,7 +111,7 @@ ffi.cdef('''
      * Library interface
      */
 
-     /*
+    /*
      * return an allocated io_uring_probe structure, or NULL if probe fails (for
      * example, if it is not available). The caller is responsible for freeing it
      */

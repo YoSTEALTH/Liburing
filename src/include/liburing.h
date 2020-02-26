@@ -16,7 +16,6 @@ extern "C" {
 #include "liburing/barrier.h"
 #include "custom.h" // manually added to prevent build errors.
 
-
 /*
  * Library interface to io_uring
  */
