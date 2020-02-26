@@ -1,3 +1,7 @@
 include LICENSE.txt
 include README.rst
 include builder.py
+include libs/liburing/configure
+include libs/liburing/src/include/liburing.h
+include libs/liburing/src/include/liburing/barrier.h
+include libs/liburing/src/include/liburing/io_uring.h
