@@ -2,10 +2,13 @@ import os
 import cffi
 import subprocess
 
+__all__ = ('ffi',)
+
+
+# Configure
 os.chdir('./libs/liburing')
 subprocess.run('./configure')
 os.chdir('../../')
-__all__ = ('ffi',)
 
 
 ffi = cffi.FFI()
