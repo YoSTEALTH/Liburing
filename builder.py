@@ -1,5 +1,10 @@
+import os
 import cffi
+import subprocess
 
+os.chdir('./libs/liburing')
+subprocess.run('./configure')
+os.chdir('../../')
 __all__ = ('ffi',)
 
 
@@ -11,8 +16,11 @@ ffi.set_source('liburing._liburing',
                    #include <fcntl.h>       /* statx(2) - Definition of AT_* constants */
                    #include "liburing.h"
                ''',
-               sources=['src/queue.c', 'src/register.c', 'src/setup.c', 'src/syscall.c'],
-               include_dirs=['src/include'])
+               sources=['./libs/liburing/src/queue.c',
+                        './libs/liburing/src/register.c',
+                        './libs/liburing/src/setup.c',
+                        './libs/liburing/src/syscall.c'],
+               include_dirs=['./libs/liburing/src/include'])
 
 
 # Socket
