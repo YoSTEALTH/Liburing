@@ -1,8 +1,9 @@
-import cffi
 import os
+import cffi
+import subprocess
 
 os.chdir('./libs/liburing')
-os.system('./configure')
+subprocess.run('./configure')
 os.chdir('../../')
 __all__ = ('ffi',)
 
