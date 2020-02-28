@@ -1,10 +1,14 @@
-import cffi
 import os
+import cffi
+import subprocess
 
-os.chdir('./libs/liburing')
-os.system('./configure')
-os.chdir('../../')
 __all__ = ('ffi',)
+
+
+# Configure
+os.chdir('./libs/liburing')
+subprocess.run('./configure')
+os.chdir('../../')
 
 
 ffi = cffi.FFI()
@@ -148,7 +152,7 @@ ffi.cdef('''
      * Library interface
      */
 
-     /*
+    /*
      * return an allocated io_uring_probe structure, or NULL if probe fails (for
      * example, if it is not available). The caller is responsible for freeing it
      */
