@@ -1,7 +1,7 @@
 from ._liburing import ffi, lib
 
 __all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec',
-           'sigmask', 'sockaddr')
+           'sigmask', 'sockaddr', 'build_sockaddr_in', 'sockaddr_in')
 
 
 NULL = ffi.NULL
@@ -146,5 +146,22 @@ def sockaddr():
             >>> sock_addr, sock_len = sockaddr()
     '''
     addr = ffi.new('struct sockaddr *')
-    len_ = ffi.new('socklen_t *', ffi.sizeof(addr))
-    return addr, len_
+    return addr, ffi.new('socklen_t *', ffi.sizeof('struct sockaddr'))
+
+
+def sockaddr_in():
+    sa = ffi.new('struct sockaddr_in *')
+    len_ = ffi.sizeof('struct sockaddr_in')
+    lib.bzero(sa, len_)
+    return sa, ffi.new('socklen_t *', len_)
+
+
+def build_sockaddr_in(ip, port):
+    if isinstance(ip, str):
+        ip = ip.encode('utf8')
+    sa = ffi.new('struct sockaddr_in *')
+    len_ = ffi.sizeof('struct sockaddr_in')
+    lib.bzero(sa, len_)
+    lib.inet_aton(ip, ffi.addressof(sa.sin_addr))
+    sa.sin_port = lib.htons(port)
+    return sa, ffi.new('socklen_t *', len_)

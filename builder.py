@@ -14,6 +14,11 @@ ffi.set_source('liburing._liburing',
                '''
                    #include <fcntl.h>       /* statx(2) - Definition of AT_* constants */
                    #include "liburing.h"
+                   #include <netinet/in.h>
+                   #include <arpa/inet.h>
+                   #include <stdlib.h>
+                   #include <strings.h>
+
                ''',
                sources=['./libs/liburing/src/queue.c',
                         './libs/liburing/src/register.c',
@@ -70,6 +75,31 @@ ffi.cdef('''
         uint64_t    mode;
         uint64_t    resolve;
     };
+
+''')
+
+
+# sockaddr_in and helper
+ffi.cdef('''
+    int printf(const char *format, ...);
+    const char *inet_ntop(int af, const void *src,
+                             char *dst, socklen_t size);
+    uint16_t ntohs(uint16_t netshort);
+    void bzero(void *s, size_t n);
+
+    typedef uint32_t in_addr_t;
+    typedef unsigned short int sa_family_t;
+    typedef uint16_t in_port_t;
+
+    struct  in_addr { in_addr_t s_addr; };
+    struct sockaddr_in {
+         sa_family_t sin_family;
+         in_port_t sin_port;
+         struct in_addr sin_addr;
+         ...;
+    };
+    extern int inet_aton (const char *__cp, struct in_addr *__inp);
+    extern __u16 htons(uint16_t hostshort);
 ''')
 
 
