@@ -1,6 +1,6 @@
 from ._liburing import lib
 from .wrapper import trap_error
-from .helper import timespec, sigmask
+from .helper import timespec, sigmask, NULL
 
 
 # Library interface
@@ -78,12 +78,14 @@ def io_uring_peek_batch_cqe(ring, cqes, count):
     return trap_error(lib.io_uring_peek_batch_cqe(ring, cqes, count))
 
 
-def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=None, sm=None):
+def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=NULL, sm=NULL):
     ''' Wait Completion Queue Entry
 
         Example
             >>> cqe = io_uring_cqe()
             >>> io_uring_wait_cqes(ring, cqe, 2)
+
+            >> io_uring_wait_cqes(ring, cqe, ts=timespec(1, 1000000), ...)
 
         Note
             Like io_uring_wait_cqe(), except it accepts a timeout value as well. Note
@@ -96,8 +98,6 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=None, sm=None):
             handling between two threads and expect that to work without synchronization,
             as this function manipulates both the SQ and CQ side.
     '''
-    ts = timespec(ts)
-    sm = sigmask(sm)
     return trap_error(lib.io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sm))
 
 
