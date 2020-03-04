@@ -85,12 +85,6 @@ ffi.cdef('''
 
 # sockaddr_in and helper
 ffi.cdef('''
-    int printf(const char *format, ...);
-    const char *inet_ntop(int af, const void *src,
-                             char *dst, socklen_t size);
-    uint16_t ntohs(uint16_t netshort);
-    void bzero(void *s, size_t n);
-
     typedef uint32_t in_addr_t;
     typedef unsigned short int sa_family_t;
     typedef uint16_t in_port_t;
@@ -102,8 +96,20 @@ ffi.cdef('''
          struct in_addr sin_addr;
          ...;
     };
-    extern int inet_aton (const char *__cp, struct in_addr *__inp);
-    extern __u16 htons(uint16_t hostshort);
+    struct in6_addr {
+        union {
+            uint8_t __u6_addr8[16];
+            uint16_t __u6__addr16[8];
+            uint32_t __u6_addr32[4];
+        } __in6_u;
+    };
+    struct sockaddr_in6 {
+        sa_family_t sin6_family;
+        in_port_t sin6_port;
+        uint32_t sin6_flowinfo;
+        struct in6_addr sin6_addr;
+        uint32_t sin6_scope_id;
+    };
 ''')
 
 

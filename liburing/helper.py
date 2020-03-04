@@ -1,7 +1,11 @@
+import sys
+from socket import htons, inet_aton, inet_pton
+
 from ._liburing import ffi, lib
 
-__all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec',
-           'sigmask', 'sockaddr', 'build_sockaddr_in', 'sockaddr_in')
+__all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes',
+           'iovec', 'timespec', 'sigmask', 'sockaddr', 'build_sockaddr_in',
+           'sockaddr_in', 'sockaddr_in6', 'build_sockaddr_in6')
 
 
 NULL = ffi.NULL
@@ -152,16 +156,33 @@ def sockaddr():
 def sockaddr_in():
     sa = ffi.new('struct sockaddr_in *')
     len_ = ffi.sizeof('struct sockaddr_in')
-    lib.bzero(sa, len_)
     return sa, ffi.new('socklen_t *', len_)
 
 
-def build_sockaddr_in(ip, port):
-    if isinstance(ip, str):
-        ip = ip.encode('utf8')
+def build_sockaddr_in(family, ip, port):
     sa = ffi.new('struct sockaddr_in *')
     len_ = ffi.sizeof('struct sockaddr_in')
-    lib.bzero(sa, len_)
-    lib.inet_aton(ip, ffi.addressof(sa.sin_addr))
-    sa.sin_port = lib.htons(port)
+    sa.sin_family = family
+    sa.sin_addr.s_addr = int.from_bytes(inet_aton(ip), byteorder=sys.byteorder)
+    sa.sin_port = htons(port)
+    return sa, ffi.new('socklen_t *', len_)
+
+
+def sockaddr_in6():
+    sa = ffi.new('struct sockaddr_in6')
+    len_ = ffi.sizeof('struct sockaddr_in6')
+    return sa, ffi.new('socklen_t *', len_)
+
+
+def build_sockaddr_in6(family, ip6, port):
+    sa = ffi.new('struct sockaddr_in6 *')
+    len_ = ffi.sizeof('struct sockaddr_in6')
+    sa.sin6_family = family
+    pack = inet_pton(family, ip6)
+    ffi.memmove(
+        ffi.cast('char *', ffi.addressof(sa, 'sin6_addr')),
+        pack,
+        len(pack)
+    )
+    sa.sin6_port = htons(port)
     return sa, ffi.new('socklen_t *', len_)
