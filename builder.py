@@ -15,10 +15,9 @@ ffi = cffi.FFI()
 
 # Install from source files.
 ffi.set_source('liburing._liburing',
-               '''
-                   #include <fcntl.h>       /* statx(2) - Definition of AT_* constants */
-                   #include "liburing.h"
-               ''',
+               ''' #include <fcntl.h>       /* statx(2) - Definition of AT_* constants */
+                   #include <netinet/in.h>
+                   #include "liburing.h" ''',
                sources=['./libs/liburing/src/queue.c',
                         './libs/liburing/src/register.c',
                         './libs/liburing/src/setup.c',
@@ -31,6 +30,21 @@ ffi.cdef('''
     /* Socket */
     struct sockaddr { ...; };
     typedef int... socklen_t;
+
+    typedef int...  in_addr_t;
+    typedef int...  sa_family_t;
+    typedef int...  in_port_t;
+
+    struct in_addr {
+        in_addr_t s_addr;
+    };
+
+    struct sockaddr_in {
+        sa_family_t     sin_family;
+        in_port_t       sin_port;
+        struct  in_addr sin_addr;
+        ...;
+    };
 ''')
 
 
