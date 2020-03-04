@@ -1,7 +1,9 @@
+import sys
+import socket
 from ._liburing import ffi, lib
 
 __all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec',
-           'sigmask', 'sockaddr')
+           'sigmask', 'sockaddr', 'sockaddr_in')
 
 
 NULL = ffi.NULL
@@ -148,3 +150,26 @@ def sockaddr():
     addr = ffi.new('struct sockaddr *')
     len_ = ffi.new('socklen_t *', ffi.sizeof(addr))
     return addr, len_
+
+
+def sockaddr_in(family, ip, port):
+    '''
+        Type
+            family:  int
+            ip:      str
+            port:    int
+            return:  Union[<cdata>, <cdata>]
+
+        Example
+            >>> addr, addrlen = sockaddr_in(socket.AF_INET, '127.0.0.1', 3000)
+    '''
+    pack = socket.inet_pton(family, ip)
+
+    sa = ffi.new('struct sockaddr_in[1]')
+    sa[0].sin_addr.s_addr = int.from_bytes(pack, sys.byteorder)
+    sa[0].sin_port = socket.htons(port)
+    sa[0].sin_family = family
+
+    addr = ffi.cast('struct sockaddr[1]', sa)
+    len_ = ffi.new('socklen_t[1]', [ffi.sizeof(addr)])
+    return addr, len_[0]
