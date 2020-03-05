@@ -64,7 +64,7 @@ def test_connect(ring, ipv6=False):
         return 0
 
 
-def main():
+def test_main():
     ring = liburing.io_uring()
     assert liburing.io_uring_queue_init(32, ring, 0) == 0,\
         "io_uring_queue_setup() failed"
@@ -78,6 +78,3 @@ def main():
         "test_connect() failed, ipv6: True"
     liburing.io_uring_queue_exit(ring)
     return 0
-
-
-main()
