@@ -34,9 +34,22 @@ def io_uring_cqe():
     return ffi.new('struct io_uring_cqe *')
 
 
-def io_uring_cqes():
-    #
-    return ffi.new('struct io_uring_cqe **')
+def io_uring_cqes(no=1):
+    '''
+        Type
+            no:      int
+            return:  <cdata>
+
+        Example
+            >>> cqes = io_uring_cqe()
+
+            >>> cqes = io_uring_cqe(12)
+            >>> cqes[0]
+            ...
+            >>> cqes[11]
+            ...
+    '''
+    return ffi.new('struct io_uring_cqe *[]', no)
 
 
 def iovec(*buffers):
