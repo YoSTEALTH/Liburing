@@ -10,6 +10,17 @@ def test_setup():
     assert liburing.io_uring_queue_init(1, ring, 0) == 0
     assert liburing.io_uring_queue_exit(ring) is None
 
+    ring = liburing.io_uring()
+    with pytest.raises(ValueError):
+        assert liburing.io_uring_queue_init(0, ring, 0) == 0
+
+    # check `ring.ring_fd` test
+    ring = liburing.io_uring()
+    try:
+        assert liburing.lib.io_uring_queue_init(0, ring, 0) == -22
+    finally:
+        assert liburing.io_uring_queue_exit(ring) is None
+
 
 def test_setup_polling_io():
     ring = liburing.io_uring()
