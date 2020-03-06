@@ -77,7 +77,7 @@ def iovec(*buffers):
         >>> len(iov)
         2
     '''
-    iovs = ffi.new(f'struct iovec[{len(buffers)}]')
+    iovs = ffi.new('struct iovec []', len(buffers))
     for i, buffer in enumerate(buffers):
         iovs[i].iov_base = ffi.from_buffer(buffer)
         iovs[i].iov_len = len(buffer)
