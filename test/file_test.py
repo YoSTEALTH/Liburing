@@ -20,6 +20,7 @@ def test_file_registration(tmpdir):
 def test_files_write_read(tmpdir):
     fd = os.open(os.path.join(tmpdir, '1.txt'), os.O_RDWR | os.O_CREAT, 0o660)
     ring = liburing.io_uring()
+    cqes = liburing.io_uring_cqes(2)
 
     # prepare for writing two separate writes.
     one = bytearray(b'hello')
@@ -39,15 +40,16 @@ def test_files_write_read(tmpdir):
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_writev(sqe, fd, vec_two, len(vec_two), 5)
 
-        # submit both writes
+        # submit both reads
         assert liburing.io_uring_submit(ring) == 2
 
-        cqes = liburing.io_uring_cqes()
-        # wait for cqe (completion queue entry)
+        # submits and wait for cqe (completion queue entry)
         liburing.io_uring_wait_cqes(ring, cqes, 2)
 
-        # clear old query ?
-        cqe = liburing.io_uring_cqe()
+        cqe = cqes[0]
+        liburing.io_uring_cqe_seen(ring, cqe)
+
+        cqe = cqes[1]
         liburing.io_uring_cqe_seen(ring, cqe)
 
         # read "world"
@@ -61,11 +63,13 @@ def test_files_write_read(tmpdir):
         # submit both reads
         assert liburing.io_uring_submit(ring) == 2
 
-        # wait for the cqe to complete
-        cqes = liburing.io_uring_cqes()
+        # submit and wait for the cqe to complete, reuse `cqes` again.
         liburing.io_uring_wait_cqes(ring, cqes, 2)
 
-        cqe = liburing.io_uring_cqe()
+        cqe = cqes[0]
+        liburing.io_uring_cqe_seen(ring, cqe)
+
+        cqe = cqes[1]
         liburing.io_uring_cqe_seen(ring, cqe)
 
         # use same as write buffer to read but switch values so the change is detected
