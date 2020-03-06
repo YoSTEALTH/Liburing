@@ -28,7 +28,7 @@ def test_event(tmpdir):
             except BlockingIOError:
                 print('waiting event')
             else:
-                cqe = liburing.io_uring_cqe()
+                cqe = cqes[0]
                 liburing.io_uring_cqe_seen(ring, cqe)
                 break
 
