@@ -22,7 +22,7 @@ def test_files_write_read(tmpdir):
     ring = liburing.io_uring()
     cqes = liburing.io_uring_cqes(2)
 
-    # prepare for writing two separate writes.
+    # prepare for writing two separate writes and reads.
     one = bytearray(b'hello')
     two = bytearray(b'world')
     vec_one = liburing.iovec(one)
@@ -40,7 +40,7 @@ def test_files_write_read(tmpdir):
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_writev(sqe, fd, vec_two, len(vec_two), 5)
 
-        # submit both reads
+        # submit both writes
         assert liburing.io_uring_submit(ring) == 2
 
         # submits and wait for cqe (completion queue entry)
