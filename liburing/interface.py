@@ -1,6 +1,6 @@
 from ._liburing import lib
 from .wrapper import trap_error
-from .helper import timespec, sigmask, NULL
+from .helper import NULL
 
 
 # Library interface
@@ -71,6 +71,13 @@ def io_uring_ring_dontfork(ring):
     return trap_error(lib.io_uring_ring_dontfork(ring))
 
 
+def io_uring_queue_exit(ring):
+    # Only call `io_uring_queue_exit(ring)` if `ring_fd` is true, or else
+    # `Segmentation fault (core dumped)` could happen in certain scenarios.
+    if ring.ring_fd:
+        lib.io_uring_queue_exit(ring)
+
+
 def io_uring_peek_batch_cqe(ring, cqes, count):
     '''
         ...
@@ -88,11 +95,11 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=NULL, sm=NULL):
             >> io_uring_wait_cqes(ring, cqe, ts=timespec(1, 1000000), ...)
 
         Note
-            Like io_uring_wait_cqe(), except it accepts a timeout value as well. Note
-            that an sqe is used internally to handle the timeout. Applications using
-            this function must never set sqe->user_data to LIBURING_UDATA_TIMEOUT!
+            Like `io_uring_wait_cqe()`, except it accepts a timeout value as well. Note
+            that an `sqe` is used internally to handle the timeout. Applications using
+            this function must never set `sqe->user_data` to `LIBURING_UDATA_TIMEOUT`!
 
-            Note that the application need not call io_uring_submit() before calling
+            Note that the application need not call `io_uring_submit()` before calling
             this function, as we will do that on its behalf. From this it also follows
             that this function isn't safe to use for applications that split SQ and CQ
             handling between two threads and expect that to work without synchronization,
