@@ -32,6 +32,12 @@ Use `pip`_ to install, upgrade & uninstall Python wrapper:
 
     pip uninstall liburing
 
+Install directly from GitHub:
+
+.. code-block:: text
+
+    pip install --upgrade git+https://github.com/YoSTEALTH/Liburing
+
 
 To find out all the functions and definitions:
 
