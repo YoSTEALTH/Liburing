@@ -178,6 +178,19 @@ def io_uring_unregister_eventfd(ring):
     return trap_error(lib.io_uring_unregister_eventfd(ring))
 
 
+def io_uring_register_eventfd_async(ring, event_fd):
+    '''
+        Type
+            ring:     io_uring
+            event_fd: int
+            return:   int
+
+        Version
+            0.6.0
+    '''
+    return trap_error(lib.io_uring_register_eventfd_async(ring, event_fd))
+
+
 def io_uring_register_probe(ring, p, nr):
     '''
         Type
