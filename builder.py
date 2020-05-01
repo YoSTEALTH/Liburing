@@ -58,6 +58,7 @@ ffi.cdef('''
     typedef int...  __u64;
 
     typedef int...  off_t;
+    typedef int...  loff_t;
     typedef int...  mode_t;
     typedef ...     igset_t;
     typedef int...  __aligned_u64;
@@ -76,17 +77,6 @@ ffi.cdef('''
     const struct iovec {
         void * iov_base;    // starting address
         size_t iov_len;     // number of bytes to transfer
-    };
-
-    struct __kernel_timespec {
-        int64_t     tv_sec;
-        long long   tv_nsec;
-    };
-
-    struct open_how {
-        uint64_t    flags;
-        uint64_t    mode;
-        uint64_t    resolve;
     };
 ''')
 
@@ -185,6 +175,7 @@ ffi.cdef('''
                                               int *files,
                                               unsigned nr_files);
     extern int io_uring_register_eventfd(struct io_uring *ring, int fd);
+    extern int io_uring_register_eventfd_async(struct io_uring *ring, int fd);
     extern int io_uring_unregister_eventfd(struct io_uring *ring);
     extern int io_uring_register_probe(struct io_uring *ring,
                                        struct io_uring_probe *p,
@@ -235,6 +226,13 @@ ffi.cdef('''
                                         const void *addr,
                                         unsigned len,
                                         __u64 offset);
+    static inline void io_uring_prep_splice(struct io_uring_sqe *sqe,
+                                            int fd_in,
+                                            loff_t off_in,
+                                            int fd_out,
+                                            loff_t off_out,
+                                            unsigned int nbytes,
+                                            unsigned int splice_flags);
     static inline void io_uring_prep_readv(struct io_uring_sqe *sqe,
                                            int fd,
                                            const struct iovec *iovecs,
@@ -347,8 +345,18 @@ ffi.cdef('''
     struct epoll_event;
     static inline void io_uring_prep_epoll_ctl(struct io_uring_sqe *sqe,
                                                int epfd,
-                                               int fd, int op,
+                                               int fd,
+                                               int op,
                                                struct epoll_event *ev);
+    static inline void io_uring_prep_provide_buffers(struct io_uring_sqe *sqe,
+                                                     void *addr,
+                                                     int len,
+                                                     int nr,
+                                                     int bgid,
+                                                     int bid);
+    static inline void io_uring_prep_remove_buffers(struct io_uring_sqe *sqe,
+                                                    int nr,
+                                                    int bgid);
     static inline unsigned io_uring_sq_ready(struct io_uring *ring);
     static inline unsigned io_uring_sq_space_left(struct io_uring *ring);
     static inline unsigned io_uring_cq_ready(struct io_uring *ring);
@@ -397,7 +405,10 @@ ffi.cdef('''
             __u64   off;    /* offset into file */
             __u64   addr2;
         };
-        __u64   addr;       /* pointer to buffer or iovecs */
+        union {
+            __u64   addr;   /* pointer to buffer or iovecs */
+            __u64   splice_off_in;
+        };
         __u32   len;        /* buffer size or number of iovecs */
         union {
             __kernel_rwf_t  rw_flags;
@@ -411,14 +422,23 @@ ffi.cdef('''
             __u32           open_flags;
             __u32           statx_flags;
             __u32           fadvise_advice;
+            __u32           splice_flags;
         };
         __u64   user_data;  /* data to be passed back at completion time */
         union {
             struct {
-                __u16       buf_index;      /* index into fixed buffers, if used */
-                __u16       personality;    /* personality to use, if used */
+                /*
+                 * // pack this to avoid bogus arm OABI complaints
+                 * union {
+                 *    __u16   buf_index;      // index into fixed buffers, if used
+                 *    __u16   buf_group;      // for grouped buffer selection
+                 * } __attribute__((packed));
+                 */
+                ...;
+                __u16   personality;    /* personality to use, if used */
+                __s32   splice_fd_in;
             };
-            __u64           __pad2[3];
+            __u64   __pad2[3];
         };
     };
 
@@ -428,6 +448,7 @@ ffi.cdef('''
         IOSQE_IO_LINK_BIT,
         IOSQE_IO_HARDLINK_BIT,
         IOSQE_ASYNC_BIT,
+        IOSQE_BUFFER_SELECT_BIT,
     };
 
     /*
@@ -438,6 +459,7 @@ ffi.cdef('''
     #define IOSQE_IO_LINK           ...     /* links next sqe */
     #define IOSQE_IO_HARDLINK       ...     /* like LINK, but stronger */
     #define IOSQE_ASYNC             ...     /* always go async */
+    #define IOSQE_BUFFER_SELECT     ...     /* select buffer from sqe->buf_group */
 
     /*
      * io_uring_setup() flags
@@ -480,6 +502,9 @@ ffi.cdef('''
         IORING_OP_RECV,
         IORING_OP_OPENAT2,
         IORING_OP_EPOLL_CTL,
+        IORING_OP_SPLICE,
+        IORING_OP_PROVIDE_BUFFERS,
+        IORING_OP_REMOVE_BUFFERS,
 
         /* this goes last, obviously */
         IORING_OP_LAST,
@@ -496,12 +521,29 @@ ffi.cdef('''
     #define IORING_TIMEOUT_ABS      ...
 
     /*
+     * sqe->splice_flags
+     * extends splice(2) flags
+     */
+    #define SPLICE_F_FD_IN_FIXED    ...     /* the last bit of __u32 */
+
+    /*
      * IO completion data structure (Completion Queue Entry)
      */
     struct io_uring_cqe {
         __u64   user_data;  /* sqe->data submission passed back */
         __s32   res;        /* result code for this event */
         __u32   flags;
+    };
+
+    /*
+     * cqe->flags
+     *
+     * IORING_CQE_F_BUFFER  If set, the upper 16 bits are the buffer ID
+     */
+    #define IORING_CQE_F_BUFFER     ...
+
+    enum {
+        IORING_CQE_BUFFER_SHIFT     = 16,
     };
 
     /*
@@ -571,6 +613,7 @@ ffi.cdef('''
     #define IORING_FEAT_SUBMIT_STABLE       ...
     #define IORING_FEAT_RW_CUR_POS          ...
     #define IORING_FEAT_CUR_PERSONALITY     ...
+    #define IORING_FEAT_FAST_POLL           ...
 
     /*
      * io_uring_register(2) opcodes and arguments
@@ -612,6 +655,10 @@ ffi.cdef('''
 ''')
 
 
+# compat.h
+# Note: auto created in `./configure`
+
+
 # statx(2)
 ffi.cdef('''
     /* man page @ http://man7.org/linux/man-pages/man2/statx.2.html */
@@ -619,6 +666,7 @@ ffi.cdef('''
     struct statx_timestamp {
         __s64 tv_sec;    /* Seconds since the Epoch (UNIX time) */
         __u32 tv_nsec;   /* Nanoseconds since tv_sec */
+        ...;
     };
 
     struct statx {
@@ -652,6 +700,7 @@ ffi.cdef('''
          */
         __u32 stx_dev_major;   /* Major ID */
         __u32 stx_dev_minor;   /* Minor ID */
+        ...;
     };
 
     /* Flags */
