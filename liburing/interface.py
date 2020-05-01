@@ -194,10 +194,10 @@ def io_uring_register_eventfd_async(ring, event_fd):
 def io_uring_register_probe(ring, p, nr):
     '''
         Type
-            ring:    io_uring
-            p:       io_uring_probe
-            nr:      int
-            return:  int
+            ring:   io_uring
+            p:      io_uring_probe
+            nr:     int
+            return: int
 
         Version
             0.4.0
@@ -208,8 +208,8 @@ def io_uring_register_probe(ring, p, nr):
 def io_uring_register_personality(ring):
     '''
         Type
-            ring:    io_uring
-            return:  int
+            ring:   io_uring
+            return: int
 
         Version
             0.4.0
@@ -220,9 +220,9 @@ def io_uring_register_personality(ring):
 def io_uring_unregister_personality(ring, id):
     '''
         Type
-            ring:    io_uring
-            id:      int
-            return:  int
+            ring:   io_uring
+            id:     int
+            return: int
 
         Version
             0.4.0
@@ -262,15 +262,45 @@ def io_uring_wait_cqe(ring, cqe_ptr):
 
 # Prep Functions
 # --------------
+def io_uring_prep_read(sqe, fd, buf, nbytes, offset, flags=0):
+    '''
+        Type
+            sqe:    io_uring_sqe
+            fd:     int
+            buf:    ffi.from_buffer
+            nbytes: int
+            offset: int
+            flags:  int
+            return: None
+
+        Example
+            >>> buffer = bytearray(11)
+            >>> iov = iovec(buffer)
+            >>> io_uring_prep_read(sqe, fd, iov[0].iov_base, iov[0].iov_len, 0, 0)
+            ...
+            >>> buffer
+            b'hello world'
+
+        Version
+            linux: 5.6
+
+        Note
+            - Liburing C library does not provide much needed `flags` parameter
+    '''
+    lib.io_uring_prep_read(sqe, fd, buf, nbytes, offset)
+    if flags:
+        lib.io_uring_sqe_set_flags(sqe, flags)
+
+
 def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=0):
     '''
         Type
-            fd:         int
-            iovecs:     iovec
-            nr_vecs:    int
-            offset:     int
-            flags:      int
-            return:     None
+            fd:      int
+            iovecs:  iovec
+            nr_vecs: int
+            offset:  int
+            flags:   int
+            return:  None
 
         Example
             >>> fd = os.open(...)
@@ -286,21 +316,55 @@ def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=0):
             - Liburing C library does not provide much needed `flags` parameter
     '''
     lib.io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset)
-    sqe.rw_flags = flags
+    if flags:
+        lib.io_uring_sqe_set_flags(sqe, flags)
+
+
+def io_uring_prep_write(sqe, fd, buf, nbytes, offset, flags=0):
+    '''
+        Type
+            sqe:    io_uring_sqe
+            fd:     int
+            buf:    ffi.from_buffer
+            nbytes: int
+            offset: int
+            flags:  int
+            return: None
+
+        Example
+            >>> iov = iovec(bytearray(b'hello world'))
+            >>> io_uring_prep_write(sqe, fd, iov[0].iov_base, iov[0].iov_len, 0, 0)
+            ...
+
+        Version
+            linux: 5.6
+
+        Note
+            - Liburing C library does not provide much needed `flags` parameter
+    '''
+    lib.io_uring_prep_write(sqe, fd, buf, nbytes, offset)
+    if flags:
+        lib.io_uring_sqe_set_flags(sqe, flags)
 
 
 def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=0):
     '''
         Type
-            fd:         int
-            iovecs:     iovec
-            nr_vecs:    int
-            offset:     int
-            flags:      int
-            return:     None
+            fd:      int
+            iovecs:  iovec
+            nr_vecs: int
+            offset:  int
+            flags:   int
+            return:  None
+
+        Example
+            >>> iov = iovec(bytearray(b'hello'), bytearray(b'world'))
+            >>> io_uring_prep_writev(sqe, fd, iov, len(iov), 0, 0)
+            ...
 
         Note
             - Liburing C library does not provide much needed `flags` parameter
     '''
     lib.io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset)
-    sqe.rw_flags = flags
+    if flags:
+        lib.io_uring_sqe_set_flags(sqe, flags)
