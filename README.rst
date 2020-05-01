@@ -16,7 +16,7 @@ Requires
 Includes
 --------
 
-    - liburing 0.5.0
+    - liburing 0.6.0
 
 
 Install, update & uninstall (Alpha)
