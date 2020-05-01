@@ -3,7 +3,7 @@ import socket
 from ._liburing import ffi, lib
 
 __all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec',
-           'sigmask', 'sockaddr', 'sockaddr_in')
+           'statx', 'sigmask', 'sockaddr', 'sockaddr_in')
 
 
 NULL = ffi.NULL
@@ -116,6 +116,20 @@ def timespec(seconds=0, nanoseconds=0):
         return ts
     else:
         return NULL
+
+
+def statx():
+    '''
+        Type
+            return:  <cdata>
+
+        Example
+            >>> stats = statx()
+            >>> io_uring_prep_statx(sqe, -1, path, 0, 0, stats)
+            # or
+            >>> io_uring_prep_statx(sqe, -1, path, 0, liburing.STATX_SIZE, stats)
+    '''
+    return ffi.new('struct statx[1]')
 
 
 # TODO: needs testing
