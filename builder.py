@@ -78,6 +78,21 @@ ffi.cdef('''
         void * iov_base;    // starting address
         size_t iov_len;     // number of bytes to transfer
     };
+
+    /*
+     * Note: Bellow structs are needed or else error is raised while using, even though they are
+     *       defined in `configure` file.
+     */
+    struct __kernel_timespec {
+        int64_t     tv_sec;
+        long long   tv_nsec;
+    };
+
+    struct open_how {
+        uint64_t    flags;
+        uint64_t    mode;
+        uint64_t    resolve;
+    };
 ''')
 
 
