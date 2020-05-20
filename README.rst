@@ -4,7 +4,7 @@ Liburing
 This is a Python + CFFI wrapper around Liburing C library, which is a helper to setup and tear-down ``io_uring`` instances.
 
 Read how to use `Liburing`_ (pdf)
-Another good documentation `Lord of the io_uring`_
+Another good documentation Lord of the `io_uring`_
 
 
 Requires
@@ -66,4 +66,4 @@ TODO
 .. _pip: https://pip.pypa.io/en/stable/quickstart/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
 .. _Liburing: https://kernel.dk/io_uring.pdf
-.. Lord of the io_uring: https://unixism.net/loti/
+.. io_uring: https://unixism.net/loti/
