@@ -2,8 +2,8 @@ import sys
 import socket
 from ._liburing import ffi, lib
 
-__all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'iovec', 'timespec',
-           'statx', 'sigmask', 'sockaddr', 'sockaddr_in')
+__all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'io_uring_get_sqes',
+           'iovec', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', 'sockaddr_in')
 
 
 NULL = ffi.NULL
@@ -52,30 +52,58 @@ def io_uring_cqes(no=1):
     return ffi.new('struct io_uring_cqe *[]', no)
 
 
+def io_uring_get_sqes(ring, no=2):
+    ''' Get multiple sqes
+
+        Type
+            ring:   io_uring
+            no:     int
+            return: Optional[<cdata>]
+
+        Example
+            >>> sqes = io_uring_get_sqes(ring, 2)
+            >>> if sqes:
+            ...     io_uring_prep_accept(sqes[0], ...)
+    '''
+    sqes = ffi.new('struct io_uring_sqe *[]', no)
+    for i in range(no):
+        sqe = lib.io_uring_get_sqe(ring)
+        if not sqe:
+            # ran out of entries, return `None` so user can try again.
+            return None
+        sqes[i] = sqe
+    return sqes
+
+
 def iovec(*buffers):
     '''
-        # single read
-        >>> data = bytearray(5)
-        >>> iov = iovec(data)
+        Type
+            buffers: Sequence[bytearray, memoryview]
+            return:  struct iovec
 
-        # multiple reads
-        >>> one = bytearray(5)
-        >>> two = bytearray(5)
-        >>> iovs = iovec(one, two)
+        Example
+            # single read
+            >>> data = bytearray(5)
+            >>> iov = iovec(data)
 
-        # single write
-        >>> data = bytearray(b'hello)
-        >>> iov = iovec(data)
+            # multiple reads
+            >>> one = bytearray(5)
+            >>> two = bytearray(5)
+            >>> iovs = iovec(one, two)
 
-        # multiple writes
-        >>> one = bytearray(b'hello')
-        >>> two = bytearray(b'world)
-        >>> iovs = iovec(one, two)
+            # single write
+            >>> data = bytearray(b'hello)
+            >>> iov = iovec(data)
 
-        # get length
-        >>> iov = iovec(bytearray(5), bytearray(5))
-        >>> len(iov)
-        2
+            # multiple writes
+            >>> one = bytearray(b'hello')
+            >>> two = bytearray(b'world)
+            >>> iovs = iovec(one, two)
+
+            # get length
+            >>> iov = iovec(bytearray(5), bytearray(5))
+            >>> len(iov)
+            2
     '''
     iovs = ffi.new('struct iovec []', len(buffers))
     for i, buffer in enumerate(buffers):
