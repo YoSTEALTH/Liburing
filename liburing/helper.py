@@ -118,10 +118,32 @@ def timespec(seconds=0, nanoseconds=0):
         return NULL
 
 
-def statx():
+def time_convert(second):
+    ''' Convert `second` to ``second, nanosecond``
+
+        Type
+            second: Union[int, float]
+            return: Tuple[int, int]
+
+        Example
+            >>> time_convert(1.5)
+            1, 500_000_000
+
+            >>> time_convert(1)
+            1, 0
+
+        Usage
+            >>> timespec(*time_convert(1.5))
+    '''
+    # second(s) to second(s), nanosecond
+    return int(second // 1), int((second % 1)*1_000_000_000 // 1)
+
+
+def statx(no=1):
     '''
         Type
-            return:  <cdata>
+            no:     int
+            return: <cdata>
 
         Example
             >>> stats = statx()
@@ -129,7 +151,7 @@ def statx():
             # or
             >>> io_uring_prep_statx(sqe, -1, path, 0, liburing.STATX_SIZE, stats)
     '''
-    return ffi.new('struct statx[1]')
+    return ffi.new('struct statx []', no)
 
 
 # TODO: needs testing
