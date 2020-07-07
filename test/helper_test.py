@@ -16,3 +16,13 @@ def test_time_convert():
     result = liburing.time_convert(1.0005)
     assert result[0] == 1
     assert math.isclose(result[1], 500_000, abs_tol=1)
+
+
+def test_probe():
+    op = liburing.probe()
+    for name, bo in op.items():
+        assert isinstance(name, str)
+        assert isinstance(bo, bool)
+
+    assert op['IORING_OP_NOP'] is True
+    assert op.get('IORING_OP_LAST') is None
