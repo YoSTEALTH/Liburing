@@ -229,20 +229,20 @@ def sockaddr():
     return addr, len_
 
 
-def sockaddr_in(family, ip, port):
+def sockaddr_in(ip, port):
     '''
         Type
-            family:  int
             ip:      str
             port:    int
             return:  Union[<cdata>, <cdata>]
 
         Example
-            >>> addr, addrlen = sockaddr_in(socket.AF_INET, '127.0.0.1', 3000)
+            >>> addr, addrlen = sockaddr_in('127.0.0.1', 3000)
     '''
+    family = socket.AF_INET
     pack = socket.inet_pton(family, ip)
 
-    sa = ffi.new('struct sockaddr_in[1]')
+    sa = ffi.new('struct sockaddr_in [1]')
     sa[0].sin_addr.s_addr = int.from_bytes(pack, sys.byteorder)
     sa[0].sin_port = socket.htons(port)
     sa[0].sin_family = family
