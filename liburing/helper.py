@@ -3,7 +3,8 @@ import socket
 from ._liburing import ffi, lib
 
 __all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'io_uring_get_sqes',
-           'iovec', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', 'sockaddr_in')
+           'iovec', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', 'sockaddr_in',
+           'probe')
 
 
 NULL = ffi.NULL
@@ -250,3 +251,31 @@ def sockaddr_in(ip, port):
     addr = ffi.cast('struct sockaddr[1]', sa)
     len_ = ffi.new('socklen_t[1]', [ffi.sizeof(addr)])
     return addr, len_[0]
+
+
+def probe():
+    ''' Find out which `io_uring` operations is supported by the kernel.
+
+        Type
+            return: Dict[str, bool]
+
+        Example
+            >>> op = probe()
+            >>> op['IORING_OP_NOP']
+            True
+
+            >>> for op, supported in probe().items():
+            ...     op, supported
+            'IORING_OP_NOP', True
+
+        Note
+            - Dict key/value is not sorted
+    '''
+    get_probe = lib.io_uring_get_probe()
+    r = {}
+    for name in dir(lib):  # get `IORING_OP_*` defined in ``builder.py``
+        if name.startswith('IORING_OP_'):
+            if name != 'IORING_OP_LAST':
+                value = getattr(lib, name)
+                r[name] = bool(lib.io_uring_opcode_supported(get_probe, value))
+    return r
