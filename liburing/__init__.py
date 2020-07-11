@@ -1,6 +1,7 @@
 from ._liburing import ffi, lib  # noqa
 from ._liburing.lib import *  # noqa
 from .interface import *  # noqa 
+from .wrapper import *  # noqa 
 from .helper import *  # noqa 
 '''
     This is a Python wrapper around liburing C library,
