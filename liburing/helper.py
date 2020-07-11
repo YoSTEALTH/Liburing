@@ -42,13 +42,13 @@ def io_uring_cqes(no=1):
             return:  <cdata>
 
         Example
-            >>> cqes = io_uring_cqe()
+            >>> cqes = io_uring_cqes()
+            >>> cqes[0]
 
-            >>> cqes = io_uring_cqe(12)
+            >>> cqes = io_uring_cqes(12)
             >>> cqes[0]
             ...
             >>> cqes[11]
-            ...
     '''
     return ffi.new('struct io_uring_cqe *[]', no)
 
