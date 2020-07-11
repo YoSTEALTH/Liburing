@@ -34,47 +34,60 @@ def test_files_write_read(tmpdir):
 
         # write "hello"
         sqe = liburing.io_uring_get_sqe(ring)  # get sqe (submission queue entry) to fill
-        liburing.io_uring_prep_writev(sqe, fd, vec_one, len(vec_one), 0)
+        liburing.io_uring_prep_write(sqe, fd, vec_one[0].iov_base, vec_one[0].iov_len, 0)
+        sqe.user_data = 1
 
-        # write "world"
+        # # write "world"
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_writev(sqe, fd, vec_two, len(vec_two), 5)
+        sqe.user_data = 2
 
         # submit both writes
         assert liburing.io_uring_submit(ring) == 2
 
-        # submits and wait for cqe (completion queue entry)
-        liburing.io_uring_wait_cqes(ring, cqes, 2)
-
+        # wait for ``2`` entry to complete using single syscall
+        assert liburing.io_uring_wait_cqes(ring, cqes, 2) == 0
         cqe = cqes[0]
+        assert cqe.res == 5
+        assert cqe.user_data == 1
         liburing.io_uring_cqe_seen(ring, cqe)
 
-        cqe = cqes[1]
+        # re-uses the same resources from above?!
+        assert liburing.io_uring_wait_cqes(ring, cqes, 2) == 0
+        cqe = cqes[0]
+        assert cqe.res == 5
+        assert cqe.user_data == 2
         liburing.io_uring_cqe_seen(ring, cqe)
+
+        # Using same ``vec*`` swap so read can be confirmed.
 
         # read "world"
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_readv(sqe, fd, vec_one, len(vec_one), 5)
+        sqe.user_data = 3
+
+        assert liburing.io_uring_submit(ring) == 1
+        assert liburing.io_uring_wait_cqe(ring, cqes) == 0
+        cqe = cqes[0]
+        assert cqe.res == 5
+        assert cqe.user_data == 3
+        liburing.io_uring_cq_advance(ring, 1)
 
         # read "hello"
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_readv(sqe, fd, vec_two, len(vec_two), 0)
+        liburing.io_uring_prep_read(sqe, fd, vec_two[0].iov_base, vec_two[0].iov_len, 0)
+        sqe.user_data = 4
 
-        # submit both reads
-        assert liburing.io_uring_submit(ring) == 2
-
-        # submit and wait for the cqe to complete, reuse `cqes` again.
-        liburing.io_uring_wait_cqes(ring, cqes, 2)
-
+        assert liburing.io_uring_submit(ring) == 1
+        assert liburing.io_uring_wait_cqe(ring, cqes) == 0
         cqe = cqes[0]
-        liburing.io_uring_cqe_seen(ring, cqe)
-
-        cqe = cqes[1]
+        assert cqe.res == 5
+        assert cqe.user_data == 4
         liburing.io_uring_cqe_seen(ring, cqe)
 
         # use same as write buffer to read but switch values so the change is detected
-        assert two == b'hello'
         assert one == b'world'
+        assert two == b'hello'
     finally:
         os.close(fd)
         liburing.io_uring_queue_exit(ring)
