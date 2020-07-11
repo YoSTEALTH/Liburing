@@ -27,22 +27,24 @@ ffi.set_source('liburing._liburing',
 
 # Socket
 ffi.cdef('''
-    /* Socket */
-    struct sockaddr { ...; };
-    typedef int... socklen_t;
-
+    typedef int...  socklen_t;
     typedef int...  in_addr_t;
     typedef int...  sa_family_t;
     typedef int...  in_port_t;
 
+    struct sockaddr {
+        sa_family_t     sa_family;      /* AF_INET, AF_UNIX, AF_NS, AF_IMPLINK */
+        char            sa_data[14];    /* Protocol-specific Address */
+    };
+
     struct in_addr {
-        in_addr_t s_addr;
+        in_addr_t       s_addr;         /* Service Port */
     };
 
     struct sockaddr_in {
-        sa_family_t     sin_family;
-        in_port_t       sin_port;
-        struct  in_addr sin_addr;
+        sa_family_t     sin_family;     /* AF_INET, AF_UNIX, AF_NS, AF_IMPLINK */
+        in_port_t       sin_port;       /* Service Port */
+        struct  in_addr sin_addr;       /* IP Address */
         ...;
     };
 ''')
@@ -123,6 +125,7 @@ ffi.cdef('''
         unsigned *ktail;
         unsigned *kring_mask;
         unsigned *kring_entries;
+        unsigned *kflags;
         unsigned *koverflow;
         struct io_uring_cqe *cqes;
 
@@ -198,7 +201,6 @@ ffi.cdef('''
     extern int io_uring_register_personality(struct io_uring *ring);
     extern int io_uring_unregister_personality(struct io_uring *ring, int id);
 ''')
-
 
 # helper & prep functions
 ffi.cdef('''
@@ -376,10 +378,9 @@ ffi.cdef('''
     static inline unsigned io_uring_sq_space_left(struct io_uring *ring);
     static inline unsigned io_uring_cq_ready(struct io_uring *ring);
 
-    /*
-     * SKIPPING - should use `io_uring_peek_cqe` or `io_uring_wait_cqe`
-     * static int __io_uring_peek_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr);
-     */
+    static inline bool io_uring_cq_eventfd_enabled(struct io_uring *ring);
+    static inline int io_uring_cq_eventfd_toggle(struct io_uring *ring,
+                         bool enabled);
 
     /*
      * Return an IO completion, waiting for 'wait_nr' completions if one isn't
@@ -427,17 +428,18 @@ ffi.cdef('''
         __u32   len;        /* buffer size or number of iovecs */
         union {
             __kernel_rwf_t  rw_flags;
-            __u32           fsync_flags;
-            __u16           poll_events;
-            __u32           sync_range_flags;
-            __u32           msg_flags;
-            __u32           timeout_flags;
-            __u32           accept_flags;
-            __u32           cancel_flags;
-            __u32           open_flags;
-            __u32           statx_flags;
-            __u32           fadvise_advice;
-            __u32           splice_flags;
+            __u32       fsync_flags;
+            __u16       poll_events;    /* compatibility */
+            __u32       poll32_events;  /* word-reversed for BE */
+            __u32       sync_range_flags;
+            __u32       msg_flags;
+            __u32       timeout_flags;
+            __u32       accept_flags;
+            __u32       cancel_flags;
+            __u32       open_flags;
+            __u32       statx_flags;
+            __u32       fadvise_advice;
+            __u32       splice_flags;
         };
         __u64   user_data;  /* data to be passed back at completion time */
         union {
@@ -520,6 +522,7 @@ ffi.cdef('''
         IORING_OP_SPLICE,
         IORING_OP_PROVIDE_BUFFERS,
         IORING_OP_REMOVE_BUFFERS,
+        IORING_OP_TEE,
 
         /* this goes last, obviously */
         IORING_OP_LAST,
@@ -587,6 +590,7 @@ ffi.cdef('''
      * sq_ring->flags
      */
     #define IORING_SQ_NEED_WAKEUP       ...     /* needs io_uring_enter wakeup */
+    #define IORING_SQ_CQ_OVERFLOW       ...     /* CQ ring is overflown */
 
     struct io_cqring_offsets {
         __u32 head;
@@ -595,8 +599,17 @@ ffi.cdef('''
         __u32 ring_entries;
         __u32 overflow;
         __u32 cqes;
-        __u64 resv[2];
+        __u32 flags;
+        __u32 resv1;
+        __u64 resv2;
     };
+
+    /*
+     * cq_ring->flags
+     */
+
+    /* disable eventfd notifications */
+    #define IORING_CQ_EVENTFD_DISABLED  ...
 
     /*
      * io_uring_enter(2) flags
@@ -629,6 +642,7 @@ ffi.cdef('''
     #define IORING_FEAT_RW_CUR_POS          ...
     #define IORING_FEAT_CUR_PERSONALITY     ...
     #define IORING_FEAT_FAST_POLL           ...
+    #define IORING_FEAT_POLL_32BITS         ...
 
     /*
      * io_uring_register(2) opcodes and arguments
@@ -748,4 +762,5 @@ ffi.cdef('''
     #define STATX_ATTR_APPEND       ...
     #define STATX_ATTR_NODUMP       ...
     #define STATX_ATTR_ENCRYPTED    ...
+    #define STATX_ATTR_VERITY       ...
 ''')
