@@ -10,11 +10,17 @@ def trap_error(no):
             return: int
 
         Example
-            >>> trap_error(lib.function_name(*args, *kwargs))
+            >>> def normal_function(arg):
+            ...     return arg
+
+            >>> trap_error(normal_function(123))
+            123
+
+            >>> trap_error(normal_function(-11))
+            BlockingIOError: [Errno 11] Resource temporarily unavailable
 
         Note
             - Raises appropriate python exception for `-errno` returned by C.
-            - `trap_error` name suggested by _habnabit @ https://github.com/habnabit
     '''
     if no < 0:
         raise OSError(-no, os.strerror(-no))
