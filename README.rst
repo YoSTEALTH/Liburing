@@ -96,7 +96,7 @@ Simple File Example
 
     def _submit_and_wait(ring, cqes):
         io_uring_submit(ring)  # submit entry
-        io_uring_wait_cqe(ring, cqes)  # wait for opening to finish
+        io_uring_wait_cqe(ring, cqes)  # wait for entry to finish
         cqe = cqes[0]  # cqe(completion queue entry)
         result = trap_error(cqe.res)  # auto raise appropriate exception if failed
         # note `cqe.res` returns results, if ``< 0`` its an error, if ``>= 0`` its the value
