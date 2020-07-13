@@ -5,6 +5,7 @@ import liburing
 def test_socket_timeout():
     print()
     ring = liburing.io_uring()
+    cqes = liburing.io_uring_cqes()
 
     # socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -35,7 +36,6 @@ def test_socket_timeout():
 
         while True:
             try:
-                cqes = liburing.io_uring_cqes()
                 assert liburing.io_uring_peek_cqe(ring, cqes) == 0
             except BlockingIOError:
                 print('waiting socket')
@@ -52,7 +52,7 @@ def test_socket_timeout():
 
                     # `OSError: [Errno 62] Timer expired` or
                     # `BlockingIOError: [Errno 114] Operation already in progress`
-                    assert cqe.res == -62 or -114
+                    assert cqe.res in (-62, -114)
                     liburing.io_uring_cqe_seen(ring, cqe)
                     break
 
