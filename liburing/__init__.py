@@ -13,4 +13,4 @@ from .helper import *  # noqa
 #   - enables `help(liburing)` to display everything
 __all__ = [i for i in locals().keys() if not i.startswith('_')]
 __liburing__ = '0.6.0'
-__version__ = '2020.2.26'
+__version__ = '2020.7.13'
