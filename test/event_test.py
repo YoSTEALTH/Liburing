@@ -6,6 +6,7 @@ import liburing
 def test_event(tmpdir):
     fd = os.open(os.path.join(tmpdir, 'event.txt'), os.O_RDWR | os.O_CREAT, 0o660)
     ring = liburing.io_uring()
+    cqes = liburing.io_uring_cqes()
 
     # prepare for writing.
     data = bytearray(b'hello world')
@@ -15,20 +16,18 @@ def test_event(tmpdir):
         # initialization
         assert liburing.io_uring_queue_init(32, ring, 0) == 0
 
-        # write "hello"
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_writev(sqe, fd, vecs, 1, 0)
+        liburing.io_uring_prep_writev(sqe, fd, vecs, len(vecs), 0)
         assert liburing.io_uring_submit(ring) == 1
 
-        print()
-        cqes = liburing.io_uring_cqes()
         while True:
             try:
-                assert liburing.io_uring_peek_cqe(ring, cqes) == 0
+                liburing.io_uring_peek_cqe(ring, cqes)
             except BlockingIOError:
-                print('waiting event')
+                pass  # waiting for events, do something else here.
             else:
                 cqe = cqes[0]
+                assert cqe.res == 11
                 liburing.io_uring_cqe_seen(ring, cqe)
                 break
 
