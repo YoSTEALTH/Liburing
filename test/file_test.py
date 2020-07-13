@@ -37,7 +37,7 @@ def test_files_write_read(tmpdir):
         liburing.io_uring_prep_write(sqe, fd, vec_one[0].iov_base, vec_one[0].iov_len, 0)
         sqe.user_data = 1
 
-        # # write "world"
+        # write "world"
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_writev(sqe, fd, vec_two, len(vec_two), 5)
         sqe.user_data = 2
@@ -83,7 +83,7 @@ def test_files_write_read(tmpdir):
         cqe = cqes[0]
         assert cqe.res == 5
         assert cqe.user_data == 4
-        liburing.io_uring_cqe_seen(ring, cqe)
+        liburing.io_uring_cq_advance(ring, 1)
 
         # use same as write buffer to read but switch values so the change is detected
         assert one == b'world'
