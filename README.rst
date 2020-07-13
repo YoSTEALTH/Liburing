@@ -107,18 +107,14 @@ Simple File Example
 
 
     def main():
-        # prepare
         ring = io_uring()
         cqes = io_uring_cqes()
-
         try:
             io_uring_queue_init(8, ring, 0)
 
-            # Open
             fd = open(ring, cqes, '/tmp/liburing-test-file.txt', os.O_CREAT | os.O_RDWR)
             print('fd:', fd)
 
-            # Write
             length = write(ring, cqes, fd, b'hello world')
             print('wrote:', length)
 
@@ -127,7 +123,6 @@ Simple File Example
 
             close(ring, cqes, fd)
             print('closed.')
-
         finally:
             io_uring_queue_exit(ring)
 
