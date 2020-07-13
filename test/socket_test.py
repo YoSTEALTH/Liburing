@@ -3,7 +3,6 @@ import liburing
 
 
 def test_socket_timeout():
-    print()
     ring = liburing.io_uring()
     cqes = liburing.io_uring_cqes()
 
@@ -38,7 +37,7 @@ def test_socket_timeout():
             try:
                 assert liburing.io_uring_peek_cqe(ring, cqes) == 0
             except BlockingIOError:
-                print('waiting socket')
+                pass  # waiting for events, do something else here.
             else:
                 cqe = cqes[0]
                 if cqe.user_data == 1:
