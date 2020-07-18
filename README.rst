@@ -4,8 +4,7 @@ Liburing
 This is a Python + CFFI wrapper around Liburing C library, which is a helper to setup and tear-down ``io_uring`` instances.
 
 Read how to use `Liburing`_ (pdf)
-
-Another good documentation `Lord of the io_uring`_
+Good documentation `Lord of the io_uring`_
 
 
 Requires
@@ -34,6 +33,7 @@ Use `pip`_ to install, upgrade & uninstall Python wrapper:
 
     pip uninstall liburing
 
+
 Install directly from GitHub:
 
 .. code-block:: text
@@ -43,11 +43,21 @@ Install directly from GitHub:
 
 To find out all the functions and definitions:
 
-.. code-block:: text
+.. code-block:: python
     
     import liburing
 
     help(liburing)
+
+
+Find out which ``io_uring`` operations is supported by the kernel:
+
+.. code-block:: python
+    
+    import liburing
+
+    probe = liburing.probe()
+    print(probe)
 
 
 Simple File Example
@@ -61,7 +71,7 @@ Simple File Example
 
 
     def open(ring, cqes, path, flags, mode=0o660, dir_fd=-1):
-        # file path must be absolute path and in bytes.
+        # file `path` must be in in bytes and as absolute path if no `dir_fd` is provided.
         _path = os.path.abspath(path).encode()
 
         sqe = io_uring_get_sqe(ring)  # sqe(submission queue entry)
