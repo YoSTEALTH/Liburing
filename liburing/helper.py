@@ -275,8 +275,7 @@ def probe():
     r = {}
     for name in dir(lib):
         # find `IORING_OP_*` defined in "builder.py"
-        if name.startswith('IORING_OP_'):
-            if name != 'IORING_OP_LAST':
-                value = getattr(lib, name)
-                r[name] = bool(lib.io_uring_opcode_supported(get_probe, value))
+        if name.startswith('IORING_OP_') and name != 'IORING_OP_LAST':
+            value = getattr(lib, name)
+            r[name] = bool(lib.io_uring_opcode_supported(get_probe, value))
     return r
