@@ -72,7 +72,7 @@ Simple File Example
 
 
     def open(ring, cqes, path, flags, mode=0o660, dir_fd=-1):
-        # file `path` must be in in bytes and as absolute path if no `dir_fd` is provided.
+        # file `path` must be in bytes and as absolute path if no `dir_fd` is provided.
         _path = os.path.abspath(path).encode()
 
         sqe = io_uring_get_sqe(ring)  # sqe(submission queue entry)
