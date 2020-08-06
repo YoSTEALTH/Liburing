@@ -20,7 +20,7 @@ source_code = '''
 
     /* since linux 5.5 */
     #ifndef STATX_ATTR_VERITY
-    #define STATX_ATTR_VERITY = 0;
+    #define STATX_ATTR_VERITY 0
     #endif
 '''
 

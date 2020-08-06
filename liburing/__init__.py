@@ -14,7 +14,7 @@ from .helper import *  # noqa
 
 # since linux 5.5
 if lib.STATX_ATTR_VERITY == 0:
-    delattr(lib, 'STATX_ATTR_VERITY')
+    del lib.STATX_ATTR_VERITY
     del STATX_ATTR_VERITY
 
 
