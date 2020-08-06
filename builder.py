@@ -13,11 +13,19 @@ os.chdir('../../')
 
 ffi = cffi.FFI()
 
+source_code = '''
+    #include <fcntl.h>       /* statx(2) - Definition of AT_* constants */
+    #include <netinet/in.h>
+    #include "liburing.h"
+
+    /* since linux 5.5 */
+    #ifndef STATX_ATTR_VERITY
+    #define STATX_ATTR_VERITY = 0;
+    #endif
+'''
+
 # Install from source files.
-ffi.set_source('liburing._liburing',
-               ''' #include <fcntl.h>       /* statx(2) - Definition of AT_* constants */
-                   #include <netinet/in.h>
-                   #include "liburing.h" ''',
+ffi.set_source('liburing._liburing', source_code,
                sources=['./libs/liburing/src/queue.c',
                         './libs/liburing/src/register.c',
                         './libs/liburing/src/setup.c',
@@ -762,5 +770,5 @@ ffi.cdef('''
     #define STATX_ATTR_APPEND       ...
     #define STATX_ATTR_NODUMP       ...
     #define STATX_ATTR_ENCRYPTED    ...
-    #define STATX_ATTR_VERITY       ...
+    #define STATX_ATTR_VERITY       ...     /* since linux 5.5 */
 ''')
