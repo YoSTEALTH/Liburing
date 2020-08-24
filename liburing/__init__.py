@@ -19,5 +19,5 @@ if lib.STATX_ATTR_VERITY == 0:
 
 
 __all__ = [i for i in locals().keys() if not i.startswith('_')]
-__liburing__ = '0.6.0'
 __version__ = '2020.7.13'
+__liburing__ = '0.7.0'
