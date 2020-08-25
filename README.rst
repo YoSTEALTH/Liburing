@@ -11,7 +11,7 @@ Good documentation `Lord of the io_uring`_
 Requires
 --------
 
-    - Linux 5.5+ (5.7+ recommended)
+    - Linux 5.1+ (5.7+ recommended)
     - Python 3.6+
 
 
