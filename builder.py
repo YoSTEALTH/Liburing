@@ -22,7 +22,7 @@ source_code = '''
     #ifndef STATX_ATTR_VERITY
     #define STATX_ATTR_VERITY 0
     #endif
-'''
+    '''
 
 # Install from source files.
 ffi.set_source('liburing._liburing', source_code,
@@ -103,6 +103,12 @@ ffi.cdef('''
         uint64_t    mode;
         uint64_t    resolve;
     };
+
+    /* splice flags */
+    #define SPLICE_F_MOVE       ...
+    #define SPLICE_F_NONBLOCK   ...
+    #define SPLICE_F_MORE       ...
+    #define SPLICE_F_GIFT       ...
 ''')
 
 
