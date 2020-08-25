@@ -5,7 +5,7 @@ import liburing
 def test_clone_file_using_splice(tmpdir):
     fd_in = os.open(os.path.join(tmpdir, '1.txt'), os.O_RDWR | os.O_CREAT, 0o660)
     fd_out = os.open(os.path.join(tmpdir, '2.txt'), os.O_RDWR | os.O_CREAT, 0o660)
-    flags = liburing.SPLICE_F_MOVE | liburing.SPLICE_F_MORE | liburing.SPLICE_F_GIFT
+    flags = liburing.SPLICE_F_MOVE | liburing.SPLICE_F_MORE
     data = b'hello world'
     BUF_SIZE = len(data)
     os.write(fd_in, data)
@@ -21,7 +21,6 @@ def test_clone_file_using_splice(tmpdir):
         # read from file "1.txt"
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_splice(sqe, fd_in, 0, w, -1, BUF_SIZE, flags)
-        sqe.opcode = liburing.IORING_OP_SPLICE
         sqe.user_data = 1
 
         # chain top and bottom sqe
@@ -30,7 +29,6 @@ def test_clone_file_using_splice(tmpdir):
         # write to file "2.txt"
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_splice(sqe, r, -1, fd_out, 0, BUF_SIZE, flags)
-        sqe.opcode = liburing.IORING_OP_SPLICE
         sqe.user_data = 2
 
         # submit both
