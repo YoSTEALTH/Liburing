@@ -21,14 +21,13 @@ def io_uring_opcode_supported(p, op):
 def io_uring_queue_init_params(entries, ring, p):
     '''
         Type
-            entries:  int
-            ring:     io_uring
-            p:        io_uring_params
-            return:   int
+            entries: int
+            ring:    io_uring
+            p:       io_uring_params
+            return:  int
     '''
     if entries < 1:
-        _ = 'io_uring_queue_init_params(entries) can not be < 1'
-        raise ValueError(_)
+        raise ValueError('`io_uring_queue_init_params(entries)` can not be ``< 1``')
     return trap_error(lib.io_uring_queue_init_params(entries, ring, p))
 
 
@@ -41,14 +40,13 @@ def io_uring_queue_init(entries, ring, flags=0):
             >>> io_uring_queue_init(1024, ring, IORING_SETUP_SQPOLL)
 
         Type
-            entries:  int
-            ring:     io_uring
-            flags:    int
-            return:   int
+            entries: int
+            ring:    io_uring
+            flags:   int
+            return:  int
     '''
     if entries < 1:
-        _ = '`io_uring_queue_init(entries)` can not be ``< 1``'
-        raise ValueError(_)
+        raise ValueError('`io_uring_queue_init(entries)` can not be ``< 1``')
     return trap_error(lib.io_uring_queue_init(entries, ring, flags))
 
 
@@ -408,6 +406,7 @@ def io_uring_prep_write(sqe, fd, buf, nbytes, offset, flags=0):
 def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=0):
     '''
         Type
+            sqe:     io_uring_sqe
             fd:      int
             iovecs:  iovec
             nr_vecs: int
@@ -426,3 +425,45 @@ def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=0):
     lib.io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset)
     if flags:
         lib.io_uring_sqe_set_flags(sqe, flags)
+
+
+def io_uring_prep_splice(sqe, fd_in, off_in, fd_out, off_out, nbytes, flags=0):
+    ''' Splice data to/from a pipe
+
+        Type
+            sqe:     io_uring_sqe
+            fd_in:   int
+            off_in:  int
+            fd_out:  int
+            off_out: int
+            nbytes:  int
+            flags:   int
+            return:  None
+
+        Flags
+            SPLICE_F_MOVE
+            SPLICE_F_NONBLOCK
+            SPLICE_F_MORE
+    '''
+    lib.io_uring_prep_splice(sqe, fd_in, off_in, fd_out, off_out, nbytes, flags)
+    sqe.opcode = lib.IORING_OP_SPLICE
+
+
+def io_uring_prep_tee(sqe, fd_in, off_in, fd_out, off_out, nbytes, flags=0):
+    ''' Duplicating pipe content
+
+        Type
+            sqe:     io_uring_sqe
+            fd_in:   int
+            off_in:  int
+            fd_out:  int
+            off_out: int
+            nbytes:  int
+            flags:   int
+            return:  None
+
+        Flags
+            SPLICE_F_NONBLOCK
+    '''
+    lib.io_uring_prep_splice(sqe, fd_in, off_in, fd_out, off_out, nbytes, flags)
+    sqe.opcode = lib.IORING_OP_TEE
