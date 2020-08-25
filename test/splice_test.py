@@ -2,18 +2,10 @@ import os
 import liburing
 
 
-SPLICE_F_MOVE = (0x01)  # move pages instead of copying
-# don't block on the pipe splicing (but we may still block on the fd we splice from/to, of course
-SPLICE_F_NONBLOCK = (0x02)
-SPLICE_F_MORE = (0x04)  # expect more data
-SPLICE_F_GIFT = (0x08)  # pages passed in are a gift
-SPLICE_F_ALL = (SPLICE_F_MOVE | SPLICE_F_NONBLOCK | SPLICE_F_MORE | SPLICE_F_GIFT)
-
-
 def test_clone_file_using_splice(tmpdir):
     fd_in = os.open(os.path.join(tmpdir, '1.txt'), os.O_RDWR | os.O_CREAT, 0o660)
     fd_out = os.open(os.path.join(tmpdir, '2.txt'), os.O_RDWR | os.O_CREAT, 0o660)
-    flags = SPLICE_F_ALL
+    flags = liburing.SPLICE_F_MOVE | liburing.SPLICE_F_MORE | liburing.SPLICE_F_GIFT
     data = b'hello world'
     BUF_SIZE = len(data)
     os.write(fd_in, data)
@@ -31,6 +23,8 @@ def test_clone_file_using_splice(tmpdir):
         liburing.io_uring_prep_splice(sqe, fd_in, 0, w, -1, BUF_SIZE, flags)
         sqe.opcode = liburing.IORING_OP_SPLICE
         sqe.user_data = 1
+
+        # chain top and bottom sqe
         sqe.flags |= liburing.IOSQE_IO_LINK
 
         # write to file "2.txt"
@@ -52,7 +46,6 @@ def test_clone_file_using_splice(tmpdir):
         # re-uses the same resources from above?!
         assert liburing.io_uring_wait_cqes(ring, cqes, 2) == 0
         cqe = cqes[0]
-
         assert cqe.res == BUF_SIZE
         assert cqe.user_data == 2
         liburing.io_uring_cqe_seen(ring, cqe)
