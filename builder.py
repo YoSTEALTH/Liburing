@@ -259,9 +259,9 @@ ffi.cdef('''
                                         __u64 offset);
     static inline void io_uring_prep_splice(struct io_uring_sqe *sqe,
                                             int fd_in,
-                                            loff_t off_in,
+                                            int64_t off_in,
                                             int fd_out,
-                                            loff_t off_out,
+                                            int64_t off_out,
                                             unsigned int nbytes,
                                             unsigned int splice_flags);
     static inline void io_uring_prep_readv(struct io_uring_sqe *sqe,
