@@ -91,3 +91,54 @@ def test_files_write_read(tmpdir):
     finally:
         os.close(fd)
         liburing.io_uring_queue_exit(ring)
+
+
+def test_rwf_nowait_flag():
+    path = './test_rwf_nowait_flag.txt'
+    # note
+    #   - `RWF_NOWAIT` will raise ``OSError: [Errno 95] Operation not supported`` if the file is not on disk!
+    #   - ram is not supported.
+    #   - `tmpdir` can be linked to ram thus using local file path
+
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NONBLOCK, 0o660)
+
+    one = bytearray(6)
+    two = bytearray(5)
+    vec = liburing.iovec(one, two)
+
+    ring = liburing.io_uring()
+    cqes = liburing.io_uring_cqes()
+
+    try:
+        # WRITE
+        # -----
+        os.write(fd, b'hello world')
+        os.fsync(fd)
+
+        assert liburing.io_uring_queue_init(2, ring, 0) == 0
+
+        # READ
+        # ----
+        sqe = liburing.io_uring_get_sqe(ring)
+        liburing.io_uring_prep_readv(sqe, fd, vec, len(vec), 0, os.RWF_NOWAIT)
+        sqe.user_data = 1
+
+        assert liburing.io_uring_submit(ring) == 1
+
+        while True:
+            try:
+                liburing.io_uring_peek_cqe(ring, cqes)
+            except BlockingIOError:
+                print('test_rwf_nowait_flag BlockingIOError', flush=True)
+            else:
+                cqe = cqes[0]
+                assert cqe.res == 6 + 5
+                assert cqe.user_data == 1
+                assert one == b'hello '
+                assert two == b'world'
+                liburing.io_uring_cqe_seen(ring, cqe)
+                break
+    finally:
+        liburing.io_uring_queue_exit(ring)
+        os.close(fd)
+        os.unlink(path)
