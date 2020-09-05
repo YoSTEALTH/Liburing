@@ -318,7 +318,7 @@ def io_uring_wait_cqe(ring, cqe_ptr):
 
 # Prep Functions
 # --------------
-def io_uring_prep_read(sqe, fd, buf, nbytes, offset, flags=0):
+def io_uring_prep_read(sqe, fd, buf, nbytes, offset, flags=None):
     '''
         Type
             sqe:    io_uring_sqe
@@ -326,13 +326,13 @@ def io_uring_prep_read(sqe, fd, buf, nbytes, offset, flags=0):
             buf:    ffi.from_buffer
             nbytes: int
             offset: int
-            flags:  int
+            flags:  Optional[int]
             return: None
 
         Example
             >>> buffer = bytearray(11)
             >>> iov = iovec(buffer)
-            >>> io_uring_prep_read(sqe, fd, iov[0].iov_base, iov[0].iov_len, 0, 0)
+            >>> io_uring_prep_read(sqe, fd, iov[0].iov_base, iov[0].iov_len, 0)
             ...
             >>> buffer
             b'hello world'
@@ -344,18 +344,18 @@ def io_uring_prep_read(sqe, fd, buf, nbytes, offset, flags=0):
             - Liburing C library does not provide much needed `flags` parameter
     '''
     lib.io_uring_prep_read(sqe, fd, buf, nbytes, offset)
-    if flags:
-        lib.io_uring_sqe_set_flags(sqe, flags)
+    if flags is not None:
+        sqe.rw_flags = flags
 
 
-def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=0):
+def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=None):
     '''
         Type
             fd:      int
             iovecs:  iovec
             nr_vecs: int
             offset:  int
-            flags:   int
+            flags:   Optional[int]
             return:  None
 
         Example
@@ -372,11 +372,11 @@ def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=0):
             - Liburing C library does not provide much needed `flags` parameter
     '''
     lib.io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset)
-    if flags:
-        lib.io_uring_sqe_set_flags(sqe, flags)
+    if flags is not None:
+        sqe.rw_flags = flags
 
 
-def io_uring_prep_write(sqe, fd, buf, nbytes, offset, flags=0):
+def io_uring_prep_write(sqe, fd, buf, nbytes, offset, flags=None):
     '''
         Type
             sqe:    io_uring_sqe
@@ -384,12 +384,12 @@ def io_uring_prep_write(sqe, fd, buf, nbytes, offset, flags=0):
             buf:    ffi.from_buffer
             nbytes: int
             offset: int
-            flags:  int
+            flags:  Optional[int]
             return: None
 
         Example
             >>> iov = iovec(bytearray(b'hello world'))
-            >>> io_uring_prep_write(sqe, fd, iov[0].iov_base, iov[0].iov_len, 0, 0)
+            >>> io_uring_prep_write(sqe, fd, iov[0].iov_base, iov[0].iov_len, 0)
             ...
 
         Version
@@ -399,11 +399,11 @@ def io_uring_prep_write(sqe, fd, buf, nbytes, offset, flags=0):
             - Liburing C library does not provide much needed `flags` parameter
     '''
     lib.io_uring_prep_write(sqe, fd, buf, nbytes, offset)
-    if flags:
-        lib.io_uring_sqe_set_flags(sqe, flags)
+    if flags is not None:
+        sqe.rw_flags = flags
 
 
-def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=0):
+def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=None):
     '''
         Type
             sqe:     io_uring_sqe
@@ -411,20 +411,20 @@ def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=0):
             iovecs:  iovec
             nr_vecs: int
             offset:  int
-            flags:   int
+            flags:   Optional[int]
             return:  None
 
         Example
             >>> iov = iovec(bytearray(b'hello'), bytearray(b'world'))
-            >>> io_uring_prep_writev(sqe, fd, iov, len(iov), 0, 0)
+            >>> io_uring_prep_writev(sqe, fd, iov, len(iov), 0)
             ...
 
         Note
             - Liburing C library does not provide much needed `flags` parameter
     '''
     lib.io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset)
-    if flags:
-        lib.io_uring_sqe_set_flags(sqe, flags)
+    if flags is not None:
+        sqe.rw_flags = flags
 
 
 def io_uring_prep_splice(sqe, fd_in, off_in, fd_out, off_out, nbytes, flags=0):
