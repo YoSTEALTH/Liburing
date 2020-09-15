@@ -28,18 +28,18 @@ Use `pip`_ to install, upgrade & uninstall Python wrapper:
 
 .. code-block:: text
 
-    pip install liburing
+    python3 -m pip install --user liburing
 
-    pip install --upgrade liburing
+    python3 -m pip install --user --upgrade liburing
 
-    pip uninstall liburing
+    python3 -m pip uninstall liburing
 
 
 Install directly from GitHub:
 
 .. code-block:: text
 
-    pip install --upgrade git+https://github.com/YoSTEALTH/Liburing
+    python3 -m pip install --user --upgrade git+https://github.com/YoSTEALTH/Liburing
 
 
 To find out all the functions and definitions:
