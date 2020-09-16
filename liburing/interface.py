@@ -109,15 +109,16 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=NULL, sm=NULL):
 
         Example
             >>> cqes = io_uring_cqes()
+            ... ...
+            >>> io_uring_wait_cqes(ring, cqes, 2)
+            >>> cqe = cqes[0]
+            ... ...
+            >>> io_uring_cqe_seen(ring, cqe)
             ...
-            >>> io_uring_wait_cqes(ring, cqes, 2)
+            >>> io_uring_wait_cqes(ring, cqes, 1)
             >>> cqe = cqes[0]
-            # do something with first `cqe`
-            >>> liburing.io_uring_cqe_seen(ring, cqe)
-            >>> io_uring_wait_cqes(ring, cqes, 2)
-            >>> cqe = cqes[0]
-            # do something with second `cqe`
-            >>> liburing.io_uring_cqe_seen(ring, cqe)
+            ... ...
+            >>> io_uring_cqe_seen(ring, cqe)
 
         Note
             Like `io_uring_wait_cqe()`, except it accepts a timeout value as well. Note
@@ -318,7 +319,7 @@ def io_uring_wait_cqe(ring, cqe_ptr):
 
 # Prep Functions
 # --------------
-def io_uring_prep_read(sqe, fd, buf, nbytes, offset, flags=None):
+def io_uring_prep_read(sqe, fd, buf, nbytes, offset):
     '''
         Type
             sqe:    io_uring_sqe
@@ -326,7 +327,6 @@ def io_uring_prep_read(sqe, fd, buf, nbytes, offset, flags=None):
             buf:    ffi.from_buffer
             nbytes: int
             offset: int
-            flags:  Optional[int]
             return: None
 
         Example
@@ -339,13 +339,29 @@ def io_uring_prep_read(sqe, fd, buf, nbytes, offset, flags=None):
 
         Version
             linux: 5.6
-
-        Note
-            - Liburing C library does not provide much needed `flags` parameter
     '''
     lib.io_uring_prep_read(sqe, fd, buf, nbytes, offset)
-    if flags is not None:
-        sqe.rw_flags = flags
+
+
+def io_uring_prep_write(sqe, fd, buf, nbytes, offset):
+    '''
+        Type
+            sqe:    io_uring_sqe
+            fd:     int
+            buf:    ffi.from_buffer
+            nbytes: int
+            offset: int
+            return: None
+
+        Example
+            >>> iov = iovec(bytearray(b'hello world'))
+            >>> io_uring_prep_write(sqe, fd, iov[0].iov_base, iov[0].iov_len, 0)
+            ...
+
+        Version
+            linux: 5.6
+    '''
+    lib.io_uring_prep_write(sqe, fd, buf, nbytes, offset)
 
 
 def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=None):
@@ -372,33 +388,6 @@ def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=None):
             - Liburing C library does not provide much needed `flags` parameter
     '''
     lib.io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset)
-    if flags is not None:
-        sqe.rw_flags = flags
-
-
-def io_uring_prep_write(sqe, fd, buf, nbytes, offset, flags=None):
-    '''
-        Type
-            sqe:    io_uring_sqe
-            fd:     int
-            buf:    ffi.from_buffer
-            nbytes: int
-            offset: int
-            flags:  Optional[int]
-            return: None
-
-        Example
-            >>> iov = iovec(bytearray(b'hello world'))
-            >>> io_uring_prep_write(sqe, fd, iov[0].iov_base, iov[0].iov_len, 0)
-            ...
-
-        Version
-            linux: 5.6
-
-        Note
-            - Liburing C library does not provide much needed `flags` parameter
-    '''
-    lib.io_uring_prep_write(sqe, fd, buf, nbytes, offset)
     if flags is not None:
         sqe.rw_flags = flags
 
