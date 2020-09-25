@@ -1,4 +1,5 @@
 import os
+import pytest
 import liburing
 
 
@@ -99,6 +100,15 @@ def test_rwf_nowait_flag():
     #   - `RWF_NOWAIT` will raise ``OSError: [Errno 95] Operation not supported`` if the file is not on disk!
     #   - ram is not supported.
     #   - `tmpdir` can be linked to ram thus using local file path
+    onwait_flag(path)
+
+    # one of the ways to tell if `RWF_NOWAIT` flag is working is to catch its error
+    with pytest.raises(OSError):
+        path = '/dev/shm/test_rwf_nowait_flag.txt'
+        onwait_flag(path)
+
+
+def onwait_flag(path):
 
     fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NONBLOCK, 0o660)
 
@@ -132,6 +142,7 @@ def test_rwf_nowait_flag():
                 print('test_rwf_nowait_flag BlockingIOError', flush=True)
             else:
                 cqe = cqes[0]
+                liburing.trap_error(cqe.res)
                 assert cqe.res == 6 + 5
                 assert cqe.user_data == 1
                 assert one == b'hello '
