@@ -3,7 +3,7 @@ from socket import AF_INET, inet_pton, htons
 from ._liburing import ffi, lib
 
 
-__all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'io_uring_get_sqes',
+__all__ = ('NULL', 'files', 'io_uring', 'io_uring_params', 'io_uring_cqe', 'io_uring_cqes', 'io_uring_get_sqes',
            'iovec', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', 'sockaddr_in',
            'probe')
 
@@ -38,6 +38,12 @@ def io_uring():
     '''
     return new('struct io_uring *')
 
+def io_uring_params():
+    '''
+        Example
+            >>> params = io_uring_params()
+    '''
+    return new('struct io_uring_params *')
 
 def io_uring_cqe():
     ''' completion queue entry
