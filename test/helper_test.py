@@ -26,3 +26,9 @@ def test_probe():
 
     assert op['IORING_OP_NOP'] is True
     assert op.get('IORING_OP_LAST') is None
+
+
+def test_sockaddr_convert():
+    ip, port = '123.45.67.89', 1234
+    addr, _ = liburing.sockaddr_in(ip, port)
+    assert liburing.decode_sockaddr(addr) == (ip, port)

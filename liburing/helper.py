@@ -1,11 +1,11 @@
 from sys import byteorder
-from socket import AF_INET, inet_pton, htons
+from socket import AF_INET, AF_INET6, inet_ntop, inet_pton, htons, ntohs
 from ._liburing import ffi, lib
 
 
 __all__ = ('NULL', 'files', 'io_uring', 'io_uring_params', 'io_uring_cqe', 'io_uring_cqes', 'io_uring_get_sqes',
            'iovec', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', 'sockaddr_in',
-           'probe')
+           'probe', 'decode_sockaddr')
 
 
 # localize
@@ -269,6 +269,30 @@ def sockaddr_in(ip, port):
     addr = cast('struct sockaddr[1]', sa)
     len_ = new('socklen_t[1]', [sizeof(addr)])
     return addr, len_[0]
+
+
+def decode_sockaddr(addr):
+    '''
+        Type
+            addr:    <cdata>
+            return:  Tuple[str, int]
+
+        Example
+            >>> ip, port = decode_sockaddr(addr)
+    '''
+    sockaddr_in = ffi.cast('struct sockaddr_in *', addr)
+
+    if sockaddr_in.sin_family == AF_INET:
+        length = 4
+    elif sockaddr_in.sin_family == AF_INET6:
+        length = 16
+    else:
+        raise NotImplementedError
+
+    pack = sockaddr_in.sin_addr.s_addr.to_bytes(length, byteorder)
+    ip = inet_ntop(sockaddr_in.sin_family, pack)
+    port = ntohs(sockaddr_in.sin_port)
+    return ip, port
 
 
 def probe():
