@@ -1,6 +1,7 @@
-import os
+from os import strerror
 
-__all__ = ('trap_error',)
+
+__all__ = 'trap_error',
 
 
 def trap_error(no):
@@ -23,5 +24,5 @@ def trap_error(no):
             - Raises appropriate python exception for `-errno` returned by C.
     '''
     if no < 0:
-        raise OSError(-no, os.strerror(-no))
+        raise OSError(-no, strerror(-no))
     return no  # success or value
