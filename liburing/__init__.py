@@ -4,7 +4,7 @@ from .interface import *  # noqa
 from .wrapper import *  # noqa 
 from .helper import *  # noqa 
 '''
-    This is a Python wrapper around liburing C library,
+    This is a Python + CFFI wrapper around Liburing C library,
     which is a helper to setup and tear-down io_uring instances.
 '''
 # note:
@@ -16,6 +16,11 @@ from .helper import *  # noqa
 if lib.STATX_ATTR_VERITY == 0:
     del lib.STATX_ATTR_VERITY
     del STATX_ATTR_VERITY
+
+# since linux 5.8
+if lib.STATX_ATTR_DAX == 0:
+    del lib.STATX_ATTR_DAX
+    del STATX_ATTR_DAX
 
 
 __all__ = [i for i in locals().keys() if not i.startswith('_')]
