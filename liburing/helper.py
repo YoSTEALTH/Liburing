@@ -3,9 +3,9 @@ from socket import AF_INET, inet_pton, htons
 from ._liburing import ffi, lib
 
 
-__all__ = ('NULL', 'files', 'io_uring', 'io_uring_cqe', 'io_uring_cqes', 'io_uring_get_sqes',
-           'iovec', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', 'sockaddr_in',
-           'probe')
+__all__ = 'NULL', 'files', 'io_uring', 'io_uring_params', 'io_uring_cqe', 'io_uring_cqes', 'io_uring_get_sqes', \
+          'iovec', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', 'sockaddr_in', \
+          'probe'
 
 
 # localize
@@ -22,6 +22,8 @@ io_uring_get_probe = lib.io_uring_get_probe
 io_uring_sq_space_left = lib.io_uring_sq_space_left
 io_uring_opcode_supported = lib.io_uring_opcode_supported
 
+io_uring_free_probe = getattr(lib, 'io_uring_free_probe', None)
+
 
 def files(*fds):
     '''
@@ -37,6 +39,14 @@ def io_uring():
             >>> ring = io_uring()
     '''
     return new('struct io_uring *')
+
+
+def io_uring_params():
+    '''
+        Example
+            >>> params = io_uring_params()
+    '''
+    return new('struct io_uring_params *')
 
 
 def io_uring_cqe():
@@ -136,7 +146,7 @@ def timespec(seconds=0, nanoseconds=0):
         Example
             >>> timespec()
             >>> timespec(None)
-            fii.NULL
+            ffi.NULL
 
             >>> timespec(1, 1000000)
             ts
@@ -187,10 +197,12 @@ def statx(no=1):
             return: <cdata>
 
         Example
-            >>> stats = statx()
-            >>> io_uring_prep_statx(sqe, -1, path, 0, 0, stats)
+            >>> stat = statx()
+            >>> io_uring_prep_statx(sqe, -1, path, 0, 0, stat)
             # or
-            >>> io_uring_prep_statx(sqe, -1, path, 0, liburing.STATX_SIZE, stats)
+            >>> io_uring_prep_statx(sqe, -1, path, 0, liburing.STATX_SIZE, stat)
+            >>> stat[0].stx_size
+            123
     '''
     return new('struct statx []', no)
 
@@ -290,4 +302,6 @@ def probe():
         if name.startswith('IORING_OP_') and name != 'IORING_OP_LAST':
             value = getattr(lib, name)
             r[name] = bool(io_uring_opcode_supported(get_probe, value))
+    if io_uring_free_probe:
+        io_uring_free_probe(get_probe)
     return r
