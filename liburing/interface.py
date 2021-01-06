@@ -3,6 +3,50 @@ from .wrapper import trap_error
 from .helper import NULL
 
 
+__all__ = 'io_uring_opcode_supported', 'io_uring_queue_init_params', 'io_uring_queue_init', 'io_uring_queue_mmap', \
+          'io_uring_ring_dontfork', 'io_uring_queue_exit', 'io_uring_peek_batch_cqe', 'io_uring_wait_cqes', \
+          'io_uring_wait_cqe_timeout', 'io_uring_submit', 'io_uring_submit_and_wait', 'io_uring_register_buffers', \
+          'io_uring_unregister_buffers', 'io_uring_register_files', 'io_uring_unregister_files', \
+          'io_uring_register_files_update', 'io_uring_register_eventfd', 'io_uring_unregister_eventfd', \
+          'io_uring_register_eventfd_async', 'io_uring_register_probe', 'io_uring_register_personality', \
+          'io_uring_unregister_personality', 'io_uring_sqring_wait', 'io_uring_wait_cqe_nr', 'io_uring_peek_cqe', \
+          'io_uring_wait_cqe', 'io_uring_prep_read', 'io_uring_prep_write', 'io_uring_prep_readv', \
+          'io_uring_prep_writev'
+
+
+# localize functions
+_io_uring_opcode_supported = lib.io_uring_opcode_supported
+_io_uring_queue_init_params = lib.io_uring_queue_init_params
+_io_uring_queue_init = lib.io_uring_queue_init
+_io_uring_queue_mmap = lib.io_uring_queue_mmap
+_io_uring_ring_dontfork = lib.io_uring_ring_dontfork
+_io_uring_queue_exit = lib.io_uring_queue_exit
+_io_uring_peek_batch_cqe = lib.io_uring_peek_batch_cqe
+_io_uring_wait_cqes = lib.io_uring_wait_cqes
+_io_uring_wait_cqe_timeout = lib.io_uring_wait_cqe_timeout
+_io_uring_submit = lib.io_uring_submit
+_io_uring_submit_and_wait = lib.io_uring_submit_and_wait
+_io_uring_register_buffers = lib.io_uring_register_buffers
+_io_uring_unregister_buffers = lib.io_uring_unregister_buffers
+_io_uring_register_files = lib.io_uring_register_files
+_io_uring_unregister_files = lib.io_uring_unregister_files
+_io_uring_register_files_update = lib.io_uring_register_files_update
+_io_uring_register_eventfd = lib.io_uring_register_eventfd
+_io_uring_unregister_eventfd = lib.io_uring_unregister_eventfd
+_io_uring_register_eventfd_async = lib.io_uring_register_eventfd_async
+_io_uring_register_probe = lib.io_uring_register_probe
+_io_uring_register_personality = lib.io_uring_register_personality
+_io_uring_unregister_personality = lib.io_uring_unregister_personality
+_io_uring_sqring_wait = lib.io_uring_sqring_wait
+_io_uring_wait_cqe_nr = lib.io_uring_wait_cqe_nr
+_io_uring_peek_cqe = lib.io_uring_peek_cqe
+_io_uring_wait_cqe = lib.io_uring_wait_cqe
+_io_uring_prep_read = lib.io_uring_prep_read
+_io_uring_prep_write = lib.io_uring_prep_write
+_io_uring_prep_readv = lib.io_uring_prep_readv
+_io_uring_prep_writev = lib.io_uring_prep_writev
+
+
 # Library interface
 # -----------------
 def io_uring_opcode_supported(p, op):
@@ -15,7 +59,7 @@ def io_uring_opcode_supported(p, op):
         Version
             0.4.0
     '''
-    return trap_error(lib.io_uring_opcode_supported(p, op))
+    return trap_error(_io_uring_opcode_supported(p, op))
 
 
 def io_uring_queue_init_params(entries, ring, p):
@@ -28,7 +72,7 @@ def io_uring_queue_init_params(entries, ring, p):
     '''
     if entries < 1:
         raise ValueError('`io_uring_queue_init_params(entries)` can not be ``< 1``')
-    return trap_error(lib.io_uring_queue_init_params(entries, ring, p))
+    return trap_error(_io_uring_queue_init_params(entries, ring, p))
 
 
 def io_uring_queue_init(entries, ring, flags=0):
@@ -47,7 +91,7 @@ def io_uring_queue_init(entries, ring, flags=0):
     '''
     if entries < 1:
         raise ValueError('`io_uring_queue_init(entries)` can not be ``< 1``')
-    return trap_error(lib.io_uring_queue_init(entries, ring, flags))
+    return trap_error(_io_uring_queue_init(entries, ring, flags))
 
 
 def io_uring_queue_mmap(fd, p, ring):
@@ -58,7 +102,7 @@ def io_uring_queue_mmap(fd, p, ring):
             ring:   io_uring
             return: int
     '''
-    return trap_error(lib.io_uring_queue_mmap(fd, p, ring))
+    return trap_error(_io_uring_queue_mmap(fd, p, ring))
 
 
 def io_uring_ring_dontfork(ring):
@@ -70,7 +114,7 @@ def io_uring_ring_dontfork(ring):
         Version
             0.4.0
     '''
-    return trap_error(lib.io_uring_ring_dontfork(ring))
+    return trap_error(_io_uring_ring_dontfork(ring))
 
 
 def io_uring_queue_exit(ring):
@@ -79,10 +123,10 @@ def io_uring_queue_exit(ring):
             ring:   io_uring
             return: int
     '''
-    # Only call `io_uring_queue_exit(ring)` if `ring_fd` is true, or else
+    # only call `io_uring_queue_exit(ring)` if `ring_fd` is true, or else
     # `Segmentation fault (core dumped)` could happen in certain scenarios.
     if ring.ring_fd:
-        lib.io_uring_queue_exit(ring)
+        _io_uring_queue_exit(ring)
 
 
 def io_uring_peek_batch_cqe(ring, cqes, count):
@@ -92,8 +136,12 @@ def io_uring_peek_batch_cqe(ring, cqes, count):
             cqes:   io_uring_cqes
             count:  int
             return: int
+
+        Note
+            - Returns `0` or `1+`
     '''
-    return trap_error(lib.io_uring_peek_batch_cqe(ring, cqes, count))
+    return _io_uring_peek_batch_cqe(ring, cqes, count)
+    # note: no need for `trap_error`
 
 
 def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=NULL, sm=NULL):
@@ -131,7 +179,7 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=NULL, sm=NULL):
             handling between two threads and expect that to work without synchronization,
             as this function manipulates both the SQ and CQ side.
     '''
-    return trap_error(lib.io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sm))
+    return trap_error(_io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts, sm))
 
 
 def io_uring_wait_cqe_timeout(ring, cqe_ptr, ts):
@@ -142,7 +190,7 @@ def io_uring_wait_cqe_timeout(ring, cqe_ptr, ts):
             ts:      timespec
             return:  int
     '''
-    return trap_error(lib.io_uring_wait_cqe_timeout(ring, cqe_ptr, ts))
+    return trap_error(_io_uring_wait_cqe_timeout(ring, cqe_ptr, ts))
 
 
 def io_uring_submit(ring):
@@ -151,7 +199,7 @@ def io_uring_submit(ring):
             ring:   io_uring
             return: int
     '''
-    return trap_error(lib.io_uring_submit(ring))
+    return trap_error(_io_uring_submit(ring))
 
 
 def io_uring_submit_and_wait(ring, wait_nr):
@@ -161,7 +209,7 @@ def io_uring_submit_and_wait(ring, wait_nr):
             wait_nr: int
             return:  int
     '''
-    return trap_error(lib.io_uring_submit_and_wait(ring, wait_nr))
+    return trap_error(_io_uring_submit_and_wait(ring, wait_nr))
 
 
 def io_uring_register_buffers(ring, iovecs, nr_iovecs):
@@ -172,7 +220,7 @@ def io_uring_register_buffers(ring, iovecs, nr_iovecs):
             nr_iovecs: int
             return:    int
     '''
-    return trap_error(lib.io_uring_register_buffers(ring, iovecs, nr_iovecs))
+    return trap_error(_io_uring_register_buffers(ring, iovecs, nr_iovecs))
 
 
 def io_uring_unregister_buffers(ring):
@@ -181,7 +229,7 @@ def io_uring_unregister_buffers(ring):
             ring:   io_uring
             return: int
     '''
-    return trap_error(lib.io_uring_unregister_buffers(ring))
+    return trap_error(_io_uring_unregister_buffers(ring))
 
 
 def io_uring_register_files(ring, files, nr_files):
@@ -192,7 +240,7 @@ def io_uring_register_files(ring, files, nr_files):
             nr_files: int
             return:   int
     '''
-    return trap_error(lib.io_uring_register_files(ring, files, nr_files))
+    return trap_error(_io_uring_register_files(ring, files, nr_files))
 
 
 def io_uring_unregister_files(ring):
@@ -201,7 +249,7 @@ def io_uring_unregister_files(ring):
             ring:   io_uring
             return: int
     '''
-    return trap_error(lib.io_uring_unregister_files(ring))
+    return trap_error(_io_uring_unregister_files(ring))
 
 
 def io_uring_register_files_update(ring, off, files, nr_files):
@@ -213,7 +261,7 @@ def io_uring_register_files_update(ring, off, files, nr_files):
             nr_files: int
             return:   int
     '''
-    return trap_error(lib.io_uring_register_files_update(ring, off, files, nr_files))
+    return trap_error(_io_uring_register_files_update(ring, off, files, nr_files))
 
 
 def io_uring_register_eventfd(ring, fd):
@@ -223,7 +271,7 @@ def io_uring_register_eventfd(ring, fd):
             fd:     int
             return: int
     '''
-    return trap_error(lib.io_uring_register_eventfd(ring, fd))
+    return trap_error(_io_uring_register_eventfd(ring, fd))
 
 
 def io_uring_unregister_eventfd(ring):
@@ -232,7 +280,7 @@ def io_uring_unregister_eventfd(ring):
             ring:   io_uring
             return: int
     '''
-    return trap_error(lib.io_uring_unregister_eventfd(ring))
+    return trap_error(_io_uring_unregister_eventfd(ring))
 
 
 def io_uring_register_eventfd_async(ring, event_fd):
@@ -245,7 +293,7 @@ def io_uring_register_eventfd_async(ring, event_fd):
         Version
             0.6.0
     '''
-    return trap_error(lib.io_uring_register_eventfd_async(ring, event_fd))
+    return trap_error(_io_uring_register_eventfd_async(ring, event_fd))
 
 
 def io_uring_register_probe(ring, p, nr):
@@ -259,7 +307,7 @@ def io_uring_register_probe(ring, p, nr):
         Version
             0.4.0
     '''
-    return trap_error(lib.io_uring_register_probe(ring, p, nr))
+    return trap_error(_io_uring_register_probe(ring, p, nr))
 
 
 def io_uring_register_personality(ring):
@@ -271,7 +319,7 @@ def io_uring_register_personality(ring):
         Version
             0.4.0
     '''
-    return trap_error(lib.io_uring_register_personality(ring))
+    return trap_error(_io_uring_register_personality(ring))
 
 
 def io_uring_unregister_personality(ring, id):
@@ -284,11 +332,27 @@ def io_uring_unregister_personality(ring, id):
         Version
             0.4.0
     '''
-    return trap_error(lib.io_uring_unregister_personality(ring, id))
+    return trap_error(_io_uring_unregister_personality(ring, id))
 
 
 # Peek & Wait
 # -----------
+def io_uring_sqring_wait(ring):
+    '''
+        Type
+            ring:   io_uring
+            return: int
+
+        Note
+            Only applicable when using `SQPOLL` - allows the caller to wait for space
+            to free up in the SQ ring, which happens when the kernel side thread has
+            consumed one or more entries. If the SQ ring is currently non-full, no
+            action is taken. Note: may return `-EINVAL` if the kernel doesn't support
+            this feature.
+    '''
+    return trap_error(_io_uring_sqring_wait(ring))
+
+
 def io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr):
     '''
         Note
@@ -296,7 +360,7 @@ def io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr):
             readily available. Returns ``0`` with `cqe_ptr` filled in on success, ``-errno`` on
             failure.
     '''
-    return trap_error(lib.io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr))
+    return trap_error(_io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr))
 
 
 def io_uring_peek_cqe(ring, cqe_ptr):
@@ -305,7 +369,7 @@ def io_uring_peek_cqe(ring, cqe_ptr):
             Return an IO completion, if one is readily available. Returns ``0`` with
             `cqe_ptr` filled in on success, ``-errno`` on failure.
     '''
-    return trap_error(lib.io_uring_peek_cqe(ring, cqe_ptr))
+    return trap_error(_io_uring_peek_cqe(ring, cqe_ptr))
 
 
 def io_uring_wait_cqe(ring, cqe_ptr):
@@ -314,7 +378,7 @@ def io_uring_wait_cqe(ring, cqe_ptr):
             Return an IO completion, waiting for it if necessary. Returns ``0`` with
             `cqe_ptr` filled in on success, ``-errno`` on failure.
     '''
-    return trap_error(lib.io_uring_wait_cqe(ring, cqe_ptr))
+    return trap_error(_io_uring_wait_cqe(ring, cqe_ptr))
 
 
 # Prep Functions
@@ -340,7 +404,7 @@ def io_uring_prep_read(sqe, fd, buf, nbytes, offset):
         Version
             linux: 5.6
     '''
-    lib.io_uring_prep_read(sqe, fd, buf, nbytes, offset)
+    _io_uring_prep_read(sqe, fd, buf, nbytes, offset)
 
 
 def io_uring_prep_write(sqe, fd, buf, nbytes, offset):
@@ -361,7 +425,7 @@ def io_uring_prep_write(sqe, fd, buf, nbytes, offset):
         Version
             linux: 5.6
     '''
-    lib.io_uring_prep_write(sqe, fd, buf, nbytes, offset)
+    _io_uring_prep_write(sqe, fd, buf, nbytes, offset)
 
 
 def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=None):
@@ -387,7 +451,7 @@ def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=None):
         Note
             - Liburing C library does not provide much needed `flags` parameter
     '''
-    lib.io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset)
+    _io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset)
     if flags is not None:
         sqe.rw_flags = flags
 
@@ -411,6 +475,6 @@ def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=None):
         Note
             - Liburing C library does not provide much needed `flags` parameter
     '''
-    lib.io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset)
+    _io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset)
     if flags is not None:
         sqe.rw_flags = flags
