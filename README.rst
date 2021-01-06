@@ -11,14 +11,14 @@ Good documentation `Lord of the io_uring`_
 Requires
 --------
 
-    - Linux 5.1+ (5.7+ recommended)
+    - Linux 5.1+ (5.11+ recommended)
     - Python 3.6+
 
 
 Includes
 --------
 
-    - liburing 0.7.0
+    - liburing 0.7.0 (f020d23c...)
 
 
 Install, update & uninstall (Alpha)
