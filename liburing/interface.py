@@ -1,6 +1,6 @@
 from ._liburing import lib
 from .wrapper import trap_error
-from .helper import NULL
+from .helper import NULL, cast
 
 
 __all__ = 'io_uring_opcode_supported', 'io_uring_queue_init_params', 'io_uring_queue_init', 'io_uring_queue_mmap', \
@@ -11,7 +11,7 @@ __all__ = 'io_uring_opcode_supported', 'io_uring_queue_init_params', 'io_uring_q
           'io_uring_register_eventfd_async', 'io_uring_register_probe', 'io_uring_register_personality', \
           'io_uring_unregister_personality', 'io_uring_sqring_wait', 'io_uring_wait_cqe_nr', 'io_uring_peek_cqe', \
           'io_uring_wait_cqe', 'io_uring_prep_read', 'io_uring_prep_write', 'io_uring_prep_readv', \
-          'io_uring_prep_writev'
+          'io_uring_prep_writev', 'io_uring_sqe_set_data', 'io_uring_prep_poll_remove', 'io_uring_prep_cancel'
 
 
 # localize functions
@@ -45,6 +45,9 @@ _io_uring_prep_read = lib.io_uring_prep_read
 _io_uring_prep_write = lib.io_uring_prep_write
 _io_uring_prep_readv = lib.io_uring_prep_readv
 _io_uring_prep_writev = lib.io_uring_prep_writev
+_io_uring_sqe_set_data = lib.io_uring_sqe_set_data
+_io_uring_prep_poll_remove = lib.io_uring_prep_poll_remove
+_io_uring_prep_cancel = lib.io_uring_prep_cancel
 
 
 # Library interface
@@ -431,6 +434,7 @@ def io_uring_prep_write(sqe, fd, buf, nbytes, offset):
 def io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset, flags=None):
     '''
         Type
+            sqe:     io_uring_sqe
             fd:      int
             iovecs:  iovec
             nr_vecs: int
@@ -478,3 +482,34 @@ def io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset, flags=None):
     _io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset)
     if flags is not None:
         sqe.rw_flags = flags
+
+
+def io_uring_sqe_set_data(sqe, data):
+    '''
+        Type
+            sqe:    io_uring_sqe
+            data:   int
+            return: None
+    '''
+    _io_uring_sqe_set_data(sqe, cast('void *', data))
+
+
+def io_uring_prep_poll_remove(sqe, user_data):
+    '''
+        Type
+            sqe:       io_uring_sqe
+            user_data: int
+            return:    None
+    '''
+    _io_uring_prep_poll_remove(sqe, cast('void *', user_data))
+
+
+def io_uring_prep_cancel(sqe, user_data, flags):
+    '''
+        Type
+            sqe:       io_uring_sqe
+            user_data: int
+            flags:     int
+            return:    None
+    '''
+    _io_uring_prep_cancel(sqe, cast('void *', user_data), flags)
