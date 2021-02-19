@@ -14,12 +14,10 @@ from .helper import *  # noqa
 
 # since linux 5.5
 if lib.STATX_ATTR_VERITY == 0:
-    del lib.STATX_ATTR_VERITY
     del STATX_ATTR_VERITY
 
 # since linux 5.8
 if lib.STATX_ATTR_DAX == 0:
-    del lib.STATX_ATTR_DAX
     del STATX_ATTR_DAX
 
 
