@@ -343,6 +343,9 @@ ffi.cdef('''
     static inline void io_uring_prep_renameat(struct io_uring_sqe *sqe, int olddfd,
                       const char *oldpath, int newdfd,
                       const char *newpath, int flags);
+    static inline void io_uring_prep_sync_file_range(struct io_uring_sqe *sqe,
+                         int fd, unsigned len,
+                         off_t offset, int flags);
 
     static inline unsigned io_uring_sq_ready(struct io_uring *ring);
     static inline unsigned io_uring_sq_space_left(struct io_uring *ring);
@@ -483,6 +486,7 @@ ffi.cdef('''
         IORING_OP_SHUTDOWN,
         IORING_OP_RENAMEAT,
         IORING_OP_UNLINKAT,
+        IORING_OP_MKDIRAT,
 
         /* this goes last, obviously */
         IORING_OP_LAST,
@@ -608,6 +612,7 @@ ffi.cdef('''
     #define IORING_FEAT_POLL_32BITS         ...
     #define IORING_FEAT_SQPOLL_NONFIXED     ...
     #define IORING_FEAT_EXT_ARG             ...
+    #define IORING_FEAT_NATIVE_WORKERS      ...
 
     /*
      * io_uring_register(2) opcodes and arguments
@@ -636,6 +641,15 @@ ffi.cdef('''
         __u32 resv;
         __aligned_u64 /* __s32 * */ fds;
     };
+
+    struct io_uring_rsrc_update {
+        __u32 offset;
+        __u32 resv;
+        __aligned_u64 data;
+    };
+
+    /* Skip updating fd indexes set to this value in the fd table */
+    #define IORING_REGISTER_FILES_SKIP  ...
 
     #define IO_URING_OP_SUPPORTED       ...
 
