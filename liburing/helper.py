@@ -1,11 +1,12 @@
 from sys import byteorder
 from socket import AF_INET, inet_pton, htons
 from ._liburing import ffi, lib
+from .interface import io_uring_submit
 
 
 __all__ = 'NULL', 'files', 'io_uring', 'io_uring_params', 'io_uring_cqe', 'io_uring_cqes', 'io_uring_get_sqes', \
-          'iovec', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', 'sockaddr_in', \
-          'probe'
+          'get_sqes', 'get_sqe', 'iovec', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', \
+          'sockaddr_in', 'probe'
 
 
 # localize
@@ -88,6 +89,9 @@ def io_uring_get_sqes(ring, no=2):
             >>> if sqes := io_uring_get_sqes(ring, 2):
             ...     io_uring_prep_read(sqes[0], ...)
             ...     io_uring_prep_write(sqes[1], ...)
+
+        Note
+            - look into `get_sqes` for alternative version
     '''
     # make sure enough sq entries are available before proceeding
     if no > io_uring_sq_space_left(ring):
@@ -96,6 +100,64 @@ def io_uring_get_sqes(ring, no=2):
     for i in range(no):
         sqes[i] = io_uring_get_sqe(ring)
     return sqes
+
+
+def get_sqes(ring, count):
+    ''' Safely get multiple `sqes`
+
+        Type
+            ring:   io_uring
+            count:  int
+            return: List[io_uring_sqe]
+
+        Example
+            >>> for sqe in get_sqes(ring, 2):
+            ...     io_uring_prep_read(sqe, ...)
+            ...     io_uring_sqe_set_flags(sqe, IOSQE_IO_LINK)
+            ...     ...
+
+            # or
+
+            >>> sqes = get_sqes(ring, 2)
+            ...
+            >>> sqe = sqes[0]
+            >>> io_uring_prep_read(sqe, ...)
+            >>> io_uring_sqe_set_flags(sqe, IOSQE_IO_LINK)
+            ...
+            >>> sqe = sqes[1]
+            ... ...
+
+        Note
+            - Getting multiple `sqes` is mainly useful when linking multiple `sqe` together using `IOSQE_IO_LINK`
+            - Auto submits previous queue entries if sqes required is < count
+    '''
+    # make sure `count` is not greater then init's `entries`
+    if count > ring.sq.kring_entries[0]:
+        raise ValueError('`get_sqes()` - `count` can not be higher then `entries` in `io_uring_queue_init()`')
+    elif count < io_uring_sq_space_left(ring):
+        io_uring_submit(ring)
+    return [io_uring_get_sqe(ring) for _ in range(count)]
+    # note: using List vs Generator so all the sqes is ready to be used at once
+
+
+def get_sqe(ring):
+    ''' Safely get single `sqe`
+
+        Type
+            ring:   io_uring
+            return: io_uring_sqe
+
+        Example
+            >>> sqe = get_sqe(ring)
+
+        Note
+            - Auto submits previous queue entries if no sqe is free.
+    '''
+    while True:
+        sqe = io_uring_get_sqe(ring)
+        if sqe:  # note: not using `:=` for python 3.6 support
+            return sqe
+        io_uring_submit(ring)
 
 
 def iovec(*buffers):
