@@ -1,6 +1,5 @@
-from ._liburing import lib
+from ._liburing import ffi, lib
 from .wrapper import trap_error
-from .helper import NULL, cast
 
 
 __all__ = 'io_uring_opcode_supported', 'io_uring_queue_init_params', 'io_uring_queue_init', 'io_uring_queue_mmap', \
@@ -15,6 +14,9 @@ __all__ = 'io_uring_opcode_supported', 'io_uring_queue_init_params', 'io_uring_q
 
 
 # localize functions
+NULL = ffi.NULL
+cast = ffi.cast
+
 _io_uring_opcode_supported = lib.io_uring_opcode_supported
 _io_uring_queue_init_params = lib.io_uring_queue_init_params
 _io_uring_queue_init = lib.io_uring_queue_init
