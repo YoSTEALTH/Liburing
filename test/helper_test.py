@@ -26,3 +26,39 @@ def test_probe():
 
     assert op['IORING_OP_NOP'] is True
     assert op.get('IORING_OP_LAST') is None
+
+
+def test_get_sqes():
+    ring = liburing.io_uring()
+    try:
+        assert liburing.io_uring_queue_init(2, ring, 0) == 0
+
+        for sqe in liburing.get_sqes(ring, 2):
+            liburing.io_uring_prep_nop(sqe)
+            liburing.io_uring_sqe_set_flags(sqe, liburing.IOSQE_IO_LINK)
+
+        assert liburing.io_uring_submit_and_wait(ring, 2) == 2
+        liburing.io_uring_cq_advance(ring, 2)
+
+    finally:
+        liburing.io_uring_queue_exit(ring)
+
+    # TODO:
+    #   - need to catch `ValueError`
+    #   - need to test if `io_uring_submit` is working right if count > free sqes available
+
+
+def test_get_sqe():
+    ring = liburing.io_uring()
+    try:
+        assert liburing.io_uring_queue_init(1, ring, 0) == 0
+        sqe = liburing.get_sqe(ring)
+        liburing.io_uring_prep_nop(sqe)
+
+        assert liburing.io_uring_submit_and_wait(ring, 1) == 1
+        liburing.io_uring_cq_advance(ring, 1)
+    finally:
+        liburing.io_uring_queue_exit(ring)
+
+    # TODO:
+    #   - need to test if `io_uring_submit` is working right if there is no free sqe available
