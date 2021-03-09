@@ -18,7 +18,7 @@ Requires
 Includes
 --------
 
-    - liburing 0.7.0 (f020d23c...)
+    - liburing 2.0
 
 
 Install, update & uninstall (Alpha)
