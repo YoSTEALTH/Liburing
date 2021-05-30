@@ -9,8 +9,7 @@ required = '5.1'
 
 # check to make sure `package` is only installed on supported Linux version.
 if platform.system != 'Linux' or LooseVersion(platform.release) < LooseVersion(required):
-    _ = f'"{package.title()}" only supported to run on Linux {required}+'
-    raise RuntimeError(_)
+    raise RuntimeError(f'"{package.title()}" only supported to run on Linux {required}+')
 
 
 with open('README.rst', 'r') as file:
@@ -44,4 +43,5 @@ setup(url='https://github.com/YoSTEALTH/Liburing',
                    'Programming Language :: Python :: 3.7',
                    'Programming Language :: Python :: 3.8',
                    'Programming Language :: Python :: 3.9',
+                   'Programming Language :: Python :: 3.10',
                    'Topic :: Software Development :: Libraries :: Python Modules'])
