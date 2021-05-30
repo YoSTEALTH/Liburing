@@ -361,6 +361,8 @@ ffi.cdef('''
                     struct io_uring_cqe **cqe_ptr);
     static inline int io_uring_wait_cqe(struct io_uring *ring,
                     struct io_uring_cqe **cqe_ptr);
+    ssize_t io_uring_mlock_size(unsigned entries, unsigned flags);
+    ssize_t io_uring_mlock_size_params(unsigned entries, struct io_uring_params *p);
 ''')
 
 
@@ -510,6 +512,21 @@ ffi.cdef('''
     #define SPLICE_F_FD_IN_FIXED    ...     /* the last bit of __u32 */
 
     /*
+     * POLL_ADD flags. Note that since sqe->poll_events is the flag space, the
+     * command flags for POLL_ADD are stored in sqe->len.
+     *
+     * IORING_POLL_ADD_MULTI    Multishot poll. Sets IORING_CQE_F_MORE if
+     *              the poll handler will continue to report
+     *              CQEs on behalf of the same SQE.
+     *
+     * IORING_POLL_UPDATE       Update existing poll request, matching
+     *              sqe->addr as the old user_data field.
+     */
+    #define IORING_POLL_ADD_MULTI           ...
+    #define IORING_POLL_UPDATE_EVENTS       ...
+    #define IORING_POLL_UPDATE_USER_DATA    ...
+
+    /*
      * IO completion data structure (Completion Queue Entry)
      */
     struct io_uring_cqe {
@@ -522,8 +539,11 @@ ffi.cdef('''
      * cqe->flags
      *
      * IORING_CQE_F_BUFFER  If set, the upper 16 bits are the buffer ID
+     * IORING_CQE_F_MORE    If set, parent SQE will generate more CQE entries
      */
     #define IORING_CQE_F_BUFFER     ...
+    #define IORING_CQE_F_MORE       ...
+
 
     enum {
         IORING_CQE_BUFFER_SHIFT     = 16,
@@ -631,6 +651,8 @@ ffi.cdef('''
         IORING_UNREGISTER_PERSONALITY,
         IORING_REGISTER_RESTRICTIONS,
         IORING_REGISTER_ENABLE_RINGS,
+        IORING_REGISTER_RSRC,
+        IORING_REGISTER_RSRC_UPDATE,
 
         /* this goes last */
         IORING_REGISTER_LAST
@@ -642,10 +664,31 @@ ffi.cdef('''
         __aligned_u64 /* __s32 * */ fds;
     };
 
+    enum {
+        IORING_RSRC_FILE,
+        IORING_RSRC_BUFFER,
+    };
+
+    struct io_uring_rsrc_register {
+        __u32 type;
+        __u32 nr;
+        __aligned_u64 data;
+        __aligned_u64 tags;
+    };
+
     struct io_uring_rsrc_update {
         __u32 offset;
         __u32 resv;
         __aligned_u64 data;
+    };
+
+    struct io_uring_rsrc_update2 {
+        __u32 offset;
+        __u32 resv;
+        __aligned_u64 data;
+        __aligned_u64 tags;
+        __u32 type;
+        __u32 nr;
     };
 
     /* Skip updating fd indexes set to this value in the fd table */
