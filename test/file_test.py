@@ -1,4 +1,5 @@
 import os
+import errno
 import pytest
 import liburing
 
@@ -96,11 +97,16 @@ def test_files_write_read(tmpdir):
 
 def test_rwf_nowait_flag():
     path = './test_rwf_nowait_flag.txt'
+    path = './test_rwf_nowait_flag_empty_file.txt'
     # note
     #   - `RWF_NOWAIT` will raise ``OSError: [Errno 95] Operation not supported`` if the file is not on disk!
     #   - ram is not supported.
     #   - `tmpdir` can be linked to ram thus using local file path
     onwait_flag(path)
+    # note
+    #   - `RWF_NOWAIT` will return `-11` if file reading is empty
+    onwait_flag_empty_file(path, os.RWF_NOWAIT)
+    # onwait_flag_empty_file(path, 0)  # TODO: lookinto why this is not working!!!
 
     # one of the ways to tell if `RWF_NOWAIT` flag is working is to catch its error
     with pytest.raises(OSError):
@@ -118,6 +124,8 @@ def onwait_flag(path):
 
     ring = liburing.io_uring()
     cqes = liburing.io_uring_cqes()
+
+    # print()
 
     try:
         # WRITE
@@ -139,7 +147,7 @@ def onwait_flag(path):
             try:
                 liburing.io_uring_peek_cqe(ring, cqes)
             except BlockingIOError:
-                print('test_rwf_nowait_flag BlockingIOError', flush=True)
+                pass  # print('test_rwf_nowait_flag BlockingIOError', flush=True)
             else:
                 cqe = cqes[0]
                 liburing.trap_error(cqe.res)
@@ -147,6 +155,45 @@ def onwait_flag(path):
                 assert cqe.user_data == 1
                 assert one == b'hello '
                 assert two == b'world'
+                liburing.io_uring_cqe_seen(ring, cqe)
+                break
+    finally:
+        liburing.io_uring_queue_exit(ring)
+        os.close(fd)
+        os.unlink(path)
+
+
+def onwait_flag_empty_file(path, flag):
+
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NONBLOCK, 0o660)
+    vec = liburing.iovec(bytearray(5))
+
+    ring = liburing.io_uring()
+    cqes = liburing.io_uring_cqes()
+
+    try:
+        assert liburing.io_uring_queue_init(2, ring, 0) == 0
+
+        # READ empty file
+        # ---------------
+        sqe = liburing.io_uring_get_sqe(ring)
+        liburing.io_uring_prep_readv(sqe, fd, vec, len(vec), 0, flag)
+        sqe.user_data = 1
+
+        assert liburing.io_uring_submit(ring) == 1
+
+        while True:
+            try:
+                liburing.io_uring_peek_cqe(ring, cqes)
+            except BlockingIOError:
+                pass  # print('test_rwf_nowait_flag BlockingIOError', flush=True)
+            else:
+                cqe = cqes[0]
+                # empty file with `RWF_NOWAIT` flag will return `-EAGAIN` rather then `0`
+                if flag & os.RWF_NOWAIT:
+                    assert cqe.res == -errno.EAGAIN
+                else:
+                    assert cqe.res == 0
                 liburing.io_uring_cqe_seen(ring, cqe)
                 break
     finally:
