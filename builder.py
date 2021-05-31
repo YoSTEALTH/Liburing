@@ -74,12 +74,9 @@ ffi.cdef('''
     typedef int...  __u64;
 
     typedef int...  off_t;
-    // typedef int...  loff_t; // is not needed anymore?
     typedef int...  mode_t;
-    // typedef ...     igset_t;
     typedef int...  __aligned_u64;
     typedef int...  __kernel_rwf_t;
-    //typedef ...  __kernel_rwf_t;
 
     /*
      * TypeError: initializer for ctype 'sigset_t *' must be a cdata pointer, not NoneType
@@ -117,10 +114,16 @@ ffi.cdef('''
     #define SPLICE_F_MORE       ...
     #define SPLICE_F_GIFT       ...
 
-    /* renameat2 flags  */
+    /* renameat2 flags */
     #define RENAME_NOREPLACE    ...
     #define RENAME_EXCHANGE     ...
     #define RENAME_WHITEOUT     ...
+
+    /* AT_ flags */
+    #define AT_FDCWD                ...     /* Use the current working directory. */
+    #define AT_REMOVEDIR            ...     /* Remove directory instead of unlinking file. */
+    #define AT_SYMLINK_FOLLOW       ...     /* Follow symbolic links. */
+    #define AT_EACCESS              ...     /* Test access permitted for effective IDs, not real IDs. */
 ''')
 
 # liburing.h
@@ -806,7 +809,7 @@ ffi.cdef('''
     /* Flags */
     #define AT_EMPTY_PATH           ...
     #define AT_NO_AUTOMOUNT         ...
-    #define AT_SYMLINK_NOFOLLOW     ...
+    #define AT_SYMLINK_NOFOLLOW     ...     /* Do not follow symbolic links. */
     #define AT_STATX_SYNC_AS_STAT   ...
     #define AT_STATX_FORCE_SYNC     ...
     #define AT_STATX_DONT_SYNC      ...
