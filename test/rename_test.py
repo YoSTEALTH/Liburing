@@ -1,7 +1,19 @@
+import sys
 import os.path
+import pytest
+from platform import uname
+if sys.version_info < (3, 10):
+    from distutils.version import LooseVersion
+else:
+    from setuptools._distutils.version import LooseVersion
 import liburing
 
 
+required = '5.11'
+skip = LooseVersion(uname().release) < LooseVersion(required)
+
+
+@pytest.mark.skipif(skip, reason=f'requires linux {required}+')
 def test_rename_file(tmpdir):
     src_file_path = os.path.join(tmpdir, 'src_file.txt').encode()
     dst_file_path = os.path.join(tmpdir, 'dst_file.txt').encode()
