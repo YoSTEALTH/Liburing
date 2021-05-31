@@ -82,17 +82,17 @@ def io_uring_queue_init_params(entries, ring, p):
 
 def io_uring_queue_init(entries, ring, flags=0):
     '''
-        Example
-            >>> ring = io_uring()
-            >>> io_uring_queue_init(1024, ring, 0)
-            >>> io_uring_queue_init(1024, ring, IORING_SETUP_IOPOLL)
-            >>> io_uring_queue_init(1024, ring, IORING_SETUP_SQPOLL)
-
         Type
             entries: int
             ring:    io_uring
             flags:   int
             return:  int
+
+        Example
+            >>> ring = io_uring()
+            >>> io_uring_queue_init(1024, ring, 0)
+            >>> io_uring_queue_init(1024, ring, IORING_SETUP_IOPOLL)
+            >>> io_uring_queue_init(1024, ring, IORING_SETUP_SQPOLL)
     '''
     if entries < 1:
         raise ValueError('`io_uring_queue_init(entries)` can not be ``< 1``')
@@ -143,7 +143,7 @@ def io_uring_peek_batch_cqe(ring, cqes, count):
             return: int
 
         Note
-            - Returns `0` or `1+`
+            - Returns `0` or `1`+
     '''
     return _io_uring_peek_batch_cqe(ring, cqes, count)
     # note: no need for `trap_error`
@@ -156,8 +156,8 @@ def io_uring_wait_cqes(ring, cqe_ptr, wait_nr, ts=NULL, sm=NULL):
             ring:    io_uring
             cqe_ptr: io_uring_cqes
             wait_nr: int
-            ts:      timespec
-            sm:      sigmask
+            ts:      Union[NULL, timespec]
+            sm:      Union[NULL, sigmask]
             return:  int
 
         Example
@@ -360,6 +360,12 @@ def io_uring_sqring_wait(ring):
 
 def io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr):
     '''
+        Type
+            ring:    io_uring
+            cqe_ptr: io_uring_cqes
+            wait_nr: int
+            return:  int
+
         Note
             Return an IO completion, waiting for `wait_nr` completions if one isn't
             readily available. Returns ``0`` with `cqe_ptr` filled in on success, ``-errno`` on
@@ -370,6 +376,11 @@ def io_uring_wait_cqe_nr(ring, cqe_ptr, wait_nr):
 
 def io_uring_peek_cqe(ring, cqe_ptr):
     '''
+        Type
+            ring:    io_uring
+            cqe_ptr: io_uring_cqes
+            return:  int
+
         Note
             Return an IO completion, if one is readily available. Returns ``0`` with
             `cqe_ptr` filled in on success, ``-errno`` on failure.
@@ -379,6 +390,11 @@ def io_uring_peek_cqe(ring, cqe_ptr):
 
 def io_uring_wait_cqe(ring, cqe_ptr):
     '''
+        Type
+            ring:    io_uring
+            cqe_ptr: io_uring_cqes
+            return:  int
+
         Note
             Return an IO completion, waiting for it if necessary. Returns ``0`` with
             `cqe_ptr` filled in on success, ``-errno`` on failure.
