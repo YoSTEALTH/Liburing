@@ -1,5 +1,9 @@
+import sys
 from setuptools import setup, find_packages
-from distutils.version import LooseVersion
+if sys.version_info < (3, 10):
+    from distutils.version import LooseVersion
+else:
+    from setuptools._distutils.version import LooseVersion
 from platform import uname
 from datestamp import stamp
 
