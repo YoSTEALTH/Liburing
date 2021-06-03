@@ -1,12 +1,12 @@
 # flake8: noqa
 import os
-import os.path
 from liburing import *
 
 
-def open(ring, cqes, path, flags, mode=0o660, dir_fd=-1):
-    # file path must be absolute path and in bytes.
-    _path = os.path.abspath(path).encode()
+def open(ring, cqes, path, flags, mode=0o660, dir_fd=AT_FDCWD):
+    _path = path if isinstance(path, bytes) else str(path).encode()
+    # if `path` is relative and `dir_fd` is `AT_FDCWD`, then `path` is relative to current working
+    # directory. Also `_path` must be in bytes
 
     sqe = io_uring_get_sqe(ring)  # sqe(submission queue entry)
     io_uring_prep_openat(sqe, dir_fd, _path, flags, mode)
