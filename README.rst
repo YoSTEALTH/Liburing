@@ -1,7 +1,7 @@
 Liburing
 ========
 
-This is a Python + CFFI wrapper around Liburing C library, which is a helper to setup and tear-down ``io_uring`` instances.
+This is a Python + CFFI wrapper around Liburing C library, which is a helper to setup and tear-down `io_uring` instances.
 
 Read how to use `Liburing`_ (pdf)
 
@@ -12,13 +12,14 @@ Requires
 --------
 
     - Linux 5.1+ (5.11+ recommended)
-    - Python 3.6+
+    - Python 3.6+ (3.10+ in testing)
+    - Tested in Linux 5.13+, Python 3.10+
 
 
 Includes
 --------
 
-    - liburing 2.0
+    - liburing 2.0+
 
 
 Install, update & uninstall (Alpha)
@@ -51,7 +52,7 @@ To find out all the functions and definitions:
     help(liburing)
 
 
-Find out which ``io_uring`` operations is supported by the kernel:
+Find out which `io_uring` operations is supported by the kernel:
 
 .. code-block:: python
     
@@ -67,13 +68,13 @@ Simple File Example
 .. code-block:: python
 
     import os
-    import os.path
     from liburing import *
 
 
-    def open(ring, cqes, path, flags, mode=0o660, dir_fd=-1):
-        # file `path` must be in bytes and as absolute path if no `dir_fd` is provided.
-        _path = os.path.abspath(path).encode()
+    def open(ring, cqes, path, flags, mode=0o660, dir_fd=AT_FDCWD):
+        _path = path if isinstance(path, bytes) else str(path).encode()
+        # if `path` is relative and `dir_fd` is `AT_FDCWD`, then `path` is relative to current working
+        # directory. Also `_path` must be in bytes
 
         sqe = io_uring_get_sqe(ring)  # sqe(submission queue entry)
         io_uring_prep_openat(sqe, dir_fd, _path, flags, mode)
@@ -110,7 +111,7 @@ Simple File Example
         io_uring_wait_cqe(ring, cqes)  # wait for entry to finish
         cqe = cqes[0]  # cqe(completion queue entry)
         result = trap_error(cqe.res)  # auto raise appropriate exception if failed
-        # note `cqe.res` returns results, if ``< 0`` its an error, if ``>= 0`` its the value
+        # note `cqe.res` returns results, if `< 0` its an error, if `>= 0` its the value
 
         # done with current entry so clear it from completion queue.
         io_uring_cqe_seen(ring, cqe)
