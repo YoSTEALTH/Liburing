@@ -3,16 +3,17 @@ Liburing
 
 This is a Python + CFFI wrapper around Liburing C library, which is a helper to setup and tear-down `io_uring` instances.
 
-Read how to use `Liburing`_ (pdf)
 
+Original Liburing C library can be found here `Liburing`_
+Read how to use `Liburing PDF`_
 Good documentation `Lord of the io_uring`_
 
 
 Requires
 --------
 
-    - Linux 5.1+ (5.11+ recommended)
-    - Python 3.6+ (3.10+ in testing)
+    - Linux 5.1+ (5.12+ recommended)
+    - Python 3.6+
     - Tested in Linux 5.13+, Python 3.10+
 
 
@@ -159,5 +160,6 @@ TODO
 
 .. _pip: https://pip.pypa.io/en/stable/quickstart/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
-.. _Liburing: https://kernel.dk/io_uring.pdf
+.. _Liburingg: https://github.com/axboe/liburing
+.. _Liburingg PDF: https://kernel.dk/io_uring.pdf
 .. _Lord of the io_uring: https://unixism.net/loti/
