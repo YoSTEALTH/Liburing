@@ -51,7 +51,7 @@ def test_personality(tmpdir):
             open_file(ring, cqes, file_path, 0)
 
         # try again to open file with root credential
-        open_file(ring, cqes, file_path, root_cred_id)
+        fd = open_file(ring, cqes, file_path, root_cred_id)
         close_file(ring, cqes, fd)
 
         # "root" again
@@ -59,11 +59,11 @@ def test_personality(tmpdir):
         seteuid(0)
 
         # try again to open file with root credential
-        open_file(ring, cqes, file_path, root_cred_id)
+        fd = open_file(ring, cqes, file_path, root_cred_id)
         close_file(ring, cqes, fd)
 
         # try again to open file with no credential
-        open_file(ring, cqes, file_path, None)
+        fd = open_file(ring, cqes, file_path, None)
         close_file(ring, cqes, fd)
 
         # try again to open file with "user" credential
