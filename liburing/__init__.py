@@ -1,8 +1,10 @@
 from ._liburing import ffi, lib  # noqa
 from ._liburing.lib import *  # noqa
+from .versioning import *  # noqa
 from .interface import *  # noqa 
 from .wrapper import *  # noqa 
 from .helper import *  # noqa 
+
 '''
     This is a Python + CFFI wrapper around Liburing C library,
     which is a helper to setup and tear-down io_uring instances.
@@ -22,5 +24,5 @@ if lib.STATX_ATTR_DAX == 0:
 
 
 __all__ = [i for i in locals().keys() if not i.startswith('_')]
-__version__ = '2020.7.13'
+__version__ = '2021.3.10'
 __liburing__ = '0.7.0'
