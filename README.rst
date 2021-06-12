@@ -162,6 +162,6 @@ TODO
 
 .. _pip: https://pip.pypa.io/en/stable/quickstart/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
-.. _Liburingg: https://github.com/axboe/liburing
-.. _Liburingg PDF: https://kernel.dk/io_uring.pdf
+.. _Liburing: https://github.com/axboe/liburing
+.. _Liburing PDF: https://kernel.dk/io_uring.pdf
 .. _Lord of the io_uring: https://unixism.net/loti/
