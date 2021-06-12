@@ -6,7 +6,7 @@ This is a Python + CFFI wrapper around Liburing C library, which is a helper to 
 
 Original Liburing C library can be found `here`_
 
-Read how to use `Liburing`_(PDF)
+Read how to use `Liburing`_ (PDF)
 
 Good documentation `Lord of the io_uring`_
 
