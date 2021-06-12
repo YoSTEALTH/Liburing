@@ -200,8 +200,10 @@ def iovec(*buffers):
 def open_how(flags, mode=0, resolve=0):
     '''
         Type
-            no:     int
-            return: <cdata>
+            flags:   int
+            mode:    int
+            resolve: int
+            return:  <cdata>
 
         Example
             >>> how = open_how(O_RDWR, 0, RESOLVE_CACHED)
