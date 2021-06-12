@@ -1,41 +1,38 @@
-import sys
-import os.path
-import pytest
-from platform import uname
-if sys.version_info < (3, 10):
-    from distutils.version import LooseVersion
-else:
-    from setuptools._distutils.version import LooseVersion
-import liburing
+from os import mkdir
+from os.path import join, exists
+from pytest import mark
+from liburing import AT_FDCWD, AT_REMOVEDIR, IOSQE_IO_LINK, io_uring, io_uring_cqes, get_sqes, io_uring_queue_init, \
+                     io_uring_queue_exit, io_uring_prep_unlinkat, skip_it
+from test_helper import submit_wait_result
 
 
-required = '5.11'
-skip = LooseVersion(uname().release) < LooseVersion(required)
+version = '5.11'
 
 
-@pytest.mark.skipif(skip, reason=f'requires Linux {required}+')
+@mark.skipif(skip_it(version), reason=f'Requires Linux {version}+')
 def test_unlink(tmpdir):
-    file_path = os.path.join(tmpdir, 'file.txt').encode()
-    dir_path = os.path.join(tmpdir, 'directory').encode()
+    dir_path = join(tmpdir, 'directory').encode()
+    mkdir(dir_path)             # create directory
 
-    os.mkdir(dir_path)          # create directory
+    file_path = join(tmpdir, 'file.txt').encode()
     with open(file_path, 'x'):  # create file
         pass
 
     flags = 0
-    ring = liburing.io_uring()
+    ring = io_uring()
+    cqes = io_uring_cqes()
     try:
-        assert liburing.io_uring_queue_init(2, ring, 0) == 0
+        assert io_uring_queue_init(2, ring, 0) == 0
 
-        sqes = liburing.get_sqes(ring, 2)
-        liburing.io_uring_prep_unlinkat(sqes[0], liburing.AT_FDCWD, file_path, flags)
-        liburing.io_uring_prep_unlinkat(sqes[1], liburing.AT_FDCWD, dir_path, liburing.AT_REMOVEDIR)
+        sqes = get_sqes(ring, 2)
+        io_uring_prep_unlinkat(sqes[0], AT_FDCWD, file_path, flags)
+        sqes[0].flags |= IOSQE_IO_LINK
+        flags |= AT_REMOVEDIR
+        io_uring_prep_unlinkat(sqes[1], AT_FDCWD, dir_path, flags)
 
-        assert liburing.io_uring_submit_and_wait(ring, 2) == 2
-        liburing.io_uring_cq_advance(ring, 2)
-
-        assert not os.path.exists(file_path)  # file should not exist
-        assert not os.path.exists(dir_path)   # dir should not exist
+        assert submit_wait_result(ring, cqes, 2) == [0, 0]
+        assert not exists(file_path)  # file should not exist
+        assert not exists(dir_path)   # dir should not exist
 
     finally:
-        liburing.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
