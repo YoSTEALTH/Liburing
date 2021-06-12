@@ -4,7 +4,7 @@ Liburing
 This is a Python + CFFI wrapper around Liburing C library, which is a helper to setup and tear-down `io_uring` instances.
 
 
-Original Liburing C library can be found here `Liburing`_
+Original Liburing C library can be found `here`_
 
 Read how to use `Liburing PDF`_
 
@@ -162,6 +162,6 @@ TODO
 
 .. _pip: https://pip.pypa.io/en/stable/quickstart/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
-.. _Liburing: https://github.com/axboe/liburing
+.. _here: https://github.com/axboe/liburing
 .. _Liburing PDF: https://kernel.dk/io_uring.pdf
 .. _Lord of the io_uring: https://unixism.net/loti/
