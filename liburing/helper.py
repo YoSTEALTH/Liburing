@@ -5,7 +5,7 @@ from .interface import io_uring_submit
 
 
 __all__ = 'NULL', 'files', 'io_uring', 'io_uring_params', 'io_uring_cqe', 'io_uring_cqes', 'io_uring_get_sqes', \
-          'get_sqes', 'get_sqe', 'iovec', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', \
+          'get_sqes', 'get_sqe', 'iovec', 'open_how', 'timespec', 'time_convert', 'statx', 'sigmask', 'sockaddr', \
           'sockaddr_in', 'probe'
 
 
@@ -163,7 +163,7 @@ def get_sqe(ring):
 def iovec(*buffers):
     '''
         Type
-            buffers: Sequence[bytearray, memoryview]
+            buffers: Sequence[bytearray, memoryview, mmap]
             return:  struct iovec
 
         Example
@@ -171,7 +171,7 @@ def iovec(*buffers):
             >>> data = bytearray(5)
             >>> iov = iovec(data)
 
-            # multiple reads
+            # for multiple reads
             >>> one = bytearray(5)
             >>> two = bytearray(5)
             >>> iovs = iovec(one, two)
@@ -180,7 +180,7 @@ def iovec(*buffers):
             >>> data = bytearray(b'hello)
             >>> iov = iovec(data)
 
-            # multiple writes
+            # for multiple writes
             >>> one = bytearray(b'hello')
             >>> two = bytearray(b'world)
             >>> iovs = iovec(one, two)
@@ -195,6 +195,34 @@ def iovec(*buffers):
         iovs[i].iov_base = from_buffer(buffer)
         iovs[i].iov_len = len(buffer)
     return iovs
+
+
+def open_how(flags, mode=0, resolve=0):
+    '''
+        Type
+            no:     int
+            return: <cdata>
+
+        Example
+            >>> how = open_how(O_RDWR, 0, RESOLVE_CACHED)
+            >>> io_uring_prep_openat2(..., how)
+
+        Resolve
+            RESOLVE_BENEATH
+            RESOLVE_IN_ROOT
+            RESOLVE_NO_MAGICLINKS
+            RESOLVE_NO_SYMLINKS
+            RESOLVE_NO_XDEV
+            RESOLVE_CACHED
+
+        Note
+            - visit https://man7.org/linux/man-pages/man2/openat2.2.html for more information.
+    '''
+    how = new('struct open_how [1]')
+    how[0].flags = flags
+    how[0].mode = mode
+    how[0].resolve = resolve
+    return how
 
 
 def timespec(seconds=0, nanoseconds=0):
@@ -359,8 +387,7 @@ def probe():
     '''
     get_probe = io_uring_get_probe()
     r = {}
-    for name in dir(lib):
-        # find `IORING_OP_*` defined in "builder.py"
+    for name in dir(lib):  # find `IORING_OP_*` defined in "builder.py"
         if name.startswith('IORING_OP_') and name != 'IORING_OP_LAST':
             value = getattr(lib, name)
             r[name] = bool(io_uring_opcode_supported(get_probe, value))
