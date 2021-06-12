@@ -28,7 +28,17 @@ source_code = '''
     #ifndef STATX_ATTR_DAX
     #define STATX_ATTR_DAX 0
     #endif
-    '''
+
+    /* how->resolve flags for openat2(2). linux 5.6 */
+    #ifndef RESOLVE_NO_XDEV
+    #define RESOLVE_NO_XDEV         0x01
+    #define RESOLVE_NO_MAGICLINKS   0x02
+    #define RESOLVE_NO_SYMLINKS     0x04
+    #define RESOLVE_BENEATH         0x08
+    #define RESOLVE_IN_ROOT         0x10
+    #define RESOLVE_CACHED          0x20    /* linux 5.12 */
+    #endif
+'''
 
 # Install from source files.
 ffi.set_source('liburing._liburing', source_code,
