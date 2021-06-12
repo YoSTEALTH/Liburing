@@ -1,18 +1,14 @@
-import sys
 from setuptools import setup, find_packages
-if sys.version_info < (3, 10):
-    from distutils.version import LooseVersion
-else:
-    from setuptools._distutils.version import LooseVersion
-from platform import uname
 from datestamp import stamp
+from liburing import skip_it
+
 
 package = 'liburing'
-platform = uname()
 required = '5.1'
 
+
 # check to make sure `package` is only installed on supported Linux version.
-if platform.system != 'Linux' or LooseVersion(platform.release) < LooseVersion(required):
+if skip_it(required, 'linux'):
     raise RuntimeError(f'"{package.title()}" only supported to run on Linux {required}+')
 
 
