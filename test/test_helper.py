@@ -1,7 +1,7 @@
 from liburing import io_uring_submit, io_uring_wait_cqe, io_uring_wait_cqes, trap_error, io_uring_cqe_seen
 
 
-__all__ = 'submit_wait_result'
+__all__ = 'submit_wait_result',
 
 
 def submit_wait_result(ring, cqes, no=1):
