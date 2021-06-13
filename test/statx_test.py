@@ -12,10 +12,10 @@ version = '5.6'
 
 @mark.skipif(skip_it(version), reason=f'Requires Linux {version}+')
 def test_statx(tmpdir):
-    
     ring = io_uring()
     cqes = io_uring_cqes()
     file_path = join(tmpdir, 'statx_test.txt').encode()
+    bad_path = join(tmpdir, 'file-that-does-not-exists').encode()
 
     # create sample file
     fd = open(file_path, O_CREAT, 0o700)
@@ -32,5 +32,22 @@ def test_statx(tmpdir):
         stat[0]
         assert S_IMODE(stat[0].stx_mode) == 448 == 0o700
         assert oct(S_IMODE(stat[0].stx_mode)) == oct(0o700)
+
+        # statx version of file, dir, ... exists or not
+        assert exists(ring, cqes, file_path)
+        assert not exists(ring, cqes, bad_path)
+
     finally:
         io_uring_queue_exit(ring)
+
+
+def exists(ring, cqes, path):
+    try:
+        stat = statx()
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_statx(sqe, AT_FDCWD, path, 0, 0, stat)
+        submit_wait_result(ring, cqes)
+    except OSError:
+        return False
+    else:
+        return True
