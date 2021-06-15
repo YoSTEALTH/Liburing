@@ -1,14 +1,14 @@
 from os.path import join, exists
 from pytest import mark
 from liburing import AT_FDCWD, io_uring, io_uring_cqes, io_uring_queue_init, \
-                     io_uring_get_sqe, io_uring_queue_exit, io_uring_prep_renameat, skip_it
+                     io_uring_get_sqe, io_uring_queue_exit, io_uring_prep_renameat, skip_os
 from test_helper import submit_wait_result
 
 
 version = '5.11'
 
 
-@mark.skipif(skip_it(version), reason=f'Requires Linux {version}+')
+@mark.skipif(skip_os(version), reason=f'Requires Linux {version}+')
 def test_rename_file(tmpdir):
     src_file_path = join(tmpdir, 'src_file.txt').encode()
     dst_file_path = join(tmpdir, 'dst_file.txt').encode()

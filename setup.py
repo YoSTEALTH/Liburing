@@ -1,15 +1,15 @@
 from setuptools import setup, find_packages
 from datestamp import stamp
-from liburing import skip_it
+from liburing import skip_os
 
 
 package = 'liburing'
-required = '5.1'
+version = '5.1'  # required OS version
 
 
 # check to make sure `package` is only installed on supported Linux version.
-if skip_it(required, 'linux'):
-    raise RuntimeError(f'"{package.title()}" only supported to run on Linux {required}+')
+if skip_os(version, 'Linux'):
+    raise RuntimeError(f'"{package.title()}" only supported to run on Linux {version}+')
 
 
 with open('README.rst', 'r') as file:

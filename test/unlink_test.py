@@ -2,14 +2,14 @@ from os import mkdir
 from os.path import join, exists
 from pytest import mark
 from liburing import AT_FDCWD, AT_REMOVEDIR, IOSQE_IO_LINK, io_uring, io_uring_cqes, get_sqes, io_uring_queue_init, \
-                     io_uring_queue_exit, io_uring_prep_unlinkat, skip_it
+                     io_uring_queue_exit, io_uring_prep_unlinkat, skip_os
 from test_helper import submit_wait_result
 
 
 version = '5.11'
 
 
-@mark.skipif(skip_it(version), reason=f'Requires Linux {version}+')
+@mark.skipif(skip_os(version), reason=f'Requires Linux {version}+')
 def test_unlink(tmpdir):
     dir_path = join(tmpdir, 'directory').encode()
     mkdir(dir_path)             # create directory
