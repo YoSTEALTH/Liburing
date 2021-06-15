@@ -4,14 +4,16 @@ if version_info < (3, 10):
     from distutils.version import LooseVersion
 else:
     from setuptools._distutils.version import LooseVersion
+from functools import lru_cache
 
 
-__all__ = 'skip_it',
+__all__ = 'skip_os',
 RELEASE = LooseVersion(release())
 OS = system().casefold()
 
 
-def skip_it(version, os=None):
+@lru_cache(maxsize=None)
+def skip_os(version, os=None):
     ''' Skip if OS version is not supported.
 
         Type
@@ -22,16 +24,16 @@ def skip_it(version, os=None):
         Example
             # Assume Linux version is "5.13"
 
-            >>> skip = skip_it('5.14')
+            >>> skip = skip_os('5.14')
             True
             >>> @pytest.mark.skipif(skip, reason='Requires Linux 5.14+')
 
-            >>> skip = skip_it('5.11')
+            >>> skip = skip_os('5.11')
             False
             >>> @pytest.mark.skipif(skip, reason='Requires Linux 5.11+')
 
 
-            >>> if skip_it('5.1', 'linux'):
+            >>> if skip_os('5.1', 'linux'):
             ...     ...
     '''
     required = LooseVersion(version)
