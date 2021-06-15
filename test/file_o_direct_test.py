@@ -3,14 +3,14 @@ from mmap import PAGESIZE, MAP_PRIVATE, mmap
 from pytest import mark
 from liburing import AT_FDCWD, io_uring, io_uring_cqes, iovec, io_uring_queue_init, io_uring_get_sqe, \
                      io_uring_prep_openat, io_uring_prep_write_fixed, io_uring_prep_read_fixed, \
-                     io_uring_prep_close, io_uring_queue_exit, io_uring_register_buffers, skip_it
+                     io_uring_prep_close, io_uring_queue_exit, io_uring_register_buffers, skip_os
 from test_helper import submit_wait_result
 
 
 version = '5.6'
 
 
-@mark.skipif(skip_it(version), reason=f'Requires Linux {version}+')
+@mark.skipif(skip_os(version), reason=f'Requires Linux {version}+')
 def test_file_o_direct():
     # note:
     #   - `O_DIRECT` does not work if the file path is in memory, like "/dev/shm" or "/tmp"
@@ -19,12 +19,15 @@ def test_file_o_direct():
     ring = io_uring()
     cqes = io_uring_cqes()
 
-    read = mmap(-1, PAGESIZE, flags=MAP_PRIVATE)
-    write = mmap(-1, PAGESIZE, flags=MAP_PRIVATE)
+    if skip_os('5.14'):  # was a bug < 5.14
+        read = mmap(-1, PAGESIZE, flags=MAP_PRIVATE)
+        write = mmap(-1, PAGESIZE, flags=MAP_PRIVATE)
+    else:
+        read = mmap(-1, PAGESIZE)  # MAP_SHARED
+        write = mmap(-1, PAGESIZE)
+
     write[0:11] = b'hello world'
-
     iov = iovec(write, read)
-
     try:
         assert io_uring_queue_init(2, ring, 0) == 0
         assert io_uring_register_buffers(ring, iov, len(iov)) == 0
