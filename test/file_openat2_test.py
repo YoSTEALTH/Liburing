@@ -1,17 +1,17 @@
 from os import O_CREAT, O_RDWR
 from os.path import join
-from pytest import mark
+from pytest import mark, skip
 from liburing import AT_FDCWD, RESOLVE_CACHED, io_uring, io_uring_cqes, iovec, io_uring_queue_init, \
                      io_uring_get_sqe, io_uring_prep_openat2, io_uring_prep_write, io_uring_prep_read, \
                      io_uring_prep_close, io_uring_queue_exit, io_uring_register_buffers, \
-                     open_how, skip_it
+                     open_how, skip_os
 from test_helper import submit_wait_result
 
 
 version = '5.6'
 
 
-@mark.skipif(skip_it(version), reason=f'Requires Linux {version}+')
+@mark.skipif(skip_os(version), reason=f'Requires Linux {version}+')
 def test_openat2(tmpdir):
     ring = io_uring()
     cqes = io_uring_cqes()
@@ -47,7 +47,9 @@ def test_openat2(tmpdir):
         io_uring_prep_close(sqe, fd)
         submit_wait_result(ring, cqes)
 
-        if not skip_it('5.12'):
+        if skip_os('5.12'):
+            skip('RESOLVE_CACHED 5.12+ Linux required')
+        else:
             # second open for resolve test
             how = open_how(O_RDWR, 0, RESOLVE_CACHED)
             sqe = io_uring_get_sqe(ring)

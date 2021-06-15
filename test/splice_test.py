@@ -2,14 +2,14 @@ import os
 from os.path import join
 from pytest import mark
 from liburing import SPLICE_F_MOVE, SPLICE_F_MORE, IOSQE_IO_LINK, io_uring, io_uring_cqes, io_uring_queue_init, \
-                     io_uring_get_sqe, io_uring_prep_splice, io_uring_queue_exit, skip_it
+                     io_uring_get_sqe, io_uring_prep_splice, io_uring_queue_exit, skip_os
 from test_helper import submit_wait_result
 
 
 version = '5.7'
 
 
-@mark.skipif(skip_it(version), reason=f'Requires Linux {version}+')
+@mark.skipif(skip_os(version), reason=f'Requires Linux {version}+')
 def test_clone_file_using_splice(tmpdir):
     fd_in = os.open(join(tmpdir, '1.txt'), os.O_RDWR | os.O_CREAT, 0o660)
     fd_out = os.open(join(tmpdir, '2.txt'), os.O_RDWR | os.O_CREAT, 0o660)

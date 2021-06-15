@@ -3,7 +3,7 @@ from os.path import join, exists
 from pytest import raises, mark
 from liburing import AT_FDCWD, io_uring_queue_init, io_uring_queue_exit, io_uring, io_uring_cqes, \
                      io_uring_register_personality, io_uring_get_sqe, io_uring_prep_openat, \
-                     io_uring_prep_close, io_uring_unregister_personality, skip_it
+                     io_uring_prep_close, io_uring_unregister_personality, skip_os
 from test_helper import submit_wait_result
 
 
@@ -11,7 +11,7 @@ version = '5.6'
 
 
 @mark.skipif(getuid() != 0, reason='need to be "root" user')
-@mark.skipif(skip_it(version), reason=f'Requires Linux {version}+')
+@mark.skipif(skip_os(version), reason=f'Requires Linux {version}+')
 def test_personality(tmpdir):
     # note: `sqe.personality` has limited use-case like its restricts to opening `fd`
     #       but not for read, write, close, ...

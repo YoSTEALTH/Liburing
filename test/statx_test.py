@@ -3,19 +3,19 @@ from os.path import join
 from stat import S_IMODE
 from pytest import mark
 from liburing import AT_FDCWD, AT_STATX_FORCE_SYNC, STATX_MODE, io_uring_queue_init, io_uring_queue_exit, \
-                     io_uring, io_uring_cqes, io_uring_get_sqe, statx, io_uring_prep_statx, skip_it
+                     io_uring, io_uring_cqes, io_uring_get_sqe, statx, io_uring_prep_statx, skip_os
 from test_helper import submit_wait_result
 
 
 version = '5.6'
 
 
-@mark.skipif(skip_it(version), reason=f'Requires Linux {version}+')
+@mark.skipif(skip_os(version), reason=f'Requires Linux {version}+')
 def test_statx(tmpdir):
     ring = io_uring()
     cqes = io_uring_cqes()
     file_path = join(tmpdir, 'statx_test.txt').encode()
-    bad_path = join(tmpdir, 'file-that-does-not-exists').encode()
+    bad_path = join(tmpdir, 'file-that-does-not-exist').encode()
 
     # create sample file
     fd = open(file_path, O_CREAT, 0o700)
