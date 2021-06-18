@@ -56,9 +56,46 @@ def test_openat2(tmpdir):
             io_uring_prep_openat2(sqe, AT_FDCWD, file_path, how)
             fd2 = submit_wait_result(ring, cqes)
 
+            assert fd2 > 0
+
             # close `fd2`
             sqe = io_uring_get_sqe(ring)
             io_uring_prep_close(sqe, fd2)
-            submit_wait_result(ring, cqes)
+            assert submit_wait_result(ring, cqes) == 0
+    finally:
+        io_uring_queue_exit(ring)
+
+
+@mark.skipif(skip_os('5.12'), reason='Requires Linux 5.12+')
+def test_openat2_resolve_cache(tmpdir):
+    ring = io_uring()
+    cqes = io_uring_cqes()
+    try:
+        assert io_uring_queue_init(2, ring, 0) == 0
+
+        how = open_how(O_CREAT, 0o600, RESOLVE_CACHED)
+        lookup_path = join(tmpdir, 'lookup-file.txt').encode()
+
+        for _ in range(2, 0, -1):  # countdown
+            try:
+                sqe = io_uring_get_sqe(ring)
+                io_uring_prep_openat2(sqe, AT_FDCWD, lookup_path, how)
+                fd = submit_wait_result(ring, cqes)
+            except BlockingIOError:
+                if how[0].resolve & RESOLVE_CACHED:
+                    how[0].resolve = how[0].resolve & ~RESOLVE_CACHED
+                # note:
+                #   must retry without `RESOLVE_CACHED` since
+                #   file path was not in kernel's lookup cache.
+            else:
+                assert fd > 0
+
+                # close `fd`
+                sqe = io_uring_get_sqe(ring)
+                io_uring_prep_close(sqe, fd)
+                assert submit_wait_result(ring, cqes) == 0
+                break
+        else:
+            assert False  # failed to create file
     finally:
         io_uring_queue_exit(ring)
