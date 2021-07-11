@@ -145,8 +145,9 @@ def test_register_fd_close():
         # confirm
         assert write == read
 
-        # unregister
-        assert io_uring_unregister_files(ring) == 0
+        # unregister - index
+        fds[index] = -1
+        assert io_uring_register_files_update(ring, index, fds, 1) == 1
 
         # re-read - should not be able to since index was unregistered
         with raises(OSError):  # [Errno 9] Bad file descriptor
