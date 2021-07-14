@@ -73,7 +73,6 @@ ffi.cdef('''
     };
 ''')
 
-
 # Custom types
 ffi.cdef('''
     typedef int...  __u8;
@@ -304,6 +303,10 @@ ffi.cdef('''
                       unsigned poll_mask);
     static inline void io_uring_prep_poll_remove(struct io_uring_sqe *sqe,
                          void *user_data);
+    static inline void io_uring_prep_poll_update(struct io_uring_sqe *sqe,
+                         void *old_user_data,
+                         void *new_user_data,
+                         unsigned poll_mask, unsigned flags);
     static inline void io_uring_prep_fsync(struct io_uring_sqe *sqe, int fd,
                        unsigned fsync_flags);
     static inline void io_uring_prep_nop(struct io_uring_sqe *sqe);
@@ -372,6 +375,13 @@ ffi.cdef('''
     static inline void io_uring_prep_sync_file_range(struct io_uring_sqe *sqe,
                          int fd, unsigned len,
                          off_t offset, int flags);
+    static inline void io_uring_prep_mkdirat(struct io_uring_sqe *sqe, int dfd,
+                    const char *path, mode_t mode);
+    static inline void io_uring_prep_symlinkat(struct io_uring_sqe *sqe,
+                    const char *target, int newdirfd, const char *linkpath);
+    static inline void io_uring_prep_linkat(struct io_uring_sqe *sqe, int olddfd,
+                    const char *oldpath, int newdfd,
+                    const char *newpath, int flags);
 
     static inline unsigned io_uring_sq_ready(struct io_uring *ring);
     static inline unsigned io_uring_sq_space_left(struct io_uring *ring);
@@ -427,6 +437,7 @@ ffi.cdef('''
             __u32       splice_flags;
             __u32       rename_flags;
             __u32       unlink_flags;
+            __u32       hardlink_flags;
         };
         __u64   user_data;  /* data to be passed back at completion time */
         union {
@@ -515,6 +526,8 @@ ffi.cdef('''
         IORING_OP_RENAMEAT,
         IORING_OP_UNLINKAT,
         IORING_OP_MKDIRAT,
+        IORING_OP_SYMLINKAT,
+        IORING_OP_LINKAT,
 
         /* this goes last, obviously */
         IORING_OP_LAST,
@@ -659,6 +672,7 @@ ffi.cdef('''
     #define IORING_FEAT_SQPOLL_NONFIXED     ...
     #define IORING_FEAT_EXT_ARG             ...
     #define IORING_FEAT_NATIVE_WORKERS      ...
+    #define IORING_FEAT_RSRC_TAGS           ...
 
     /*
      * io_uring_register(2) opcodes and arguments
@@ -677,8 +691,12 @@ ffi.cdef('''
         IORING_UNREGISTER_PERSONALITY,
         IORING_REGISTER_RESTRICTIONS,
         IORING_REGISTER_ENABLE_RINGS,
-        IORING_REGISTER_RSRC,
-        IORING_REGISTER_RSRC_UPDATE,
+
+        /* extended with tagging */
+        IORING_REGISTER_FILES2,
+        IORING_REGISTER_FILES_UPDATE2,
+        IORING_REGISTER_BUFFERS2,
+        IORING_REGISTER_BUFFERS_UPDATE,
 
         /* this goes last */
         IORING_REGISTER_LAST
@@ -690,14 +708,10 @@ ffi.cdef('''
         __aligned_u64 /* __s32 * */ fds;
     };
 
-    enum {
-        IORING_RSRC_FILE,
-        IORING_RSRC_BUFFER,
-    };
-
     struct io_uring_rsrc_register {
-        __u32 type;
         __u32 nr;
+        __u32 resv;
+        __u64 resv2;
         __aligned_u64 data;
         __aligned_u64 tags;
     };
@@ -713,8 +727,8 @@ ffi.cdef('''
         __u32 resv;
         __aligned_u64 data;
         __aligned_u64 tags;
-        __u32 type;
         __u32 nr;
+        __u32 resv2;
     };
 
     /* Skip updating fd indexes set to this value in the fd table */
@@ -734,7 +748,7 @@ ffi.cdef('''
         __u8 ops_len;   /* length of ops[] array below */
         __u16 resv;
         __u32 resv2[3];
-        struct io_uring_probe_op ops[];  // struct io_uring_probe_op ops[0];
+        struct io_uring_probe_op ops[];
     };
 
     struct io_uring_restriction {
