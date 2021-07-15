@@ -1,5 +1,5 @@
 from os import getuid
-from pytest import mark, raises
+from pytest import mark, raises, skip
 from liburing import IORING_SETUP_IOPOLL, IORING_SETUP_SQPOLL, lib, \
                      io_uring, io_uring_queue_init, io_uring_queue_exit, skip_os
 
@@ -38,6 +38,9 @@ def test_setup_kernel_side_polling_by_root():
 
 @mark.skipif(skip_os('5.11'), reason='`IORING_SETUP_SQPOLL` Linux version is `< 5.11`')
 def test_setup_kernel_side_polling_by_user():
-    ring = io_uring()
-    assert io_uring_queue_init(1, ring, IORING_SETUP_SQPOLL) == 0
-    assert io_uring_queue_exit(ring) is None
+    try:
+        ring = io_uring()
+        assert io_uring_queue_init(1, ring, IORING_SETUP_SQPOLL) == 0
+        assert io_uring_queue_exit(ring) is None
+    except PermissionError:
+        skip('CAP_SYS_NICE not enabled!')
