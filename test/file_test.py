@@ -22,7 +22,7 @@ def test_file_registration(tmpdir):
 def test_files_write_read(tmpdir):
     fd = os.open(os.path.join(tmpdir, '1.txt'), os.O_RDWR | os.O_CREAT, 0o660)
     ring = liburing.io_uring()
-    cqes = liburing.io_uring_cqes(2)
+    cqes = liburing.io_uring_cqes()
 
     # prepare for writing two separate writes and reads.
     one = bytearray(b'hello')
@@ -55,7 +55,7 @@ def test_files_write_read(tmpdir):
         liburing.io_uring_cqe_seen(ring, cqe)
 
         # re-uses the same resources from above?!
-        assert liburing.io_uring_wait_cqes(ring, cqes, 2) == 0
+        assert liburing.io_uring_wait_cqes(ring, cqes, 1) == 0
         cqe = cqes[0]
         assert cqe.res == 5
         assert cqe.user_data == 2
@@ -166,7 +166,8 @@ def onwait_flag(path):
 def onwait_flag_empty_file(path, flag):
 
     fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NONBLOCK, 0o660)
-    vec = liburing.iovec(bytearray(5))
+    read = bytearray(5)
+    vec = liburing.iovec(read)
 
     ring = liburing.io_uring()
     cqes = liburing.io_uring_cqes()
