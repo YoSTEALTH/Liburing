@@ -163,7 +163,7 @@ def get_sqe(ring):
 def iovec(*buffers):
     '''
         Type
-            buffers: Sequence[bytearray, memoryview, mmap]
+            buffers: Union[bytearray, memoryview, mmap]
             return:  struct iovec
 
         Example
@@ -186,9 +186,14 @@ def iovec(*buffers):
             >>> iovs = iovec(one, two)
 
             # get length
-            >>> iov = iovec(bytearray(5), bytearray(5))
+            >>> buffers = [bytearray(5), bytearray(5)]
+            >>> iov = iovec(*buffers)
             >>> len(iov)
             2
+
+        Note
+            - You should hold on to reference e.g. `one` passed into `iovec()` e.g. `one = bytearray(); iovec(one)`,
+            or else the object passed into `iovec` will disappear and have unforeseen results.
     '''
     iovs = new('struct iovec []', len(buffers))
     for i, buffer in enumerate(buffers):
