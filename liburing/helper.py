@@ -191,9 +191,17 @@ def iovec(*buffers):
             >>> len(iov)
             2
 
-        Note
-            - You should hold on to reference e.g. `one` passed into `iovec()` e.g. `one = bytearray(); iovec(one)`,
-            or else the object passed into `iovec` will disappear and have unforeseen results.
+        WARNING
+            - You should hold on to reference passed into `iovec` till the transaction is complete,
+            or else the object passed into `iovec` will disappear resulting in corrupt data and 
+            unforeseen results e.g:
+
+                # Good
+                >>> one = bytearray(...)
+                >>> iov = iovec(one)
+
+                # Bad
+                >>> iov = iovec(bytearray(...))
     '''
     iovs = new('struct iovec []', len(buffers))
     for i, buffer in enumerate(buffers):
