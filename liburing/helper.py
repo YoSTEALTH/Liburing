@@ -26,12 +26,25 @@ io_uring_opcode_supported = lib.io_uring_opcode_supported
 io_uring_free_probe = getattr(lib, 'io_uring_free_probe', None)
 
 
-def files(*fds):
-    '''
+def files(fds, *fd):
+    ''' Single/Multiple File Descriptor(s)
+
+        Type
+            fds     Union[int, Iterable[int]]
+            *fd:    int  # extends `fds`
+            return: <cdata 'int[]'>
+
         Example
-            >>> fds = files(fd1, fd2, ...)
+            >>> fds = files(1)
+            >>> fds = files(1, 2, 3)
+            >>> fds = files([1, 2, 3])
+            >>> fds = files(-1 for _ in range(3))
+            >>> fds = files(*(-1 for _ in range(3))))
     '''
-    return new('int[]', fds)
+    _fds = [fds] if isinstance(fds, int) else [*fds]
+    if fd:
+        _fds.extend(fd)
+    return new('int[]', _fds)
 
 
 def io_uring():
