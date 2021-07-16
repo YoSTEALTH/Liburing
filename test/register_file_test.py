@@ -171,7 +171,7 @@ def test_multiple_register_fd_mix(tmpdir):
     data = b'hello world'
     write = [bytearray(data) for _ in range(loop)]
     iov = iovec(*write)
-    fds = files(*(-1 for _ in range(loop)))  # prep fds
+    fds = files(-1 for _ in range(loop))  # prep fds
     try:
         assert io_uring_queue_init(2, ring, 0) == 0
         # initialize register
