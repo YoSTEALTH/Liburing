@@ -1,15 +1,21 @@
+from sys import version_info
+from platform import release
 from setuptools import setup, find_packages
 from datestamp import stamp
-from liburing import skip_os
+if version_info < (3, 10):
+    from distutils.version import LooseVersion
+else:
+    from setuptools._distutils.version import LooseVersion
 
 
 package = 'liburing'
-version = '5.1'  # required OS version
+current_os_version = release()
+required_os_version = '5.1'
 
 
 # check to make sure `package` is only installed on supported Linux version.
-if skip_os(version, 'Linux'):
-    raise RuntimeError(f'"{package.title()}" only supported to run on Linux {version}+')
+if LooseVersion(current_os_version) < LooseVersion(required_os_version):
+    raise RuntimeError(f'"{package.title()}" only supported to run on Linux {required_os_version}+')
 
 
 with open('README.rst', 'r') as file:
