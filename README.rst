@@ -10,6 +10,11 @@ Read how to use `Liburing`_ (PDF)
 
 Good documentation `Lord of the io_uring`_
 
+Notification
+------------
+
+Next release of Liburing will use Cython. `Read more here`_.
+
 
 Requires
 --------
@@ -165,3 +170,4 @@ TODO
 .. _here: https://github.com/axboe/liburing
 .. _Liburing: https://kernel.dk/io_uring.pdf
 .. _Lord of the io_uring: https://unixism.net/loti/
+.. _Read more here: https://github.com/YoSTEALTH/Liburing/discussions/16
