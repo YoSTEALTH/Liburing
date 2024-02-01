@@ -1,9 +1,17 @@
-include LICENSE.txt
 include README.rst
-include builder.py
+include LICENSE.txt
+
+# C Liburing
 include libs/liburing/LICENSE
 include libs/liburing/configure
 include libs/liburing/src/include/liburing.h
 include libs/liburing/src/include/liburing/barrier.h
 include libs/liburing/src/include/liburing/io_uring.h
+include libs/liburing/src/include/liburing/io_uring_version.h
 exclude libs/liburing/src/include/liburing/compat.h
+
+graft liburing
+graft example
+graft test
+
+global-exclude *.py[cod]  # note: must run last to exclude properly
