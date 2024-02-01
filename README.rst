@@ -1,7 +1,9 @@
-Liburing
+|test-status| |downloads|
+
+Liburing (Work in progress ... )
 ========
 
-This is a Python + CFFI wrapper around Liburing C library, which is a helper to setup and tear-down `io_uring` instances.
+This is a Python + Cython wrapper around Liburing C library, which is a helper to setup and tear-down `io_uring` instances.
 
 
 Original Liburing C library can be found `here`_
@@ -15,14 +17,13 @@ Requires
 --------
 
     - Linux 5.1+ (5.12+ recommended)
-    - Python 3.6+
-    - Tested in Linux 5.13+, Python 3.10+
+    - Python 3.8+
 
 
 Includes
 --------
 
-    - liburing 2.0+
+    - liburing 2.5+
 
 
 Install, update & uninstall (Alpha)
@@ -32,18 +33,18 @@ Use `pip`_ to install, upgrade & uninstall Python wrapper:
 
 .. code-block:: text
 
-    python3 -m pip install --user liburing
+    python3 -m pip install liburing             # install
 
-    python3 -m pip install --user --upgrade liburing
+    python3 -m pip install --upgrade liburing   # upgrade
 
-    python3 -m pip uninstall liburing
+    python3 -m pip uninstall liburing           # uninstall
 
 
 Install directly from GitHub:
 
 .. code-block:: text
 
-    python3 -m pip install --user --upgrade git+https://github.com/YoSTEALTH/Liburing
+    python3 -m pip install --upgrade git+https://github.com/YoSTEALTH/Liburing
 
 
 To find out all the functions and definitions:
@@ -70,6 +71,7 @@ Simple File Example
 
 .. code-block:: python
 
+    # note: example requires Linux 6.0+
     import os
     from liburing import *
 
@@ -154,14 +156,16 @@ Free, Public Domain (CC0). `Read more`_
 TODO
 ----
 
-    - create more test
-    - Development Status :: 4 - Beta
-    - create example
-    - Development Status :: 5 - Production/Stable
+    - Move everything to using Cython
     
 
-.. _pip: https://pip.pypa.io/en/stable/quickstart/
+.. _pip: https://pip.pypa.io/en/stable/getting-started/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
 .. _here: https://github.com/axboe/liburing
 .. _Liburing: https://kernel.dk/io_uring.pdf
 .. _Lord of the io_uring: https://unixism.net/loti/
+.. |test-status| image:: https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=master&event=push
+    :target: https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml
+    :alt: Test status
+.. |downloads| image:: https://img.shields.io/pypi/dm/liburing
+   :alt: PyPI - Downloads
