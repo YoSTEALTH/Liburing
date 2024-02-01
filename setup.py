@@ -1,53 +1,55 @@
-from sys import version_info
-from platform import release
-from setuptools import setup, find_packages
-from datestamp import stamp
-if version_info < (3, 10):
-    from distutils.version import LooseVersion
-else:
-    from setuptools._distutils.version import LooseVersion
+from os import cpu_count
+from subprocess import run as sub_process_run
+from setuptools import setup
+from Cython.Build import cythonize
+from Cython.Compiler import Options
+from Cython.Distutils import Extension
 
 
+# manually change this:
+os_liburing = False  # use OS `liburing.so`?
+# note: OS `liburing.so` tend to be outdated! Try it, run test, if no error is raised its good :)
 package = 'liburing'
-current_os_version = release()
-required_os_version = '5.1'
+threads = cpu_count()//2 or 1  # use half of cpu resources
+sources = 'liburing/*.pyx'
+language = 'c'
+lib_name = f'{package}.*'
 
+# compiler options
+Options.warning_errors = True   # turn all warnings into errors.
+if __debug__:  # `gcc --help=common` for more info
+    Options.fast_fail = False
+    Options.annotate = True  # generate `*.html` file for debugging & optimization purposes.
+    compile_args = ['-Oz', '-g0']
+else:
+    Options.fast_fail = True
+    Options.annotate = False
+    compile_args = ['-O3', '-g0']
 
-# check to make sure `package` is only installed on supported Linux version.
-if LooseVersion(current_os_version) < LooseVersion(required_os_version):
-    raise RuntimeError(f'"{package.title()}" only supported to run on Linux {required_os_version}+')
+if os_liburing:  # compile using OS `liburing.so`
+    extension = [Extension(name=lib_name,  # where the `.so` will be saved.
+                           sources=[sources],
+                           language=language,
+                           extra_compile_args=compile_args)]
+else:  # compile `liburing` C library as well.
+    path = 'libs/liburing'
+    makefile = 'libs/liburing/Makefile'
+    src_path = 'libs/liburing/src'
+    inc_path = 'libs/liburing/src/include'
+    extension = [Extension(name=lib_name,  # where the `.so` will be saved.
+                           sources=[sources],
+                           language=language,
+                           include_dirs=[inc_path],
+                           # TODO: see if this will include "includes" folder!
+                           # cython_include_dirs=['liburing/includes'],
+                           # note: commenting bellow will make liburing compile from `/usr/lib/`
+                           libraries=[package[3:]],  # remove `lib` part.
+                           library_dirs=[src_path],
+                           extra_compile_args=compile_args)]
+    # configure custom C liburing install
+    sub_process_run(['./configure'], cwd=path, capture_output=True, check=True)
 
-
-with open('README.rst', 'r') as file:
-    long_description = file.read()
-
-
-setup(url='https://github.com/YoSTEALTH/Liburing',
-      name=package,
-      author='STEALTH',
-      version=stamp(package),  # version number is auto generated.
-      packages=find_packages(),
-      description=('This is a Python + CFFI wrapper around Liburing C library, '
-                   'which is a helper to setup and tear-down io_uring instances.'),
-      cffi_modules=['builder.py:ffi'],
-      python_requires='>=3.6',
-      install_requires=['cffi'],
-      long_description=long_description,
-      include_package_data=True,
-      long_description_content_type="text/x-rst",
-      classifiers=['License :: Public Domain',
-                   'Operating System :: POSIX :: Linux',
-                   'Intended Audience :: Developers',
-                   # 'Development Status :: 1 - Planning',
-                   # 'Development Status :: 2 - Pre-Alpha',
-                   'Development Status :: 3 - Alpha',
-                   # 'Development Status :: 4 - Beta',
-                   # 'Development Status :: 5 - Production/Stable',
-                   # 'Development Status :: 6 - Mature',
-                   # 'Development Status :: 7 - Inactive',
-                   'Programming Language :: Python :: 3.6',
-                   'Programming Language :: Python :: 3.7',
-                   'Programming Language :: Python :: 3.8',
-                   'Programming Language :: Python :: 3.9',
-                   'Programming Language :: Python :: 3.10',
-                   'Topic :: Software Development :: Libraries :: Python Modules'])
+setup(ext_modules=cythonize(extension,
+                            nthreads=threads,
+                            compiler_directives={'embedsignature': True,  # show all `__doc__`
+                                                 'language_level': '3'}))

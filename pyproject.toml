@@ -1,2 +1,44 @@
 [build-system]
-requires = ["setuptools", "wheel", "datestamp", "cffi"]
+requires = ["setuptools>=60", "wheel", "cython>=3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liburing"
+dynamic = ["version"]
+authors = [{name="Ritesh"}]
+readme = {file="README.rst", content-type="text/x-rst"}
+license = {file="LICENSE.txt", content-type="text"}
+requires-python = ">=3.8"
+dependencies = ["dynamic-import"]
+description = "..."
+classifiers = ["Topic :: Software Development",
+               "License :: Public Domain",
+               "Intended Audience :: Developers",
+               "Operating System :: POSIX :: Linux",
+               "Programming Language :: Python :: 3.8",
+               "Programming Language :: Python :: 3.9",
+               "Programming Language :: Python :: 3.10",
+               "Programming Language :: Python :: 3.11",
+               "Programming Language :: Python :: 3.12",
+               "Development Status :: 2 - Pre-Alpha"]
+               # 1 - Planning
+               # 2 - Pre-Alpha
+               # 3 - Alpha
+               # 4 - Beta
+               # 5 - Production/Stable
+               # 6 - Mature
+               # 7 - Inactive
+
+[project.urls]
+Homepage = "https://github.com/YoSTEALTH/Liburing"
+Issues = "https://github.com/YoSTEALTH/Liburing/issues"
+
+[tool.setuptools]
+packages = ["liburing"]
+zip-safe = false
+
+[tool.setuptools.dynamic]
+version = {attr="liburing.__version__"}
+
+[tool.setuptools.package-data]
+"*" = ["*.pyx", "*.pxd"]
