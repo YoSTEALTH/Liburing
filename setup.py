@@ -49,7 +49,7 @@ else:  # compile `liburing` C library as well.
                            extra_compile_args=compile_args)]
     # TODO: should not use `check=True` but check for output for error
     sub_process_run(['./configure'], cwd=path, capture_output=False, check=True)
-    # sub_process_run(['make'], cwd=path, capture_output=True, check=True)
+    sub_process_run(['make'], cwd=path, capture_output=False, check=True)
 
 setup(name=package,
       version=version,
