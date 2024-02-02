@@ -40,5 +40,5 @@ zip-safe = false
 [tool.setuptools.dynamic]
 version = {attr="liburing.__version__"}
 
-[tool.setuptools.package-data]
-"*" = ["*.pyx", "*.pxd"]
+# [tool.setuptools.package-data]
+# "*" = ["*.pyx", "*.pxd"]
