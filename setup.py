@@ -49,10 +49,10 @@ else:  # compile `liburing` C library as well.
                            libraries=[package[3:]],  # remove `lib` part.
                            library_dirs=[src_path],
                            extra_compile_args=compile_args)]
-    # configure custom C liburing install
-    sub_process_run(['./configure'], cwd=path, capture_output=True, check=True)
-    sub_process_run(['make'], cwd=path, check=True)
-    sub_process_run(['make', 'install'], cwd=path, capture_output=True, check=True)
+    # configure custom C liburing install , capture_output=True
+    sub_process_run(['./configure'], cwd=path)
+    sub_process_run(['make'], cwd=path)
+    sub_process_run(['make', 'install'], cwd=path)
 
 setup(package_data={package: ['*.pxd']},
       ext_modules=cythonize(extension,
