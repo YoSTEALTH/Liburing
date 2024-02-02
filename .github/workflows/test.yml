@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip flake8 pytest
-          python3 -m pip install --upgrade .
+          python3 -m pip -vvvv install --upgrade .
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
