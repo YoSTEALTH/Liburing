@@ -4,3 +4,7 @@
 __version__ = '2024.2.1'
 
 # importer()
+
+
+def hello_worl():
+    return 'Hello World!'
