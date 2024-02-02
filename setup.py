@@ -26,6 +26,8 @@ else:
     Options.annotate = False
     Options.fast_fail = True
     compile_args = ['O3', 'g0']
+
+compile_args = []
 if os_liburing:  # compile using OS `liburing.so`
     extension = [Extension(name=lib_name,  # where the `.so` will be saved.
                            sources=[sources],
