@@ -46,6 +46,6 @@ version = {attr="liburing.__version__"}
 where = ["src/"]
 namespaces = false
 
-[tool.pytest.ini_options]
-pythonpath = ["src"]
+# [tool.pytest.ini_options]
+# pythonpath = ["src"]
 
