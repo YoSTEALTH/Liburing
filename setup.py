@@ -23,7 +23,7 @@ Options.warning_errors = True   # turn all warnings into errors.
 #     Options.annotate = True  # generate `*.html` file for debugging & optimization purposes.
 #     compile_args = ['Oz', 'g0']
 # else:
-Options.fast_fail = True
+Options.fast_fail = False
 Options.annotate = False
 # compile_args = ['O3', 'g0']
 
@@ -46,10 +46,7 @@ else:  # compile `liburing` C library as well.
                            # TODO: see if this will include "includes" folder!
                            # cython_include_dirs=['liburing/includes'],
                            # note: commenting bellow will make liburing compile from `/usr/lib/`
-
-                           # libraries=[package[3:]],  # remove `lib` part.
-                           libraries=[package],  # remove `lib` part.
-
+                           libraries=[package[3:]],  # remove `lib` part.
                            library_dirs=[src_path],
                            extra_compile_args=compile_args)]
     # configure custom C liburing install
