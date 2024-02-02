@@ -6,5 +6,5 @@ __version__ = '2024.2.1'
 # importer()
 
 
-def hello_worl():
+def hello_world():
     return 'Hello World!'
