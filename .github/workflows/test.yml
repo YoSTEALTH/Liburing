@@ -16,6 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          fetch-depth: 25
           submodules: true
       # Setup Python
       - uses: actions/checkout@v4
