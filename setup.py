@@ -56,6 +56,7 @@ setup(name=package,
       platforms=['linux'],
       # packages=[package, f'{package}.includes'],
       packages=[package],
+      install_requires=['dynamic-import'],
       # include header so people can `cimport`
       # package_data={package: ['*.pxd'], f'{package}.includes': [f'{package}/includes/*.pxd']},
       # package_data={package: ['*.pxd'], f'{package}.includes': ['*.pxd']},
