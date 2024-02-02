@@ -16,7 +16,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 25
           submodules: true
       # Setup Python
       - uses: actions/checkout@v4
@@ -28,8 +27,11 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip flake8 pytest
-          python3 -m pip -vvvv install --upgrade .
-          ls -alFR
+          python3 -m pip install --upgrade .
+
+          # for debugging:
+          # python3 -m pip -vvvv install --upgrade .
+          # ls -alFR
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
