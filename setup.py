@@ -21,11 +21,11 @@ Options.warning_errors = True   # turn all warnings into errors.
 if __debug__:  # `gcc --help=common` for more info
     Options.fast_fail = False
     Options.annotate = True  # generate `*.html` file for debugging & optimization purposes.
-    compile_args = ['-Oz', '-g0']
+    compile_args = ['Oz', 'g0']
 else:
     Options.annotate = False
     Options.fast_fail = True
-    compile_args = ['-O3', '-g0']
+    compile_args = ['O3', 'g0']
 if os_liburing:  # compile using OS `liburing.so`
     extension = [Extension(name=lib_name,  # where the `.so` will be saved.
                            sources=[sources],
@@ -46,7 +46,7 @@ else:  # compile `liburing` C library as well.
                            library_dirs=[src_path],
                            extra_compile_args=compile_args)]
     # TODO: should not use `check=True` but check for output for error
-    sub_process_run(['./configure'], cwd=path, capture_output=True, check=True)
+    sub_process_run(['./configure'], cwd=path, capture_output=False, check=True)
     # sub_process_run(['make'], cwd=path, capture_output=True, check=True)
 
 setup(name=package,
