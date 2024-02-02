@@ -1,3 +1,10 @@
+import liburing
+
+print()
+print('liburing:', liburing)
+print()
+
+
 from pytest import raises
 from liburing.helper import trap_error
 
