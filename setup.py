@@ -47,8 +47,8 @@ else:  # compile `liburing` C library as well.
                            # cython_include_dirs=['liburing/includes'],
                            # note: commenting bellow will make liburing compile from `/usr/lib/`
 
-                           libraries=[package[3:]],  # remove `lib` part.
-                           # libraries=[package],  # remove `lib` part.
+                           # libraries=[package[3:]],  # remove `lib` part.
+                           libraries=[package],  # remove `lib` part.
 
                            library_dirs=[src_path],
                            extra_compile_args=compile_args)]
