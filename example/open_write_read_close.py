@@ -1,3 +1,4 @@
+# note: example requires Linux 5.6+
 # flake8: noqa
 import os
 from liburing import *
