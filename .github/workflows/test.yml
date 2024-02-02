@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: 'true'
+          submodules: true
       # Setup Python
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
