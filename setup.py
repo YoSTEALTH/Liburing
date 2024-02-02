@@ -42,7 +42,7 @@ else:  # compile `liburing` C library as well.
                            library_dirs=[src_path],
                            extra_compile_args=compile_args)]
     sub_process_run(['./configure'], cwd=path, capture_output=True, check=True)
-    # sub_process_run(['make'], cwd=path, capture_output=False, check=True)
+    sub_process_run(['make'], cwd=path, capture_output=False, check=True)
 
 setup(ext_modules=cythonize(extension,
                             nthreads=threads,
