@@ -11,7 +11,8 @@ os_liburing = False  # use OS `liburing.so`?
 # note: OS `liburing.so` tend to be outdated! Try it, run test, if no error is raised its good :)
 package = 'liburing'
 threads = cpu_count()//2 or 1  # use half of cpu resources
-sources = 'liburing/*.pyx'
+# sources = 'liburing/*.pyx'
+sources = 'liburing/helper.pyx'
 language = 'c'
 lib_name = f'{package}.*'
 
@@ -20,11 +21,13 @@ Options.warning_errors = True   # turn all warnings into errors.
 if __debug__:  # `gcc --help=common` for more info
     Options.fast_fail = False
     Options.annotate = True  # generate `*.html` file for debugging & optimization purposes.
-    compile_args = ['-Oz', '-g0']
+    compile_args = ['Oz', 'g0']
 else:
     Options.fast_fail = True
     Options.annotate = False
-    compile_args = ['-O3', '-g0']
+    compile_args = ['O3', 'g0']
+
+compile_args = []  # bypass
 
 if os_liburing:  # compile using OS `liburing.so`
     extension = [Extension(name=lib_name,  # where the `.so` will be saved.
