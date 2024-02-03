@@ -1,4 +1,4 @@
-from liburing.version import liburing_major_version, liburing_minor_version
+from liburing import liburing_major_version, liburing_minor_version
 
 
 def test_liburing_version():
