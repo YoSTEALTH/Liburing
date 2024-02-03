@@ -42,10 +42,13 @@ version = {attr="liburing.__version__"}
 [tool.setuptools.package-data]
 "*" = ["*.pyx", "*.pxd"]
 
+[tool.setuptools.exclude-package-data]
+"*" = ["*.c"]
+
 [tool.setuptools.packages.find]
-where = ["src/"]
+where = ["src"]
 namespaces = false
 
+# for debugging locally
 # [tool.pytest.ini_options]
 # pythonpath = ["src"]
-
