@@ -1,7 +1,4 @@
-# from .type cimport bool
-
-cdef extern from * nogil:
-    ctypedef bint   bool
+from .type cimport bool
 
 
 cdef extern from 'liburing.h' nogil:
