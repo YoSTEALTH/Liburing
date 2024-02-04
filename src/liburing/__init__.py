@@ -1,10 +1,6 @@
 from dynamic_import import importer
 
 
-__version__ = '2024.2.1'
+__version__ = '2024.2.4'
 
 importer()
-
-
-def hello_world():
-    return 'Hello World!'
