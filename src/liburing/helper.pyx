@@ -1,4 +1,4 @@
-# distutils: language=c
+# cython: linetrace=False
 
 
 cpdef inline int trap_error(int no):
@@ -36,3 +36,9 @@ cpdef inline void raise_error(signed int no=-1) except *:
     no = -errno or no
     cdef str error = strerror(-no).decode()
     raise OSError(-no, error)
+
+
+cpdef inline void memory_error(object self) except *:
+    ''' Raises MemoryError '''
+    cdef str error = f'`{self.__class__.__name__}()` is out of memory!'
+    raise MemoryError(error)
