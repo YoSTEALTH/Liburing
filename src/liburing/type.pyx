@@ -1,5 +1,6 @@
-# distutils: language=c
+# cython: linetrace=False
 from libc.stdlib cimport calloc, free
+from .helper cimport memory_error
 
 
 cdef class timespec:
@@ -20,9 +21,7 @@ cdef class timespec:
         cdef str error
         self.ptr = <__kernel_timespec*>calloc(1, sizeof(__kernel_timespec))
         if self.ptr is NULL:
-            error = f'`{self.__class__.__name__}()` is out of memory!'
-            raise MemoryError(error)
-
+            memory_error(self)
         if second:
             # note: converting from `double` is the reason for casting
             self.ptr.tv_sec  = <int64_t>(second / 1)
@@ -47,6 +46,7 @@ cdef class timespec:
     @tv_nsec.setter
     def tv_nsec(self, long long nanosecond):
         self.ptr.tv_nsec = nanosecond
+
 
 cdef class iovec:
     ''' Vector I/O data structure
@@ -79,23 +79,21 @@ cdef class iovec:
         cdef:
             unsigned int           buffers_len, index
             const unsigned char[:] buffer
-            str error
+            str                    error
 
         if (buffers_len := len(buffers)) > SC_IOV_MAX:
-            error = f'`{self.__class__.__name__}()` - `buffers` length of {buffers_len!r} exceeds `SC_IOV_MAX` limit '
-            error += f'set by OS of {SC_IOV_MAX!r}'
-            raise OSError(error)
+            error = f'`{self.__class__.__name__}()` - `buffers` length of {buffers_len!r} '
+            error += f'exceeds `SC_IOV_MAX` limit set by OS of {SC_IOV_MAX!r}'
+            raise OverflowError(error)
         elif buffers_len:
             self.len = buffers_len
             self.ptr = <iovec_t*>calloc(buffers_len, sizeof(iovec_t))
             if self.ptr is NULL:
-                error = f'`{self.__class__.__name__}()` is out of memory!'
-                raise MemoryError(error)
-
+                memory_error(self)
             for index in range(buffers_len):
                 buffer = buffers[index]
-                self.ptr[index].iov_base = <void*>&buffer[0]  # starting address
-                self.ptr[index].iov_len = len(buffers[index])   # size of the memory pointed to by iov_base.
+                self.ptr[index].iov_base = <void*>&buffer[0]   # starting address
+                self.ptr[index].iov_len = len(buffers[index])  # size of the memory pointed to by iov_base.
 
     def __dealloc__(self):
         if self.ptr is not NULL:

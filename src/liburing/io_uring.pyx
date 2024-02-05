@@ -1,5 +1,6 @@
-# distutils: language=c
+# cython: linetrace=False
 from libc.stdlib cimport calloc, free
+from .helper cimport memory_error
 
 
 cdef class io_uring_sqe:
@@ -20,8 +21,7 @@ cdef class io_uring_sqe:
         if num:
             self.ptr = <io_uring_sqe_t*>calloc(num, sizeof(io_uring_sqe_t))
             if self.ptr is NULL:
-                error = f'`{self.__class__.__name__}()` is out of memory!'
-                raise MemoryError(error)
+                memory_error(self)
             if num > 1:
                 self.ref = [None]*(num-1)  # do not hold `0` reference.
         else:
@@ -114,7 +114,6 @@ cdef class io_uring_cqe:
 
     def __repr__(self):
         return f'{self.__class__.__name__}(user_data={self.ptr.user_data!r}, res={self.ptr.res!r}, flags={self.ptr.flags!r})'
-
 
     @property
     def user_data(self):
