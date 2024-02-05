@@ -14,7 +14,9 @@ def test_io_uring_sqe():
     sqe = io_uring_sqe(2)
     assert len(sqe) == 2
     assert sqe[0] is sqe
-    assert sqe[1] is not sqe
+    assert (a := sqe[1]) is not sqe
+    assert (b := sqe[1]) is a  # refernce from cache
+    assert b is not sqe  
     with pytest.raises(IndexError):
         assert sqe[2]
 
