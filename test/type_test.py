@@ -1,5 +1,6 @@
+import re
 import pytest
-from liburing import timespec, iovec
+from liburing import SC_IOV_MAX, timespec, iovec
 
 
 def test_timespec():
@@ -51,3 +52,9 @@ def test_iovec():
     # assert iovec(write_bytes).iov_base == b'a'
     # assert iovec(write_bytearray).iov_base == b'bb'
     # assert iovec(write_memoryview).iov_base == b'ccc'
+
+    iov_max = SC_IOV_MAX + 1
+    buffers = [bytes(1)] * iov_max
+    error = re.escape(f"`iovec()` - `buffers` length of {iov_max} exceeds `SC_IOV_MAX` limit set by OS of {SC_IOV_MAX}")
+    with pytest.raises(OverflowError, match=error):
+        iovec(buffers)
