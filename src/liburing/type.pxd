@@ -5,10 +5,6 @@ cpdef enum:
     SC_IOV_MAX = _SC_IOV_MAX
 
 
-cdef extern from * nogil:
-    ctypedef bint   bool
-
-
 cdef extern from '<linux/types.h>' nogil:
     # NOTE: Does not matter that `ctypedef int` is given to all,
     #       compiler will assign it correct type(I think!).
@@ -27,6 +23,7 @@ cdef extern from '<linux/types.h>' nogil:
 
     ctypedef int off_t
     ctypedef int mode_t
+    ctypedef int size_t
     ctypedef int ssize_t
     ctypedef int int64_t
 
@@ -38,47 +35,9 @@ cdef extern from '<linux/types.h>' nogil:
 
     ctypedef unsigned int uintptr_t
 
-    struct iovec_t 'iovec':
-        void *  iov_base
-        size_t  iov_len
-
-    ctypedef fused string_t:
-        bytes
-        str
-
     # compat.h - this file is auto-created so its correct for these values to be here.
     # ========------------------------------------------------------------------------
     ctypedef int __kernel_rwf_t
-
-    cpdef enum:
-        # splice flags
-        SPLICE_F_MOVE
-        SPLICE_F_NONBLOCK
-        SPLICE_F_MORE
-        SPLICE_F_GIFT
-
-        # renameat2 flags
-        RENAME_NOREPLACE
-        RENAME_EXCHANGE
-        RENAME_WHITEOUT
-
-
-cdef extern from '<fcntl.h>' nogil:
-    cpdef enum:
-        AT_FDCWD            # Use the current working directory.
-        AT_REMOVEDIR        # Remove directory instead of unlinking file.
-        AT_SYMLINK_FOLLOW   # Follow symbolic links.
-        AT_EACCESS          # Test access permitted for effective IDs, not real IDs.
-
-
-cdef extern from '<linux/time_types.h>' nogil:
-    ctypedef int64_t __kernel_time64_t
-    struct __kernel_timespec:
-        __kernel_time64_t   tv_sec      # seconds
-        long long           tv_nsec     # nanoseconds
-
-cdef class timespec:
-    cdef __kernel_timespec * ptr
 
 
 cdef extern from '<sched.h>' nogil:
@@ -93,6 +52,30 @@ cdef extern from '<sched.h>' nogil:
         __cpu_mask    __bits[BITS]
 
 
+cdef extern from '<signal.h>' nogil:
+    ctypedef int id_t
+    ctypedef int idtype_t
+
+    ctypedef int pid_t
+    ctypedef int uid_t
+    ctypedef int si_value
+
+    union sigval:
+        si_value value
+
+    ctypedef struct siginfo_t:
+        int     si_signo    # Signal number
+        int     si_code     # Signal code
+        pid_t   si_pid      # Sending process ID
+        uid_t   si_uid      # Real user ID of sending process
+        void   *si_addr     # Address of faulting instruction
+        int     si_status   # Exit value or signal
+        sigval  si_value    # Signal value
+
+cdef class siginfo:
+    cdef siginfo_t *ptr
+
+
 cdef extern from '<bits/types/sigset_t.h>' nogil:
     enum: _SIGSET_NWORDS
     ctypedef struct __sigset_t:
@@ -100,8 +83,27 @@ cdef extern from '<bits/types/sigset_t.h>' nogil:
     ctypedef __sigset_t sigset_t
 
 
+cdef extern from '<bits/types/struct_iovec.h>' nogil:
+    struct iovec_t 'iovec':
+        void *  iov_base
+        size_t  iov_len
+
 cdef class iovec:
-    cdef iovec_t *      ptr
-    cdef unsigned int   len
+    cdef:
+        iovec_t *ptr
+        unsigned int len
+        list ref
+        # const unsigned char[:] ref
 
 
+cdef extern from '<linux/time_types.h>' nogil:
+    ctypedef int64_t __kernel_time64_t
+    struct __kernel_timespec:
+        __kernel_time64_t   tv_sec      # seconds
+        long long           tv_nsec     # nanoseconds
+
+cdef class timespec:
+    cdef __kernel_timespec *ptr
+
+
+ctypedef bint bool
