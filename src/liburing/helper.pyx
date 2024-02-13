@@ -1,4 +1,5 @@
-# cython: linetrace=False
+from libc.errno cimport errno
+from libc.string cimport strerror
 
 
 cpdef inline int trap_error(int no):
@@ -38,7 +39,17 @@ cpdef inline void raise_error(signed int no=-1) except *:
     raise OSError(-no, error)
 
 
-cpdef inline void memory_error(object self) except *:
+cpdef inline void memory_error(object self, str msg='') except *:
     ''' Raises MemoryError '''
-    cdef str error = f'`{self.__class__.__name__}()` is out of memory!'
+    if not msg:
+        msg = 'is out of memory!'
+    cdef str error = f'`{self.__class__.__name__}()` {msg}'
     raise MemoryError(error)
+
+
+cpdef inline void index_error(object self, unsigned int index, str msg='') except *:
+    ''' Raises IndexError '''
+    if not msg:
+        msg = 'out of range!'
+    cdef str error = f'`{self.__class__.__name__}()[{index}]` {msg}'
+    raise IndexError(error)
