@@ -1,5 +1,5 @@
 from libc.stdlib cimport calloc, free
-from .helper cimport memory_error, index_error
+from .error cimport memory_error, index_error
 from collections.abc import Iterable
 
 
@@ -18,7 +18,6 @@ cdef class timespec:
             >>> io_uring_prep_timeout(sqe, ts, ...)
     '''
     def __cinit__(self, double second=0):
-        cdef str error
         self.ptr = <__kernel_timespec*>calloc(1, sizeof(__kernel_timespec))
         if self.ptr is NULL:
             memory_error(self)
@@ -30,6 +29,7 @@ cdef class timespec:
     def __dealloc__(self):
         if self.ptr is not NULL:
             free(self.ptr)
+            self.ptr = NULL
 
     @property
     def tv_sec(self):
@@ -116,22 +116,23 @@ cdef class iovec:
     def __dealloc__(self):
         if self.ptr is not NULL:
             free(self.ptr)
+            self.ptr = NULL
 
     def __bool__(self):
         return not self.ptr is NULL
+
+    def __len__(self):
+        return self.len
 
     def __getitem__(self, unsigned int index):
         cdef iovec iov
         if index:
             iov = iovec()
             iov.ptr = &self.ptr[index]
-            if iov:
+            if iov.ptr is not NULL:
                 return iov
             index_error(self, index)
         return self
-
-    def __len__(self):
-        return self.len
 
     @property
     def iov_base(self):
