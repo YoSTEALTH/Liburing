@@ -1,4 +1,5 @@
-import pytest
+from re import escape
+from pytest import raises
 from liburing import io_uring_sqe, io_uring_cqe
 
 
@@ -16,18 +17,20 @@ def test_io_uring_sqe():
     assert sqe[0] is sqe
     assert (a := sqe[1]) is not sqe
     assert (b := sqe[1]) is a  # refernce from cache
-    assert b is not sqe  
-    with pytest.raises(IndexError):
+    assert b is not sqe
+    with raises(IndexError):
         assert sqe[2]
 
-    with pytest.raises(OverflowError, match="can't convert negative value to unsigned int"):
+    with raises(OverflowError, match="can't convert negative value to unsigned int"):
         io_uring_sqe(-3)
 
-    with pytest.raises(TypeError):
+    with raises(TypeError):
         io_uring_sqe(None)
 
 
 def test_io_uring_cqe():
-    io_uring_cqe()
-    # note: not much to test here, since the data is filled by `io_uring` backend.
-    #       most of the test will be done while using other functions
+    cqe = io_uring_cqe()
+    with raises(IndexError, match=escape('`io_uring_cqe()[0]` out of `cqe`')):
+        cqe[0]
+    with raises(IndexError, match=escape('`io_uring_cqe()[1]` out of `cqe`')):
+        cqe[1]

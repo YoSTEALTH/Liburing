@@ -1,4 +1,3 @@
-# distutils: language=c
 from .type cimport *
 
 
@@ -414,18 +413,19 @@ cdef extern from 'liburing.h' nogil:
 
         IO_URING_OP_SUPPORTED
 
-    struct io_uring_probe_op_t "io_uring_probe_op":
-        __u8    op
-        __u8    resv
-        __u16   flags   # IO_URING_OP_* flags
-        __u32   resv2
+    # moved
+    # struct io_uring_probe_op_t "io_uring_probe_op":
+    #     __u8    op
+    #     __u8    resv
+    #     __u16   flags   # IO_URING_OP_* flags
+    #     __u32   resv2
 
-    struct io_uring_probe_t "io_uring_probe":
-        __u8    last_op   # last opcode supported
-        __u8    ops_len   # length of ops[] array below
-        __u16   resv
-        __u32   resv2[3]
-        io_uring_probe_op_t   ops[]
+    # struct io_uring_probe_t "io_uring_probe":
+    #     __u8    last_op   # last opcode supported
+    #     __u8    ops_len   # length of ops[] array below
+    #     __u16   resv
+    #     __u32   resv2[3]
+    #     io_uring_probe_op_t   ops[]
 
     struct io_uring_restriction_t "io_uring_restriction":
         pass # TODO:
@@ -520,25 +520,24 @@ cdef extern from 'liburing.h' nogil:
 
 cdef class io_uring_sqe:
     cdef:
-        io_uring_sqe_t  *   ptr
-        unsigned int        len
-        list                ref  # index object reference holder
+        io_uring_sqe_t * ptr
+        unsigned int     len
+        list             ref  # index object reference holder
 
 cdef class io_uring_cqe:
     cdef io_uring_cqe_t * ptr
 
-# TODO:
-# cdef class io_uring_params:
-#     cdef io_uring_params_t * ptr
+cdef class io_uring_params:
+    cdef io_uring_params_t * ptr
 
-# cdef class io_uring_restriction:
-#     cdef io_uring_restriction_t * ptr
+cdef class io_uring_restriction:
+    cdef io_uring_restriction_t * ptr
 
-# cdef class io_uring_buf_reg:
-#     cdef io_uring_buf_reg_t * ptr
+cdef class io_uring_buf_reg:
+    cdef io_uring_buf_reg_t * ptr
 
-# cdef class io_uring_sync_cancel_reg:
-#     cdef io_uring_sync_cancel_reg_t * ptr
+cdef class io_uring_sync_cancel_reg:
+    cdef io_uring_sync_cancel_reg_t * ptr
 
-# cdef class io_uring_buf_ring:
-#     cdef io_uring_buf_ring_t * ptr
+cdef class io_uring_buf_ring:
+    cdef io_uring_buf_ring_t * ptr
