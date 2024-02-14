@@ -90,10 +90,9 @@ cdef extern from '<bits/types/struct_iovec.h>' nogil:
 
 cdef class iovec:
     cdef:
-        iovec_t *ptr
+        iovec_t     *ptr
+        list         ref
         unsigned int len
-        list ref
-        # const unsigned char[:] ref
 
 
 cdef extern from '<linux/time_types.h>' nogil:
