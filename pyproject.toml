@@ -47,8 +47,18 @@ version = {attr="liburing.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-namespaces = false
 
 # for debugging locally
+# ---------------------
 # [tool.pytest.ini_options]
 # pythonpath = ["src"]
+
+# [tool.coverage.run]
+# plugins = ["Cython.Coverage"]
+
+# [tool.coverage.report]
+# exclude_also = [
+#     "raise NotImplementedError",
+#     "memory_error\\(self\\)",
+#     "index_error\\(self, index, '.*'\\)"
+# ]
