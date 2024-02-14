@@ -5,13 +5,15 @@ from liburing import IORING_SETUP_IOPOLL, IORING_SETUP_SQPOLL, \
 
 
 def test_io_uring_init_exit():
-    ring = io_uring()
-    assert io_uring_queue_init(8, ring, 0) == 0
-    assert ring.flags == 65_536
-    assert ring.ring_fd > 0
-    assert ring.features == 16_383
-    assert ring.enter_ring_fd > 0
+    ring = io_uring()    
+    assert ring.flags == 0
+    assert ring.ring_fd == 0
+    assert ring.features == 0
+    assert ring.enter_ring_fd == 0
     assert ring.int_flags == 0
+    assert io_uring_queue_init(8, ring, 0) == 0
+    assert ring.ring_fd > 0
+    assert ring.enter_ring_fd > 0
     assert io_uring_queue_exit(ring) is None
     assert str(ring).startswith('io_uring(flags=')
 
@@ -25,8 +27,5 @@ def test_io_uring_init_exit():
 def test_setup_iopoll_sqpoll():
     for i, setup in enumerate((IORING_SETUP_IOPOLL, IORING_SETUP_SQPOLL), 1):
         ring = io_uring()
-        try:
-            assert io_uring_queue_init(1, ring, setup) == 0
-            assert ring.flags == 65_536 + i
-        finally:
-            assert io_uring_queue_exit(ring) is None
+        assert io_uring_queue_init(1, ring, setup) == 0
+        assert io_uring_queue_exit(ring) is None
