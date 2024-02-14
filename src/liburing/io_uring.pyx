@@ -1,6 +1,5 @@
-# cython: linetrace=False
 from libc.stdlib cimport calloc, free
-from .helper cimport memory_error
+from .error cimport memory_error, index_error
 
 
 cdef class io_uring_sqe:
@@ -31,6 +30,7 @@ cdef class io_uring_sqe:
     def __dealloc__(self):
         if self.len and self.ptr is not NULL:
             free(self.ptr)
+            self.ptr = NULL
 
     def __bool__(self):
         return not self.ptr is NULL
@@ -41,27 +41,27 @@ cdef class io_uring_sqe:
 
     def __getitem__(self, unsigned int index):
         cdef io_uring_sqe sqe
-        cdef str error
+
+        if self.ptr is NULL:
+            index_error(self, index, 'out of `sqe`')
 
         if index == 0:
             return self
         elif index < self.len:
             if (sqe := self.ref[index-1]) is not None:
                 return sqe  # from reference cache
+
             # create new reference class
             sqe = io_uring_sqe(0)
             sqe.ptr = &self.ptr[index]
-            if sqe.ptr is NULL:
-                error = f'{self.__class__.__name__}()[{index}]'
-                raise IndexError(error)
+            if sqe.ptr is not NULL:
+                # cache sqe as this class attribute
+                self.ref[index-1] = sqe
+                return sqe
+            index_error(self, index, 'out of `sqe`')
             # note: `len(sqe)` will be `0` since its a pointer and
             #       to make sure `free()` isn't called on it.
-            # cache sqe as this class attribute
-            self.ref[index-1] = sqe
-            return sqe
-        else:
-            error = f'{self.__class__.__name__}()[{index}]'
-            raise IndexError(error)
+        index_error(self, index)
 
 
 cdef class io_uring_cqe:
@@ -98,19 +98,21 @@ cdef class io_uring_cqe:
             - `cqes = io_uring_cqe()` only needs to be defined once, and reused.
             - Use `io_uring_cq_ready(ring)` to figure out how many cqe's are ready.
     '''
-    def __bool__(self):
-        return not self.ptr is NULL
-
     def __getitem__(self, unsigned int index):
         cdef io_uring_cqe cqe
+        if self.ptr is NULL:
+            index_error(self, index, 'out of `cqe`')
         if index:
             cqe = io_uring_cqe()
             cqe.ptr = &self.ptr[index]
-            if cqe.ptr is NULL:  # TODO: need to test this.
-                raise IndexError(f'`{self.__class__.__name__}()[{index}]` is out of range')
-            return cqe
+            if cqe.ptr is not NULL:
+                return cqe
+            index_error(self, index, 'out of `cqe`')
         return self
         # note: no need to cache items since `cqe` is normally called once or passed around.
+
+    def __bool__(self):
+        return not self.ptr is NULL
 
     def __repr__(self):
         return f'{self.__class__.__name__}(user_data={self.ptr.user_data!r}, res={self.ptr.res!r}, flags={self.ptr.flags!r})'
