@@ -3,12 +3,20 @@ include LICENSE.txt
 
 # C Liburing
 include libs/liburing/LICENSE
+include libs/liburing/COPYING
+include libs/liburing/COPYING.GPL
 include libs/liburing/configure
+
+graft libs/liburing/src/arch
+
 include libs/liburing/src/include/liburing.h
 include libs/liburing/src/include/liburing/barrier.h
 include libs/liburing/src/include/liburing/io_uring.h
-include libs/liburing/src/include/liburing/io_uring_version.h
+exclude libs/liburing/src/include/liburing/io_uring_version.h
 exclude libs/liburing/src/include/liburing/compat.h
+
+
+
 
 graft liburing
 graft example
