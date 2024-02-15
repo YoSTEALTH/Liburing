@@ -75,8 +75,8 @@ Simple File Example
     from liburing import O_CREAT, O_RDWR, AT_FDCWD, iovec, io_uring, io_uring_get_sqe, \
                          io_uring_prep_openat, io_uring_prep_write, io_uring_prep_read, \
                          io_uring_prep_close, io_uring_submit, io_uring_wait_cqe, \
-                         io_uring_cqe_seen, io_uring_cqe, io_uring_queue_init, io_uring_queue_exit, \
-                         trap_error
+                         io_uring_cqe_seen, io_uring_cqe, io_uring_queue_init, \
+                         io_uring_queue_exit, trap_error
 
 
     def open(ring, cqes, path, flags, mode=0o660, dir_fd=AT_FDCWD):

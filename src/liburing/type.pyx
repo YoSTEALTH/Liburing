@@ -1,4 +1,4 @@
-from libc.stdlib cimport calloc, free
+from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from .error cimport memory_error, index_error
 from collections.abc import Iterable
 
@@ -18,7 +18,7 @@ cdef class timespec:
             >>> io_uring_prep_timeout(sqe, ts, ...)
     '''
     def __cinit__(self, double second=0):
-        self.ptr = <__kernel_timespec*>calloc(1, sizeof(__kernel_timespec))
+        self.ptr = <__kernel_timespec*>PyMem_RawCalloc(1, sizeof(__kernel_timespec))
         if self.ptr is NULL:
             memory_error(self)
         if second:
@@ -28,7 +28,7 @@ cdef class timespec:
 
     def __dealloc__(self):
         if self.ptr is not NULL:
-            free(self.ptr)
+            PyMem_RawFree(self.ptr)
             self.ptr = NULL
 
     @property
@@ -104,7 +104,7 @@ cdef class iovec:
                 error += f'exceeds `SC_IOV_MAX` limit set by OS of {SC_IOV_MAX!r}'
                 raise OverflowError(error)
 
-            self.ptr = <iovec_t*>calloc(self.len, sizeof(iovec_t))
+            self.ptr = <iovec_t*>PyMem_RawCalloc(self.len, sizeof(iovec_t))
             if self.ptr is NULL:
                 memory_error(self)
 
@@ -115,7 +115,7 @@ cdef class iovec:
 
     def __dealloc__(self):
         if self.ptr is not NULL:
-            free(self.ptr)
+            PyMem_RawFree(self.ptr)
             self.ptr = NULL
 
     def __bool__(self):

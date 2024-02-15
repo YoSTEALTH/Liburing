@@ -25,7 +25,7 @@ cdef class open_how:
             - visit https://man7.org/linux/man-pages/man2/openat2.2.html for more information.
     '''
     def __cinit__(self, __u64 flags=0, __u64 mode=0, __u64 resolve=0):
-        self.ptr = <open_how_t*>calloc(1, sizeof(open_how_t))
+        self.ptr = <open_how_t*>PyMem_RawCalloc(1, sizeof(open_how_t))
         if self.ptr is NULL:
             memory_error(self)
 
@@ -36,7 +36,7 @@ cdef class open_how:
 
     def __dealloc__(self):
         if self.ptr is not NULL:
-            free(self.ptr)
+            PyMem_RawFree(self.ptr)
             self.ptr = NULL
 
     @property

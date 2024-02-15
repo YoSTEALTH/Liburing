@@ -1,4 +1,4 @@
-from libc.stdlib cimport calloc, free
+from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from .error cimport memory_error, index_error
 
 
@@ -18,7 +18,7 @@ cdef class io_uring_sqe:
     def __cinit__(self, unsigned int num=1):
         cdef str error
         if num:
-            self.ptr = <io_uring_sqe_t*>calloc(num, sizeof(io_uring_sqe_t))
+            self.ptr = <io_uring_sqe_t*>PyMem_RawCalloc(num, sizeof(io_uring_sqe_t))
             if self.ptr is NULL:
                 memory_error(self)
             if num > 1:
@@ -29,7 +29,7 @@ cdef class io_uring_sqe:
 
     def __dealloc__(self):
         if self.len and self.ptr is not NULL:
-            free(self.ptr)
+            PyMem_RawFree(self.ptr)
             self.ptr = NULL
 
     def __bool__(self):

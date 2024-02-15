@@ -1,4 +1,4 @@
-from libc.stdlib cimport calloc, free
+from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from .type cimport __u64, int64_t, mode_t, iovec_t, iovec
 from .error cimport trap_error, memory_error
 from .io_uring cimport io_uring_sqe_t, io_uring_sqe

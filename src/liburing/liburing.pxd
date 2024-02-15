@@ -4,38 +4,40 @@ from .io_uring cimport *
 
 
 cdef extern from 'liburing.h' nogil:
+    # ctypedef IOURINGINLINE static inline
+
     # Library interface to `io_uring`
     # -------------------------------
     struct io_uring_sq_t 'io_uring_sq':
-        unsigned int *  khead
-        unsigned int *  ktail
-        unsigned int *  kring_mask      # Deprecated: use `ring_mask` instead of `*kring_mask`
-        unsigned int *  kring_entries   # Deprecated: use `ring_entries` instead of `*kring_entries`
-        unsigned int *  kflags
-        unsigned int *  kdropped
-        unsigned int *  array
-        io_uring_sqe_t *  sqes
+        unsigned int   *khead
+        unsigned int   *ktail
+        unsigned int   *kring_mask      # Deprecated: use `ring_mask` instead of `*kring_mask`
+        unsigned int   *kring_entries   # Deprecated: use `ring_entries` instead of `*kring_entries`
+        unsigned int   *kflags
+        unsigned int   *kdropped
+        unsigned int   *array
+        io_uring_sqe_t *sqes
         unsigned int    sqe_head
         unsigned int    sqe_tail
         size_t          ring_sz
-        void *          ring_ptr
+        void           *ring_ptr
         unsigned int    ring_mask
         unsigned int    ring_entries
         unsigned int    pad[2]
 
     struct io_uring_cq_t 'io_uring_cq':
-        unsigned int    *   khead
-        unsigned int    *   ktail
-        unsigned int    *   kring_mask      # Deprecated: use `ring_mask` instead of `*kring_mask`
-        unsigned int    *   kring_entries   # Deprecated: use `ring_entries` instead of `*kring_entries`
-        unsigned int    *   kflags
-        unsigned int    *   koverflow
-        io_uring_cqe_t  *   cqes
-        size_t              ring_sz
-        void            *   ring_ptr
-        unsigned int        ring_mask
-        unsigned int        ring_entries
-        unsigned int        pad[2]
+        unsigned int   *khead
+        unsigned int   *ktail
+        unsigned int   *kring_mask      # Deprecated: use `ring_mask` instead of `*kring_mask`
+        unsigned int   *kring_entries   # Deprecated: use `ring_entries` instead of `*kring_entries`
+        unsigned int   *kflags
+        unsigned int   *koverflow
+        io_uring_cqe_t *cqes
+        size_t          ring_sz
+        void           *ring_ptr
+        unsigned int    ring_mask
+        unsigned int    ring_entries
+        unsigned int    pad[2]
 
     struct io_uring_t 'io_uring':
         io_uring_sq_t   sq
@@ -48,6 +50,7 @@ cdef extern from 'liburing.h' nogil:
         __u8            pad[3]
         unsigned int    pad2
 
+
     # Library interface
     # -----------------
     int io_uring_queue_init_mem_c 'io_uring_queue_init_mem'(unsigned int entries,
@@ -59,7 +62,7 @@ cdef extern from 'liburing.h' nogil:
                                                                   io_uring_t * ring,
                                                                   io_uring_params_t * p)
     int io_uring_queue_init_c 'io_uring_queue_init'(unsigned int entries,
-                                                    io_uring_t * ring,
+                                                    io_uring_t *ring,
                                                     unsigned int flags)
     int io_uring_queue_mmap_c 'io_uring_queue_mmap'(int fd,
                                                     io_uring_params_t * p,
@@ -200,68 +203,68 @@ cdef class io_uring:
 #                                   size_t buf_size)
 cpdef int io_uring_queue_init_params(unsigned int entries,
                                      io_uring ring,
-                                     io_uring_params p)
+                                     io_uring_params p) nogil
 cpdef int io_uring_queue_init(unsigned int entries,
                               io_uring ring,
-                              unsigned int flags=?)
+                              unsigned int flags=?) nogil
 cpdef int io_uring_queue_mmap(int fd,
                               io_uring_params p,
-                              io_uring ring)
-cpdef int io_uring_ring_dontfork(io_uring ring)
-cpdef void io_uring_queue_exit(io_uring ring)
+                              io_uring ring) nogil
+cpdef int io_uring_ring_dontfork(io_uring ring) nogil
+cpdef void io_uring_queue_exit(io_uring ring) nogil
 cpdef unsigned int io_uring_peek_batch_cqe(io_uring ring,
                                            io_uring_cqe cqes,
-                                           unsigned int count)
+                                           unsigned int count) nogil
 cpdef int io_uring_wait_cqes(io_uring ring,
                              io_uring_cqe cqe_ptr,
                              unsigned int wait_nr,
                              timespec ts,
-                             sigset_t sigmask)
+                             sigset_t sigmask) nogil
 cpdef int io_uring_wait_cqe_timeout(io_uring ring,
                                     io_uring_cqe cqe_ptr,
-                                    timespec ts)
-cpdef int io_uring_submit(io_uring ring)
-cpdef int io_uring_submit_and_wait(io_uring ring, unsigned int wait_nr)
+                                    timespec ts) nogil
+cpdef int io_uring_submit(io_uring ring) nogil
+cpdef int io_uring_submit_and_wait(io_uring ring, unsigned int wait_nr) nogil
 cpdef int io_uring_submit_and_wait_timeout(io_uring ring,
                                            io_uring_cqe cqe_ptr,
                                            unsigned int wait_nr,
                                            timespec ts,
-                                           sigset_t sigmask)
+                                           sigset_t sigmask) nogil
 
-cpdef int io_uring_get_events(io_uring ring)
-cpdef int io_uring_submit_and_get_events(io_uring ring)
+cpdef int io_uring_get_events(io_uring ring) nogil
+cpdef int io_uring_submit_and_get_events(io_uring ring) nogil
 
 #  `io_uring` syscalls.
 cpdef int io_uring_enter(unsigned int fd,
                          unsigned int to_submit,
                          unsigned int min_complete,
                          unsigned int flags,
-                         sigset_t sig)
+                         sigset_t sig) nogil
 cpdef int io_uring_enter2(unsigned int fd,
                           unsigned int to_submit,
                           unsigned int min_complete,
                           unsigned int flags,
                           sigset_t sig,
-                          size_t sz);
+                          size_t sz) nogil
 cpdef int io_uring_setup(unsigned int entries,
-                         io_uring_params p)
+                         io_uring_params p) nogil
 
-cpdef void io_uring_cq_advance(io_uring ring, unsigned int nr)
-cpdef void io_uring_cqe_seen(io_uring ring, io_uring_cqe nr)
+cpdef void io_uring_cq_advance(io_uring ring, unsigned int nr) noexcept nogil
+cpdef void io_uring_cqe_seen(io_uring ring, io_uring_cqe nr) noexcept nogil
 
 # Command prep helpers
 # --------------------
-cpdef void io_uring_sqe_set_data(io_uring_sqe sqe, object obj)
-cpdef object io_uring_cqe_get_data(io_uring_cqe cqe)
+cpdef void io_uring_sqe_set_data(io_uring_sqe sqe, object obj) noexcept
+cpdef object io_uring_cqe_get_data(io_uring_cqe cqe) noexcept
 
-cpdef void io_uring_sqe_set_data64(io_uring_sqe sqe, __u64 data)
-cpdef __u64 io_uring_cqe_get_data64(io_uring_cqe cqe)
-cpdef void io_uring_sqe_set_flags(io_uring_sqe sqe, unsigned int flags)
+cpdef void io_uring_sqe_set_data64(io_uring_sqe sqe, __u64 data) noexcept nogil
+cpdef __u64 io_uring_cqe_get_data64(io_uring_cqe cqe) noexcept nogil
+cpdef void io_uring_sqe_set_flags(io_uring_sqe sqe, unsigned int flags) noexcept nogil
 
-cpdef void io_uring_prep_nop(io_uring_sqe sqe)
-cpdef void io_uring_prep_cancel64(io_uring_sqe sqe, __u64 user_data, int flags)
-cpdef void io_uring_prep_cancel(io_uring_sqe sqe, object user_data, int flags)
-cpdef void io_uring_prep_cancel_fd(io_uring_sqe sqe, int fd, unsigned int flags)
+cpdef void io_uring_prep_nop(io_uring_sqe sqe) noexcept nogil
+cpdef void io_uring_prep_cancel64(io_uring_sqe sqe, __u64 user_data, int flags) noexcept nogil
+cpdef void io_uring_prep_cancel(io_uring_sqe sqe, object user_data, int flags) noexcept
+cpdef void io_uring_prep_cancel_fd(io_uring_sqe sqe, int fd, unsigned int flags) noexcept nogil
 
 
 cpdef void io_uring_prep_waitid(io_uring_sqe sqe,
@@ -269,29 +272,29 @@ cpdef void io_uring_prep_waitid(io_uring_sqe sqe,
                                 id_t         id,
                                 siginfo      infop,
                                 int          options,
-                                unsigned int flags)
+                                unsigned int flags) noexcept nogil
 
 cpdef void io_uring_prep_fixed_fd_install(io_uring_sqe sqe,
                                           int          fd,
-                                          unsigned int flags)
+                                          unsigned int flags) noexcept nogil
 
 
-cpdef unsigned int io_uring_sq_ready(io_uring ring)
-cpdef unsigned int io_uring_sq_space_left(io_uring ring)
-cpdef int io_uring_sqring_wait(io_uring ring)
-cpdef unsigned int io_uring_cq_ready(io_uring ring)
-cpdef bool io_uring_cq_has_overflow(io_uring ring)
-cpdef bool io_uring_cq_eventfd_enabled(io_uring ring)
+cpdef unsigned int io_uring_sq_ready(io_uring ring) noexcept nogil
+cpdef unsigned int io_uring_sq_space_left(io_uring ring) noexcept nogil
+cpdef int io_uring_sqring_wait(io_uring ring) noexcept nogil
+cpdef unsigned int io_uring_cq_ready(io_uring ring) noexcept nogil
+cpdef bool io_uring_cq_has_overflow(io_uring ring) noexcept nogil
+cpdef bool io_uring_cq_eventfd_enabled(io_uring ring) noexcept nogil
 
 
-cpdef int io_uring_cq_eventfd_toggle(io_uring ring, bool enabled)
+cpdef int io_uring_cq_eventfd_toggle(io_uring ring, bool enabled) noexcept nogil
 cpdef int io_uring_wait_cqe_nr(io_uring ring,
                                       io_uring_cqe cqe_ptr,
-                                      unsigned int     wait_nr)
-cpdef int io_uring_peek_cqe(io_uring ring, io_uring_cqe cqe_ptr)
-cpdef int io_uring_wait_cqe(io_uring ring, io_uring_cqe cqe_ptr)
-cpdef int io_uring_buf_ring_mask(__u32 ring_entries)
-cpdef void io_uring_buf_ring_init(io_uring_buf_ring br)
+                                      unsigned int     wait_nr) noexcept nogil
+cpdef int io_uring_peek_cqe(io_uring ring, io_uring_cqe cqe_ptr) noexcept nogil
+cpdef int io_uring_wait_cqe(io_uring ring, io_uring_cqe cqe_ptr) noexcept nogil
+cpdef int io_uring_buf_ring_mask(__u32 ring_entries) noexcept nogil
+cpdef void io_uring_buf_ring_init(io_uring_buf_ring br) noexcept nogil
 
 # TODO:
 # cpdef void io_uring_buf_ring_add(io_uring_buf_ring br,
@@ -299,12 +302,12 @@ cpdef void io_uring_buf_ring_init(io_uring_buf_ring br)
 #                                  unsigned int len,
 #                                  unsigned short bid,
 #                                  int mask,
-#                                  int buf_offset)
-cpdef void io_uring_buf_ring_advance(io_uring_buf_ring br, int count)
+#                                  int buf_offset) noexcept nogil
+cpdef void io_uring_buf_ring_advance(io_uring_buf_ring br, int count) noexcept nogil
 cpdef void io_uring_buf_ring_cq_advance(io_uring          ring,
                                                io_uring_buf_ring br,
-                                               int               count)
+                                               int               count) noexcept nogil
 cpdef int io_uring_buf_ring_available(io_uring          ring,
                                              io_uring_buf_ring br,
-                                             unsigned short    bgid)
-cpdef io_uring_sqe io_uring_get_sqe(io_uring ring)
+                                             unsigned short    bgid) noexcept nogil
+cpdef io_uring_sqe io_uring_get_sqe(io_uring ring) noexcept
