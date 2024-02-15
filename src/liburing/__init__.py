@@ -1,7 +1,7 @@
 from dynamic_import import importer
 
 
-__version__ = '2024.2.13'
+__version__ = '2024.2.15'
 
 importer(cache=True)
 # - `importer()` helps this project manage all import needs. It auto scans for

@@ -33,7 +33,7 @@ cdef extern from '<linux/openat2.h>' nogil:
         RENAME_WHITEOUT
 
 cdef class open_how:
-    cdef open_how_t * ptr
+    cdef open_how_t *ptr
 
 
 cdef extern from "<fcntl.h>" nogil:
@@ -69,75 +69,73 @@ cdef extern from "<fcntl.h>" nogil:
         AT_EACCESS          # Test access permitted for effective IDs, not real IDs.
 
 
-cdef extern from * nogil:
-    int io_uring_register_files_c 'io_uring_register_files'(io_uring_t * ring,
-                                                            const int * files,
+cdef extern from *nogil:
+    int io_uring_register_files_c 'io_uring_register_files'(io_uring_t *ring,
+                                                            const int *files,
                                                             unsigned int nr_files)
-    int io_uring_register_files_tags_c 'io_uring_register_files_tags'(io_uring_t * ring,
-                                                                      const int * files,
-                                                                      const __u64 * tags,
+    int io_uring_register_files_tags_c 'io_uring_register_files_tags'(io_uring_t *ring,
+                                                                      const int *files,
+                                                                      const __u64 *tags,
                                                                       unsigned int nr)
-    int io_uring_register_files_sparse_c 'io_uring_register_files_sparse'(io_uring_t * ring,
+    int io_uring_register_files_sparse_c 'io_uring_register_files_sparse'(io_uring_t *ring,
                                                                           unsigned int nr)
-    int io_uring_register_files_update_tag_c 'io_uring_register_files_update_tag'(io_uring_t * ring,
+    int io_uring_register_files_update_tag_c 'io_uring_register_files_update_tag'(io_uring_t *ring,
                                                                                   unsigned int off,
-                                                                                  const int * files,
-                                                                                  const __u64 * tags,
+                                                                                  const int *files,
+                                                                                  const __u64 *tags,
                                                                                   unsigned int nr_files)
-
-    int io_uring_unregister_files_c 'io_uring_unregister_files'(io_uring_t * ring)
-    int io_uring_register_files_update_c 'io_uring_register_files_update'(io_uring_t * ring,
+    int io_uring_unregister_files_c 'io_uring_unregister_files'(io_uring_t *ring)
+    int io_uring_register_files_update_c 'io_uring_register_files_update'(io_uring_t *ring,
                                                                           unsigned int off,
-                                                                          const int * files,
+                                                                          const int *files,
                                                                           unsigned int nr_files)
-
-    void io_uring_prep_splice_c 'io_uring_prep_splice'(io_uring_sqe_t * sqe,
+    void io_uring_prep_splice_c 'io_uring_prep_splice'(io_uring_sqe_t *sqe,
                                                        int fd_in,
                                                        int64_t off_in,
                                                        int fd_out,
                                                        int64_t off_out,
                                                        unsigned int nbytes,
                                                        unsigned int splice_flags)
-    void io_uring_prep_tee_c 'io_uring_prep_tee'(io_uring_sqe_t * sqe,
+    void io_uring_prep_tee_c 'io_uring_prep_tee'(io_uring_sqe_t *sqe,
                                                  int fd_in,
                                                  int fd_out,
                                                  unsigned int nbytes,
                                                  unsigned int splice_flags)
-    void io_uring_prep_readv_c 'io_uring_prep_readv'(io_uring_sqe_t * sqe,
+    void io_uring_prep_readv_c 'io_uring_prep_readv'(io_uring_sqe_t *sqe,
                                                      int fd,
-                                                     const iovec_t * iovecs,
+                                                     const iovec_t *iovecs,
                                                      unsigned int nr_vecs,
                                                      __u64 offset)
-    void io_uring_prep_readv2_c 'io_uring_prep_readv2'(io_uring_sqe_t * sqe,
+    void io_uring_prep_readv2_c 'io_uring_prep_readv2'(io_uring_sqe_t *sqe,
                                                        int fd,
-                                                       const iovec_t * iovecs,
+                                                       const iovec_t *iovecs,
                                                        unsigned int nr_vecs,
                                                        __u64 offset,
                                                        int flags)
-    void io_uring_prep_read_fixed_c 'io_uring_prep_read_fixed'(io_uring_sqe_t * sqe,
+    void io_uring_prep_read_fixed_c 'io_uring_prep_read_fixed'(io_uring_sqe_t *sqe,
                                                                int fd,
-                                                               void * buf,
+                                                               void *buf,
                                                                unsigned int nbytes,
                                                                __u64 offset,
                                                                int buf_index)
-    void io_uring_prep_writev_c 'io_uring_prep_writev'(io_uring_sqe_t * sqe,
+    void io_uring_prep_writev_c 'io_uring_prep_writev'(io_uring_sqe_t *sqe,
                                                        int fd,
-                                                       const iovec_t * iovecs,
+                                                       const iovec_t *iovecs,
                                                        unsigned int nr_vecs,
                                                        __u64 offset)
-    void io_uring_prep_writev2_c 'io_uring_prep_writev2'(io_uring_sqe_t * sqe,
+    void io_uring_prep_writev2_c 'io_uring_prep_writev2'(io_uring_sqe_t *sqe,
                                                          int fd,
-                                                         const iovec_t * iovecs,
+                                                         const iovec_t *iovecs,
                                                          unsigned nr_vecs, __u64 offset,
                                                          int flags)
-    void io_uring_prep_write_fixed_c 'io_uring_prep_write_fixed'(io_uring_sqe_t * sqe,
+    void io_uring_prep_write_fixed_c 'io_uring_prep_write_fixed'(io_uring_sqe_t *sqe,
                                                                  int fd,
-                                                                 const char * buf,
+                                                                 const char *buf,
                                                                  unsigned int nbytes,
                                                                  __u64 offset,
                                                                  int buf_index)
 
-    void io_uring_prep_fsync_c 'io_uring_prep_fsync'(io_uring_sqe_t * sqe, int fd, unsigned int fsync_flags)
+    void io_uring_prep_fsync_c 'io_uring_prep_fsync'(io_uring_sqe_t *sqe, int fd, unsigned int fsync_flags)
 
     void io_uring_prep_openat_c 'io_uring_prep_openat'(io_uring_sqe_t *sqe,
                                                        int dfd,
@@ -183,114 +181,104 @@ cdef extern from * nogil:
 
 cpdef int io_uring_register_files(io_uring ring,
                                   int files,
-                                  unsigned int nr_files)
+                                  unsigned int nr_files) nogil
 cpdef int io_uring_register_files_tags(io_uring ring,
                                        int files,
                                        __u64 tags,
-                                       unsigned int nr)
+                                       unsigned int nr) nogil
 cpdef int io_uring_register_files_sparse(io_uring ring,
-                                         unsigned int nr)
+                                         unsigned int nr) nogil
 cpdef int io_uring_register_files_update_tag(io_uring ring,
                                              unsigned int off,
                                              int files,
                                              __u64 tags,
-                                             unsigned int nr_files)
-
-cpdef int io_uring_unregister_files(io_uring ring)
+                                             unsigned int nr_files) nogil
+cpdef int io_uring_unregister_files(io_uring ring) nogil
 cpdef int io_uring_register_files_update(io_uring ring,
                                          unsigned int off,
                                          int files,
-                                         unsigned int nr_files)
-
-
+                                         unsigned int nr_files) nogil
 cpdef void io_uring_prep_splice(io_uring_sqe sqe,
                                        int fd_in,
                                        int64_t off_in,
                                        int fd_out,
                                        int64_t off_out,
                                        unsigned int nbytes,
-                                       unsigned int splice_flags)
+                                       unsigned int splice_flags) noexcept nogil
 cpdef void io_uring_prep_tee(io_uring_sqe sqe,
                              int fd_in,
                              int fd_out,
                              unsigned int nbytes,
-                             unsigned int splice_flags)
+                             unsigned int splice_flags) noexcept nogil
 cpdef void io_uring_prep_readv(io_uring_sqe sqe,
                                int fd,
                                iovec iovecs,
                                unsigned int nr_vecs,
-                               __u64 offset)
+                               __u64 offset) noexcept nogil
 cpdef void io_uring_prep_readv2(io_uring_sqe sqe,
                                 int fd,
                                 iovec iovecs,
                                 unsigned int nr_vecs,
                                 __u64 offset,
-                                int flags)
+                                int flags) noexcept nogil
 cpdef void io_uring_prep_read_fixed(io_uring_sqe sqe,
                                     int fd,
-                                    char * buf,
+                                    char *buf,
                                     unsigned int nbytes,
                                     __u64 offset,
-                                    int buf_index)
+                                    int buf_index) noexcept nogil
 cpdef void io_uring_prep_writev(io_uring_sqe sqe,
                                 int fd,
                                 iovec iovecs,
                                 unsigned int nr_vecs,
-                                __u64 offset)
+                                __u64 offset) noexcept nogil
 cpdef void io_uring_prep_writev2(io_uring_sqe sqe,
                                  int fd,
                                  iovec iovecs,
                                  unsigned int nr_vecs,
                                  __u64 offset,
-                                 int flags)
+                                 int flags) noexcept nogil
 cpdef void io_uring_prep_write_fixed(io_uring_sqe sqe,
                                      int fd,
-                                     char * buf,
+                                     char *buf,
                                      unsigned int nbytes,
                                      __u64 offset,
-                                     int buf_index)
-
-cpdef void io_uring_prep_fsync(io_uring_sqe sqe, int fd, unsigned int fsync_flags)
-
+                                     int buf_index) noexcept nogil
+cpdef void io_uring_prep_fsync(io_uring_sqe sqe, int fd, unsigned int fsync_flags) noexcept nogil
 cpdef void io_uring_prep_openat(io_uring_sqe sqe,
                                 int dfd,
                                 const char *path,
                                 int flags,
-                                mode_t mode)
-
+                                mode_t mode) noexcept nogil
 cpdef void io_uring_prep_openat2(io_uring_sqe sqe,
                                  int dfd,
                                  const char *path,
-                                 open_how how)
-
+                                 open_how how) noexcept nogil
 cpdef void io_uring_prep_openat_direct(io_uring_sqe sqe,
                                        int dfd,
                                        const char *path,
                                        int flags,
                                        mode_t mode,
-                                       unsigned int file_index)
-
+                                       unsigned int file_index) noexcept nogil
 cpdef void io_uring_prep_openat2_direct(io_uring_sqe sqe,
                                         int dfd,
                                         const char *path,
                                         open_how how,
-                                        unsigned int file_index)
-
-
-cpdef void io_uring_prep_close(io_uring_sqe sqe, int fd)
-cpdef void io_uring_prep_close_direct(io_uring_sqe sqe, unsigned int file_index)
+                                        unsigned int file_index) noexcept nogil
+cpdef void io_uring_prep_close(io_uring_sqe sqe, int fd) noexcept nogil
+cpdef void io_uring_prep_close_direct(io_uring_sqe sqe, unsigned int file_index) noexcept nogil
 cpdef void io_uring_prep_read(io_uring_sqe sqe,
                               int fd,
-                              unsigned char[:] buf,  # `void * buf`
+                              unsigned char[:] buf,  # `void *buf`
                               unsigned int nbytes,
-                              __u64 offset)
+                              __u64 offset) noexcept nogil
 cpdef void io_uring_prep_read_multishot(io_uring_sqe sqe,
                                         int fd,
                                         unsigned int nbytes,
                                         __u64 offset,
-                                        int buf_group)
+                                        int buf_group) noexcept nogil
 cpdef void io_uring_prep_write(io_uring_sqe sqe,
                                int fd,
                                const unsigned char[:] buf,  # `const void * buf`
                                unsigned int nbytes,
-                               __u64 offset)
+                               __u64 offset) noexcept nogil
