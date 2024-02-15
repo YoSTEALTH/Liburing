@@ -2,7 +2,7 @@ from libc.errno cimport errno
 from libc.string cimport strerror
 
 
-cpdef inline int trap_error(int no):
+cpdef inline int trap_error(int no) nogil:
     ''' Trap Error
 
         Type
@@ -29,10 +29,12 @@ cpdef inline int trap_error(int no):
     '''
     if no >= 0:
         return no
-    raise_error(no)
+
+    with gil:
+        raise_error(no)
 
 
-cpdef inline void raise_error(signed int no=-1) except *:
+cdef inline void raise_error(signed int no=-1) except *:
     ''' This function will only raise Error '''
     no = -errno or no
     cdef str error = strerror(-no).decode()
@@ -53,3 +55,4 @@ cpdef inline void index_error(object self, unsigned int index, str msg='') excep
         msg = 'out of range!'
     cdef str error = f'`{self.__class__.__name__}()[{index}]` {msg}'
     raise IndexError(error)
+

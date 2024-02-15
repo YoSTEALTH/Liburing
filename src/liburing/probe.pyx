@@ -1,4 +1,4 @@
-from libc.stdlib cimport calloc, free
+from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from .error cimport trap_error, memory_error
 
 
@@ -6,7 +6,7 @@ cdef class io_uring_probe:
     
     def __cinit__(self, unsigned int num=0):
         if num:
-            self.ptr = <io_uring_probe_t*>calloc(num, sizeof(io_uring_probe_t))
+            self.ptr = <io_uring_probe_t*>PyMem_RawCalloc(num, sizeof(io_uring_probe_t))
             if self.ptr is NULL:
                 memory_error(self)
 
