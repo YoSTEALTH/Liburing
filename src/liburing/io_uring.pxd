@@ -4,7 +4,9 @@ from .type cimport *
 cdef extern from 'liburing.h' nogil:
     # IO submission data structure (Submission Queue Entry)
     struct io_uring_sqe_t "io_uring_sqe":
-        pass    
+        __u8  flags         # IOSQE_ flags
+        __u64 user_data     # data to be passed back at completion time
+        # note: other values, embedded union & struct are ignored.
 
     cpdef enum:
         # If `sqe->file_index` is set to this for opcodes that instantiate a new
@@ -175,9 +177,9 @@ cdef extern from 'liburing.h' nogil:
         IORING_POLL_ADD_LEVEL
 
         # ASYNC_CANCEL flags.
-        IORING_ASYNC_CANCEL_ALL       # Cancel all requests that match the given key
-        IORING_ASYNC_CANCEL_FD        # Key off `fd` for cancelation rather than the request `user_data`
-        IORING_ASYNC_CANCEL_ANY       # Match any request
+        IORING_ASYNC_CANCEL_ALL  # Cancel all requests that match the given key
+        IORING_ASYNC_CANCEL_FD  # Key off `fd` for cancelation rather than the request `user_data`
+        IORING_ASYNC_CANCEL_ANY  # Match any request
         IORING_ASYNC_CANCEL_FD_FIXED  # 'fd' passed in is a fixed descriptor
 
         # send/sendmsg and recv/recvmsg flags (sqe->ioprio)
@@ -217,8 +219,8 @@ cdef extern from 'liburing.h' nogil:
 
         # IORING_OP_MSG_RING command types, stored in sqe->addr
         # enum:
-        IORING_MSG_DATA    # pass `sqe->len` as `res` and `off` as `user_data`
-        IORING_MSG_SEND_FD # send a registered `fd` to another ring
+        IORING_MSG_DATA  # pass `sqe->len` as `res` and `off` as `user_data`
+        IORING_MSG_SEND_FD  # send a registered `fd` to another ring
 
         # `IORING_OP_MSG_RING` flags (`sqe->msg_ring_flags`)
         #
@@ -249,7 +251,7 @@ cdef extern from 'liburing.h' nogil:
         IORING_CQE_F_MORE           # If set, parent SQE will generate more CQE entries
         IORING_CQE_F_SOCK_NONEMPTY  # If set, more data to read after socket recv
         IORING_CQE_F_NOTIF          # Set for notification CQEs. Can be used to distinct
-                                    # them from sends.
+        #                             them from sends.
         # enum:
         IORING_CQE_BUFFER_SHIFT
         # Magic offsets for the application to mmap the data it needs
@@ -428,7 +430,7 @@ cdef extern from 'liburing.h' nogil:
     #     io_uring_probe_op_t   ops[]
 
     struct io_uring_restriction_t "io_uring_restriction":
-        pass # TODO:
+        pass  # TODO:
         # __u16   opcode
         # union:
         #     __u8    register_op     # IORING_RESTRICTION_REGISTER_OP
@@ -521,8 +523,8 @@ cdef extern from 'liburing.h' nogil:
 cdef class io_uring_sqe:
     cdef:
         io_uring_sqe_t * ptr
-        unsigned int     len
-        list             ref  # index object reference holder
+        unsigned int len
+        list ref  # TODO: replace with `array()` # index object reference holder
 
 cdef class io_uring_cqe:
     cdef io_uring_cqe_t * ptr

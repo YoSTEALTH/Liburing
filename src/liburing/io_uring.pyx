@@ -1,5 +1,7 @@
+from cython cimport boundscheck
 from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from .error cimport memory_error, index_error
+from .liburing cimport io_uring_sqe_set_flags_c, io_uring_sqe_set_data64_c
 
 
 cdef class io_uring_sqe:
@@ -26,6 +28,7 @@ cdef class io_uring_sqe:
         else:
             self.ptr = NULL
         self.len = num
+        # note: if `self.len` is not set it means its for internally `ptr` reference use.
 
     def __dealloc__(self):
         if self.len and self.ptr is not NULL:
@@ -33,35 +36,46 @@ cdef class io_uring_sqe:
             self.ptr = NULL
 
     def __bool__(self):
-        return not self.ptr is NULL
+        return self.ptr is not NULL
 
     def __len__(self):
         return self.len
-        # note: `self.len` is not set for internally used `ptr` to reference.
-
+        
+    @boundscheck(True)
     def __getitem__(self, unsigned int index):
         cdef io_uring_sqe sqe
+        if self.ptr is not NULL:
+            if index == 0:
+                return self
+            elif self.len and index < self.len:
+                if (sqe := self.ref[index-1]) is not None:
+                    return sqe  # from reference cache
 
-        if self.ptr is NULL:
-            index_error(self, index, 'out of `sqe`')
+                # create new reference class
+                sqe = io_uring_sqe(0)  # `0` is set to indicated `ptr` is being set for internal use
+                sqe.ptr = &self.ptr[index]
+                if sqe.ptr is not NULL:
+                    # cache sqe as this class attribute
+                    self.ref[index-1] = sqe
+                    return sqe
+                
+        index_error(self, index, 'out of `sqe`')
 
-        if index == 0:
-            return self
-        elif index < self.len:
-            if (sqe := self.ref[index-1]) is not None:
-                return sqe  # from reference cache
+    @property
+    def flags(self) -> __u8:
+        return self.ptr.flags
 
-            # create new reference class
-            sqe = io_uring_sqe(0)
-            sqe.ptr = &self.ptr[index]
-            if sqe.ptr is not NULL:
-                # cache sqe as this class attribute
-                self.ref[index-1] = sqe
-                return sqe
-            index_error(self, index, 'out of `sqe`')
-            # note: `len(sqe)` will be `0` since its a pointer and
-            #       to make sure `free()` isn't called on it.
-        index_error(self, index)
+    @flags.setter
+    def flags(self, __u8 flags):
+        io_uring_sqe_set_flags_c(self.ptr, flags)
+
+    @property
+    def user_data(self) -> __u64:
+        return self.ptr.user_data
+
+    @user_data.setter
+    def user_data(self, __u64 data):
+        io_uring_sqe_set_data64_c(self.ptr, data)
 
 
 cdef class io_uring_cqe:
@@ -98,6 +112,7 @@ cdef class io_uring_cqe:
             - `cqes = io_uring_cqe()` only needs to be defined once, and reused.
             - Use `io_uring_cq_ready(ring)` to figure out how many cqe's are ready.
     '''
+    @boundscheck(True)
     def __getitem__(self, unsigned int index):
         cdef io_uring_cqe cqe
         if self.ptr is NULL:
@@ -112,19 +127,28 @@ cdef class io_uring_cqe:
         # note: no need to cache items since `cqe` is normally called once or passed around.
 
     def __bool__(self):
-        return not self.ptr is NULL
+        return self.ptr is not NULL
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(user_data={self.ptr.user_data!r}, res={self.ptr.res!r}, flags={self.ptr.flags!r})'
+        if self.ptr is not NULL:
+            return f'{self.__class__.__name__}(user_data={self.ptr.user_data!r}, ' \
+                   f'res={self.ptr.res!r}, flags={self.ptr.flags!r})'
+        memory_error(self, 'out of `cqe`')
 
     @property
-    def user_data(self):
-        return self.ptr.user_data  # type: header.__u64
+    def user_data(self) -> __u64:
+        if self.ptr is not NULL:
+            return self.ptr.user_data
+        memory_error(self, 'out of `cqe`')
 
     @property
-    def res(self):
-        return self.ptr.res
+    def res(self) -> __s32:
+        if self.ptr is not NULL:
+            return self.ptr.res
+        memory_error(self, 'out of `cqe`')
 
     @property
-    def flags(self):
-        return self.ptr.flags
+    def flags(self) -> __u32:
+        if self.ptr is not NULL:
+            return self.ptr.flags
+        memory_error(self, 'out of `cqe`')
