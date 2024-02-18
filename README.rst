@@ -57,10 +57,11 @@ To find out all the class, functions and definitions:
     help(liburing)  # to see all the help docs (this will load all the modules.)
 
 
-Find out which `io_uring` operations is supported by the kernel:
+Find out which ``io_uring`` operations is supported by the kernel:
 
 .. code-block:: python
     
+    # example/probe.py
     import liburing
 
     probe = liburing.probe()
@@ -72,6 +73,7 @@ Simple File Example
 
 .. code-block:: python
 
+    # example/open_write_read_close.py
     from liburing import O_CREAT, O_RDWR, AT_FDCWD, iovec, io_uring, io_uring_get_sqe, \
                          io_uring_prep_openat, io_uring_prep_write, io_uring_prep_read, \
                          io_uring_prep_close, io_uring_submit, io_uring_wait_cqe, \
@@ -149,7 +151,10 @@ Simple File Example
 
 Note
 ----
-    - try not to use ``from liburing import *`` this will load all the modules at once, unless thats what you want!
+    - Try not to use ``from liburing import *`` this will load all the modules at once, unless
+    that's what you want!
+    - If including ``.pxd`` directly into your Cython project note that all ``C`` function ends with
+    ``_c`` and ``struct`` ends with ``_t``
 
 
 License

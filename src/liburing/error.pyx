@@ -55,4 +55,3 @@ cpdef inline void index_error(object self, unsigned int index, str msg='') excep
         msg = 'out of range!'
     cdef str error = f'`{self.__class__.__name__}()[{index}]` {msg}'
     raise IndexError(error)
-

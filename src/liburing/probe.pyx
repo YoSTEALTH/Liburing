@@ -3,7 +3,7 @@ from .error cimport trap_error, memory_error
 
 
 cdef class io_uring_probe:
-    
+
     def __cinit__(self, unsigned int num=0):
         if num:
             self.ptr = <io_uring_probe_t*>PyMem_RawCalloc(num, sizeof(io_uring_probe_t))
@@ -11,8 +11,8 @@ cdef class io_uring_probe:
                 memory_error(self)
 
     def __dealloc__(self):
-        # just in case user forgets to call `io_uring_free_probe` or error happened 
         if self.ptr is not NULL:
+            # just in case user forgets to call `io_uring_free_probe` or error happened
             io_uring_free_probe_c(self.ptr)
             self.ptr = NULL
 
