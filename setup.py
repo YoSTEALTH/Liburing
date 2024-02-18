@@ -7,7 +7,7 @@ from Cython.Compiler import Options
 from Cython.Distutils import Extension
 
 
-debug = __debug__
+debug = True  # <- manually change this
 os_liburing = False  # <- manually change this
 # note: OS `liburing` tends to be outdated! Try it, run test, if no error is raised its good :)
 
@@ -58,4 +58,5 @@ setup(ext_modules=cythonize(extension,
                             nthreads=threads,
                             compiler_directives={'embedsignature': True,  # show all `__doc__`
                                                  'linetrace': True if debug else False,  # enable for coverage
+                                                 'boundscheck': False,
                                                  'language_level': 3}))
