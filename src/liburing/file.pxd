@@ -1,4 +1,5 @@
 from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
+from cpython.array cimport array
 from .type cimport __u64, int64_t, mode_t, iovec_t, iovec
 from .error cimport trap_error, memory_error
 from .io_uring cimport io_uring_sqe_t, io_uring_sqe
@@ -63,10 +64,10 @@ cdef extern from "<fcntl.h>" nogil:
         O_NDELAY
 
         # AT_* flags
-        AT_FDCWD            # Use the current working directory.
-        AT_REMOVEDIR        # Remove directory instead of unlinking file.
-        AT_SYMLINK_FOLLOW   # Follow symbolic links.
-        AT_EACCESS          # Test access permitted for effective IDs, not real IDs.
+        AT_FDCWD           # Use the current working directory.
+        AT_REMOVEDIR       # Remove directory instead of unlinking file.
+        AT_SYMLINK_FOLLOW  # Follow symbolic links.
+        AT_EACCESS         # Test access permitted for effective IDs, not real IDs.
 
 
 cdef extern from *nogil:
@@ -79,11 +80,12 @@ cdef extern from *nogil:
                                                                       unsigned int nr)
     int io_uring_register_files_sparse_c 'io_uring_register_files_sparse'(io_uring_t *ring,
                                                                           unsigned int nr)
-    int io_uring_register_files_update_tag_c 'io_uring_register_files_update_tag'(io_uring_t *ring,
-                                                                                  unsigned int off,
-                                                                                  const int *files,
-                                                                                  const __u64 *tags,
-                                                                                  unsigned int nr_files)
+    int io_uring_register_files_update_tag_c 'io_uring_register_files_update_tag'(
+            io_uring_t *ring,
+            unsigned int off,
+            const int *files,
+            const __u64 *tags,
+            unsigned int nr_files)
     int io_uring_unregister_files_c 'io_uring_unregister_files'(io_uring_t *ring)
     int io_uring_register_files_update_c 'io_uring_register_files_update'(io_uring_t *ring,
                                                                           unsigned int off,
@@ -135,7 +137,9 @@ cdef extern from *nogil:
                                                                  __u64 offset,
                                                                  int buf_index)
 
-    void io_uring_prep_fsync_c 'io_uring_prep_fsync'(io_uring_sqe_t *sqe, int fd, unsigned int fsync_flags)
+    void io_uring_prep_fsync_c 'io_uring_prep_fsync'(io_uring_sqe_t *sqe,
+                                                     int fd,
+                                                     unsigned int fsync_flags)
 
     void io_uring_prep_openat_c 'io_uring_prep_openat'(io_uring_sqe_t *sqe,
                                                        int dfd,
@@ -179,9 +183,7 @@ cdef extern from *nogil:
                                                      __u64 offset)
 
 
-cpdef int io_uring_register_files(io_uring ring,
-                                  int files,
-                                  unsigned int nr_files) nogil
+cpdef int io_uring_register_files(io_uring ring, list[int] fds)
 cpdef int io_uring_register_files_tags(io_uring ring,
                                        int files,
                                        __u64 tags,
@@ -199,12 +201,12 @@ cpdef int io_uring_register_files_update(io_uring ring,
                                          int files,
                                          unsigned int nr_files) nogil
 cpdef void io_uring_prep_splice(io_uring_sqe sqe,
-                                       int fd_in,
-                                       int64_t off_in,
-                                       int fd_out,
-                                       int64_t off_out,
-                                       unsigned int nbytes,
-                                       unsigned int splice_flags) noexcept nogil
+                                int fd_in,
+                                int64_t off_in,
+                                int fd_out,
+                                int64_t off_out,
+                                unsigned int nbytes,
+                                unsigned int splice_flags) noexcept nogil
 cpdef void io_uring_prep_tee(io_uring_sqe sqe,
                              int fd_in,
                              int fd_out,
@@ -213,14 +215,12 @@ cpdef void io_uring_prep_tee(io_uring_sqe sqe,
 cpdef void io_uring_prep_readv(io_uring_sqe sqe,
                                int fd,
                                iovec iovecs,
-                               unsigned int nr_vecs,
-                               __u64 offset) noexcept nogil
+                               __u64 offset=?) noexcept nogil
 cpdef void io_uring_prep_readv2(io_uring_sqe sqe,
                                 int fd,
                                 iovec iovecs,
-                                unsigned int nr_vecs,
-                                __u64 offset,
-                                int flags) noexcept nogil
+                                __u64 offset=?,
+                                int flags=?) noexcept nogil
 cpdef void io_uring_prep_read_fixed(io_uring_sqe sqe,
                                     int fd,
                                     char *buf,
@@ -244,7 +244,9 @@ cpdef void io_uring_prep_write_fixed(io_uring_sqe sqe,
                                      unsigned int nbytes,
                                      __u64 offset,
                                      int buf_index) noexcept nogil
-cpdef void io_uring_prep_fsync(io_uring_sqe sqe, int fd, unsigned int fsync_flags) noexcept nogil
+cpdef void io_uring_prep_fsync(io_uring_sqe sqe,
+                               int fd,
+                               unsigned int fsync_flags) noexcept nogil
 cpdef void io_uring_prep_openat(io_uring_sqe sqe,
                                 int dfd,
                                 const char *path,
@@ -265,8 +267,10 @@ cpdef void io_uring_prep_openat2_direct(io_uring_sqe sqe,
                                         const char *path,
                                         open_how how,
                                         unsigned int file_index) noexcept nogil
-cpdef void io_uring_prep_close(io_uring_sqe sqe, int fd) noexcept nogil
-cpdef void io_uring_prep_close_direct(io_uring_sqe sqe, unsigned int file_index) noexcept nogil
+cpdef void io_uring_prep_close(io_uring_sqe sqe,
+                               int fd) noexcept nogil
+cpdef void io_uring_prep_close_direct(io_uring_sqe sqe,
+                                      unsigned int file_index) noexcept nogil
 cpdef void io_uring_prep_read(io_uring_sqe sqe,
                               int fd,
                               unsigned char[:] buf,  # `void *buf`
