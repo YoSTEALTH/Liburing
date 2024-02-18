@@ -49,7 +49,7 @@ cdef extern from '<sched.h>' nogil:
         BITS
     ctypedef unsigned long  __cpu_mask
     ctypedef struct cpu_set_t:
-        __cpu_mask    __bits[BITS]
+        __cpu_mask __bits[BITS]
 
 
 cdef extern from '<signal.h>' nogil:
@@ -64,13 +64,13 @@ cdef extern from '<signal.h>' nogil:
         si_value value
 
     ctypedef struct siginfo_t:
-        int     si_signo    # Signal number
-        int     si_code     # Signal code
-        pid_t   si_pid      # Sending process ID
-        uid_t   si_uid      # Real user ID of sending process
-        void   *si_addr     # Address of faulting instruction
-        int     si_status   # Exit value or signal
-        sigval  si_value    # Signal value
+        int si_signo    # Signal number
+        int si_code     # Signal code
+        pid_t si_pid      # Sending process ID
+        uid_t si_uid      # Real user ID of sending process
+        void *si_addr     # Address of faulting instruction
+        int si_status   # Exit value or signal
+        sigval si_value    # Signal value
 
 cdef class siginfo:
     cdef siginfo_t *ptr
@@ -82,24 +82,27 @@ cdef extern from '<bits/types/sigset_t.h>' nogil:
         unsigned long int __val[_SIGSET_NWORDS]
     ctypedef __sigset_t sigset_t
 
+cdef class sigset:
+    cdef sigset_t *ptr
+
 
 cdef extern from '<bits/types/struct_iovec.h>' nogil:
     struct iovec_t 'iovec':
-        void *  iov_base
-        size_t  iov_len
+        void *iov_base
+        size_t iov_len
 
 cdef class iovec:
     cdef:
-        iovec_t     *ptr
-        list         ref
+        iovec_t *ptr
+        list ref  # TODO: replace this with array()
         unsigned int len
 
 
 cdef extern from '<linux/time_types.h>' nogil:
     ctypedef int64_t __kernel_time64_t
     struct __kernel_timespec:
-        __kernel_time64_t   tv_sec      # seconds
-        long long           tv_nsec     # nanoseconds
+        __kernel_time64_t tv_sec      # seconds
+        long long tv_nsec     # nanoseconds
 
 cdef class timespec:
     cdef __kernel_timespec *ptr

@@ -1,3 +1,4 @@
+from cython cimport boundscheck
 from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from .error cimport memory_error, index_error
 from collections.abc import Iterable
@@ -23,7 +24,7 @@ cdef class timespec:
             memory_error(self)
         if second:
             # note: converting from `double` is the reason for casting
-            self.ptr.tv_sec  = <int64_t>(second / 1)
+            self.ptr.tv_sec = <int64_t>(second / 1)
             self.ptr.tv_nsec = <long long>(((second % 1) * 1_000_000_000) / 1)
 
     def __dealloc__(self):
@@ -49,39 +50,37 @@ cdef class timespec:
 
 
 cdef class iovec:
-    ''' Vector I/O data structure
-
-        Example
-            # read single
-            # -----------
-            >>> iov_read = iovec(bytearray(11))
-            >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
-
-            # read multiple
-            # -------------
-            >>> iov_read = iovec([bytearray(1), bytearray(2), bytearray(3)])
-            >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
-
-            # write single
-            # ------------
-            >>> iov_write = iovec(b'hello world')
-            >>> io_uring_prep_readv(sqe, fd, iov_write, ...)
-
-            # write multiple
-            # --------------
-            >>> iov_write = iovec([b'1', b'22', b'333'])
-            >>> io_uring_prep_readv(sqe, fd, iov_write, ...)
-
-        Note
-            - Make sure to hold on to variable you are passing into `iovec` so it does not get
-            garbage collected before you get the chance to use it!
-            - Indexing is not supported for now! e.g. `iovec[0]`
-    '''
+    ''' Vector I/O data structure '''
     def __cinit__(self, object buffers):
         '''
             Type
-                buffer: Union[bytes, bytearray, memoryview, List[...], Tuple[...]]
-                return: None
+                buffers: Union[bytes, bytearray, memoryview, List[...], Tuple[...]]
+                return:  None
+
+            Example
+                # read single
+                # -----------
+                >>> iov_read = iovec(bytearray(11))
+                >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
+
+                # read multiple
+                # -------------
+                >>> iov_read = iovec([bytearray(1), bytearray(2), bytearray(3)])
+                >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
+
+                # write single
+                # ------------
+                >>> iov_write = iovec(b'hello world')
+                >>> io_uring_prep_readv(sqe, fd, iov_write, ...)
+
+                # write multiple
+                # --------------
+                >>> iov_write = iovec([b'1', b'22', b'333'])
+                >>> io_uring_prep_readv(sqe, fd, iov_write, ...)
+
+            Note
+                - Make sure to hold on to variable you are passing into `iovec` so it does not get
+                garbage collected before you get the chance to use it!
         '''
         cdef:
             unsigned int index
@@ -110,8 +109,8 @@ cdef class iovec:
 
             for index in range(self.len):
                 buffer = self.ref[index]
-                self.ptr[index].iov_base = <void*>&buffer[0]    # starting address
-                self.ptr[index].iov_len = len(self.ref[index])  # size of the memory pointed to by iov_base.
+                self.ptr[index].iov_base = <void*>&buffer[0]  # starting address
+                self.ptr[index].iov_len = len(self.ref[index])
 
     def __dealloc__(self):
         if self.ptr is not NULL:
@@ -119,11 +118,12 @@ cdef class iovec:
             self.ptr = NULL
 
     def __bool__(self):
-        return not self.ptr is NULL
+        return self.ptr is not NULL
 
     def __len__(self):
         return self.len
 
+    @boundscheck(True)
     def __getitem__(self, unsigned int index):
         cdef iovec iov
         if index:
