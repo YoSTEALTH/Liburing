@@ -16,6 +16,18 @@ cdef class io_uring_sqe:
             >>> sqe = io_uring_sqe(2)
             >>> io_uring_prep_write(sqe[0], ...)
             >>> io_uring_prep_read(sqe[1], ...)
+
+            # *** MUST DO ***
+            >>> if io_uring_put_sqe(ring, sqe):
+            ...     io_uring_submit(ring)
+
+        Note
+            - `io_uring_sqe` is not the same as `io_uring_get_sqe()`.
+            - This class has multiple uses:
+                1. It works as a base class for `io_uring_get_sqe()` return.
+                2. It can also be used as `sqe = io_uring_sqe(<int>)`, rather than "get" sqe(s)
+                you are going to "put" pre-made sqe(s) into the ring later.
+            - Refer to `help(io_uring_put_sqe)` to see more detail.
     '''
     def __cinit__(self, unsigned int num=1):
         cdef str error

@@ -151,10 +151,8 @@ Simple File Example
 
 Note
 ----
-    - Try not to use ``from liburing import *`` this will load all the modules at once, unless
-    that's what you want!
-    - If including ``.pxd`` directly into your Cython project note that all ``C`` function ends with
-    ``_c`` and ``struct`` ends with ``_t``
+    - Try not to use ``from liburing import *`` this will load all the modules at once, unless that's what you want!
+    - If including ``.pxd`` directly into your Cython project note that all ``C`` function ends with ``_c`` and ``struct`` ends with ``_t``
 
 
 License
