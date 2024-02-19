@@ -1,6 +1,6 @@
 from liburing import io_uring_put_sqe, io_uring, io_uring_cqe, io_uring_submit, \
                      io_uring_sqe, io_uring_queue_init, io_uring_queue_exit, \
-                     io_uring_wait_cqes, io_uring_cq_advance
+                     io_uring_wait_cqes, io_uring_cq_advance, io_uring_prep_nop
 
 
 def test_io_uring_put_sqe():
@@ -18,6 +18,7 @@ def _loop(entries, num):
         assert io_uring_queue_init(entries, ring) == 0
         sqe = io_uring_sqe(num)
         for i in range(num):
+            io_uring_prep_nop(sqe[i])
             sqe[i].user_data = i
         if io_uring_put_sqe(ring, sqe):
             io_uring_submit(ring)
