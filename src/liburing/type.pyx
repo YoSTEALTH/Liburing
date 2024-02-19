@@ -99,8 +99,8 @@ cdef class iovec:
             self.len = len(self.ref)
 
             if self.len > SC_IOV_MAX:
-                error = f'`{self.__class__.__name__}()` - `buffers` length of {self.len!r} '
-                error += f'exceeds `SC_IOV_MAX` limit set by OS of {SC_IOV_MAX!r}'
+                error = f'`{self.__class__.__name__}()` - `buffers` length of {self.len!r} ' \
+                        f'exceeds `SC_IOV_MAX` limit set by OS of {SC_IOV_MAX!r}'
                 raise OverflowError(error)
 
             self.ptr = <iovec_t*>PyMem_RawCalloc(self.len, sizeof(iovec_t))
