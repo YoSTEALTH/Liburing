@@ -152,7 +152,11 @@ Simple File Example
 Note
 ----
     - Try not to use ``from liburing import *`` this will load all the modules at once, unless that's what you want!
-    - If including ``.pxd`` directly into your Cython project note that all ``C`` function ends with ``_c`` and ``struct`` ends with ``_t``
+
+
+Cython Note
+-----------
+    - For hardcore developers that need raw access, there is ``lib`` directory with ``.pxd`` header files. To include ``C liburing`` directly you can ``from liburing.lib.uring cimport *``. Note that all ``C`` function, enum, struct, defines starts with ``__``, not including anything that's ``ctypedef``. This is to prevent naming confusion between whats ``C`` and ``Python`` side.
 
 
 License
@@ -164,7 +168,7 @@ TODO
 ----
 
     - Move everything to using Cython
-    
+
 
 .. _pip: https://pip.pypa.io/en/stable/getting-started/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
