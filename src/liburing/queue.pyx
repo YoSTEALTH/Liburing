@@ -3,6 +3,9 @@ from cpython.ref cimport Py_INCREF, Py_DECREF
 from .error cimport memory_error, trap_error
 
 
+LIBURING_UDATA_TIMEOUT = __LIBURING_UDATA_TIMEOUT
+
+
 # TODO:
 # cpdef int io_uring_queue_init_mem(unsigned int entries,
 #                                   io_uring ring,
