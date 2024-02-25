@@ -174,9 +174,10 @@ cdef extern from 'liburing.h' nogil:
                                             __io_uring * ring,
                                             __io_uring_sync_cancel_reg * reg)
 
-    int __io_uring_register_file_alloc_range 'io_uring_register_file_alloc_range'(__io_uring * ring,
-                                                                                  unsigned int off,
-                                                                                  unsigned int len)
+    int __io_uring_register_file_alloc_range 'io_uring_register_file_alloc_range'(
+            __io_uring *ring,
+            unsigned int off,
+            unsigned int len)
 
     int __io_uring_register_napi 'io_uring_register_napi'(__io_uring *ring,
                                                           __io_uring_napi *napi)
@@ -216,9 +217,9 @@ cdef extern from 'liburing.h' nogil:
                                                           unsigned int nentries,
                                                           int bgid)
 
-    unsigned int __LIBURING_UDATA_TIMEOUT 'LIBURING_UDATA_TIMEOUT'
+    __u64 __LIBURING_UDATA_TIMEOUT 'LIBURING_UDATA_TIMEOUT'
 
-    # TODO: need to properly test these functions.
+    # TODO: need to properly test these functions.f
     # Calculates the step size for CQE iteration. For standard CQE's its `1`, for big CQE's its `2`.
     __io_uring_cqe_shift 'io_uring_cqe_shift'(ring)
     __io_uring_cqe_index 'io_uring_cqe_index'(ring, ptr, mask)   
@@ -247,8 +248,8 @@ cdef extern from 'liburing.h' nogil:
                                                              __u64 data)
     __u64 __io_uring_cqe_get_data64 'io_uring_cqe_get_data64'(const __io_uring_cqe *cqe)
 
-    # Tell the app the have the 64-bit variants of the get/set userdata
-    bool __LIBURING_HAVE_DATA64 'LIBURING_HAVE_DATA64'
+    # Tell the app whether to use 64-bit variants of the `get/set->userdata`
+    bint __LIBURING_HAVE_DATA64 'LIBURING_HAVE_DATA64'
 
     void __io_uring_sqe_set_flags 'io_uring_sqe_set_flags'(__io_uring_sqe *sqe,
                                                            unsigned int flags)
