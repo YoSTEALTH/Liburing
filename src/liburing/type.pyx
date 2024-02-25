@@ -1,52 +1,9 @@
+# TODO: these classes will be moved later to appropriate files.
 from cython cimport boundscheck
 from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from .error cimport memory_error, index_error
+
 from collections.abc import Iterable
-
-
-cdef class timespec:
-    ''' Kernel Timespec
-
-        Example
-            >>> ts = timespec(1)        # int
-            >>> ts = timespec(1.5)      # float
-            >>> io_uring_prep_timeout(sqe, ts, ...)
-
-            # manually set raw value
-            >>> ts = timespec()
-            >>> ts.tv_sec = 1           # second
-            >>> ts.tv_nsec = 500000000  # nanosecond
-            >>> io_uring_prep_timeout(sqe, ts, ...)
-    '''
-    def __cinit__(self, double second=0):
-        self.ptr = <__kernel_timespec*>PyMem_RawCalloc(1, sizeof(__kernel_timespec))
-        if self.ptr is NULL:
-            memory_error(self)
-        if second:
-            # note: converting from `double` is the reason for casting
-            self.ptr.tv_sec = <int64_t>(second / 1)
-            self.ptr.tv_nsec = <long long>(((second % 1) * 1_000_000_000) / 1)
-
-    def __dealloc__(self):
-        if self.ptr is not NULL:
-            PyMem_RawFree(self.ptr)
-            self.ptr = NULL
-
-    @property
-    def tv_sec(self):
-        return self.ptr.tv_sec
-
-    @tv_sec.setter
-    def tv_sec(self, int64_t second):
-        self.ptr.tv_sec = second
-
-    @property
-    def tv_nsec(self):
-        return self.ptr.tv_nsec
-
-    @tv_nsec.setter
-    def tv_nsec(self, long long nanosecond):
-        self.ptr.tv_nsec = nanosecond
 
 
 cdef class iovec:
@@ -103,7 +60,7 @@ cdef class iovec:
                         f'exceeds `SC_IOV_MAX` limit set by OS of {SC_IOV_MAX!r}'
                 raise OverflowError(error)
 
-            self.ptr = <iovec_t*>PyMem_RawCalloc(self.len, sizeof(iovec_t))
+            self.ptr = <__iovec*>PyMem_RawCalloc(self.len, sizeof(__iovec))
             if self.ptr is NULL:
                 memory_error(self)
 
@@ -143,5 +100,9 @@ cdef class iovec:
         return self.ptr.iov_len
 
 
+# TODO:
 cdef class siginfo:
+    pass
+
+cdef class sigset:
     pass
