@@ -156,7 +156,7 @@ Note
 
 Cython Note
 -----------
-    - For hardcore developers that need raw access, there is ``lib`` directory with ``.pxd`` header files. To include ``C liburing`` directly you can ``from liburing.lib.uring cimport *``. Note that all ``C`` function, enum, struct, defines starts with ``__``, not including anything that's ``ctypedef``. This is to prevent naming confusion between whats ``C`` and ``Python`` side.
+    - For hardcore developers that need raw access, there is ``src/liburing/lib`` directory with ``.pxd`` header files. To include ``C liburing`` directly you can ``from liburing.lib.uring cimport *``. Note that all ``C`` function, enum, struct, defines starts with ``__``, not including anything that's ``ctypedef``. This is to prevent naming confusion between whats ``C`` and ``Python`` side.
 
 
 License
