@@ -1,4 +1,4 @@
-from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
+from cpython.mem cimport PyMem_RawCalloc
 from .error cimport trap_error, memory_error
 
 
@@ -6,14 +6,14 @@ cdef class io_uring_probe:
 
     def __cinit__(self, unsigned int num=0):
         if num:
-            self.ptr = <io_uring_probe_t*>PyMem_RawCalloc(num, sizeof(io_uring_probe_t))
+            self.ptr = <__io_uring_probe*>PyMem_RawCalloc(num, sizeof(__io_uring_probe))
             if self.ptr is NULL:
                 memory_error(self)
 
     def __dealloc__(self):
         if self.ptr is not NULL:
             # just in case user forgets to call `io_uring_free_probe` or error happened
-            io_uring_free_probe_c(self.ptr)
+            __io_uring_free_probe(self.ptr)
             self.ptr = NULL
 
     @property
@@ -26,23 +26,22 @@ cdef class io_uring_probe:
         if self.ptr is not NULL:
             return self.ptr.ops_len
 
-
 cpdef io_uring_probe io_uring_get_probe_ring(io_uring ring):
     cdef io_uring_probe probe = io_uring_probe()
-    probe.ptr = io_uring_get_probe_ring_c(ring.ptr)
+    probe.ptr = __io_uring_get_probe_ring(ring.ptr)
     return probe
 
 cpdef io_uring_probe io_uring_get_probe():
     cdef io_uring_probe probe = io_uring_probe()
-    probe.ptr = io_uring_get_probe_c()
+    probe.ptr = __io_uring_get_probe()
     return probe
 
 cpdef void io_uring_free_probe(io_uring_probe probe):
-    io_uring_free_probe_c(probe.ptr)
+    __io_uring_free_probe(probe.ptr)
     probe.ptr = NULL
 
 cpdef inline bool io_uring_opcode_supported(io_uring_probe p, int op):
-    return io_uring_opcode_supported_c(p.ptr, op)
+    return __io_uring_opcode_supported(p.ptr, op)
 
 cpdef int io_uring_register_probe(io_uring ring, io_uring_probe p, unsigned int nr):
-    return trap_error(io_uring_register_probe_c(ring.ptr, p.ptr, nr))
+    return trap_error(__io_uring_register_probe(ring.ptr, p.ptr, nr))
