@@ -30,10 +30,9 @@ cpdef inline bool io_uring_put_sqe(io_uring ring, io_uring_sqe sqe) noexcept nog
             - Returns `False` if queue is full. Will need to `io_uring_submit()` and try again.
             - `io_uring_sqe()` will auto delete memory used for `sqe` if not referenced/reused.
     '''
-    cdef unsigned int size = sizeof(io_uring_sqe_t)
-    cdef unsigned int sqe_left = io_uring_sq_space_left_c(ring.ptr)
+    cdef unsigned int i, size = sizeof(__io_uring_sqe)
 
-    if sqe_left >= sqe.len:
+    if __io_uring_sq_space_left(ring.ptr) >= sqe.len:
         for i in range(sqe.len):
-            memcpy(io_uring_get_sqe_c(ring.ptr), &sqe.ptr[i], size)
+            memcpy(__io_uring_get_sqe(ring.ptr), &sqe.ptr[i], size)
         return True
