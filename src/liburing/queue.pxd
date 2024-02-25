@@ -1,8 +1,12 @@
 from .lib.uring cimport *
 from .time cimport timespec
 from .type cimport sigset, siginfo
-from .io_uring cimport *
+from ._io_uring cimport *
 
+
+# cpdef enum __define__:
+# LIBURING_UDATA_TIMEOUT = __LIBURING_UDATA_TIMEOUT
+# LIBURING_HAVE_DATA64 = __LIBURING_HAVE_DATA64
 
 # TODO:
 # cpdef int io_uring_queue_init_mem(unsigned int entries,

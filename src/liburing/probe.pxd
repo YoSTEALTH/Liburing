@@ -1,5 +1,5 @@
 from .lib.uring cimport *
-from .io_uring cimport io_uring
+from ._io_uring cimport io_uring
 
 
 cdef class io_uring_probe:
