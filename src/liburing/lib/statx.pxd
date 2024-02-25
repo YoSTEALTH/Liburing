@@ -82,7 +82,7 @@ cdef extern from '<linux/stat.h>' nogil:
         __STATX_ATTR_DAX 'STATX_ATTR_DAX'                # File is currently in DAX state
         # note: flags marked [I] correspond to the `FS_IOC_SETFLAGS` flags
 
-    # NOTE: Bellow should only be exposed to Cython or Wrapper Class
+    # NOTE: Bellow code should only be exposed to Cython or Wrapper Class
     enum:
         # Encoding of the file mode.
         __S_IFMT 'S_IFMT'       # These bits determine file type.

@@ -262,7 +262,7 @@ cdef extern from 'liburing/io_uring.h' nogil:
     unsigned int __IORING_CQE_F_NOTIF 'IORING_CQE_F_NOTIF'
 
     enum __io_uring_cqe_op 'io_uring_cqe_op':
-        IORING_CQE_BUFFER_SHIFT
+        __IORING_CQE_BUFFER_SHIFT 'IORING_CQE_BUFFER_SHIFT'
 
     # Magic offsets for the application to mmap the data it needs
     unsigned long long __IORING_OFF_SQ_RING 'IORING_OFF_SQ_RING'
