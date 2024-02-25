@@ -1,0 +1,4 @@
+
+
+cdef class statx:
+    pass
