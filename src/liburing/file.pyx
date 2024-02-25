@@ -1,17 +1,30 @@
+from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
+from cpython.array cimport array
+from .error cimport trap_error, memory_error
+
+
 cdef class open_how:
-    ''' How to Open a Pathname
+    ''' How to Open a Path
 
         Example
-            >>> how = open_how(O_RDWR, 0, RESOLVE_CACHED)
+            >>> how = open_how(O_CREAT | O_RDWR, 0o777, RESOLVE_CACHED)
             >>> io_uring_prep_openat2(..., how)
 
             # or
 
             >>> how = open_how()
-            >>> how.flags   = O_RDWR
-            >>> how.mode    = 0o777
+            >>> how.flags   = O_CREAT | O_RDWR
+            >>> how.mode    = 0
             >>> how.resolve = RESOLVE_CACHED
             >>> io_uring_prep_openat2(..., how)
+
+        flags
+            O_CREAT
+            O_RDWR
+            O_RDONLY
+            O_WRONLY
+            O_TMPFILE
+            ...
 
         Resolve
             RESOLVE_BENEATH
@@ -20,9 +33,13 @@ cdef class open_how:
             RESOLVE_NO_SYMLINKS
             RESOLVE_NO_XDEV
             RESOLVE_CACHED
+
+        Note
+            - `mode` is only to set when creating new or temp file.
+            - You can use same `open_how()` reference if opening multiple files with same settings.
     '''
     def __cinit__(self, __u64 flags=0, __u64 mode=0, __u64 resolve=0):
-        self.ptr = <open_how_t*>PyMem_RawCalloc(1, sizeof(open_how_t))
+        self.ptr = <__open_how*>PyMem_RawCalloc(1, sizeof(__open_how))
         if self.ptr is NULL:
             memory_error(self)
 
@@ -80,34 +97,34 @@ cpdef int io_uring_register_files(io_uring ring, list[int] fds):
              operate on a file."
     '''
     cdef array[int] _fds = array('i', fds)
-    return trap_error(io_uring_register_files_c(ring.ptr, _fds.data.as_ints, len(_fds)))
+    return trap_error(__io_uring_register_files(ring.ptr, _fds.data.as_ints, len(_fds)))
 
 cpdef int io_uring_register_files_tags(io_uring ring,
                                        int files,
                                        __u64 tags,
                                        unsigned int nr) nogil:
-    return trap_error(io_uring_register_files_tags_c(ring.ptr, &files, &tags, nr))
+    return trap_error(__io_uring_register_files_tags(ring.ptr, &files, &tags, nr))
 
 cpdef int io_uring_register_files_sparse(io_uring ring,
                                          unsigned int nr) nogil:
-    return trap_error(io_uring_register_files_sparse_c(ring.ptr, nr))
+    return trap_error(__io_uring_register_files_sparse(ring.ptr, nr))
 
 cpdef int io_uring_register_files_update_tag(io_uring ring,
                                              unsigned int off,
                                              int files,
                                              __u64 tags,
                                              unsigned int nr_files) nogil:
-    return trap_error(io_uring_register_files_update_tag_c(ring.ptr, off, &files, &tags, nr_files))
+    return trap_error(__io_uring_register_files_update_tag(ring.ptr, off, &files, &tags, nr_files))
 
 cpdef int io_uring_unregister_files(io_uring ring) nogil:
     ''' Unregister All File Descriptor(s) '''
-    return trap_error(io_uring_unregister_files_c(ring.ptr))
+    return trap_error(__io_uring_unregister_files(ring.ptr))
 
 cpdef int io_uring_register_files_update(io_uring ring,
                                          unsigned int off,
                                          int files,
                                          unsigned int nr_files) nogil:
-    return trap_error(io_uring_register_files_update_c(ring.ptr, off, &files, nr_files))
+    return trap_error(__io_uring_register_files_update(ring.ptr, off, &files, nr_files))
 
 cpdef inline void io_uring_prep_splice(io_uring_sqe sqe,
                                        int fd_in,
@@ -138,27 +155,27 @@ cpdef inline void io_uring_prep_splice(io_uring_sqe sqe,
             operation, e.g. reading from terminal is unsupported from kernel 5.7 to 5.11.
             Check issue #291 for more information.
     '''
-    io_uring_prep_splice_c(sqe.ptr, fd_in, off_in, fd_out, off_out, nbytes, splice_flags)
+    __io_uring_prep_splice(sqe.ptr, fd_in, off_in, fd_out, off_out, nbytes, splice_flags)
 
 cpdef inline void io_uring_prep_tee(io_uring_sqe sqe,
                                     int fd_in,
                                     int fd_out,
                                     unsigned int nbytes,
                                     unsigned int splice_flags) noexcept nogil:
-    io_uring_prep_tee_c(sqe.ptr, fd_in, fd_out, nbytes, splice_flags)
+    __io_uring_prep_tee(sqe.ptr, fd_in, fd_out, nbytes, splice_flags)
 
 cpdef inline void io_uring_prep_readv(io_uring_sqe sqe,
                                       int fd,
                                       iovec iovecs,
                                       __u64 offset=0) noexcept nogil:
-    io_uring_prep_readv_c(sqe.ptr, fd, iovecs.ptr, iovecs.len, offset)
+    __io_uring_prep_readv(sqe.ptr, fd, iovecs.ptr, iovecs.len, offset)
 
 cpdef inline void io_uring_prep_readv2(io_uring_sqe sqe,
                                        int fd,
                                        iovec iovecs,
                                        __u64 offset=0,
                                        int flags=0) noexcept nogil:
-    io_uring_prep_readv2_c(sqe.ptr, fd, iovecs.ptr, iovecs.len, offset, flags)
+    __io_uring_prep_readv2(sqe.ptr, fd, iovecs.ptr, iovecs.len, offset, flags)
 
 cpdef inline void io_uring_prep_read_fixed(io_uring_sqe sqe,
                                            int fd,
@@ -166,14 +183,14 @@ cpdef inline void io_uring_prep_read_fixed(io_uring_sqe sqe,
                                            unsigned int nbytes,
                                            __u64 offset,
                                            int buf_index) noexcept nogil:
-    io_uring_prep_read_fixed_c(sqe.ptr, fd, buf, nbytes, offset, buf_index)
+    __io_uring_prep_read_fixed(sqe.ptr, fd, buf, nbytes, offset, buf_index)
 
 cpdef inline void io_uring_prep_writev(io_uring_sqe sqe,
                                        int fd,
                                        iovec iovecs,
                                        unsigned int nr_vecs,
                                        __u64 offset) noexcept nogil:
-    io_uring_prep_writev_c(sqe.ptr, fd, iovecs.ptr, nr_vecs, offset)
+    __io_uring_prep_writev(sqe.ptr, fd, iovecs.ptr, nr_vecs, offset)
 
 cpdef inline void io_uring_prep_writev2(io_uring_sqe sqe,
                                         int fd,
@@ -181,7 +198,7 @@ cpdef inline void io_uring_prep_writev2(io_uring_sqe sqe,
                                         unsigned int nr_vecs,
                                         __u64 offset,
                                         int flags) noexcept nogil:
-    io_uring_prep_writev2_c(sqe.ptr, fd, iovecs.ptr, nr_vecs, offset, flags)
+    __io_uring_prep_writev2(sqe.ptr, fd, iovecs.ptr, nr_vecs, offset, flags)
 
 cpdef inline void io_uring_prep_write_fixed(io_uring_sqe sqe,
                                             int fd,
@@ -189,65 +206,78 @@ cpdef inline void io_uring_prep_write_fixed(io_uring_sqe sqe,
                                             unsigned int nbytes,
                                             __u64 offset,
                                             int buf_index) noexcept nogil:
-    io_uring_prep_write_fixed_c(sqe.ptr, fd, buf, nbytes, offset, buf_index)
+    __io_uring_prep_write_fixed(sqe.ptr, fd, buf, nbytes, offset, buf_index)
 
 cpdef inline void io_uring_prep_fsync(io_uring_sqe sqe,
                                       int fd,
                                       unsigned int fsync_flags) noexcept nogil:
-    io_uring_prep_fsync_c(sqe.ptr, fd, fsync_flags)
+    __io_uring_prep_fsync(sqe.ptr, fd, fsync_flags)
 
 cpdef inline void io_uring_prep_openat(io_uring_sqe sqe,
-                                       int dfd,
                                        const char *path,
-                                       int flags,
-                                       mode_t mode) noexcept nogil:
-    io_uring_prep_openat_c(sqe.ptr, dfd, path, flags, mode)
+                                       int flags=0,
+                                       mode_t mode=0o777,
+                                       int dfd=__AT_FDCWD) noexcept nogil:
+    ''' Open File
+
+        Example
+            >>> sqe = io_uring_get_sqe(ring)
+            >>> io_uring_prep_openat(sqe, b'./file.ext')
+            >>> sqe.user_data = 123
+            ...
+            >>> io_uring_submit(ring)
+            >>> io_uring_wait_cqe(ring, cqe)
+            ...
+            >>> assert cqe.user_data == 123
+            >>> fd = trap_error(cqe.res)
+    '''
+    __io_uring_prep_openat(sqe.ptr, dfd, path, flags, mode)
 
 cpdef inline void io_uring_prep_openat2(io_uring_sqe sqe,
-                                        int          dfd,
-                                        const char * path,
-                                        open_how     how) noexcept nogil:
-    io_uring_prep_openat2_c(sqe.ptr, dfd, path, how.ptr)
+                                        const char *path,
+                                        open_how how,
+                                        int dfd=__AT_FDCWD) noexcept nogil:
+    __io_uring_prep_openat2(sqe.ptr, dfd, path, how.ptr)
 
 cpdef inline void io_uring_prep_openat_direct(io_uring_sqe sqe,
-                                              int dfd,
                                               const char *path,
-                                              int flags,
-                                              mode_t mode,
-                                              unsigned int file_index) noexcept nogil:
-    io_uring_prep_openat_direct_c(sqe.ptr, dfd, path, flags, mode, file_index)
+                                              unsigned int file_index,  # unsigned int file_index,
+                                              int flags=0,
+                                              mode_t mode=0o777,
+                                              int dfd=__AT_FDCWD) noexcept nogil:
+    __io_uring_prep_openat_direct(sqe.ptr, dfd, path, flags, mode, file_index)
 
 cpdef inline void io_uring_prep_openat2_direct(io_uring_sqe sqe,
-                                               int          dfd,
-                                               const char * path,
-                                               open_how     how,
-                                               unsigned int file_index) noexcept nogil:
-    io_uring_prep_openat2_direct_c(sqe.ptr, dfd, path, how.ptr, file_index)
+                                               const char *path,
+                                               unsigned int file_index,
+                                               open_how how,
+                                               int dfd=__AT_FDCWD) noexcept nogil:
+    __io_uring_prep_openat2_direct(sqe.ptr, dfd, path, how.ptr, file_index)
 
 cpdef inline void io_uring_prep_close(io_uring_sqe sqe, int fd) noexcept nogil:
-    io_uring_prep_close_c(sqe.ptr, fd)
+    __io_uring_prep_close(sqe.ptr, fd)
 
 cpdef inline void io_uring_prep_close_direct(io_uring_sqe sqe,
                                              unsigned int file_index) noexcept nogil:
-    io_uring_prep_close_direct_c(sqe.ptr, file_index)
+    __io_uring_prep_close_direct(sqe.ptr, file_index)
 
 cpdef inline void io_uring_prep_read(io_uring_sqe sqe,
                                      int fd,
                                      unsigned char[:] buf,  # `void *buf`
                                      unsigned int nbytes,
                                      __u64 offset) noexcept nogil:
-    io_uring_prep_read_c(sqe.ptr, fd, &buf[0], nbytes, offset)
+    __io_uring_prep_read(sqe.ptr, fd, &buf[0], nbytes, offset)
 
 cpdef inline void io_uring_prep_read_multishot(io_uring_sqe sqe,
                                                int fd,
                                                unsigned int nbytes,
                                                __u64 offset,
                                                int buf_group) noexcept nogil:
-    io_uring_prep_read_multishot_c(sqe.ptr, fd, nbytes, offset, buf_group)
+    __io_uring_prep_read_multishot(sqe.ptr, fd, nbytes, offset, buf_group)
 
 cpdef inline void io_uring_prep_write(io_uring_sqe sqe,
                                       int fd,
                                       const unsigned char[:] buf,  # `const void *buf`
                                       unsigned int nbytes,
                                       __u64 offset) noexcept nogil:
-    io_uring_prep_write_c(sqe.ptr, fd, &buf[0], nbytes, offset)
+    __io_uring_prep_write(sqe.ptr, fd, &buf[0], nbytes, offset)
