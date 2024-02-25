@@ -32,32 +32,51 @@ cdef extern from '<fcntl.h>' nogil:
         __SYNC_FILE_RANGE_WRITE 'SYNC_FILE_RANGE_WRITE'
         __SYNC_FILE_RANGE_WAIT_AFTER 'SYNC_FILE_RANGE_WAIT_AFTER'
 
+        # AT_* flags
+        __AT_FDCWD 'AT_FDCWD'  # Use the current working directory.
+        __AT_REMOVEDIR 'AT_REMOVEDIR'  # Remove directory instead of unlinking file.
+        __AT_SYMLINK_FOLLOW 'AT_SYMLINK_FOLLOW'  # Follow symbolic links.
+        __AT_EACCESS 'AT_EACCESS'  # Test access permitted for effective IDs, not real IDs.
+
         __O_ACCMODE 'O_ACCMODE'
         __O_RDONLY 'O_RDONLY'
         __O_WRONLY 'O_WRONLY'
         __O_RDWR 'O_RDWR'
-        __O_CREAT 'O_CREAT'
-        __O_EXCL 'O_EXCL'
-        __O_NOCTTY 'O_NOCTTY'
-        __O_TRUNC 'O_TRUNC'
+
         __O_APPEND 'O_APPEND'
-        __O_NONBLOCK 'O_NONBLOCK'
-        __O_DSYNC 'O_DSYNC'
-        __FASYNC 'FASYNC'
-        __O_DIRECT 'O_DIRECT'
-        __O_LARGEFILE 'O_LARGEFILE'
-        __O_DIRECTORY 'O_DIRECTORY'
-        __O_NOFOLLOW 'O_NOFOLLOW'
-        __O_NOATIME 'O_NOATIME'
+        __O_ASYNC 'O_ASYNC'
         __O_CLOEXEC 'O_CLOEXEC'
-
-        __O_SYNC 'O_SYNC'
+        __O_CREAT 'O_CREAT'
+        # ...
+        __O_DIRECT 'O_DIRECT'
+        __O_DIRECTORY 'O_DIRECTORY'
+        __O_DSYNC 'O_DSYNC'
+        __O_EXCL 'O_EXCL'
+        __O_LARGEFILE 'O_LARGEFILE'
+        __O_NOATIME 'O_NOATIME'
+        __O_NOCTTY 'O_NOCTTY'
+        __O_NOFOLLOW 'O_NOFOLLOW'
+        __O_NONBLOCK 'O_NONBLOCK'  # 'O_NDELAY'
         __O_PATH 'O_PATH'
-        __O_TMPFILE 'O_TMPFILE'
-        __O_NDELAY 'O_NDELAY'
+        # ...
+        __O_SYNC 'O_SYNC'
+        __O_TMPFILE 'O_TMPFILE'  # must be specified with `O_RDWR` | `O_WRONLY`. `O_EXCL` (optional)
+        __O_TRUNC 'O_TRUNC'
 
-        # AT_* flags
-        __AT_FDCWD 'AT_FDCWD'           # Use the current working directory.
-        __AT_REMOVEDIR 'AT_REMOVEDIR'       # Remove directory instead of unlinking file.
-        __AT_SYMLINK_FOLLOW 'AT_SYMLINK_FOLLOW'  # Follow symbolic links.
-        __AT_EACCESS 'AT_EACCESS'         # Test access permitted for effective IDs, not real IDs.
+        # Mode - used with `O_CREAT`
+        __S_IRWXU 'S_IRWXU'  # user (file owner) has read, write, and execute permission
+        __S_IRUSR 'S_IRUSR'  # user has read permission
+        __S_IWUSR 'S_IWUSR'  # user has write permission
+        __S_IXUSR 'S_IXUSR'  # user has execute permission
+        __S_IRWXG 'S_IRWXG'  # group has read, write, and execute permission
+        __S_IRGRP 'S_IRGRP'  # group has read permission
+        __S_IWGRP 'S_IWGRP'  # group has write permission
+        __S_IXGRP 'S_IXGRP'  # group has execute permission
+        __S_IRWXO 'S_IRWXO'  # others have read, write, and execute permission
+        __S_IROTH 'S_IROTH'  # others have read permission
+        __S_IWOTH 'S_IWOTH'  # others have write permission
+        __S_IXOTH 'S_IXOTH'  # others have execute permission
+
+        __S_ISUID 'S_ISUID'  # set-user-ID bit
+        __S_ISGID 'S_ISGID'  # set-group-ID bit (see inode(7)).
+        __S_ISVTX 'S_ISVTX'  # sticky bit (see inode(7)).
