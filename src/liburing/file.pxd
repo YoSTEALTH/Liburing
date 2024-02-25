@@ -1,10 +1,10 @@
 from .lib.uring cimport *
 from .type cimport iovec
-from .io_uring cimport io_uring_sqe
+from ._io_uring cimport io_uring_sqe
 from .queue cimport io_uring
 
 
-cpdef enum:
+cpdef enum __define__:
     RESOLVE_NO_XDEV = __RESOLVE_NO_XDEV
     RESOLVE_NO_MAGICLINKS = __RESOLVE_NO_MAGICLINKS
     RESOLVE_NO_SYMLINKS = __RESOLVE_NO_SYMLINKS
@@ -20,30 +20,44 @@ cpdef enum:
     O_RDONLY = __O_RDONLY
     O_WRONLY = __O_WRONLY
     O_RDWR = __O_RDWR
-    O_CREAT = __O_CREAT
-    O_EXCL = __O_EXCL
-    O_NOCTTY = __O_NOCTTY
-    O_TRUNC = __O_TRUNC
+
     O_APPEND = __O_APPEND
-    O_NONBLOCK = __O_NONBLOCK
-    O_DSYNC = __O_DSYNC
-    FASYNC = __FASYNC
-    O_DIRECT = __O_DIRECT
-    O_LARGEFILE = __O_LARGEFILE
-    O_DIRECTORY = __O_DIRECTORY
-    O_NOFOLLOW = __O_NOFOLLOW
-    O_NOATIME = __O_NOATIME
+    O_ASYNC = __O_ASYNC
     O_CLOEXEC = __O_CLOEXEC
+    O_CREAT = __O_CREAT
+
+    O_DIRECT = __O_DIRECT
+    O_DIRECTORY = __O_DIRECTORY
+    O_DSYNC = __O_DSYNC
+    O_EXCL = __O_EXCL
+    O_LARGEFILE = __O_LARGEFILE
+    O_NOATIME = __O_NOATIME
+    O_NOCTTY = __O_NOCTTY
+    O_NOFOLLOW = __O_NOFOLLOW
+    O_NONBLOCK = __O_NONBLOCK
+    O_PATH = __O_PATH
 
     O_SYNC = __O_SYNC
-    O_PATH = __O_PATH
     O_TMPFILE = __O_TMPFILE
-    O_NDELAY = __O_NDELAY
+    O_TRUNC = __O_TRUNC
 
-    AT_FDCWD = __AT_FDCWD
-    AT_REMOVEDIR = __AT_REMOVEDIR
-    AT_SYMLINK_FOLLOW = __AT_SYMLINK_FOLLOW
-    AT_EACCESS = __AT_EACCESS
+    S_IRWXU = __S_IRWXU
+    S_IRUSR = __S_IRUSR
+    S_IWUSR = __S_IWUSR
+    S_IXUSR = __S_IXUSR
+    S_IRWXG = __S_IRWXG
+    S_IRGRP = __S_IRGRP
+    S_IWGRP = __S_IWGRP
+    S_IXGRP = __S_IXGRP
+    S_IRWXO = __S_IRWXO
+    S_IROTH = __S_IROTH
+    S_IWOTH = __S_IWOTH
+    S_IXOTH = __S_IXOTH
+
+    S_ISUID = __S_ISUID
+    S_ISGID = __S_ISGID
+    S_ISVTX = __S_ISVTX
+
 
 cdef class open_how:
     cdef __open_how *ptr
