@@ -6,7 +6,7 @@ cdef class timespec:
 
 
 # from .type cimport __u64, int64_t, __kernel_timespec, timespec
-# from .io_uring cimport __io_uring_sqe, io_uring_sqe
+# from ._io_uring cimport __io_uring_sqe, io_uring_sqe
 
 
 # cpdef void io_uring_prep_timeout(io_uring_sqe sqe,
