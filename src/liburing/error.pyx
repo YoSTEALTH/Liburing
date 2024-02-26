@@ -33,19 +33,25 @@ cpdef inline int trap_error(int no) nogil:
     with gil:
         raise_error(no)
 
+
 cdef inline void raise_error(signed int no=-1) except *:
     ''' This function will only raise Error '''
     no = -errno or no
-    raise OSError(-no, strerror(-no))
+    cdef str error = strerror(-no).decode()
+    raise OSError(-no, error)
+
 
 cpdef inline void memory_error(object self, str msg='') except *:
     ''' Raises MemoryError '''
     if not msg:
         msg = 'is out of memory!'
-    raise MemoryError(f'`{self.__class__.__name__}()` {msg}')
+    cdef str error = f'`{self.__class__.__name__}()` {msg}'
+    raise MemoryError(error)
+
 
 cpdef inline void index_error(object self, unsigned int index, str msg='') except *:
     ''' Raises IndexError '''
     if not msg:
         msg = 'out of range!'
-    raise IndexError(f'`{self.__class__.__name__}()[{index}]` {msg}')
+    cdef str error = f'`{self.__class__.__name__}()[{index}]` {msg}'
+    raise IndexError(error)
