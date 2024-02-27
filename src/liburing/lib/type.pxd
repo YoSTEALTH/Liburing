@@ -60,13 +60,13 @@ cdef extern from '<signal.h>' nogil:
         si_value value
 
     ctypedef struct siginfo_t:
-        int si_signo    # Signal number
-        int si_code     # Signal code
-        pid_t si_pid      # Sending process ID
-        uid_t si_uid      # Real user ID of sending process
-        void *si_addr     # Address of faulting instruction
-        int si_status   # Exit value or signal
-        sigval si_value    # Signal value
+        int si_signo     # Signal number
+        int si_code      # Signal code
+        pid_t si_pid     # Sending process ID
+        uid_t si_uid     # Real user ID of sending process
+        void *si_addr    # Address of faulting instruction
+        int si_status    # Exit value or signal
+        sigval si_value  # Signal value
 
 
 cdef extern from '<bits/types/sigset_t.h>' nogil:
