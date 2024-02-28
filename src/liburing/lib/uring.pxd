@@ -58,7 +58,7 @@ cdef extern from 'liburing.h' nogil:
     # frees a probe allocated through `io_uring_get_probe()` or `io_uring_get_probe_ring()`
     void __io_uring_free_probe 'io_uring_free_probe'(__io_uring_probe *probe)
 
-    bool __io_uring_opcode_supported 'io_uring_opcode_supported'(__io_uring_probe *p,
+    bint __io_uring_opcode_supported 'io_uring_opcode_supported'(__io_uring_probe *p,
                                                                  int op)
 
     int __io_uring_queue_init_mem 'io_uring_queue_init_mem'(unsigned int entries,
@@ -733,13 +733,13 @@ cdef extern from 'liburing.h' nogil:
     # Returns how many unconsumed entries are ready in the CQ ring
     unsigned int __io_uring_cq_ready 'io_uring_cq_ready'(const __io_uring *ring)
     # Returns true if there are overflow entries waiting to be flushed onto the CQ ring
-    bool __io_uring_cq_has_overflow 'io_uring_cq_has_overflow'(const __io_uring *ring)
+    bint __io_uring_cq_has_overflow 'io_uring_cq_has_overflow'(const __io_uring *ring)
     # Returns true if the eventfd notification is currently enabled
-    bool __io_uring_cq_eventfd_enabled 'io_uring_cq_eventfd_enabled'(const __io_uring *ring)
+    bint __io_uring_cq_eventfd_enabled 'io_uring_cq_eventfd_enabled'(const __io_uring *ring)
 
     # Toggle eventfd notification on or off, if an eventfd is registered with the ring.
     int __io_uring_cq_eventfd_toggle 'io_uring_cq_eventfd_toggle'(__io_uring *ring,
-                                                                  bool enabled)
+                                                                  bint enabled)
     # Return an IO completion, waiting for `wait_nr` completions if one isn't
     # readily available. Returns `0` with `cqe_ptr` filled in on success, `-errno` on
     # failure.
@@ -796,4 +796,4 @@ cdef extern from 'liburing.h' nogil:
     # liburing that was loaded by the dynamic linker.
     int __io_uring_major_version "io_uring_major_version"()
     int __io_uring_minor_version "io_uring_minor_version"()
-    bool __io_uring_check_version "io_uring_check_version"(int major, int minor)
+    bint __io_uring_check_version "io_uring_check_version"(int major, int minor)
