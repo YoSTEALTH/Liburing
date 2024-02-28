@@ -2,7 +2,7 @@ from libc.errno cimport errno
 from libc.string cimport strerror
 
 
-cpdef inline int trap_error(int no) nogil:
+cpdef inline int trap_error(int no) except -1 nogil:
     ''' Trap Error
 
         Type
