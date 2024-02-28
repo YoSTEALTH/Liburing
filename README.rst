@@ -3,27 +3,27 @@
 Liburing (Work in progress ... )
 ========
 
-This is a Python + Cython wrapper around Liburing C library, which is a helper to setup and tear-down `io_uring` instances.
+Liburing is Python + Cython wrapper around `C Liburing`_, which is a helper to setup and tear-down io_uring instances.
+
+* Fast & scalable asynchronous I/O (storage, networking, ...) interface.
+* ``io_uring`` reduces number of syscalls overhead & context switches, thus improving speed.
+* ...
 
 
-Original Liburing C library can be found `here`_
-
-Read how to use `Liburing`_ (PDF)
-
-Good documentation `Lord of the io_uring`_
+Good(old) documentation `Lord of the io_uring`_
 
 
 Requires
 --------
 
-    - Linux 5.1+ (5.12+ recommended)
+    - Linux 6.0+ (6.7+ recommended)
     - Python 3.8+
 
 
 Includes
 --------
 
-    - liburing 2.5+
+    - liburing 2.6+
 
 
 Install, update & uninstall (Alpha)
@@ -172,8 +172,7 @@ TODO
 
 .. _pip: https://pip.pypa.io/en/stable/getting-started/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
-.. _here: https://github.com/axboe/liburing
-.. _Liburing: https://kernel.dk/io_uring.pdf
+.. _C Liburing: https://github.com/axboe/liburing
 .. _Lord of the io_uring: https://unixism.net/loti/
 .. |test-status| image:: https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=master&event=push
     :target: https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml
