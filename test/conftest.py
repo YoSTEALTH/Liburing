@@ -7,6 +7,7 @@ import tempfile
 import platform
 import functools
 from packaging.version import Version
+import liburing
 
 
 @pytest.fixture
@@ -35,6 +36,24 @@ def tmp_dir():
     return pathlib.Path(tempfile.mkdtemp(dir=path))
 
 
+# liburing start
+@pytest.fixture
+def ring():
+    ring = liburing.io_uring()
+    try:
+        liburing.io_uring_queue_init(32, ring)
+        yield ring
+    finally:
+        liburing.io_uring_queue_exit(ring)
+
+
+@pytest.fixture
+def cqe():
+    return liburing.io_uring_cqe()
+# liburing end
+
+
+# linux version start
 @functools.lru_cache
 def parse_linux_version(version):
     '''
@@ -75,3 +94,4 @@ def skip_by_platform(request):
 def pytest_configure(config):
     config.addinivalue_line("markers",
                             "skip_linux(version, message): skipping linux version not supported.")
+# linux version end
