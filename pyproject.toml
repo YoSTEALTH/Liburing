@@ -33,6 +33,9 @@ classifiers = ["Topic :: Software Development",
 Homepage = "https://github.com/YoSTEALTH/Liburing"
 Issues = "https://github.com/YoSTEALTH/Liburing/issues"
 
+[project.optional-dependencies]
+test = ["pytest", "packaging"]
+
 [tool.setuptools]
 zip-safe = false
 
