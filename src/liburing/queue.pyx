@@ -1,18 +1,224 @@
+from cython cimport boundscheck
 from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from cpython.ref cimport Py_INCREF, Py_DECREF
-from .error cimport memory_error, trap_error
+from .error cimport trap_error, memory_error, index_error
 
 
 LIBURING_UDATA_TIMEOUT = __LIBURING_UDATA_TIMEOUT
 
 
-# TODO:
-# cpdef int io_uring_queue_init_mem(unsigned int entries,
-#                                   io_uring ring,
-#                                   io_uring_params p,
-#                                   nullptr_t buf,
-#                                   size_t buf_size):
-#     return trap_error(__io_uring_queue_init_mem(entries, ring.ptr, p.ptr, &buf, buf_size))
+cdef class io_uring:
+    ''' I/O URing
+
+        Example
+            >>> ring = io_uring()
+            >>> io_uring_queue_init(123, ring, 0)
+            >>> io_uring_queue_exit(ring)
+    '''
+    def __cinit__(self):
+        self.ptr = <__io_uring*>PyMem_RawCalloc(1, sizeof(__io_uring))
+        if self.ptr is NULL:
+            memory_error(self)
+
+    def __dealloc__(self):
+        if self.ptr is not NULL:
+            PyMem_RawFree(self.ptr)
+            self.ptr = NULL
+
+    @property
+    def flags(self):
+        return self.ptr.flags
+
+    @property
+    def ring_fd(self):
+        return self.ptr.ring_fd
+
+    @property
+    def features(self):
+        return self.ptr.features
+
+    @property
+    def enter_ring_fd(self):
+        return self.ptr.enter_ring_fd
+
+    @property
+    def int_flags(self):
+        return self.ptr.int_flags
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(flags={self.ptr.flags!r}, ' \
+               f'ring_fd={self.ptr.ring_fd!r}, features={self.ptr.features!r}, ' \
+               f'enter_ring_fd={self.ptr.enter_ring_fd!r}, int_flags={self.ptr.int_flags!r}) '
+
+
+cdef class io_uring_sqe:
+    ''' IO submission data structure (Submission Queue Entry)
+
+        Example
+            # single
+            >>> sqe = io_uring_sqe()
+            >>> io_uring_prep_read(sqe, ...)
+
+            # multiple
+            >>> sqe = io_uring_sqe(2)
+            >>> io_uring_prep_write(sqe[0], ...)
+            >>> io_uring_prep_read(sqe[1], ...)
+
+            # *** MUST DO ***
+            >>> if io_uring_put_sqe(ring, sqe):
+            ...     io_uring_submit(ring)
+
+        Note
+            - `io_uring_sqe` is not the same as `io_uring_get_sqe()`.
+            - This class has multiple uses:
+                1. It works as a base class for `io_uring_get_sqe()` return.
+                2. It can also be used as `sqe = io_uring_sqe(<int>)`, rather than "get" sqe(s)
+                you are going to "put" pre-made sqe(s) into the ring later.
+            - Refer to `help(io_uring_put_sqe)` to see more detail.
+    '''
+    def __cinit__(self, unsigned int num=1):
+        cdef str error
+        if num:
+            self.ptr = <__io_uring_sqe*>PyMem_RawCalloc(num, sizeof(__io_uring_sqe))
+            if self.ptr is NULL:
+                memory_error(self)
+            if num > 1:
+                self.ref = [None]*(num-1)  # do not hold `0` reference.
+        else:
+            self.ptr = NULL
+        self.len = num
+        # note: if `self.len` is not set it means its for internally `ptr` reference use.
+
+    def __dealloc__(self):
+        if self.len and self.ptr is not NULL:
+            PyMem_RawFree(self.ptr)
+            self.ptr = NULL
+
+    def __bool__(self):
+        return self.ptr is not NULL
+
+    def __len__(self):
+        return self.len
+        
+    @boundscheck(True)
+    def __getitem__(self, unsigned int index):
+        cdef io_uring_sqe sqe
+        if self.ptr is not NULL:
+            if index == 0:
+                return self
+            elif self.len and index < self.len:
+                if (sqe := self.ref[index-1]) is not None:
+                    return sqe  # from reference cache
+
+                # create new reference class
+                sqe = io_uring_sqe(0)  # `0` is set to indicated `ptr` is being set for internal use
+                sqe.ptr = &self.ptr[index]
+                if sqe.ptr is not NULL:
+                    # cache sqe as this class attribute
+                    self.ref[index-1] = sqe
+                    return sqe
+                
+        index_error(self, index, 'out of `sqe`')
+
+    @property
+    def flags(self) -> __u8:
+        return self.ptr.flags
+
+    @flags.setter
+    def flags(self, __u8 flags):
+        __io_uring_sqe_set_flags(self.ptr, flags)
+
+    @property
+    def user_data(self) -> __u64:
+        return self.ptr.user_data
+
+    @user_data.setter
+    def user_data(self, __u64 data):
+        __io_uring_sqe_set_data64(self.ptr, data)
+
+
+cdef class io_uring_cqe:
+    ''' IO completion data structure (Completion Queue Entry)
+
+        Example
+            >>> cqes = io_uring_cqe()
+
+            # single
+            # ------
+            >>> cqe = cqes  # same as `cqes[0]`
+            >>> cqe.res
+            0
+            >>> cqe.flags
+            0
+            >>> cqe.user_data
+            123
+
+            # get item
+            # --------
+            >>> cqes[0].user_data
+            123
+
+            # iter
+            # ----
+            >>> ready = io_uring_cq_ready(ring)
+            >>> for i in range(ready):
+            ...     cqe = cqes[i]
+            ...     cqe.user_data
+            ...     io_uring_cq_advance(ring, 1)
+            123
+
+        Note
+            - `cqes = io_uring_cqe()` only needs to be defined once, and reused.
+            - Use `io_uring_cq_ready(ring)` to figure out how many cqe's are ready.
+    '''
+    @boundscheck(True)
+    def __getitem__(self, unsigned int index):
+        cdef io_uring_cqe cqe
+        if self.ptr is NULL:
+            index_error(self, index, 'out of `cqe`')
+        if index:
+            cqe = io_uring_cqe()
+            cqe.ptr = &self.ptr[index]
+            if cqe.ptr is not NULL:
+                return cqe
+            index_error(self, index, 'out of `cqe`')
+        return self
+        # note: no need to cache items since `cqe` is normally called once or passed around.
+
+    def __bool__(self):
+        return self.ptr is not NULL
+
+    def __repr__(self):
+        if self.ptr is not NULL:
+            return f'{self.__class__.__name__}(user_data={self.ptr.user_data!r}, ' \
+                   f'res={self.ptr.res!r}, flags={self.ptr.flags!r})'
+        memory_error(self, 'out of `cqe`')
+
+    @property
+    def user_data(self) -> __u64:
+        if self.ptr is not NULL:
+            return self.ptr.user_data
+        memory_error(self, 'out of `cqe`')
+
+    @property
+    def res(self) -> __s32:
+        if self.ptr is not NULL:
+            return self.ptr.res
+        memory_error(self, 'out of `cqe`')
+
+    @property
+    def flags(self) -> __u32:
+        if self.ptr is not NULL:
+            return self.ptr.flags
+        memory_error(self, 'out of `cqe`')
+
+
+cpdef int io_uring_queue_init_mem(unsigned int entries,
+                                  io_uring ring,
+                                  io_uring_params p,
+                                  unsigned char[:] buf,
+                                  size_t buf_size):
+    return trap_error(__io_uring_queue_init_mem(entries, ring.ptr, p.ptr, &buf[0], buf_size))
 
 cpdef int io_uring_queue_init_params(unsigned int entries,
                                      io_uring ring,
@@ -82,26 +288,6 @@ cpdef int io_uring_get_events(io_uring ring) nogil:
 
 cpdef int io_uring_submit_and_get_events(io_uring ring) nogil:
     return trap_error(__io_uring_submit_and_get_events(ring.ptr))
-
-#  `io_uring` syscalls.
-cpdef int io_uring_enter(unsigned int fd,
-                         unsigned int to_submit,
-                         unsigned int min_complete,
-                         unsigned int flags,
-                         sigset sig) nogil:
-    return trap_error(__io_uring_enter(fd, to_submit, min_complete, flags, sig.ptr))
-
-cpdef int io_uring_enter2(unsigned int fd,
-                          unsigned int to_submit,
-                          unsigned int min_complete,
-                          unsigned int flags,
-                          sigset sig,
-                          size_t sz) nogil:
-    return trap_error(__io_uring_enter2(fd, to_submit, min_complete, flags, sig.ptr, sz))
-
-cpdef int io_uring_setup(unsigned int entries,
-                         io_uring_params p) nogil:
-    return trap_error(__io_uring_setup(entries, p.ptr))
 
 cpdef inline void io_uring_cq_advance(io_uring ring,
                                       unsigned int nr) noexcept nogil:
