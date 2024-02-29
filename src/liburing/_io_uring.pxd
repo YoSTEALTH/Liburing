@@ -1,18 +1,6 @@
 from .lib.uring cimport *
 
 
-cdef class io_uring:
-    cdef __io_uring *ptr
-
-cdef class io_uring_sqe:
-    cdef:
-        __io_uring_sqe * ptr
-        unsigned int len
-        list ref  # TODO: replace with `array()` # index object reference holder
-
-cdef class io_uring_cqe:
-    cdef __io_uring_cqe * ptr
-
 cdef class io_uring_params:
     cdef __io_uring_params * ptr
 

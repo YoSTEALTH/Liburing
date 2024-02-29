@@ -4,16 +4,24 @@ from .type cimport sigset, siginfo
 from ._io_uring cimport *
 
 
-# cpdef enum __define__:
-# LIBURING_UDATA_TIMEOUT = __LIBURING_UDATA_TIMEOUT
-# LIBURING_HAVE_DATA64 = __LIBURING_HAVE_DATA64
+cdef class io_uring:
+    cdef __io_uring *ptr
 
-# TODO:
-# cpdef int io_uring_queue_init_mem(unsigned int entries,
-#                                   io_uring ring,
-#                                   io_uring_params p,
-#                                   nullptr_t buf,
-#                                   size_t buf_size)
+cdef class io_uring_sqe:
+    cdef:
+        __io_uring_sqe * ptr
+        unsigned int len
+        list ref
+
+cdef class io_uring_cqe:
+    cdef __io_uring_cqe * ptr
+
+
+cpdef int io_uring_queue_init_mem(unsigned int entries,
+                                  io_uring ring,
+                                  io_uring_params p,
+                                  unsigned char[:] buf,
+                                  size_t buf_size)
 cpdef int io_uring_queue_init_params(unsigned int entries,
                                      io_uring ring,
                                      io_uring_params p) nogil
@@ -47,21 +55,6 @@ cpdef int io_uring_submit_and_wait_timeout(io_uring ring,
 
 cpdef int io_uring_get_events(io_uring ring) nogil
 cpdef int io_uring_submit_and_get_events(io_uring ring) nogil
-
-#  `io_uring` syscalls.
-cpdef int io_uring_enter(unsigned int fd,
-                         unsigned int to_submit,
-                         unsigned int min_complete,
-                         unsigned int flags,
-                         sigset sig) nogil
-cpdef int io_uring_enter2(unsigned int fd,
-                          unsigned int to_submit,
-                          unsigned int min_complete,
-                          unsigned int flags,
-                          sigset sig,
-                          size_t sz) nogil
-cpdef int io_uring_setup(unsigned int entries,
-                         io_uring_params p) nogil
 
 cpdef void io_uring_cq_advance(io_uring ring,
                                unsigned int nr) noexcept nogil
