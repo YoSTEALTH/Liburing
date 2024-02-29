@@ -1,7 +1,6 @@
 from .lib.uring cimport *
 from .type cimport iovec
-from ._io_uring cimport io_uring_sqe
-from .queue cimport io_uring
+from .queue cimport io_uring, io_uring_sqe
 
 
 cpdef enum __define__:
@@ -151,10 +150,6 @@ cpdef void io_uring_prep_openat2_direct(io_uring_sqe sqe,
                                         unsigned int file_index,
                                         open_how how,
                                         int dfd=?) noexcept nogil
-cpdef void io_uring_prep_close(io_uring_sqe sqe,
-                               int fd) noexcept nogil
-cpdef void io_uring_prep_close_direct(io_uring_sqe sqe,
-                                      unsigned int file_index) noexcept nogil
 cpdef void io_uring_prep_read(io_uring_sqe sqe,
                               int fd,
                               unsigned char[:] buf,  # `void *buf`
