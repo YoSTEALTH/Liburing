@@ -207,7 +207,7 @@ cdef extern from 'liburing.h' nogil:
                                                 unsigned int nr_args)
 
     # Mapped buffer ring alloc/register + unregister/free helpers
-    __io_uring_buf_ring * io_uring_setup_buf_ring 'io_uring_setup_buf_ring'(__io_uring * ring,
+    __io_uring_buf_ring * __io_uring_setup_buf_ring 'io_uring_setup_buf_ring'(__io_uring * ring,
                                                                             unsigned int nentries,
                                                                             int bgid,
                                                                             unsigned int flags,
