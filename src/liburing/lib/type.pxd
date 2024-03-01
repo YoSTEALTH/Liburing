@@ -39,13 +39,12 @@ cdef extern from '<linux/types.h>' nogil:
 cdef extern from '<sched.h>' nogil:
     ''' // C Source Code
         // need bit of help from C to get this to work properly.
-        // const int BITS = __CPU_SETSIZE / __NCPUBITS;
+        const int BITS = __CPU_SETSIZE / __NCPUBITS;
     '''
-    # const int BITS
+    const int BITS
     ctypedef unsigned long  __cpu_mask
     ctypedef struct cpu_set_t:
-        pass
-        # __cpu_mask __bits[BITS]
+        __cpu_mask __bits[BITS]
 
 
 cdef extern from '<signal.h>' nogil:
@@ -88,12 +87,14 @@ cdef extern from '<linux/time_types.h>' nogil:
         __kernel_time64_t tv_sec      # seconds
         long long tv_nsec     # nanoseconds
 
+
 cdef extern from '<stdio.h>' nogil:
     # renameat2 flags
     enum:
         __RENAME_NOREPLACE 'RENAME_NOREPLACE'
         __RENAME_EXCHANGE 'RENAME_EXCHANGE'
         __RENAME_WHITEOUT 'RENAME_WHITEOUT'
+
 
 cdef extern from '<fcntl.h>' nogil:
     enum:
