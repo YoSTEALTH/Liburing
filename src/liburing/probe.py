@@ -1,5 +1,4 @@
-from ._io_uring import io_uring_op
-from liburing import io_uring_get_probe, io_uring_opcode_supported, io_uring_free_probe
+from liburing import io_uring_op, io_uring_get_probe, io_uring_opcode_supported, io_uring_free_probe
 
 
 def probe() -> dict:
