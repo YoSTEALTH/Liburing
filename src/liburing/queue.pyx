@@ -283,6 +283,14 @@ cpdef int io_uring_submit_and_wait_timeout(io_uring ring,
     return trap_error(__io_uring_submit_and_wait_timeout(ring.ptr, &cqe_ptr.ptr, wait_nr, ts.ptr,
                                                          sigmask.ptr))
 
+
+cpdef int io_uring_enable_rings(io_uring ring) nogil:
+    return trap_error(__io_uring_enable_rings(ring.ptr))
+
+cpdef int io_uring_close_ring_fd(io_uring ring) nogil:
+    return trap_error(__io_uring_close_ring_fd(ring.ptr))
+
+
 cpdef int io_uring_get_events(io_uring ring) nogil:
     return trap_error(__io_uring_get_events(ring.ptr))
 
@@ -394,14 +402,13 @@ cpdef inline int io_uring_buf_ring_mask(__u32 ring_entries) noexcept nogil:
 cpdef inline void io_uring_buf_ring_init(io_uring_buf_ring br) noexcept nogil:
     __io_uring_buf_ring_init(br.ptr)
 
-# TODO:
-# cpdef inline void io_uring_buf_ring_add(io_uring_buf_ring br,
-#                                                      void *addr,
-#                                                      unsigned int len,
-#                                                      unsigned short bid,
-#                                                      int mask,
-#                                                      int buf_offset) noexcept nogil:
-#     __io_uring_buf_ring_add(br.ptr, &addr, len, bid, mask, buf_offset)
+cpdef inline void io_uring_buf_ring_add(io_uring_buf_ring br,
+                                        unsigned char[:] addr,  # void *addr,
+                                        unsigned int len,
+                                        unsigned short bid,
+                                        int mask,
+                                        int buf_offset) noexcept nogil:
+    __io_uring_buf_ring_add(br.ptr, &addr[0], len, bid, mask, buf_offset)
 
 cpdef inline void io_uring_buf_ring_advance(io_uring_buf_ring br,
                                             int count) noexcept nogil:

@@ -1,7 +1,6 @@
 from .lib.uring cimport *
 from .time cimport timespec
 from .type cimport sigset, siginfo
-from ._io_uring cimport *
 
 
 cdef class io_uring:
@@ -15,6 +14,12 @@ cdef class io_uring_sqe:
 
 cdef class io_uring_cqe:
     cdef __io_uring_cqe * ptr
+
+cdef class io_uring_params:
+    cdef __io_uring_params * ptr
+
+cdef class io_uring_buf_ring:
+    cdef __io_uring_buf_ring * ptr
 
 
 cpdef int io_uring_queue_init_mem(unsigned int entries,
@@ -52,6 +57,9 @@ cpdef int io_uring_submit_and_wait_timeout(io_uring ring,
                                            unsigned int wait_nr,
                                            timespec ts,
                                            sigset sigmask) nogil
+
+cpdef int io_uring_enable_rings(io_uring ring) nogil
+cpdef int io_uring_close_ring_fd(io_uring ring) nogil
 
 cpdef int io_uring_get_events(io_uring ring) nogil
 cpdef int io_uring_submit_and_get_events(io_uring ring) nogil
@@ -109,16 +117,15 @@ cpdef int io_uring_peek_cqe(io_uring ring,
                             io_uring_cqe cqe_ptr) noexcept nogil
 cpdef int io_uring_wait_cqe(io_uring ring,
                             io_uring_cqe cqe_ptr) noexcept nogil
+
 cpdef int io_uring_buf_ring_mask(__u32 ring_entries) noexcept nogil
 cpdef void io_uring_buf_ring_init(io_uring_buf_ring br) noexcept nogil
-
-# TODO:
-# cpdef void io_uring_buf_ring_add(io_uring_buf_ring br,
-#                                  void *addr,
-#                                  unsigned int len,
-#                                  unsigned short bid,
-#                                  int mask,
-#                                  int buf_offset) noexcept nogil
+cpdef void io_uring_buf_ring_add(io_uring_buf_ring br,
+                                 unsigned char[:] addr,
+                                 unsigned int len,
+                                 unsigned short bid,
+                                 int mask,
+                                 int buf_offset) noexcept nogil
 cpdef void io_uring_buf_ring_advance(io_uring_buf_ring br,
                                      int count) noexcept nogil
 cpdef void io_uring_buf_ring_cq_advance(io_uring ring,
@@ -127,4 +134,5 @@ cpdef void io_uring_buf_ring_cq_advance(io_uring ring,
 cpdef int io_uring_buf_ring_available(io_uring ring,
                                       io_uring_buf_ring br,
                                       unsigned short bgid) noexcept nogil
+
 cpdef io_uring_sqe io_uring_get_sqe(io_uring ring)
