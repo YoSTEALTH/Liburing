@@ -7,6 +7,7 @@ cdef extern from 'liburing/io_uring.h' nogil:
         __u8 flags       # IOSQE_ flags
         __u64 user_data  # data to be passed back at completion time
         # note: other values, embedded union & struct are ignored.
+        #   - will add more if someone needs it.
 
     # If `sqe->file_index` is set to this for opcodes that instantiate a new
     # direct descriptor (like openat/openat2/accept), then `io_uring` will allocate
