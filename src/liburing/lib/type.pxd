@@ -89,8 +89,8 @@ cdef extern from '<linux/time_types.h>' nogil:
 
 
 cdef extern from '<stdio.h>' nogil:
-    # renameat2 flags
     enum:
+        # flags for `renameat2`.
         __RENAME_NOREPLACE 'RENAME_NOREPLACE'
         __RENAME_EXCHANGE 'RENAME_EXCHANGE'
         __RENAME_WHITEOUT 'RENAME_WHITEOUT'
@@ -103,3 +103,12 @@ cdef extern from '<fcntl.h>' nogil:
         __SPLICE_F_NONBLOCK 'SPLICE_F_NONBLOCK'
         __SPLICE_F_MORE 'SPLICE_F_MORE'
         __SPLICE_F_GIFT 'SPLICE_F_GIFT'
+
+        # `fallocate` mode
+        __FALLOC_FL_KEEP_SIZE 'FALLOC_FL_KEEP_SIZE'
+        __FALLOC_FL_PUNCH_HOLE 'FALLOC_FL_PUNCH_HOLE'
+        __FALLOC_FL_NO_HIDE_STALE 'FALLOC_FL_NO_HIDE_STALE'
+        __FALLOC_FL_COLLAPSE_RANGE 'FALLOC_FL_COLLAPSE_RANGE'
+        __FALLOC_FL_ZERO_RANGE 'FALLOC_FL_ZERO_RANGE'
+        __FALLOC_FL_INSERT_RANGE 'FALLOC_FL_INSERT_RANGE'
+        __FALLOC_FL_UNSHARE_RANGE 'FALLOC_FL_UNSHARE_RANGE'
