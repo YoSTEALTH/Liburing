@@ -47,24 +47,24 @@ cdef class timespec:
         self.ptr.tv_nsec = nanosecond
 
 
-# cpdef inline void io_uring_prep_timeout(io_uring_sqe sqe,
-#                                         timespec ts,
-#                                         unsigned int count,
-#                                         unsigned int flags):
-#     __io_uring_prep_timeout(sqe.ptr, ts.ptr, count, flags)
+cpdef inline void io_uring_prep_timeout(io_uring_sqe sqe,
+                                        timespec ts,
+                                        unsigned int count,
+                                        unsigned int flags) noexcept nogil:
+    __io_uring_prep_timeout(sqe.ptr, ts.ptr, count, flags)
 
-# cpdef inline void io_uring_prep_timeout_remove(io_uring_sqe sqe,
-#                                                __u64 user_data,
-#                                                unsigned int flags):
-#     __io_uring_prep_timeout_remove(sqe.ptr, user_data, flags)
+cpdef inline void io_uring_prep_timeout_remove(io_uring_sqe sqe,
+                                               __u64 user_data,
+                                               unsigned int flags) noexcept nogil:
+    __io_uring_prep_timeout_remove(sqe.ptr, user_data, flags)
 
-# cpdef inline void io_uring_prep_timeout_update(io_uring_sqe sqe,
-#                                                timespec ts,
-#                                                __u64 user_data,
-#                                                unsigned int flags):
-#     __io_uring_prep_timeout_update(sqe.ptr, ts.ptr, user_data, flags)
+cpdef inline void io_uring_prep_timeout_update(io_uring_sqe sqe,
+                                               timespec ts,
+                                               __u64 user_data,
+                                               unsigned int flags) noexcept nogil:
+    __io_uring_prep_timeout_update(sqe.ptr, ts.ptr, user_data, flags)
 
-# cpdef inline void io_uring_prep_link_timeout(io_uring_sqe sqe,
-#                                              timespec ts,
-#                                              unsigned int flags):
-#     __io_uring_prep_link_timeout(sqe.ptr, ts.ptr, flags)
+cpdef inline void io_uring_prep_link_timeout(io_uring_sqe sqe,
+                                             timespec ts,
+                                             unsigned int flags) noexcept nogil:
+    __io_uring_prep_link_timeout(sqe.ptr, ts.ptr, flags)
