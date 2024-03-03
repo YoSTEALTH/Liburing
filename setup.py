@@ -1,4 +1,4 @@
-from os import cpu_count
+from os import cpu_count, environ  # noqa
 from os.path import exists
 from subprocess import run as sub_process_run
 from setuptools import setup
@@ -6,6 +6,9 @@ from Cython.Build import cythonize
 from Cython.Compiler import Options
 from Cython.Distutils import Extension
 
+
+# enable `clang` compiler
+# environ['LDSHARED'] = 'clang -shared'  # <- manually uncomment this
 
 debug = True  # <- manually change this
 os_liburing = False  # <- manually change this
@@ -20,34 +23,27 @@ uring = 'uring-ffi'
 
 # compiler options
 if debug:
-    Options.docstrings = True
     Options.warning_errors = True  # turn all warnings into errors.
     Options.fast_fail = False
     Options.annotate = True  # generate `*.html` file for debugging & optimization.
-    compile_args = [
-        '--debug',
-        # '--extra-warnings',
-        # '-Wstrict-overflow'
-    ]
-
 else:
-    Options.docstrings = False
     Options.warning_errors = False
     Options.fast_fail = True
     Options.annotate = False
-    compile_args = [
-        '-Oz'
-        # '-O3'
-        # '-Os'
-    ]
+Options.docstrings = True
+compile_args = [
+    '-O3',
+    '-g0',
+]  # Optimize and remove debug symbols + data.
 
-if os_liburing:  # compile using OS `liburing.so`
+
+if os_liburing:  # compile using OS installed `liburing`
     extension = [Extension(name=lib_name,  # where the `.so` will be saved.
                            sources=sources,
                            language=language,
                            libraries=[uring],
                            extra_compile_args=compile_args)]
-else:  # compile `liburing` C library as well.
+else:  # (default) compile using latest `liburing` that's included.
     extension = [Extension(name=lib_name,  # where the `.so` will be saved.
                            sources=sources,
                            language=language,
@@ -67,4 +63,5 @@ setup(ext_modules=cythonize(extension,
                                 'embedsignature': True,  # show all `__doc__`
                                 'linetrace': True if debug else False,  # enable for coverage
                                 'boundscheck': False,
+                                'wraparound': False,
                                 'language_level': 3}))

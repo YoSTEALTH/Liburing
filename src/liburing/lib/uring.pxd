@@ -1,5 +1,6 @@
 from .type cimport *
 from .file cimport *
+from .poll cimport *
 from .statx cimport *
 from .futex cimport *
 from .socket cimport *
@@ -207,11 +208,12 @@ cdef extern from 'liburing.h' nogil:
                                                 unsigned int nr_args)
 
     # Mapped buffer ring alloc/register + unregister/free helpers
-    __io_uring_buf_ring * __io_uring_setup_buf_ring 'io_uring_setup_buf_ring'(__io_uring * ring,
-                                                                            unsigned int nentries,
-                                                                            int bgid,
-                                                                            unsigned int flags,
-                                                                            int * ret)
+    __io_uring_buf_ring * __io_uring_setup_buf_ring 'io_uring_setup_buf_ring'(
+        __io_uring * ring,
+        unsigned int nentries,
+        int bgid,
+        unsigned int flags,
+        int * ret)
     int __io_uring_free_buf_ring 'io_uring_free_buf_ring'(__io_uring * ring,
                                                           __io_uring_buf_ring * br,
                                                           unsigned int nentries,
