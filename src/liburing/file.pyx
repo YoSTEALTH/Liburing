@@ -3,6 +3,10 @@ from cpython.array cimport array
 from .error cimport trap_error, memory_error
 
 
+# fsync flags
+IORING_FSYNC_DATASYNC = __IORING_FSYNC_DATASYNC
+
+
 cdef class open_how:
     ''' How to Open a Path
 
@@ -126,6 +130,7 @@ cpdef int io_uring_register_files_update(io_uring ring,
                                          unsigned int nr_files) nogil:
     return trap_error(__io_uring_register_files_update(ring.ptr, off, &files, nr_files))
 
+
 cpdef inline void io_uring_prep_splice(io_uring_sqe sqe,
                                        int fd_in,
                                        int64_t off_in,
@@ -210,8 +215,15 @@ cpdef inline void io_uring_prep_write_fixed(io_uring_sqe sqe,
 
 cpdef inline void io_uring_prep_fsync(io_uring_sqe sqe,
                                       int fd,
-                                      unsigned int fsync_flags) noexcept nogil:
+                                      unsigned int fsync_flags=0) noexcept nogil:
     __io_uring_prep_fsync(sqe.ptr, fd, fsync_flags)
+
+cpdef inline void io_uring_prep_sync_file_range(io_uring_sqe sqe,
+                                                int fd,
+                                                unsigned int len=0,
+                                                __u64 offset=0,
+                                                int flags=0) noexcept nogil:
+    __io_uring_prep_sync_file_range(sqe.ptr, fd, len, offset, flags)
 
 cpdef inline void io_uring_prep_openat(io_uring_sqe sqe,
                                        const char *path,
@@ -274,3 +286,10 @@ cpdef inline void io_uring_prep_write(io_uring_sqe sqe,
                                       unsigned int nbytes,
                                       __u64 offset) noexcept nogil:
     __io_uring_prep_write(sqe.ptr, fd, &buf[0], nbytes, offset)
+
+cpdef inline void io_uring_prep_files_update(io_uring_sqe sqe, list[int] fds, int offset=0):
+    cdef array[int] _fds = array('i', fds)
+    __io_uring_prep_files_update(sqe.ptr, _fds.data.as_ints, len(_fds), offset)
+
+cpdef inline void io_uring_prep_ftruncate(io_uring_sqe sqe, int fd, loff_t len) noexcept nogil:
+    __io_uring_prep_ftruncate(sqe.ptr, fd, len)

@@ -1,6 +1,10 @@
 from cython cimport boundscheck
 from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
+from .lib.io_uring cimport *
 from .error cimport memory_error, index_error
+
+
+# NOTE: This is temporary flags(mask) holder. Flags will eventually be moved or deleted.
 
 
 IORING_FILE_INDEX_ALLOC = __IORING_FILE_INDEX_ALLOC
@@ -14,9 +18,7 @@ IOSQE_ASYNC = __IOSQE_ASYNC
 IOSQE_BUFFER_SELECT = __IOSQE_BUFFER_SELECT
 IOSQE_CQE_SKIP_SUCCESS = __IOSQE_CQE_SKIP_SUCCESS
 
-
 IORING_URING_CMD_FIXED = __IORING_URING_CMD_FIXED
-IORING_FSYNC_DATASYNC = __IORING_FSYNC_DATASYNC
 
 IORING_TIMEOUT_ABS = __IORING_TIMEOUT_ABS
 IORING_TIMEOUT_UPDATE = __IORING_TIMEOUT_UPDATE
