@@ -129,7 +129,12 @@ cpdef void io_uring_prep_write_fixed(io_uring_sqe sqe,
                                      int buf_index) noexcept nogil
 cpdef void io_uring_prep_fsync(io_uring_sqe sqe,
                                int fd,
-                               unsigned int fsync_flags) noexcept nogil
+                               unsigned int fsync_flags=?) noexcept nogil
+cpdef void io_uring_prep_sync_file_range(io_uring_sqe sqe,
+                                         int fd,
+                                         unsigned int len=?,
+                                         __u64 offset=?,
+                                         int flags=?) noexcept nogil
 cpdef void io_uring_prep_openat(io_uring_sqe sqe,
                                 const char *path,
                                 int flags=?,
@@ -165,3 +170,7 @@ cpdef void io_uring_prep_write(io_uring_sqe sqe,
                                const unsigned char[:] buf,  # `const void * buf`
                                unsigned int nbytes,
                                __u64 offset) noexcept nogil
+
+cpdef void io_uring_prep_files_update(io_uring_sqe sqe, list[int] fds, int offset=?)
+
+cpdef void io_uring_prep_ftruncate(io_uring_sqe sqe, int fd, loff_t len) noexcept nogil
