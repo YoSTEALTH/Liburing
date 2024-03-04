@@ -17,14 +17,14 @@ cdef extern from '<linux/futex.h>' nogil:
     __u8 __FUTEX_REQUEUE 'FUTEX_REQUEUE'
     __u8 __FUTEX_CMP_REQUEUE 'FUTEX_CMP_REQUEUE'
     __u8 __FUTEX_WAKE_OP 'FUTEX_WAKE_OP'
-    __u8 __FUTEX_LOCK_PI 'FUTEX_LOCK_PI'
-    __u8 __FUTEX_UNLOCK_PI 'FUTEX_UNLOCK_PI'
-    __u8 __FUTEX_TRYLOCK_PI 'FUTEX_TRYLOCK_PI'
     __u8 __FUTEX_WAIT_BITSET 'FUTEX_WAIT_BITSET'
     __u8 __FUTEX_WAKE_BITSET 'FUTEX_WAKE_BITSET'
-    __u8 __FUTEX_WAIT_REQUEUE_PI 'FUTEX_WAIT_REQUEUE_PI'
-    __u8 __FUTEX_CMP_REQUEUE_PI 'FUTEX_CMP_REQUEUE_PI'
+    __u8 __FUTEX_LOCK_PI 'FUTEX_LOCK_PI'
     __u8 __FUTEX_LOCK_PI2 'FUTEX_LOCK_PI2'
+    __u8 __FUTEX_TRYLOCK_PI 'FUTEX_TRYLOCK_PI'
+    __u8 __FUTEX_UNLOCK_PI 'FUTEX_UNLOCK_PI'
+    __u8 __FUTEX_CMP_REQUEUE_PI 'FUTEX_CMP_REQUEUE_PI'
+    __u8 __FUTEX_WAIT_REQUEUE_PI 'FUTEX_WAIT_REQUEUE_PI'
 
     # a futex can be either private or shared. private is used for processes that shares the
     # same memory space and the virtual address of the futex will be the same for all processes.
