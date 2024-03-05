@@ -44,6 +44,7 @@ cdef extern from '<linux/version.h>' nogil:
     '''
     __u8 __LINUX_VERSION_MAJOR 'LINUX_VERSION_MAJOR'
     __u8 __LINUX_VERSION_MINOR 'LINUX_VERSION_PATCHLEVEL'
+    bint __LINUX_VERSION_CHECK(__u8 major, __u8 minor)
 
 
 cdef extern from '<sched.h>' nogil:
