@@ -1,5 +1,6 @@
 ctypedef bint bool
 
+
 cdef extern from '<linux/types.h>' nogil:
     # NOTE: Does not matter that `ctypedef int` is given to all,
     #       compiler will assign it correct type(I think!).
@@ -36,10 +37,18 @@ cdef extern from '<linux/types.h>' nogil:
     ctypedef int __kernel_rwf_t
 
 
+cdef extern from '<linux/version.h>' nogil:
+    ''' #define __LINUX_VERSION_CHECK(major, minor) (major > LINUX_VERSION_MAJOR) || \
+                                                    ((major == LINUX_VERSION_MAJOR) && \
+                                                     (minor > LINUX_VERSION_PATCHLEVEL))
+     '''
+    bint __LINUX_VERSION_CHECK(__u8 major, __u8 minor)
+    __u8 __LINUX_VERSION_MAJOR 'LINUX_VERSION_MAJOR'
+    __u8 __LINUX_VERSION_MINOR 'LINUX_VERSION_PATCHLEVEL'
+
+
 cdef extern from '<sched.h>' nogil:
-    ''' // C Source Code
-        // need bit of help from C to get this to work properly.
-        const int BITS = __CPU_SETSIZE / __NCPUBITS;
+    ''' const int BITS = __CPU_SETSIZE / __NCPUBITS;
     '''
     const int BITS
     ctypedef unsigned long  __cpu_mask
