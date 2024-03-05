@@ -34,7 +34,7 @@ Homepage = "https://github.com/YoSTEALTH/Liburing"
 Issues = "https://github.com/YoSTEALTH/Liburing/issues"
 
 [project.optional-dependencies]
-test = ["pytest", "packaging"]
+test = ["pytest"]
 
 [tool.setuptools]
 zip-safe = false
