@@ -23,7 +23,8 @@ cpdef inline bool linux_version_check(__u8 major, __u8 minor=0) noexcept nogil:
             >>> linux_version_check(7, 0)
             True
     '''
-    return __LINUX_VERSION_CHECK(major, minor)
+    return (major > __LINUX_VERSION_MAJOR) or ((major == __LINUX_VERSION_MAJOR) and 
+                                               (minor > __LINUX_VERSION_MINOR))
 
 
 # liburing version
