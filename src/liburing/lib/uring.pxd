@@ -696,7 +696,7 @@ cdef extern from 'liburing.h' nogil:
                                                        siginfo_t *infop,
                                                        int options,
                                                        unsigned int flags)
-    
+
     void __io_uring_prep_futex_wake 'io_uring_prep_futex_wake'(__io_uring_sqe *sqe,
                                                                uint32_t *futex,
                                                                uint64_t val,
@@ -796,6 +796,6 @@ cdef extern from 'liburing.h' nogil:
     # Versioning information for liburing.
     # Use `io_uring_check_version()` for runtime checks of the version of
     # liburing that was loaded by the dynamic linker.
-    int __io_uring_major_version "io_uring_major_version"()
-    int __io_uring_minor_version "io_uring_minor_version"()
-    bint __io_uring_check_version "io_uring_check_version"(int major, int minor)
+    __u8 __io_uring_major_version "io_uring_major_version"()
+    __u8 __io_uring_minor_version "io_uring_minor_version"()
+    bint __io_uring_check_version "io_uring_check_version"(__u8 major, __u8 minor)
