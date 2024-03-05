@@ -24,6 +24,9 @@ def test_futex_define():
         assert liburing.FUTEX2_SIZE_U32 == 0
         assert liburing.FUTEX2_SIZE_U64 == 0
         assert liburing.FUTEX2_NUMA == 0
+
+        assert liburing.FUTEX2_PRIVATE | liburing.FUTEX_WAIT == 0
+        assert liburing.FUTEX2_PRIVATE | liburing.FUTEX_WAKE == 1
     else:
         assert liburing.FUTEX2_PRIVATE == 128
         assert liburing.FUTEX2_SIZE_U8 == 0x00
@@ -32,8 +35,8 @@ def test_futex_define():
         assert liburing.FUTEX2_SIZE_U64 == 0x03
         assert liburing.FUTEX2_NUMA == 0x04
 
+        assert liburing.FUTEX2_PRIVATE | liburing.FUTEX_WAIT == 128
+        assert liburing.FUTEX2_PRIVATE | liburing.FUTEX_WAKE == 129
+
     assert liburing.FUTEX_WAITV_MAX == 128
     assert liburing.FUTEX_BITSET_MATCH_ANY == 0xffffffff
-
-    assert liburing.FUTEX2_PRIVATE | liburing.FUTEX_WAIT == 128
-    assert liburing.FUTEX2_PRIVATE | liburing.FUTEX_WAKE == 129
