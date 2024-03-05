@@ -4,9 +4,6 @@ import pytest
 import pathlib
 import getpass
 import tempfile
-import platform
-import functools
-from packaging.version import Version
 import liburing
 
 
@@ -36,7 +33,7 @@ def tmp_dir():
     return pathlib.Path(tempfile.mkdtemp(dir=path))
 
 
-# liburing start
+# liburing start >>>
 @pytest.fixture
 def ring():
     ring = liburing.io_uring()
@@ -50,48 +47,41 @@ def ring():
 @pytest.fixture
 def cqe():
     return liburing.io_uring_cqe()
-# liburing end
+# liburing end <<<
 
 
-# linux version start
-@functools.lru_cache
-def parse_linux_version(version):
-    '''
-        Example
-            >>> parse_linux_version('6.7.5')
-            '6.7.5'  # <class 'packaging.version.Version'>
-    '''
-    return Version(version)
-
-
-LINUX_VERSION = parse_linux_version(platform.release().split('-')[0])
+# linux version start >>>
+LINUX_VERSION = f'{liburing.LINUX_VERSION_MAJOR}.{liburing.LINUX_VERSION_MINOR}'
 
 
 @pytest.fixture(autouse=True)
 def skip_by_platform(request):
     '''
         Example
-            >>> @pytest.mark.skip_linux('6.7.5')
+            >>> @pytest.mark.skip_linux(6.7)
             >>> def test_function():
             ...
-            test.py::test_function SKIPPED (Linux version `6.7.4 < 6.7.5` required version.)
+            test.py::test_function SKIPPED (Linux `6.7 < 6.8`)
 
-            >>> @pytest.mark.skip_linux('6.7.5', 'custom message')
+            >>> @pytest.mark.skip_linux(6.7, 'custom message')
             >>> def test_function():
             ...
             test.py::test_function SKIPPED (custom message)
 
-            >>> @pytest.mark.skip_linux('6.7.5', '')
+            >>> @pytest.mark.skip_linux('6.7', '')
             >>> def test_function():
             ...
             test.py::test_function SKIPPED
     '''
     if r := request.node.get_closest_marker('skip_linux'):
-        if LINUX_VERSION < (res := parse_linux_version(r.args[0])):
-            pytest.skip(r.args[1] if len(r.args) > 1 else f'Linux version `{LINUX_VERSION} < {res}` required version.')
+        major, minor = map(int, str(float(r.args[0])).split('.'))  # '6.7' -> 6 7
+        if liburing.linux_version_check(major, minor):
+            msg = r.args[1] if len(r.args) > 1 else f'Kernel `{LINUX_VERSION} < {major}.{minor}`'
+            pytest.skip(msg)
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers",
-                            "skip_linux(version, message): skipping linux version not supported.")
-# linux version end
+    config.addinivalue_line(
+        "markers",
+        "skip_linux(version:str|float|int, message:str): skipping linux version not supported.")
+# linux version end <<<
