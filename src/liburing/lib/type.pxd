@@ -40,9 +40,8 @@ cdef extern from '<linux/types.h>' nogil:
 cdef extern from '<linux/version.h>' nogil:
     ''' #define __LINUX_VERSION_CHECK(major, minor) (major > LINUX_VERSION_MAJOR) || \
                                                     ((major == LINUX_VERSION_MAJOR) && \
-                                                     (minor > LINUX_VERSION_PATCHLEVEL))
-     '''
-    bint __LINUX_VERSION_CHECK(__u8 major, __u8 minor)
+                                                     (minor >= LINUX_VERSION_PATCHLEVEL))
+    '''
     __u8 __LINUX_VERSION_MAJOR 'LINUX_VERSION_MAJOR'
     __u8 __LINUX_VERSION_MINOR 'LINUX_VERSION_PATCHLEVEL'
 
