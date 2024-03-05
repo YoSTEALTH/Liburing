@@ -4,6 +4,13 @@ import pytest
 import liburing
 
 
+def test_futex_6_7():
+    # this should run if linux `< 6.7`
+    if liburing.LINUX_VERSION_MAJOR <= 6 and liburing.LINUX_VERSION_MINOR < 7:
+        with pytest.raises(EnvironmentError):
+            liburing.futex_state()
+
+
 @pytest.mark.skip_linux(6.7)
 def test_futex_state():
     # shared
