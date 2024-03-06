@@ -26,8 +26,7 @@ def test_unlink(tmp_dir, ring, cqe):
     liburing.io_uring_prep_unlink(sqe, dir_path, liburing.AT_REMOVEDIR)
     sqe.user_data = 2
 
-    assert liburing.io_uring_submit(ring) == 2
-    assert liburing.io_uring_wait_cqe(ring, cqe) == 0
+    assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 2) == 2
 
     for i in range(2):
         assert liburing.trap_error(cqe[i].res) == 0
@@ -60,8 +59,7 @@ def test_unlinkat(tmp_dir, ring, cqe):
     liburing.io_uring_prep_unlinkat(sqe, dir_path, liburing.AT_REMOVEDIR)
     sqe.user_data = 2
 
-    assert liburing.io_uring_submit(ring) == 2
-    assert liburing.io_uring_wait_cqe(ring, cqe) == 0
+    assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 2) == 2
 
     for i in range(2):
         assert liburing.trap_error(cqe[i].res) == 0
