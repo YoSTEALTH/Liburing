@@ -15,11 +15,6 @@ cpdef enum __define__:
     SYNC_FILE_RANGE_WRITE = __SYNC_FILE_RANGE_WRITE
     SYNC_FILE_RANGE_WAIT_AFTER = __SYNC_FILE_RANGE_WAIT_AFTER
 
-    AT_FDCWD = __AT_FDCWD
-    AT_REMOVEDIR = __AT_REMOVEDIR
-    AT_SYMLINK_FOLLOW = __AT_SYMLINK_FOLLOW
-    AT_EACCESS = __AT_EACCESS
-
     O_ACCMODE = __O_ACCMODE
     O_RDONLY = __O_RDONLY
     O_WRONLY = __O_WRONLY
@@ -66,23 +61,7 @@ cpdef enum __define__:
 cdef class open_how:
     cdef __open_how *ptr
 
-cpdef int io_uring_register_files(io_uring ring, list[int] fds)
-cpdef int io_uring_register_files_tags(io_uring ring,
-                                       int files,
-                                       __u64 tags,
-                                       unsigned int nr) nogil
-cpdef int io_uring_register_files_sparse(io_uring ring,
-                                         unsigned int nr) nogil
-cpdef int io_uring_register_files_update_tag(io_uring ring,
-                                             unsigned int off,
-                                             int files,
-                                             __u64 tags,
-                                             unsigned int nr_files) nogil
-cpdef int io_uring_unregister_files(io_uring ring) nogil
-cpdef int io_uring_register_files_update(io_uring ring,
-                                         unsigned int off,
-                                         int files,
-                                         unsigned int nr_files) nogil
+
 cpdef void io_uring_prep_splice(io_uring_sqe sqe,
                                 int fd_in,
                                 int64_t off_in,

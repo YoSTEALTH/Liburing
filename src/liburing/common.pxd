@@ -1,5 +1,4 @@
-from .lib.uring cimport __io_uring_prep_close, __io_uring_prep_close_direct, \
-                        __io_uring_prep_provide_buffers, __io_uring_prep_remove_buffers
+from .lib.uring cimport *
 from .queue cimport io_uring_sqe
 
 

@@ -165,9 +165,9 @@ def test_futex_wake_zero(ring, cqe):
 
     assert liburing.io_uring_wait_cqe(ring, cqe) == 0
 
-    # Should get zero res and it should be the wake
+    # should get zero res and it should be the wake
     assert cqe.res == 0 and cqe.user_data == 2
     liburing.io_uring_cqe_seen(ring, cqe)
 
-    # Should not have the wait complete
+    # should not have the wait complete
     assert liburing.io_uring_peek_cqe(ring, cqe) == -errno.EAGAIN

@@ -1,3 +1,7 @@
+# openat, openat2, accept, ...
+IORING_FILE_INDEX_ALLOC = __IORING_FILE_INDEX_ALLOC
+
+
 cpdef inline void io_uring_prep_close(io_uring_sqe sqe, int fd) noexcept nogil:
     __io_uring_prep_close(sqe.ptr, fd)
 

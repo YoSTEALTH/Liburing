@@ -32,12 +32,6 @@ cdef extern from '<fcntl.h>' nogil:
         __SYNC_FILE_RANGE_WRITE 'SYNC_FILE_RANGE_WRITE'
         __SYNC_FILE_RANGE_WAIT_AFTER 'SYNC_FILE_RANGE_WAIT_AFTER'
 
-        # AT_* flags
-        __AT_FDCWD 'AT_FDCWD'  # Use the current working directory.
-        __AT_REMOVEDIR 'AT_REMOVEDIR'  # Remove directory instead of unlinking file.
-        __AT_SYMLINK_FOLLOW 'AT_SYMLINK_FOLLOW'  # Follow symbolic links.
-        __AT_EACCESS 'AT_EACCESS'  # Test access permitted for effective IDs, not real IDs.
-
         __O_ACCMODE 'O_ACCMODE'
         __O_RDONLY 'O_RDONLY'
         __O_WRONLY 'O_WRONLY'

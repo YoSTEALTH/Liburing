@@ -38,13 +38,6 @@ cdef extern from '<linux/stat.h>' nogil:
         __u32   stx_dio_mem_align       # Memory buffer alignment for direct I/O
         __u32   stx_dio_offset_align    # File offset alignment for direct I/O
 
-    # Flags
-    enum:
-        # __AT_STATX_SYNC_TYPE 'AT_STATX_SYNC_TYPE'  # skipping: not documented
-        __AT_STATX_SYNC_AS_STAT 'AT_STATX_SYNC_AS_STAT'
-        __AT_STATX_FORCE_SYNC 'AT_STATX_FORCE_SYNC'
-        __AT_STATX_DONT_SYNC 'AT_STATX_DONT_SYNC'
-
     # Mask - flags to be set for `stx_mask`
     # - Query request/result mask for `statx()` and struct `statx::stx_mask`.
     # - These bits should be set in the "mask" argument of `statx()` to request
@@ -119,3 +112,12 @@ cdef extern from '<linux/stat.h>' nogil:
     bint __S_ISBLK 'S_ISBLK'(__u16 m)      # (((m) & S_IFMT) == S_IFBLK)
     bint __S_ISFIFO 'S_ISFIFO'(__u16 m)    # (((m) & S_IFMT) == S_IFIFO)
     bint __S_ISSOCK 'S_ISSOCK'(__u16 m)    # (((m) & S_IFMT) == S_IFSOCK)
+
+
+cdef extern from * nogil:  # '<fcntl.h>'
+    # Flags
+    enum:
+        # __AT_STATX_SYNC_TYPE 'AT_STATX_SYNC_TYPE'  # skipping: not documented
+        __AT_STATX_SYNC_AS_STAT 'AT_STATX_SYNC_AS_STAT'
+        __AT_STATX_FORCE_SYNC 'AT_STATX_FORCE_SYNC'
+        __AT_STATX_DONT_SYNC 'AT_STATX_DONT_SYNC'

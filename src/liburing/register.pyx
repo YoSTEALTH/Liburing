@@ -1,3 +1,5 @@
+from cpython.array cimport array
+
 
 cpdef int io_uring_register_buffers(io_uring ring,
                                     iovec iovecs,
@@ -88,3 +90,55 @@ cpdef int io_uring_register_napi(io_uring ring, io_uring_napi napi) nogil:
 
 cpdef int io_uring_unregister_napi(io_uring ring, io_uring_napi napi) nogil:
     return trap_error(__io_uring_unregister_napi(ring.ptr, napi.ptr))
+
+
+
+
+cpdef int io_uring_register_files(io_uring ring, list[int] fds):
+    ''' Register File Descriptor
+
+        Example
+            >>> fds = [1, 2, 3]
+            >>> io_uring_register_files(ring, fds)
+            ...
+            >>> io_uring_unregister_files(ring)
+
+        Note
+            "Registered files have less overhead per operation than normal files.
+             This is due to the kernel grabbing a reference count on a file when an
+             operation begins, and dropping it when it's done. When the process file
+             table is shared, for example if the process has ever created any
+             threads, then this cost goes up even more. Using registered files
+             reduces the overhead of file reference management across requests that
+             operate on a file."
+    '''
+    cdef array[int] _fds = array('i', fds)
+    return trap_error(__io_uring_register_files(ring.ptr, _fds.data.as_ints, len(_fds)))
+
+cpdef int io_uring_register_files_tags(io_uring ring,
+                                       int files,
+                                       __u64 tags,
+                                       unsigned int nr) nogil:
+    return trap_error(__io_uring_register_files_tags(ring.ptr, &files, &tags, nr))
+
+cpdef int io_uring_register_files_sparse(io_uring ring,
+                                         unsigned int nr) nogil:
+    return trap_error(__io_uring_register_files_sparse(ring.ptr, nr))
+
+cpdef int io_uring_register_files_update_tag(io_uring ring,
+                                             unsigned int off,
+                                             int files,
+                                             __u64 tags,
+                                             unsigned int nr_files) nogil:
+    return trap_error(__io_uring_register_files_update_tag(ring.ptr, off, &files, &tags, nr_files))
+
+cpdef int io_uring_unregister_files(io_uring ring) nogil:
+    ''' Unregister All File Descriptor(s) '''
+    return trap_error(__io_uring_unregister_files(ring.ptr))
+
+cpdef int io_uring_register_files_update(io_uring ring,
+                                         unsigned int off,
+                                         int files,
+                                         unsigned int nr_files) nogil:
+    return trap_error(__io_uring_register_files_update(ring.ptr, off, &files, nr_files))
+
