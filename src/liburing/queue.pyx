@@ -278,8 +278,8 @@ cpdef int io_uring_submit_and_wait(io_uring ring, unsigned int wait_nr) nogil:
 cpdef int io_uring_submit_and_wait_timeout(io_uring ring,
                                            io_uring_cqe cqe_ptr,
                                            unsigned int wait_nr,
-                                           timespec ts,
-                                           sigset sigmask) nogil:
+                                           timespec ts=None,
+                                           sigset sigmask=None) nogil:
     return trap_error(__io_uring_submit_and_wait_timeout(ring.ptr, &cqe_ptr.ptr, wait_nr, ts.ptr,
                                                          sigmask.ptr))
 
