@@ -55,8 +55,8 @@ cpdef int io_uring_submit_and_wait(io_uring ring,
 cpdef int io_uring_submit_and_wait_timeout(io_uring ring,
                                            io_uring_cqe cqe_ptr,
                                            unsigned int wait_nr,
-                                           timespec ts,
-                                           sigset sigmask) nogil
+                                           timespec ts=?,
+                                           sigset sigmask=?) nogil
 
 cpdef int io_uring_enable_rings(io_uring ring) nogil
 cpdef int io_uring_close_ring_fd(io_uring ring) nogil
