@@ -40,10 +40,7 @@ cdef extern from '<linux/stat.h>' nogil:
 
     # Flags
     enum:
-        __AT_EMPTY_PATH 'AT_EMPTY_PATH'
-        __AT_NO_AUTOMOUNT 'AT_NO_AUTOMOUNT'
-        __AT_SYMLINK_NOFOLLOW 'AT_SYMLINK_NOFOLLOW'      # Do not follow symbolic links.
-
+        # __AT_STATX_SYNC_TYPE 'AT_STATX_SYNC_TYPE'  # skipping: not documented
         __AT_STATX_SYNC_AS_STAT 'AT_STATX_SYNC_AS_STAT'
         __AT_STATX_FORCE_SYNC 'AT_STATX_FORCE_SYNC'
         __AT_STATX_DONT_SYNC 'AT_STATX_DONT_SYNC'
@@ -114,11 +111,11 @@ cdef extern from '<linux/stat.h>' nogil:
         __S_IWOTH 'S_IWOTH'
         __S_IXOTH 'S_IXOTH'
 
-    # Define Functions
-    __S_ISLNK 'S_ISLNK'(m)      # (((m) & S_IFMT) == S_IFLNK)
-    __S_ISREG 'S_ISREG'(m)      # (((m) & S_IFMT) == S_IFREG)
-    __S_ISDIR 'S_ISDIR'(m)      # (((m) & S_IFMT) == S_IFDIR)
-    __S_ISCHR 'S_ISCHR'(m)      # (((m) & S_IFMT) == S_IFCHR)
-    __S_ISBLK 'S_ISBLK'(m)      # (((m) & S_IFMT) == S_IFBLK)
-    __S_ISFIFO 'S_ISFIFO'(m)    # (((m) & S_IFMT) == S_IFIFO)
-    __S_ISSOCK 'S_ISSOCK'(m)    # (((m) & S_IFMT) == S_IFSOCK)
+    # Macro
+    bint __S_ISLNK 'S_ISLNK'(__u16 m)      # (((m) & S_IFMT) == S_IFLNK)
+    bint __S_ISREG 'S_ISREG'(__u16 m)      # (((m) & S_IFMT) == S_IFREG)
+    bint __S_ISDIR 'S_ISDIR'(__u16 m)      # (((m) & S_IFMT) == S_IFDIR)
+    bint __S_ISCHR 'S_ISCHR'(__u16 m)      # (((m) & S_IFMT) == S_IFCHR)
+    bint __S_ISBLK 'S_ISBLK'(__u16 m)      # (((m) & S_IFMT) == S_IFBLK)
+    bint __S_ISFIFO 'S_ISFIFO'(__u16 m)    # (((m) & S_IFMT) == S_IFIFO)
+    bint __S_ISSOCK 'S_ISSOCK'(__u16 m)    # (((m) & S_IFMT) == S_IFSOCK)
