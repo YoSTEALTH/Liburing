@@ -121,13 +121,14 @@ cdef class statx:
     def stx_mnt_id(self):
         return self.ptr.stx_mnt_id
 
-    @property
-    def stx_dio_mem_align(self):
-        return self.ptr.stx_dio_mem_align
+    # note: not supported
+    # @property
+    # def stx_dio_mem_align(self):
+    #     return self.ptr.stx_dio_mem_align
 
-    @property
-    def stx_dio_offset_align(self):
-        return self.ptr.stx_dio_offset_align
+    # @property
+    # def stx_dio_offset_align(self):
+    #     return self.ptr.stx_dio_offset_align
 
     # Inode
     # -----
@@ -222,7 +223,8 @@ cpdef inline void io_uring_prep_statx(io_uring_sqe sqe,
             STATX_BASIC_STATS   # [All of the above]
             STATX_BTIME         # Want|got `stx_btime`
             STATX_MNT_ID        # Got `stx_mnt_id`
-            STATX_DIOALIGN      # Want/got direct I/O alignment info
+            # note: not supported
+            # STATX_DIOALIGN      # Want/got direct I/O alignment info
 
         Note
             - Keep reference to `path` or else it will raise `FileNotFoundError`
@@ -249,7 +251,8 @@ STATX_BLOCKS = __STATX_BLOCKS
 STATX_BASIC_STATS = __STATX_BASIC_STATS
 STATX_BTIME = __STATX_BTIME
 STATX_MNT_ID = __STATX_MNT_ID
-STATX_DIOALIGN = __STATX_DIOALIGN
+# note: not supported
+# STATX_DIOALIGN = __STATX_DIOALIGN
 
 STATX_ATTR_COMPRESSED = __STATX_ATTR_COMPRESSED
 STATX_ATTR_IMMUTABLE = __STATX_ATTR_IMMUTABLE
