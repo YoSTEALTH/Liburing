@@ -6,6 +6,15 @@ from .error cimport memory_error, index_error
 from collections.abc import Iterable
 
 
+AT_FDCWD = __AT_FDCWD
+AT_SYMLINK_FOLLOW = __AT_SYMLINK_FOLLOW
+AT_SYMLINK_NOFOLLOW = __AT_SYMLINK_NOFOLLOW
+AT_REMOVEDIR = __AT_REMOVEDIR
+AT_NO_AUTOMOUNT = __AT_NO_AUTOMOUNT
+AT_EMPTY_PATH = __AT_EMPTY_PATH
+AT_RECURSIVE = __AT_RECURSIVE
+
+
 cdef class iovec:
     ''' Vector I/O data structure '''
     def __cinit__(self, object buffers):

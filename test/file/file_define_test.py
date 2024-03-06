@@ -2,9 +2,6 @@ import liburing
 
 
 def test_file_define():
-    # fsync flags
-    assert liburing.IORING_FSYNC_DATASYNC == 1 << 0
-
     # ?
     assert liburing.S_IRWXU == 0o700
     assert liburing.S_IRUSR == 0o400

@@ -107,6 +107,15 @@ cdef extern from '<stdio.h>' nogil:
 
 cdef extern from '<fcntl.h>' nogil:
     enum:
+        # AT_* flags
+        __AT_FDCWD 'AT_FDCWD'  # Use current working directory.
+        __AT_SYMLINK_FOLLOW 'AT_SYMLINK_FOLLOW'  # Follow symbolic links.
+        __AT_SYMLINK_NOFOLLOW 'AT_SYMLINK_NOFOLLOW'  # Do not follow symbolic links.
+        __AT_REMOVEDIR 'AT_REMOVEDIR'  # Remove directory instead of unlinking file.
+        __AT_NO_AUTOMOUNT 'AT_NO_AUTOMOUNT'  # Suppress terminal automount traversal.
+        __AT_EMPTY_PATH 'AT_EMPTY_PATH'  # Allow empty relative pathname.
+        __AT_RECURSIVE 'AT_RECURSIVE'  # Apply to the entire subtree.
+
         # splice flags
         __SPLICE_F_MOVE 'SPLICE_F_MOVE'
         __SPLICE_F_NONBLOCK 'SPLICE_F_NONBLOCK'

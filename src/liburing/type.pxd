@@ -3,7 +3,7 @@ from posix.unistd cimport _SC_IOV_MAX
 from .lib.type cimport *
 
 
-cpdef enum:
+cpdef enum __define__:
     SC_IOV_MAX = _SC_IOV_MAX
 
 

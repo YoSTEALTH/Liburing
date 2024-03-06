@@ -65,3 +65,22 @@ cpdef int io_uring_register_file_alloc_range(io_uring ring,
 
 cpdef int io_uring_register_napi(io_uring ring, io_uring_napi napi) nogil
 cpdef int io_uring_unregister_napi(io_uring ring, io_uring_napi napi) nogil
+
+
+cpdef int io_uring_register_files(io_uring ring, list[int] fds)
+cpdef int io_uring_register_files_tags(io_uring ring,
+                                       int files,
+                                       __u64 tags,
+                                       unsigned int nr) nogil
+cpdef int io_uring_register_files_sparse(io_uring ring,
+                                         unsigned int nr) nogil
+cpdef int io_uring_register_files_update_tag(io_uring ring,
+                                             unsigned int off,
+                                             int files,
+                                             __u64 tags,
+                                             unsigned int nr_files) nogil
+cpdef int io_uring_unregister_files(io_uring ring) nogil
+cpdef int io_uring_register_files_update(io_uring ring,
+                                         unsigned int off,
+                                         int files,
+                                         unsigned int nr_files) nogil

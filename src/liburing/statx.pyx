@@ -13,7 +13,7 @@ cdef class statx:
             >>> if sqe := io_uring_get_sqe(ring)
             ...     io_uring_prep_statx(sqe, stat, path)
             ... ...
-            >>> stat.is_file
+            >>> stat.isfile
             True
             >>> stat.size
             123
@@ -194,7 +194,7 @@ cpdef inline void io_uring_prep_statx(io_uring_sqe sqe,
             >>> if sqe := io_uring_get_sqe()
             ...     io_uring_prep_statx(sqe, AT_FDCWD, path, 0, 0, stat)
             ... ...
-            >>> stat.is_file
+            >>> stat.isfile
             True
             >>> stat.size
             123
@@ -230,7 +230,7 @@ cpdef inline void io_uring_prep_statx(io_uring_sqe sqe,
     __io_uring_prep_statx(sqe.ptr, dfd, path, flags, mask, statxbuf.ptr)
 
 
-# AT_STATX_SYNC_TYPE = __AT_STATX_SYNC_TYPE
+# AT_STATX_SYNC_TYPE = __AT_STATX_SYNC_TYPE  # skipping: not documented
 AT_STATX_SYNC_AS_STAT = __AT_STATX_SYNC_AS_STAT
 AT_STATX_FORCE_SYNC = __AT_STATX_FORCE_SYNC
 AT_STATX_DONT_SYNC = __AT_STATX_DONT_SYNC

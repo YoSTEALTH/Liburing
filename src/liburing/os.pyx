@@ -59,12 +59,14 @@ cpdef inline void io_uring_prep_linkat(io_uring_sqe sqe,
 cpdef inline void io_uring_prep_unlink(io_uring_sqe sqe,
                                        const char *path,
                                        int flags=0) noexcept nogil:
+    ''' Flags:  AT_REMOVEDIR '''
     __io_uring_prep_unlink(sqe.ptr, path, flags)
 
 cpdef inline void io_uring_prep_unlinkat(io_uring_sqe sqe,
                                          const char *path,
                                          int flags=0,
                                          int dfd=__AT_FDCWD) noexcept nogil:
+    ''' Flags:  AT_REMOVEDIR '''
     __io_uring_prep_unlinkat(sqe.ptr, dfd, path, flags)
 
 
