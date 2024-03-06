@@ -1,4 +1,3 @@
-from cython cimport boundscheck
 from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from cpython.ref cimport Py_INCREF, Py_DECREF
 from .error cimport trap_error, memory_error, index_error
@@ -100,7 +99,6 @@ cdef class io_uring_sqe:
     def __len__(self):
         return self.len
         
-    @boundscheck(True)
     def __getitem__(self, unsigned int index):
         cdef io_uring_sqe sqe
         if self.ptr is not NULL:
@@ -109,7 +107,6 @@ cdef class io_uring_sqe:
             elif self.len and index < self.len:
                 if (sqe := self.ref[index-1]) is not None:
                     return sqe  # from reference cache
-
                 # create new reference class
                 sqe = io_uring_sqe(0)  # `0` is set to indicated `ptr` is being set for internal use
                 sqe.ptr = &self.ptr[index]
@@ -117,7 +114,6 @@ cdef class io_uring_sqe:
                     # cache sqe as this class attribute
                     self.ref[index-1] = sqe
                     return sqe
-                
         index_error(self, index, 'out of `sqe`')
 
     @property
@@ -171,18 +167,16 @@ cdef class io_uring_cqe:
             - `cqes = io_uring_cqe()` only needs to be defined once, and reused.
             - Use `io_uring_cq_ready(ring)` to figure out how many cqe's are ready.
     '''
-    @boundscheck(True)
     def __getitem__(self, unsigned int index):
         cdef io_uring_cqe cqe
-        if self.ptr is NULL:
-            index_error(self, index, 'out of `cqe`')
-        if index:
+        if self.ptr is not NULL:
+            if index == 0:
+                return self
             cqe = io_uring_cqe()
             cqe.ptr = &self.ptr[index]
             if cqe.ptr is not NULL:
                 return cqe
-            index_error(self, index, 'out of `cqe`')
-        return self
+        index_error(self, index, 'out of `cqe`')
         # note: no need to cache items since `cqe` is normally called once or passed around.
 
     def __bool__(self):
@@ -238,6 +232,8 @@ cpdef int io_uring_queue_init(unsigned int entries,
             >>> finally:
             ...     io_uring_queue_exit(ring)
     '''
+    if ring.ptr.ring_fd:
+        raise ValueError('`io_uring_queue_init(ring)` already initialized!!!')
     return trap_error(__io_uring_queue_init(entries, ring.ptr, flags))
 
 cpdef int io_uring_queue_mmap(int fd,
@@ -248,9 +244,11 @@ cpdef int io_uring_queue_mmap(int fd,
 cpdef int io_uring_ring_dontfork(io_uring ring) nogil:
     return trap_error(__io_uring_ring_dontfork(ring.ptr))
 
-cpdef void io_uring_queue_exit(io_uring ring) noexcept nogil:
-    if ring.ptr is not NULL:
-        __io_uring_queue_exit(ring.ptr)
+cpdef int io_uring_queue_exit(io_uring ring) nogil:
+    if not ring.ptr.ring_fd:
+        raise ValueError('`io_uring_queue_exit(ring)` already exited!!!')
+    __io_uring_queue_exit(ring.ptr)
+    ring.ptr.ring_fd = 0
 
 cpdef unsigned int io_uring_peek_batch_cqe(io_uring ring,
                                            io_uring_cqe cqes,
@@ -262,8 +260,6 @@ cpdef int io_uring_wait_cqes(io_uring ring,
                              unsigned int wait_nr,
                              timespec ts=None,
                              sigset sigmask=None) nogil:
-    # cdef timespec_t _ts = ts.ptr or NULL
-    # cdef sigset_t _sm = sigmask.ptr or NULL
     return trap_error(__io_uring_wait_cqes(ring.ptr, &cqe_ptr.ptr, wait_nr, ts.ptr, sigmask.ptr))
 
 cpdef int io_uring_wait_cqe_timeout(io_uring ring, io_uring_cqe cqe_ptr, timespec ts) nogil:

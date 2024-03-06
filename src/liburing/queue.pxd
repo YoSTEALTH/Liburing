@@ -37,7 +37,7 @@ cpdef int io_uring_queue_mmap(int fd,
                               io_uring_params p,
                               io_uring ring) nogil
 cpdef int io_uring_ring_dontfork(io_uring ring) nogil
-cpdef void io_uring_queue_exit(io_uring ring) nogil
+cpdef int io_uring_queue_exit(io_uring ring) nogil
 cpdef unsigned int io_uring_peek_batch_cqe(io_uring ring,
                                            io_uring_cqe cqes,
                                            unsigned int count) nogil
