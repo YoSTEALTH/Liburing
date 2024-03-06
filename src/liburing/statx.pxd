@@ -1,5 +1,4 @@
-from .lib.uring cimport __statx, __io_uring_prep_statx
-from .queue cimport io_uring_sqe
+from .queue cimport *
 
 
 cdef class statx:
@@ -7,8 +6,8 @@ cdef class statx:
 
 
 cpdef void io_uring_prep_statx(io_uring_sqe sqe,
-                               int dfd,
+                               statx statxbuf,
                                const char *path,
-                               int flags,
-                               unsigned int mask,
-                               statx statxbuf) noexcept nogil
+                               int flags=?,
+                               unsigned int mask=?,
+                               int dfd=?) noexcept nogil
