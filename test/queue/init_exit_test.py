@@ -13,21 +13,22 @@ def test_io_uring_init_exit():
     assert liburing.io_uring_queue_init(8, ring, 0) == 0
     assert ring.ring_fd > 0
     assert ring.enter_ring_fd > 0
-    assert liburing.io_uring_queue_exit(ring) is None
+    assert liburing.io_uring_queue_exit(ring) == 0
     assert str(ring).startswith('io_uring(flags=')
 
     ring = liburing.io_uring()
     with pytest.raises(OSError) as e:  # Invalid argument
         liburing.io_uring_queue_init(0, ring, 0)
     assert e.value.errno == errno.EINVAL
-    assert liburing.io_uring_queue_exit(ring) is None
+    with pytest.raises(ValueError):
+        assert liburing.io_uring_queue_exit(ring) == 0
 
 
 def test_setup_iopoll_sqpoll():
     for i, setup in enumerate((liburing.IORING_SETUP_IOPOLL, liburing.IORING_SETUP_SQPOLL), 1):
         ring = liburing.io_uring()
         assert liburing.io_uring_queue_init(1, ring, setup) == 0
-        assert liburing.io_uring_queue_exit(ring) is None
+        assert liburing.io_uring_queue_exit(ring) == 0
 
 
 def test_init_max():
@@ -56,7 +57,4 @@ def test_init_max():
 
     liburing.io_uring_cq_advance(ring, maximum)
     assert liburing.io_uring_peek_cqe(ring, cqe) == -errno.EAGAIN
-
     liburing.io_uring_queue_exit(ring)
-    with pytest.raises(ValueError):
-        liburing.io_uring_queue_exit(ring)
