@@ -23,7 +23,8 @@ def test_statx_define():
     assert liburing.STATX_BASIC_STATS == 0x000007ff
     assert liburing.STATX_BTIME == 0x00000800
     assert liburing.STATX_MNT_ID == 0x00001000
-    assert liburing.STATX_DIOALIGN == 0x00002000
+    # note: not supported
+    # assert liburing.STATX_DIOALIGN == 0x00002000
 
     assert liburing.STATX_ATTR_COMPRESSED == 0x00000004
     assert liburing.STATX_ATTR_IMMUTABLE == 0x00000010

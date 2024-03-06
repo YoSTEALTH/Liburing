@@ -35,8 +35,9 @@ cdef extern from '<linux/stat.h>' nogil:
         __u32   stx_dev_minor
         # 0x90
         __u64   stx_mnt_id
-        __u32   stx_dio_mem_align       # Memory buffer alignment for direct I/O
-        __u32   stx_dio_offset_align    # File offset alignment for direct I/O
+        # note: not supported
+        # __u32   stx_dio_mem_align       # Memory buffer alignment for direct I/O
+        # __u32   stx_dio_offset_align    # File offset alignment for direct I/O
 
     # Mask - flags to be set for `stx_mask`
     # - Query request/result mask for `statx()` and struct `statx::stx_mask`.
@@ -57,7 +58,8 @@ cdef extern from '<linux/stat.h>' nogil:
         __STATX_BASIC_STATS 'STATX_BASIC_STATS'  # [All of the above]
         __STATX_BTIME 'STATX_BTIME'              # Want|got `stx_btime`
         __STATX_MNT_ID 'STATX_MNT_ID'            # Got `stx_mnt_id`
-        __STATX_DIOALIGN 'STATX_DIOALIGN'        # Want/got direct I/O alignment info
+        # note: not supported
+        # __STATX_DIOALIGN 'STATX_DIOALIGN'        # Want/got direct I/O alignment info
 
     # Attributes to be found in `stx_attributes` and masked in `stx_attributes_mask`.
     enum:
