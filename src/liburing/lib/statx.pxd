@@ -6,6 +6,7 @@ cdef extern from '<linux/stat.h>' nogil:
     struct __statx_timestamp 'statx_timestamp':
         __s64   tv_sec  # `tv_sec` seconds before(-) or after(+) 00:00:00 1st Jan 1970 UTC.
         __u32   tv_nsec  # `tv_nsec` nanoseconds (0..999,999,999) after the `tv_sec` time.
+        __s32   __reserved
 
     # Structures for the extended file attribute retrieval system call `statx()`.
     struct __statx 'statx':
@@ -107,13 +108,13 @@ cdef extern from '<linux/stat.h>' nogil:
         __S_IXOTH 'S_IXOTH'
 
     # Macro
-    bint __S_ISLNK 'S_ISLNK'(__u16 m)      # (((m) & S_IFMT) == S_IFLNK)
-    bint __S_ISREG 'S_ISREG'(__u16 m)      # (((m) & S_IFMT) == S_IFREG)
-    bint __S_ISDIR 'S_ISDIR'(__u16 m)      # (((m) & S_IFMT) == S_IFDIR)
-    bint __S_ISCHR 'S_ISCHR'(__u16 m)      # (((m) & S_IFMT) == S_IFCHR)
-    bint __S_ISBLK 'S_ISBLK'(__u16 m)      # (((m) & S_IFMT) == S_IFBLK)
-    bint __S_ISFIFO 'S_ISFIFO'(__u16 m)    # (((m) & S_IFMT) == S_IFIFO)
-    bint __S_ISSOCK 'S_ISSOCK'(__u16 m)    # (((m) & S_IFMT) == S_IFSOCK)
+    bint __S_ISLNK 'S_ISLNK'(__u16 m)
+    bint __S_ISREG 'S_ISREG'(__u16 m)
+    bint __S_ISDIR 'S_ISDIR'(__u16 m)
+    bint __S_ISCHR 'S_ISCHR'(__u16 m)
+    bint __S_ISBLK 'S_ISBLK'(__u16 m)
+    bint __S_ISFIFO 'S_ISFIFO'(__u16 m)
+    bint __S_ISSOCK 'S_ISSOCK'(__u16 m)
 
 
 cdef extern from * nogil:  # '<fcntl.h>'
