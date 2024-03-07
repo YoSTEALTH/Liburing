@@ -29,83 +29,76 @@ cdef class cmsghdr:
 
 cpdef void io_uring_prep_recvmsg(io_uring_sqe sqe,
                                  int fd,
-                                 msghdr msg,
-                                 unsigned int flags) noexcept nogil
+                                 msghdr msg=?,
+                                 unsigned int flags=?) noexcept nogil
 cpdef void io_uring_prep_recvmsg_multishot(io_uring_sqe sqe,
                                            int fd, 
-                                           msghdr msg,
-                                           unsigned int flags) noexcept nogil
+                                           msghdr msg=?,
+                                           unsigned int flags=?) noexcept nogil
 cpdef void io_uring_prep_sendmsg(io_uring_sqe sqe,
                                  int fd,
-                                 msghdr msg,
-                                 unsigned int flags) noexcept nogil
+                                 msghdr msg=?,
+                                 unsigned int flags=?) noexcept nogil
 cpdef void io_uring_prep_accept(io_uring_sqe sqe,
                                 int fd,
-                                sockaddr addr,
-                                socklen_t addrlen,
-                                int flags) noexcept nogil
+                                sockaddr addr=?,
+                                int flags=?) noexcept nogil
 cpdef void io_uring_prep_accept_direct(io_uring_sqe sqe,
                                        int fd,
-                                       sockaddr addr,
-                                       socklen_t addrlen,
-                                       int flags,
-                                       unsigned int file_index) noexcept nogil
+                                       sockaddr addr=?,
+                                       int flags=?,
+                                       unsigned int file_index=?) noexcept nogil
 cpdef void io_uring_prep_multishot_accept(io_uring_sqe sqe,
                                           int fd,
-                                          sockaddr addr,
-                                          socklen_t addrlen,
-                                          int flags) noexcept nogil
+                                          sockaddr addr=?,
+                                          int flags=?) noexcept nogil
 cpdef void io_uring_prep_multishot_accept_direct(io_uring_sqe sqe,
                                                  int fd,
-                                                 sockaddr addr,
-                                                 socklen_t addrlen,
-                                                 int flags) noexcept nogil
+                                                 sockaddr addr=?,
+                                                 int flags=?) noexcept nogil
 cpdef void io_uring_prep_connect(io_uring_sqe sqe,
                                  int fd,
-                                 sockaddr addr,
-                                 socklen_t addrlen) noexcept nogil
+                                 sockaddr addr) noexcept nogil
 cpdef void io_uring_prep_send(io_uring_sqe sqe,
                               int sockfd,
                               const unsigned char[:] buf,
                               size_t len,
-                              int flags) noexcept nogil
+                              int flags=?) noexcept nogil
 cpdef void io_uring_prep_send_set_addr(io_uring_sqe sqe,
-                                       sockaddr dest_addr,
-                                       __u16 addr_len) noexcept nogil
+                                       sockaddr dest_addr) noexcept nogil
 cpdef void io_uring_prep_sendto(io_uring_sqe sqe,
                                 int sockfd,
                                 const unsigned char[:] buf,
                                 size_t len,
-                                int flags,
                                 sockaddr addr,
-                                socklen_t addrlen) noexcept nogil
+                                int flags=?) noexcept nogil
 cpdef void  io_uring_prep_send_zc(io_uring_sqe sqe,
                                   int sockfd,
                                   const unsigned char[:] buf,
                                   size_t len,
-                                  int flags,
-                                  unsigned int zc_flags) noexcept nogil
+                                  int flags=?,
+                                  unsigned int zc_flags=?) noexcept nogil
 cpdef void io_uring_prep_send_zc_fixed(io_uring_sqe sqe,
                                        int sockfd,
                                        const unsigned char[:] buf,
                                        size_t len,
-                                       int flags,
-                                       unsigned int zc_flags,
-                                       unsigned int buf_index) noexcept nogil
+                                       unsigned int buf_index,
+                                       int flags=?,
+                                       unsigned int zc_flags=?) noexcept nogil
 cpdef void io_uring_prep_sendmsg_zc(io_uring_sqe sqe,
                                     int fd,
                                     msghdr msg,
-                                    unsigned int flags) noexcept nogil
+                                    unsigned int flags=?) noexcept nogil
 cpdef void io_uring_prep_recv(io_uring_sqe sqe,
                               int sockfd,
                               unsigned char[:] buf,
                               size_t len,
-                              int flags) noexcept nogil
+                              int flags=?) noexcept nogil
 cpdef void io_uring_prep_recv_multishot(io_uring_sqe sqe,
                                         int sockfd,
                                         unsigned char[:] buf,
                                         size_t len,
-                                        int flags) noexcept nogil
+                                        int flags=?) noexcept nogil
 cpdef io_uring_recvmsg_out io_uring_recvmsg_validate(unsigned char[:] buf,
                                                      int buf_len,
                                                      msghdr msgh)
@@ -125,18 +118,18 @@ cpdef void io_uring_prep_socket(io_uring_sqe sqe,
                                 int domain,
                                 int type,
                                 int protocol,
-                                unsigned int flags) noexcept nogil
+                                unsigned int flags=?) noexcept nogil
 cpdef void io_uring_prep_socket_direct(io_uring_sqe sqe,
                                        int domain,
                                        int type,
                                        int protocol,
-                                       unsigned int file_index,
-                                       unsigned int flags) noexcept nogil
+                                       unsigned int file_index=?,
+                                       unsigned int flags=?) noexcept nogil
 cpdef void io_uring_prep_socket_direct_alloc(io_uring_sqe sqe,
                                              int domain,
                                              int type,
                                              int protocol,
-                                             unsigned int flags) noexcept nogil
+                                             unsigned int flags=?) noexcept nogil
 cpdef void io_uring_prep_cmd_sock(io_uring_sqe sqe,
                                   int cmd_op,
                                   int fd,
@@ -144,3 +137,26 @@ cpdef void io_uring_prep_cmd_sock(io_uring_sqe sqe,
                                   int optname,
                                   unsigned char[:] optval,
                                   int optlen) noexcept nogil
+
+
+cpdef enum:  # TODO: need to name this.
+    AF_UNIX = __AF_UNIX
+    AF_INET = __AF_INET
+    AF_INET6 = __AF_INET6
+
+    SOCK_STREAM = __SOCK_STREAM
+    SOCK_DGRAM = __SOCK_DGRAM
+    SOCK_RAW = __SOCK_RAW
+    SOCK_RDM = __SOCK_RDM
+    SOCK_SEQPACKET = __SOCK_SEQPACKET
+    SOCK_DCCP = __SOCK_DCCP
+    SOCK_PACKET = __SOCK_PACKET
+    SOCK_CLOEXEC = __SOCK_CLOEXEC
+    SOCK_NONBLOCK = __SOCK_NONBLOCK
+
+# used by `io_uring_prep_cmd_sock(cmd_op)`
+cpdef enum io_uring_socket_op:
+    SOCKET_URING_OP_SIOCINQ = __SOCKET_URING_OP_SIOCINQ
+    SOCKET_URING_OP_SIOCOUTQ = __SOCKET_URING_OP_SIOCOUTQ
+    SOCKET_URING_OP_GETSOCKOPT = __SOCKET_URING_OP_GETSOCKOPT
+    SOCKET_URING_OP_SETSOCKOPT = __SOCKET_URING_OP_SETSOCKOPT
