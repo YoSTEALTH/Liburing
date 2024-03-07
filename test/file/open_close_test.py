@@ -54,7 +54,7 @@ def test_openat_close_direct(ring, cqe):
     liburing.io_uring_register_files(ring, [index, 1, 2, 3])
     # open
     sqe = liburing.io_uring_get_sqe(ring)
-    liburing.io_uring_prep_openat_direct(sqe, b'.', index, flags)
+    liburing.io_uring_prep_openat_direct(sqe, b'.', flags, index)
     sqe.user_data = 123
     # submit
     liburing.io_uring_submit(ring)
@@ -83,7 +83,7 @@ def test_openat2_close_direct(ring, cqe):
     liburing.io_uring_register_files(ring, [0, 1, 2, index])
     # open
     sqe = liburing.io_uring_get_sqe(ring)
-    liburing.io_uring_prep_openat2_direct(sqe, b'.', index, how)
+    liburing.io_uring_prep_openat2_direct(sqe, b'.', how, index)
     sqe.user_data = 123
     # submit
     liburing.io_uring_submit(ring)
@@ -112,7 +112,7 @@ def test_openat2_close_direct_auto_file_index_alloc(ring, cqe):
     liburing.io_uring_register_files(ring, [0, 1, 2, -1])
     # open
     sqe = liburing.io_uring_get_sqe(ring)
-    liburing.io_uring_prep_openat2_direct(sqe, b'.', liburing.IORING_FILE_INDEX_ALLOC, how)
+    liburing.io_uring_prep_openat2_direct(sqe, b'.', how)  # `file_index=IORING_FILE_INDEX_ALLOC`
     sqe.user_data = 123
     # submit
     assert liburing.io_uring_submit(ring) == 1

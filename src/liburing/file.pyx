@@ -174,7 +174,7 @@ cpdef inline void io_uring_prep_sync_file_range(io_uring_sqe sqe,
 
 cpdef inline void io_uring_prep_openat(io_uring_sqe sqe,
                                        const char *path,
-                                       int flags=0,
+                                       int flags=__O_RDONLY,
                                        mode_t mode=0o777,
                                        int dfd=__AT_FDCWD) noexcept nogil:
     ''' Open File
@@ -200,17 +200,25 @@ cpdef inline void io_uring_prep_openat2(io_uring_sqe sqe,
 
 cpdef inline void io_uring_prep_openat_direct(io_uring_sqe sqe,
                                               const char *path,
-                                              unsigned int file_index,  # unsigned int file_index,
-                                              int flags=0,
+                                              int flags=__O_RDONLY,
+                                              unsigned int file_index=__IORING_FILE_INDEX_ALLOC,
                                               mode_t mode=0o777,
                                               int dfd=__AT_FDCWD) noexcept nogil:
+    ''' Note
+            - If `file_index=IORING_FILE_INDEX_ALLOC` free direct descriptor will be auto assigned.
+            Allocated descriptor is returned in the `cqe.res`.
+    '''
     __io_uring_prep_openat_direct(sqe.ptr, dfd, path, flags, mode, file_index)
 
 cpdef inline void io_uring_prep_openat2_direct(io_uring_sqe sqe,
                                                const char *path,
-                                               unsigned int file_index,
                                                open_how how,
+                                               unsigned int file_index=__IORING_FILE_INDEX_ALLOC,
                                                int dfd=__AT_FDCWD) noexcept nogil:
+    ''' Note
+            - If `file_index=IORING_FILE_INDEX_ALLOC` free direct descriptor will be auto assigned.
+            Allocated descriptor is returned in the `cqe.res`.
+    '''
     __io_uring_prep_openat2_direct(sqe.ptr, dfd, path, how.ptr, file_index)
 
 cpdef inline void io_uring_prep_read(io_uring_sqe sqe,

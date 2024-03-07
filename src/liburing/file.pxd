@@ -125,14 +125,14 @@ cpdef void io_uring_prep_openat2(io_uring_sqe sqe,
                                  int dfd=?) noexcept nogil
 cpdef void io_uring_prep_openat_direct(io_uring_sqe sqe,
                                        const char *path,
-                                       unsigned int file_index,
                                        int flags=?,
+                                       unsigned int file_index=?,
                                        mode_t mode=?,
                                        int dfd=?) noexcept nogil
 cpdef void io_uring_prep_openat2_direct(io_uring_sqe sqe,
                                         const char *path,
-                                        unsigned int file_index,
                                         open_how how,
+                                        unsigned int file_index=?,
                                         int dfd=?) noexcept nogil
 cpdef void io_uring_prep_read(io_uring_sqe sqe,
                               int fd,
