@@ -96,6 +96,7 @@ def test_io_uring_prep_statx(tmp_dir, ring, cqe):
 
     assert statx.stx_size == 11
 
-    assert statx.stx_btime == statx.stx_atime == os.lstat(file_path).st_atime
-    assert statx.stx_ctime == os.lstat(file_path).st_ctime
-    assert statx.stx_mtime == os.lstat(file_path).st_mtime
+    os_stat = os.lstat(file_path)
+    assert statx.stx_btime == statx.stx_atime == os_stat.st_atime
+    assert statx.stx_ctime == os_stat.st_ctime
+    assert statx.stx_mtime == os_stat.st_mtime
