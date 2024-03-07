@@ -7,29 +7,7 @@ cdef extern from '<sys/socket.h>' nogil:
         __AF_UNIX 'AF_UNIX'
         __AF_INET 'AF_INET'
         __AF_INET6 'AF_INET6'
-
-    # note: Currently there is no plans for bellow addresses to be tested or added feature for.
-    #       Unless user requests it.
-    #     __AF_AX25 'AF_AX25'
-    #     __AF_IPX 'AF_IPX'
-    #     __AF_APPLETALK 'AF_APPLETALK'
-    #     __AF_X25 'AF_X25'
-    #     __AF_DECnet 'AF_DECnet'
-    #     __AF_KEY 'AF_KEY'
-    #     __AF_NETLINK 'AF_NETLINK'
-    #     __AF_PACKET 'AF_PACKET'
-    #     __AF_RDS 'AF_RDS'
-    #     __AF_PPPOX 'AF_PPPOX'
-    #     __AF_LLC 'AF_LLC'
-    #     __AF_IB 'AF_IB'
-    #     __AF_MPLS 'AF_MPLS'
-    #     __AF_CAN 'AF_CAN'
-    #     __AF_TIPC 'AF_TIPC'
-    #     __AF_BLUETOOTH 'AF_BLUETOOTH'
-    #     __AF_ALG 'AF_ALG'
-    #     __AF_VSOCK 'AF_VSOCK'
-    #     __AF_KCM 'AF_KCM'
-    #     __AF_XDP 'AF_XDP'
+        # note: currently there is no plans to add other `AF_*` flags, unless user requests it.
 
     # types of sockets.
     enum:
@@ -102,24 +80,24 @@ cdef extern from '<netinet/in.h>' nogil:
 
     # IPv4 - Internet address
     # -----------------------
-    struct in_addr:
+    struct __in_addr 'in_addr':
         in_addr_t s_addr  # Address in network byte order */
 
     struct __sockaddr_in 'sockaddr_in':
         sa_family_t sin_family  # address family: AF_INET
         in_port_t   sin_port    # port in network byte order
-        in_addr     sin_addr    # internet address
+        __in_addr   sin_addr    # internet address
 
     # IPv6 - Internet address
     # -----------------------
-    struct in6_addr:
-        unsigned char   s6_addr[16]  # IPv6 address
+    struct __in6_addr 'in6_addr':
+        unsigned char s6_addr[16]  # IPv6 address
 
     struct __sockaddr_in6 'sockaddr_in6':
         sa_family_t sin6_family    # AF_INET6
         in_port_t   sin6_port      # port number
         uint32_t    sin6_flowinfo  # IPv6 flow information
-        in6_addr    sin6_addr      # IPv6 address
+        __in6_addr  sin6_addr      # IPv6 address
         uint32_t    sin6_scope_id  # Scope ID (new in 2.4)
 
     struct __msghdr 'msghdr':
@@ -139,20 +117,20 @@ cdef extern from '<netinet/in.h>' nogil:
 
 cdef extern from '<arpa/inet.h>' nogil:
     # converts to network address
-    int inet_pton(int af,
-                  const char * src,  # restrict
-                  void * dst)        # restrict
+    int __inet_pton 'inet_pton'(int af,
+                                const char *src,  # restrict
+                                void *dst)        # restrict
 
     # converts network address to address family
-    const char *inet_ntop(int af,
-                          const void * src,  # restrict
-                          char * dst,        # restrict
-                          socklen_t size)
+    const char *__inet_ntop 'inet_ntop'(int af,
+                                        const void *src,  # restrict
+                                        char *dst,        # restrict
+                                        socklen_t size)
 
     # converting host to network order.
-    uint16_t htons(uint16_t hostshort)
-    uint32_t htonl(uint32_t hostlong)
+    uint16_t __htons 'htons'(uint16_t hostshort)
+    uint32_t __htonl 'htonl'(uint32_t hostlong)
 
     # converting network to host order,
-    uint16_t ntohs(uint16_t netshort)
-    uint32_t ntohl(uint32_t netlong)
+    uint16_t __ntohs 'ntohs'(uint16_t netshort)
+    uint32_t __ntohl 'ntohl'(uint32_t netlong)
