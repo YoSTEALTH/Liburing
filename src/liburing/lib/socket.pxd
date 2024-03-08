@@ -91,7 +91,7 @@ cdef extern from '<netinet/in.h>' nogil:
     # IPv6 - Internet address
     # -----------------------
     struct __in6_addr 'in6_addr':
-        unsigned char s6_addr[16]  # IPv6 address
+        uint8_t s6_addr[16]  # IPv6 address
 
     struct __sockaddr_in6 'sockaddr_in6':
         sa_family_t sin6_family    # AF_INET6
