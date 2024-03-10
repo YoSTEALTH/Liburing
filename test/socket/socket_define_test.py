@@ -1,7 +1,7 @@
 import liburing
 
 
-def test_define():
+def test_socket_define():
     assert liburing.AF_UNIX == 1
     assert liburing.AF_INET == 2
     assert liburing.AF_INET6 == 10
@@ -20,6 +20,8 @@ def test_define():
     assert liburing.SHUT_WR == 1
     assert liburing.SHUT_RDWR == 2
 
+
+def test_socket_extra_define():
     # setsockopt & getsockopt
     assert liburing.SOL_SOCKET == 1
     assert liburing.SO_DEBUG == 1
