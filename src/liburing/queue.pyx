@@ -3,9 +3,6 @@ from cpython.ref cimport Py_INCREF, Py_DECREF
 from .error cimport trap_error, memory_error, index_error
 
 
-LIBURING_UDATA_TIMEOUT = __LIBURING_UDATA_TIMEOUT
-
-
 cdef class io_uring:
     ''' I/O URing
 
@@ -48,7 +45,6 @@ cdef class io_uring:
         return f'{self.__class__.__name__}(flags={self.ptr.flags!r}, ' \
                f'ring_fd={self.ptr.ring_fd!r}, features={self.ptr.features!r}, ' \
                f'enter_ring_fd={self.ptr.enter_ring_fd!r}, int_flags={self.ptr.int_flags!r}) '
-
 
 cdef class io_uring_sqe:
     ''' IO submission data structure (Submission Queue Entry)
@@ -131,7 +127,6 @@ cdef class io_uring_sqe:
     @user_data.setter
     def user_data(self, __u64 data):
         __io_uring_sqe_set_data64(self.ptr, data)
-
 
 cdef class io_uring_cqe:
     ''' IO completion data structure (Completion Queue Entry)
@@ -424,3 +419,15 @@ cpdef inline io_uring_sqe io_uring_get_sqe(io_uring ring):
     cdef io_uring_sqe sqe = io_uring_sqe(0)
     sqe.ptr = __io_uring_get_sqe(ring.ptr)
     return sqe
+
+
+LIBURING_UDATA_TIMEOUT = __LIBURING_UDATA_TIMEOUT
+
+# sqe.flags
+IOSQE_FIXED_FILE = __IOSQE_FIXED_FILE
+IOSQE_IO_DRAIN = __IOSQE_IO_DRAIN
+IOSQE_IO_LINK = __IOSQE_IO_LINK
+IOSQE_IO_HARDLINK = __IOSQE_IO_HARDLINK
+IOSQE_ASYNC = __IOSQE_ASYNC
+IOSQE_BUFFER_SELECT = __IOSQE_BUFFER_SELECT
+IOSQE_CQE_SKIP_SUCCESS = __IOSQE_CQE_SKIP_SUCCESS
