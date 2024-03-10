@@ -285,3 +285,33 @@ cpdef inline void io_uring_prep_cmd_sock(io_uring_sqe sqe,
                                          unsigned char[:] optval,  # void *optval,
                                          int optlen) noexcept nogil:
     __io_uring_prep_cmd_sock(sqe.ptr, cmd_op, fd, level, optname, &optval[0], optlen)
+
+
+# defines
+cpdef enum SocketFamily:
+    AF_UNIX = __AF_UNIX
+    AF_INET = __AF_INET
+    AF_INET6 = __AF_INET6
+
+cpdef enum SocketType:
+    SOCK_STREAM = __SOCK_STREAM
+    SOCK_DGRAM = __SOCK_DGRAM
+    SOCK_RAW = __SOCK_RAW
+    SOCK_RDM = __SOCK_RDM
+    SOCK_SEQPACKET = __SOCK_SEQPACKET
+    SOCK_DCCP = __SOCK_DCCP
+    SOCK_PACKET = __SOCK_PACKET
+    SOCK_CLOEXEC = __SOCK_CLOEXEC
+    SOCK_NONBLOCK = __SOCK_NONBLOCK
+
+cpdef enum ShutdownHow:
+    SHUT_RD = __SHUT_RD
+    SHUT_WR = __SHUT_WR
+    SHUT_RDWR = __SHUT_RDWR
+
+# used by `io_uring_prep_cmd_sock(cmd_op)`
+cpdef enum io_uring_socket_op:
+    SOCKET_URING_OP_SIOCINQ = __SOCKET_URING_OP_SIOCINQ
+    SOCKET_URING_OP_SIOCOUTQ = __SOCKET_URING_OP_SIOCOUTQ
+    SOCKET_URING_OP_GETSOCKOPT = __SOCKET_URING_OP_GETSOCKOPT
+    SOCKET_URING_OP_SETSOCKOPT = __SOCKET_URING_OP_SETSOCKOPT
