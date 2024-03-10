@@ -44,6 +44,9 @@ cdef extern from '<sys/socket.h>' nogil:
         sa_family_t sa_family
         char        sa_data[14]  # protocol-specific address
 
+    int __bind 'bind'(int sockfd, const __sockaddr *addr, socklen_t addrlen)
+    int __listen 'listen'(int sockfd, int backlog)
+
     int __setsockopt 'setsockopt'(int sockfd,
                                   int level,
                                   int optname,
@@ -134,3 +137,61 @@ cdef extern from '<arpa/inet.h>' nogil:
     # converting network to host order,
     uint16_t __ntohs 'ntohs'(uint16_t netshort)
     uint32_t __ntohl 'ntohl'(uint32_t netlong)
+
+
+cdef extern from * nogil:  # <sys/socket.h>
+    enum:
+        __SHUT_RD 'SHUT_RD'
+        __SHUT_WR 'SHUT_WR'
+        __SHUT_RDWR 'SHUT_RDWR'
+
+    enum:
+        __SOL_SOCKET 'SOL_SOCKET'
+
+        __SO_DEBUG 'SO_DEBUG'
+        __SO_REUSEADDR 'SO_REUSEADDR'
+        __SO_TYPE 'SO_TYPE'
+        __SO_ERROR 'SO_ERROR'
+        __SO_DONTROUTE 'SO_DONTROUTE'
+        __SO_BROADCAST 'SO_BROADCAST'
+        __SO_SNDBUF 'SO_SNDBUF'
+        __SO_RCVBUF 'SO_RCVBUF'
+        __SO_SNDBUFFORCE 'SO_SNDBUFFORCE'
+        __SO_RCVBUFFORCE 'SO_RCVBUFFORCE'
+        __SO_KEEPALIVE 'SO_KEEPALIVE'
+        __SO_OOBINLINE 'SO_OOBINLINE'
+        __SO_NO_CHECK 'SO_NO_CHECK'
+        __SO_PRIORITY 'SO_PRIORITY'
+        __SO_LINGER 'SO_LINGER'
+        __SO_BSDCOMPAT 'SO_BSDCOMPAT'
+        __SO_REUSEPORT 'SO_REUSEPORT'
+
+        __SO_PASSCRED 'SO_PASSCRED'
+        __SO_PEERCRED 'SO_PEERCRED'
+        __SO_RCVLOWAT 'SO_RCVLOWAT'
+        __SO_SNDLOWAT 'SO_SNDLOWAT'
+
+        __SO_BINDTODEVICE 'SO_BINDTODEVICE'
+
+        # Socket filtering
+        __SO_ATTACH_FILTER 'SO_ATTACH_FILTER'
+        __SO_DETACH_FILTER 'SO_DETACH_FILTER'
+        __SO_GET_FILTER 'SO_GET_FILTER'
+        __SO_PEERNAME 'SO_PEERNAME'
+        __SO_ACCEPTCONN 'SO_ACCEPTCONN'
+        __SO_PEERSEC 'SO_PEERSEC'
+        __SO_PASSSEC 'SO_PASSSEC'
+        __SO_MARK 'SO_MARK'
+        __SO_PROTOCOL 'SO_PROTOCOL'
+        __SO_DOMAIN 'SO_DOMAIN'
+        __SO_RXQ_OVFL 'SO_RXQ_OVFL'
+        __SO_WIFI_STATUS 'SO_WIFI_STATUS'
+        __SCM_WIFI_STATUS 'SCM_WIFI_STATUS'
+        __SO_PEEK_OFF 'SO_PEEK_OFF'
+
+        # not tested
+        __SO_TIMESTAMP 'SO_TIMESTAMP'
+        __SO_TIMESTAMPNS 'SO_TIMESTAMPNS'
+        __SO_TIMESTAMPING 'SO_TIMESTAMPING'
+        __SO_RCVTIMEO 'SO_RCVTIMEO'
+        __SO_SNDTIMEO 'SO_SNDTIMEO'
