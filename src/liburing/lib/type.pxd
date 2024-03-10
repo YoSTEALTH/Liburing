@@ -3,33 +3,32 @@ ctypedef bint bool
 
 cdef extern from '<linux/types.h>' nogil:
     # NOTE: Does not matter that `ctypedef int` is given to all,
-    #       compiler will assign it correct type(I think!).
+    #       compiler will assign it correct type(tested!).
 
     # Custom Types
+    ctypedef int off_t
+    ctypedef int mode_t
+    ctypedef int size_t
+    ctypedef int ssize_t
+    ctypedef int loff_t
+
     ctypedef int __s8
     ctypedef int __s16
     ctypedef int __s32
     ctypedef int __s64
-
     ctypedef unsigned int __u8
     ctypedef unsigned int __u16
     ctypedef unsigned int __u32
     ctypedef unsigned int __u64
     ctypedef unsigned int __aligned_u64
-
-    ctypedef int off_t
-    ctypedef int mode_t
-    ctypedef int size_t
-    ctypedef int ssize_t
+    ctypedef int int8_t
+    ctypedef int int16_t
+    ctypedef int int32_t
     ctypedef int int64_t
-    ctypedef int loff_t
-
     ctypedef unsigned int uint8_t
     ctypedef unsigned int uint16_t
     ctypedef unsigned int uint32_t
     ctypedef unsigned int uint64_t
-    ctypedef unsigned int atomic_uint
-
     ctypedef unsigned int uintptr_t
 
     # compat.h - this file is auto-created so its correct for these values to be here.
