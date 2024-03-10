@@ -231,12 +231,7 @@ cpdef inline void io_uring_prep_statx(io_uring_sqe sqe,
     '''
     __io_uring_prep_statx(sqe.ptr, dfd, path, flags, mask, statxbuf.ptr)
 
-
-# AT_STATX_SYNC_TYPE = __AT_STATX_SYNC_TYPE  # skipping: not documented
-AT_STATX_SYNC_AS_STAT = __AT_STATX_SYNC_AS_STAT
-AT_STATX_FORCE_SYNC = __AT_STATX_FORCE_SYNC
-AT_STATX_DONT_SYNC = __AT_STATX_DONT_SYNC
-
+# defines
 STATX_TYPE = __STATX_TYPE
 STATX_MODE = __STATX_MODE
 STATX_NLINK = __STATX_NLINK
@@ -292,3 +287,8 @@ S_IRWXO = __S_IRWXO
 S_IROTH = __S_IROTH
 S_IWOTH = __S_IWOTH
 S_IXOTH = __S_IXOTH
+
+# AT_STATX_SYNC_TYPE = __AT_STATX_SYNC_TYPE  # skipping: not documented
+AT_STATX_SYNC_AS_STAT = __AT_STATX_SYNC_AS_STAT
+AT_STATX_FORCE_SYNC = __AT_STATX_FORCE_SYNC
+AT_STATX_DONT_SYNC = __AT_STATX_DONT_SYNC
