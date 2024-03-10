@@ -56,21 +56,3 @@ cdef extern from '<fcntl.h>' nogil:
         __O_SYNC 'O_SYNC'
         __O_TMPFILE 'O_TMPFILE'  # must be specified with `O_RDWR` | `O_WRONLY`. `O_EXCL` (optional)
         __O_TRUNC 'O_TRUNC'
-
-        # Mode - used with `O_CREAT`
-        __S_IRWXU 'S_IRWXU'  # user (file owner) has read, write, and execute permission
-        __S_IRUSR 'S_IRUSR'  # user has read permission
-        __S_IWUSR 'S_IWUSR'  # user has write permission
-        __S_IXUSR 'S_IXUSR'  # user has execute permission
-        __S_IRWXG 'S_IRWXG'  # group has read, write, and execute permission
-        __S_IRGRP 'S_IRGRP'  # group has read permission
-        __S_IWGRP 'S_IWGRP'  # group has write permission
-        __S_IXGRP 'S_IXGRP'  # group has execute permission
-        __S_IRWXO 'S_IRWXO'  # others have read, write, and execute permission
-        __S_IROTH 'S_IROTH'  # others have read permission
-        __S_IWOTH 'S_IWOTH'  # others have write permission
-        __S_IXOTH 'S_IXOTH'  # others have execute permission
-
-        __S_ISUID 'S_ISUID'  # set-user-ID bit
-        __S_ISGID 'S_ISGID'  # set-group-ID bit (see inode(7)).
-        __S_ISVTX 'S_ISVTX'  # sticky bit (see inode(7)).

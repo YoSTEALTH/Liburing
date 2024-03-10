@@ -44,77 +44,73 @@ cdef extern from '<linux/stat.h>' nogil:
     # - Query request/result mask for `statx()` and struct `statx::stx_mask`.
     # - These bits should be set in the "mask" argument of `statx()` to request
     #   particular items when calling `statx()`.
-    enum:
-        __STATX_TYPE 'STATX_TYPE'                # Want|got `stx_mode & S_IFMT`
-        __STATX_MODE 'STATX_MODE'                # Want|got `stx_mode & ~S_IFMT`
-        __STATX_NLINK 'STATX_NLINK'              # Want|got `stx_nlink`
-        __STATX_UID 'STATX_UID'                  # Want|got `stx_uid`
-        __STATX_GID 'STATX_GID'                  # Want|got `stx_gid`
-        __STATX_ATIME 'STATX_ATIME'              # Want|got `stx_atime`
-        __STATX_MTIME 'STATX_MTIME'              # Want|got `stx_mtime`
-        __STATX_CTIME 'STATX_CTIME'              # Want|got `stx_ctime`
-        __STATX_INO 'STATX_INO'                  # Want|got `stx_ino`
-        __STATX_SIZE 'STATX_SIZE'                # Want|got `stx_size`
-        __STATX_BLOCKS 'STATX_BLOCKS'            # Want|got `stx_blocks`
-        __STATX_BASIC_STATS 'STATX_BASIC_STATS'  # [All of the above]
-        __STATX_BTIME 'STATX_BTIME'              # Want|got `stx_btime`
-        __STATX_MNT_ID 'STATX_MNT_ID'            # Got `stx_mnt_id`
-        # note: not supported
-        # __STATX_DIOALIGN 'STATX_DIOALIGN'        # Want/got direct I/O alignment info
+    mode_t __STATX_TYPE 'STATX_TYPE'                # Want|got `stx_mode & S_IFMT`
+    mode_t __STATX_MODE 'STATX_MODE'                # Want|got `stx_mode & ~S_IFMT`
+    mode_t __STATX_NLINK 'STATX_NLINK'              # Want|got `stx_nlink`
+    mode_t __STATX_UID 'STATX_UID'                  # Want|got `stx_uid`
+    mode_t __STATX_GID 'STATX_GID'                  # Want|got `stx_gid`
+    mode_t __STATX_ATIME 'STATX_ATIME'              # Want|got `stx_atime`
+    mode_t __STATX_MTIME 'STATX_MTIME'              # Want|got `stx_mtime`
+    mode_t __STATX_CTIME 'STATX_CTIME'              # Want|got `stx_ctime`
+    mode_t __STATX_INO 'STATX_INO'                  # Want|got `stx_ino`
+    mode_t __STATX_SIZE 'STATX_SIZE'                # Want|got `stx_size`
+    mode_t __STATX_BLOCKS 'STATX_BLOCKS'            # Want|got `stx_blocks`
+    mode_t __STATX_BASIC_STATS 'STATX_BASIC_STATS'  # [All of the above]
+    mode_t __STATX_BTIME 'STATX_BTIME'              # Want|got `stx_btime`
+    mode_t __STATX_MNT_ID 'STATX_MNT_ID'            # Got `stx_mnt_id`
+    # note: not supported
+    # __mode_t STATX_DIOALIGN 'STATX_DIOALIGN'        # Want/got direct I/O alignment info
 
     # Attributes to be found in `stx_attributes` and masked in `stx_attributes_mask`.
-    enum:
-        __STATX_ATTR_COMPRESSED 'STATX_ATTR_COMPRESSED'  # [I] File is compressed by the fs
-        __STATX_ATTR_IMMUTABLE 'STATX_ATTR_IMMUTABLE'    # [I] File is marked immutable
-        __STATX_ATTR_APPEND 'STATX_ATTR_APPEND'          # [I] File is append-only
-        __STATX_ATTR_NODUMP 'STATX_ATTR_NODUMP'          # [I] File is not to be dumped
-        __STATX_ATTR_ENCRYPTED 'STATX_ATTR_ENCRYPTED'    # [I] File requires key to decrypt in fs
-        __STATX_ATTR_AUTOMOUNT 'STATX_ATTR_AUTOMOUNT'    # Dir: Automount trigger
-        __STATX_ATTR_MOUNT_ROOT 'STATX_ATTR_MOUNT_ROOT'  # Root of a mount
-        __STATX_ATTR_VERITY 'STATX_ATTR_VERITY'          # [I] Verity protected file
-        __STATX_ATTR_DAX 'STATX_ATTR_DAX'                # File is currently in DAX state
-        # note: flags marked [I] correspond to the `FS_IOC_SETFLAGS` flags
+    mode_t __STATX_ATTR_COMPRESSED 'STATX_ATTR_COMPRESSED'  # [I] File is compressed by the fs
+    mode_t __STATX_ATTR_IMMUTABLE 'STATX_ATTR_IMMUTABLE'    # [I] File is marked immutable
+    mode_t __STATX_ATTR_APPEND 'STATX_ATTR_APPEND'          # [I] File is append-only
+    mode_t __STATX_ATTR_NODUMP 'STATX_ATTR_NODUMP'          # [I] File is not to be dumped
+    mode_t __STATX_ATTR_ENCRYPTED 'STATX_ATTR_ENCRYPTED'    # [I] File requires key to decrypt in fs
+    mode_t __STATX_ATTR_AUTOMOUNT 'STATX_ATTR_AUTOMOUNT'    # Dir: Automount trigger
+    mode_t __STATX_ATTR_MOUNT_ROOT 'STATX_ATTR_MOUNT_ROOT'  # Root of a mount
+    mode_t __STATX_ATTR_VERITY 'STATX_ATTR_VERITY'          # [I] Verity protected file
+    mode_t __STATX_ATTR_DAX 'STATX_ATTR_DAX'                # File is currently in DAX state
+    # note: flags marked [I] correspond to the `FS_IOC_SETFLAGS` flags
 
-    # NOTE: Bellow code should only be exposed to Cython or Wrapper Class
-    enum:
-        # Encoding of the file mode.
-        __S_IFMT 'S_IFMT'       # These bits determine file type.
-        # File types.
-        __S_IFSOCK 'S_IFSOCK'   # socket
-        __S_IFLNK 'S_IFLNK'     # symbolic link
-        __S_IFREG 'S_IFREG'     # regular file
-        __S_IFBLK 'S_IFBLK'     # block device
-        __S_IFDIR 'S_IFDIR'     # directory
-        __S_IFCHR 'S_IFCHR'     # character device
-        __S_IFIFO 'S_IFIFO'     # FIFO
+    # Encoding of the file mode.
+    mode_t __S_IFMT 'S_IFMT'       # These bits determine file type.
+    # File types.
+    mode_t __S_IFSOCK 'S_IFSOCK'   # socket
+    mode_t __S_IFLNK 'S_IFLNK'     # symbolic link
+    mode_t __S_IFREG 'S_IFREG'     # regular file
+    mode_t __S_IFBLK 'S_IFBLK'     # block device
+    mode_t __S_IFDIR 'S_IFDIR'     # directory
+    mode_t __S_IFCHR 'S_IFCHR'     # character device
+    mode_t __S_IFIFO 'S_IFIFO'     # FIFO
 
-        __S_ISUID 'S_ISUID'
-        __S_ISGID 'S_ISGID'
-        __S_ISVTX 'S_ISVTX'
+    mode_t __S_ISUID 'S_ISUID'
+    mode_t __S_ISGID 'S_ISGID'
+    mode_t __S_ISVTX 'S_ISVTX'
 
-        __S_IRWXU 'S_IRWXU'
-        __S_IRUSR 'S_IRUSR'
-        __S_IWUSR 'S_IWUSR'
-        __S_IXUSR 'S_IXUSR'
+    mode_t __S_IRWXU 'S_IRWXU'
+    mode_t __S_IRUSR 'S_IRUSR'
+    mode_t __S_IWUSR 'S_IWUSR'
+    mode_t __S_IXUSR 'S_IXUSR'
 
-        __S_IRWXG 'S_IRWXG'
-        __S_IRGRP 'S_IRGRP'
-        __S_IWGRP 'S_IWGRP'
-        __S_IXGRP 'S_IXGRP'
+    mode_t __S_IRWXG 'S_IRWXG'
+    mode_t __S_IRGRP 'S_IRGRP'
+    mode_t __S_IWGRP 'S_IWGRP'
+    mode_t __S_IXGRP 'S_IXGRP'
 
-        __S_IRWXO 'S_IRWXO'
-        __S_IROTH 'S_IROTH'
-        __S_IWOTH 'S_IWOTH'
-        __S_IXOTH 'S_IXOTH'
+    mode_t __S_IRWXO 'S_IRWXO'
+    mode_t __S_IROTH 'S_IROTH'
+    mode_t __S_IWOTH 'S_IWOTH'
+    mode_t __S_IXOTH 'S_IXOTH'
 
     # Macro
-    bint __S_ISLNK 'S_ISLNK'(__u16 m)
-    bint __S_ISREG 'S_ISREG'(__u16 m)
-    bint __S_ISDIR 'S_ISDIR'(__u16 m)
-    bint __S_ISCHR 'S_ISCHR'(__u16 m)
-    bint __S_ISBLK 'S_ISBLK'(__u16 m)
-    bint __S_ISFIFO 'S_ISFIFO'(__u16 m)
-    bint __S_ISSOCK 'S_ISSOCK'(__u16 m)
+    bint __S_ISLNK 'S_ISLNK'(mode_t m)
+    bint __S_ISREG 'S_ISREG'(mode_t m)
+    bint __S_ISDIR 'S_ISDIR'(mode_t m)
+    bint __S_ISCHR 'S_ISCHR'(mode_t m)
+    bint __S_ISBLK 'S_ISBLK'(mode_t m)
+    bint __S_ISFIFO 'S_ISFIFO'(mode_t m)
+    bint __S_ISSOCK 'S_ISSOCK'(mode_t m)
 
 
 cdef extern from * nogil:  # '<fcntl.h>'
