@@ -20,6 +20,11 @@ def test_socket_define():
     assert liburing.SHUT_WR == 1
     assert liburing.SHUT_RDWR == 2
 
+    assert liburing.SOCKET_URING_OP_SIOCINQ == 0
+    assert liburing.SOCKET_URING_OP_SIOCOUTQ == 1
+    assert liburing.SOCKET_URING_OP_GETSOCKOPT == 2
+    assert liburing.SOCKET_URING_OP_SETSOCKOPT == 3
+
 
 def test_socket_extra_define():
     # setsockopt & getsockopt

@@ -1,5 +1,4 @@
 from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
-from libc.string cimport memset
 from .error cimport trap_error, memory_error, index_error
 
 
@@ -378,15 +377,100 @@ cpdef inline unsigned int io_uring_recvmsg_payload_length(io_uring_recvmsg_out o
 cpdef inline void io_uring_prep_shutdown(io_uring_sqe sqe, int fd, int how) noexcept nogil:
     __io_uring_prep_shutdown(sqe.ptr, fd, how)
 
+
 # Prepare commands for sockets
 cpdef inline void io_uring_prep_cmd_sock(io_uring_sqe sqe,
                                          int cmd_op,
-                                         int fd,
+                                         int sockfd,
                                          int level,
                                          int optname,
-                                         unsigned char[:] optval,  # void *optval,
-                                         int optlen) noexcept nogil:
-    __io_uring_prep_cmd_sock(sqe.ptr, cmd_op, fd, level, optname, &optval[0], optlen)
+                                         array optval):
+    '''
+        Example
+            >>> val = array.array('i', [1])
+            >>> sqe = io_uring_get_sqe(ring)
+            >>> io_uring_prep_cmd_sock(sqe, SOCKET_URING_OP_SETSOCKOPT,
+            ...                        sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
+
+            >>> val = array.array('B', b'eth1')
+            ... ...
+
+        Opcode
+            SOCKET_URING_OP_SIOCINQ
+            SOCKET_URING_OP_SIOCOUTQ
+            SOCKET_URING_OP_GETSOCKOPT
+            SOCKET_URING_OP_SETSOCKOPT
+
+        Note
+            - remember to hold on to `val` reference till `sqe` has been submitted.
+            - only 'i' and 'B' format is supported.
+    '''
+    if optval.typecode not in ('i', 'B'):
+        raise ValueError('`io_uring_prep_cmd_sock()` - only supports type code of "i" & "B"')
+    cdef int size = sizeof(int) if optval.typecode == 'i' else len(optval)
+    __io_uring_prep_cmd_sock(sqe.ptr, cmd_op,
+                             sockfd, level, optname, optval.data.as_voidptr, size)
+
+
+# custom prep function start >>>
+cpdef inline void io_uring_prep_setsockopt(io_uring_sqe sqe,
+                                           int sockfd,
+                                           int level,
+                                           int optname,
+                                           array optval):
+    '''
+        Example
+            >>> val = array.array('i', [0])
+            >>> sqe = io_uring_get_sqe(ring)
+            >>> io_uring_prep_setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
+
+            >>> val = array.array('i', [1])
+            >>> sqe = io_uring_get_sqe(ring)
+            >>> io_uring_prep_setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
+
+            >>> val = array.array('B', b'eth1')
+            >>> sqe = io_uring_get_sqe(ring)
+            >>> io_uring_prep_setsockopt(sqe, sockfd, SOL_SOCKET, SO_BINDTODEVICE, val)
+
+        Note
+            - remember to hold on to `val` reference till `sqe` has been submitted.
+            - only 'i' and 'B' format is supported.
+    '''
+    if optval.typecode not in ('i', 'B'):
+        raise ValueError('`io_uring_prep_setsockopt()` - only supports type code of "i" & "B"')
+    cdef int size = sizeof(int) if optval.typecode == 'i' else len(optval)
+    __io_uring_prep_cmd_sock(sqe.ptr, __SOCKET_URING_OP_SETSOCKOPT,
+                             sockfd, level, optname, optval.data.as_voidptr, size)
+
+
+cpdef inline void io_uring_prep_getsockopt(io_uring_sqe sqe,
+                                           int sockfd,
+                                           int level,
+                                           int optname,
+                                           array optval):
+    '''
+        Example
+            # assuming `SO_KEEPALIVE` was previous set to `1`
+            >>> val = array.array('i', [0])
+            >>> sqe = io_uring_get_sqe(ring)
+            >>> io_uring_prep_getsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
+            ... # after submit and wait
+            >>> val
+            array('i', [1])
+            >>> val[0]
+            1
+
+        Note
+            - remember to hold on to `val` as new result will be populated into it.
+            - `cqe.res` will return `sizeof` populating data.
+            - only 'i' and 'B' format is supported.
+    '''
+    if optval.typecode not in ('i', 'B'):
+        raise ValueError('`io_uring_prep_getsockopt()` - only supports type code of "i" & "B"')
+    cdef int size = sizeof(int) if optval.typecode == 'i' else len(optval)
+    __io_uring_prep_cmd_sock(sqe.ptr, __SOCKET_URING_OP_GETSOCKOPT,
+                             sockfd, level, optname, optval.data.as_voidptr, size)
+# custom prep function end <<<
 
 
 # defines
@@ -416,3 +500,50 @@ cpdef enum io_uring_socket_op:
     SOCKET_URING_OP_SIOCOUTQ = __SOCKET_URING_OP_SIOCOUTQ
     SOCKET_URING_OP_GETSOCKOPT = __SOCKET_URING_OP_GETSOCKOPT
     SOCKET_URING_OP_SETSOCKOPT = __SOCKET_URING_OP_SETSOCKOPT
+
+# defines
+SOL_SOCKET = __SOL_SOCKET
+SO_DEBUG = __SO_DEBUG
+SO_REUSEADDR = __SO_REUSEADDR
+SO_TYPE = __SO_TYPE
+SO_ERROR = __SO_ERROR
+SO_DONTROUTE = __SO_DONTROUTE
+SO_BROADCAST = __SO_BROADCAST
+SO_SNDBUF = __SO_SNDBUF
+SO_RCVBUF = __SO_RCVBUF
+SO_SNDBUFFORCE = __SO_SNDBUFFORCE
+SO_RCVBUFFORCE = __SO_RCVBUFFORCE
+SO_KEEPALIVE = __SO_KEEPALIVE
+SO_OOBINLINE = __SO_OOBINLINE
+SO_NO_CHECK = __SO_NO_CHECK
+SO_PRIORITY = __SO_PRIORITY
+SO_LINGER = __SO_LINGER
+SO_BSDCOMPAT = __SO_BSDCOMPAT
+SO_REUSEPORT = __SO_REUSEPORT
+SO_PASSCRED = __SO_PASSCRED
+SO_PEERCRED = __SO_PEERCRED
+SO_RCVLOWAT = __SO_RCVLOWAT
+SO_SNDLOWAT = __SO_SNDLOWAT
+SO_BINDTODEVICE = __SO_BINDTODEVICE
+
+# Socket filtering
+SO_ATTACH_FILTER = __SO_ATTACH_FILTER
+SO_DETACH_FILTER = __SO_DETACH_FILTER
+SO_GET_FILTER = __SO_GET_FILTER
+SO_PEERNAME = __SO_PEERNAME
+SO_ACCEPTCONN = __SO_ACCEPTCONN
+SO_PEERSEC = __SO_PEERSEC
+SO_PASSSEC = __SO_PASSSEC
+SO_MARK = __SO_MARK
+SO_PROTOCOL = __SO_PROTOCOL
+SO_DOMAIN = __SO_DOMAIN
+SO_RXQ_OVFL = __SO_RXQ_OVFL
+SO_WIFI_STATUS = __SO_WIFI_STATUS
+SCM_WIFI_STATUS = __SCM_WIFI_STATUS
+SO_PEEK_OFF = __SO_PEEK_OFF
+
+SO_TIMESTAMP = __SO_TIMESTAMP
+SO_TIMESTAMPNS = __SO_TIMESTAMPNS
+SO_TIMESTAMPING = __SO_TIMESTAMPING
+SO_RCVTIMEO = __SO_RCVTIMEO
+SO_SNDTIMEO = __SO_SNDTIMEO
