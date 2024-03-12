@@ -1,3 +1,4 @@
+from cpython.array cimport array
 from .lib.uring cimport *
 from .queue cimport io_uring_sqe
 
@@ -15,14 +16,14 @@ cdef __sockaddr_in6* sockaddr_in6(char *addr, in_port_t port, uint32_t scope_id)
 
 
 cdef class msghdr:
-    cdef __msghdr *ptr
+    cdef __msghdr* ptr
 
 cdef class cmsghdr:
-    cdef __cmsghdr *ptr
+    cdef __cmsghdr* ptr
 
 
 cdef class io_uring_recvmsg_out:
-    cdef __io_uring_recvmsg_out * ptr
+    cdef __io_uring_recvmsg_out* ptr
 
 
 cpdef void io_uring_prep_socket(io_uring_sqe sqe,
@@ -118,22 +119,33 @@ cpdef io_uring_recvmsg_out io_uring_recvmsg_validate(unsigned char[:] buf,
                                                      int buf_len,
                                                      msghdr msgh)
 # TODO:
-# cpdef void * io_uring_recvmsg_name(io_uring_recvmsg_out o) noexcept nogil
+# cpdef void* io_uring_recvmsg_name(io_uring_recvmsg_out o) noexcept nogil
 cpdef cmsghdr io_uring_recvmsg_cmsg_firsthdr(io_uring_recvmsg_out o, msghdr msgh)
 cpdef cmsghdr io_uring_recvmsg_cmsg_nexthdr(io_uring_recvmsg_out o,
                                             msghdr msgh,
                                             cmsghdr cmsg)
 # TODO:
-# cpdef void * io_uring_recvmsg_payload(io_uring_recvmsg_out o, msghdr msgh) noexcept nogil
+# cpdef void* io_uring_recvmsg_payload(io_uring_recvmsg_out o, msghdr msgh) noexcept nogil
 cpdef unsigned int io_uring_recvmsg_payload_length(io_uring_recvmsg_out o,
                                                    int buf_len,
                                                    msghdr msgh) noexcept nogil
 cpdef void io_uring_prep_shutdown(io_uring_sqe sqe, int fd, int how) noexcept nogil
 
+
 cpdef void io_uring_prep_cmd_sock(io_uring_sqe sqe,
                                   int cmd_op,
-                                  int fd,
+                                  int sockfd,
                                   int level,
                                   int optname,
-                                  unsigned char[:] optval,
-                                  int optlen) noexcept nogil
+                                  array optval)
+
+cpdef void io_uring_prep_setsockopt(io_uring_sqe sqe,
+                                    int sockfd,
+                                    int level,
+                                    int optname,
+                                    array optval)
+cpdef void io_uring_prep_getsockopt(io_uring_sqe sqe,
+                                    int sockfd,
+                                    int level,
+                                    int optname,
+                                    array optval)
