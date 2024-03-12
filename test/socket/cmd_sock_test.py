@@ -4,12 +4,12 @@ import pytest
 import liburing
 
 
+@pytest.mark.skip_linux('6.7')
 def test_set_getsockopt(ring, cqe):
     ts = liburing.timespec(3)
-    addr = liburing.sockaddr(liburing.AF_INET, b'0.0.0.0', 12345)  # not going to bind the socket
     # socket
     sqe = liburing.io_uring_get_sqe(ring)
-    liburing.io_uring_prep_socket(sqe, addr.family, liburing.SOL_SOCKET)
+    liburing.io_uring_prep_socket(sqe, liburing.AF_INET, liburing.SOL_SOCKET)
     sqe.user_data = 1
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     assert (sockfd := liburing.trap_error(cqe.res)) > 0
@@ -63,12 +63,12 @@ def test_set_getsockopt(ring, cqe):
     liburing.io_uring_cqe_seen(ring, cqe)
 
 
+@pytest.mark.skip_linux('6.7')
 def test_cmd_sock(ring, cqe):
     ts = liburing.timespec(3)
-    addr = liburing.sockaddr(liburing.AF_INET, b'0.0.0.0', 12345)  # not going to bind the socket
     # socket
     sqe = liburing.io_uring_get_sqe(ring)
-    liburing.io_uring_prep_socket(sqe, addr.family, liburing.SOL_SOCKET)
+    liburing.io_uring_prep_socket(sqe, liburing.AF_INET, liburing.SOL_SOCKET)
     sqe.user_data = 1
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     assert (sockfd := liburing.trap_error(cqe.res)) > 0
