@@ -28,8 +28,8 @@ cdef class sockaddr:
             self.family = family
 
         elif family == __AF_INET:  # outgoing
-            if not (addr_len and port):
-                raise ValueError('`sockaddr(AF_INET)` - `addr` or `port` not provided!')
+            if not addr_len:
+                raise ValueError('`sockaddr(AF_INET)` - `addr` not provided!')
             self.ptr = <void*>sockaddr_in(addr, port)
             if self.ptr is NULL:
                 raise ValueError('`sockaddr(AF_INET)` - `addr` did not receive IPv4 address!')
@@ -37,8 +37,8 @@ cdef class sockaddr:
             self.family = family
 
         elif family == __AF_INET6:  # outgoing
-            if not (addr_len and port):
-                raise ValueError('`sockaddr(AF_INET6)` - `addr` or `port` not provided!')
+            if not addr_len:
+                raise ValueError('`sockaddr(AF_INET6)` - `addr` not provided!')
             self.ptr = <void*>sockaddr_in6(addr, port, scope_id)
             if self.ptr is NULL:
                 raise ValueError('`sockaddr(AF_INET6)` - `addr` did not receive IPv6 address!')
@@ -255,7 +255,10 @@ cpdef inline void io_uring_prep_accept(io_uring_sqe sqe,
                                        int fd,
                                        sockaddr addr=None,
                                        int flags=0) noexcept nogil:
-    __io_uring_prep_accept(sqe.ptr, fd, <__sockaddr*>addr.ptr, &addr.sizeof, flags)
+    if addr is None:
+        __io_uring_prep_accept(sqe.ptr, fd, NULL, NULL, flags)
+    else:
+        __io_uring_prep_accept(sqe.ptr, fd, <__sockaddr*>addr.ptr, &addr.sizeof, flags)
 
 # accept directly into the fixed file table
 cpdef inline void io_uring_prep_accept_direct(
@@ -273,7 +276,7 @@ cpdef inline void io_uring_prep_multishot_accept(io_uring_sqe sqe,
                                                  int flags=0) noexcept nogil:
     __io_uring_prep_multishot_accept(sqe.ptr, fd, <__sockaddr*>addr.ptr, &addr.sizeof, flags)
 
-# multishot accept directly into the fixed file table
+# multi-shot accept directly into the fixed file table
 cpdef inline void io_uring_prep_multishot_accept_direct(io_uring_sqe sqe,
                                                         int fd,
                                                         sockaddr addr=None,
