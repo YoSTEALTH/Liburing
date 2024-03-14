@@ -2,11 +2,12 @@ from libc.errno cimport errno
 from libc.string cimport strerror
 
 
-cpdef inline int trap_error(int no) except -1 nogil:
+cpdef inline int trap_error(int no, str msg='') except -1 nogil:
     ''' Trap Error
 
         Type
             no     int
+            msg    str
             return int
 
         Example
@@ -14,7 +15,10 @@ cpdef inline int trap_error(int no) except -1 nogil:
             1
 
             >>> trap_error(-11)
-            BlockingIOError(...)
+            BlockingIOError: [Errno 11] Resource temporarily unavailable
+
+            >>> trap_error(-11, 'some message')
+            BlockingIOError: [Errno 11] some message
 
             >>> trap_error(-1)
             # dynamic error based on `errno`
@@ -31,14 +35,13 @@ cpdef inline int trap_error(int no) except -1 nogil:
         return no
 
     with gil:
-        raise_error(no)
+        raise_error(no, msg)
 
 
-cdef inline void raise_error(int no=-1) except *:
+cdef inline void raise_error(int no=-1, str msg='') except *:
     ''' This function will only raise Error '''
     no = -errno or no
-    cdef str error = strerror(-no).decode()
-    raise OSError(-no, error)
+    raise OSError(-no, msg or strerror(-no).decode())
 
 
 cpdef inline void memory_error(object self, str msg='') except *:
