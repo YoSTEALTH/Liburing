@@ -44,15 +44,11 @@ cdef inline void raise_error(int no=-1, str msg='') except *:
     raise OSError(-no, msg or strerror(-no).decode())
 
 
-cpdef inline void memory_error(object self, str msg='') except *:
+cpdef inline void memory_error(object self, str msg='is out of memory!') except *:
     ''' Raises MemoryError '''
-    if not msg:
-        msg = 'is out of memory!'
     raise MemoryError(f'`{self.__class__.__name__}()` {msg}')
 
 
-cpdef inline void index_error(object self, unsigned int index, str msg='') except *:
+cpdef inline void index_error(object self, unsigned int index, str msg='out of range!') except *:
     ''' Raises IndexError '''
-    if not msg:
-        msg = 'out of range!'
     raise IndexError(f'`{self.__class__.__name__}()[{index}]` {msg}')
