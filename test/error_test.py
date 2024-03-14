@@ -17,6 +17,10 @@ def test_trap_error():
     with raises(OSError):
         trap_error(-1)
 
+    msg = escape('testing `msg` returns')
+    with raises(BlockingIOError, match=msg):
+        trap_error(-11, 'testing `msg` returns')
+
 
 def test_memory_error():
     error = escape('`MyClass()` is out of memory!')
