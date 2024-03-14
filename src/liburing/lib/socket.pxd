@@ -2,37 +2,6 @@ from .type cimport *
 
 
 cdef extern from '<sys/socket.h>' nogil:
-    # socket domain | address families.
-    enum:
-        __AF_UNIX 'AF_UNIX'
-        __AF_INET 'AF_INET'
-        __AF_INET6 'AF_INET6'
-        # note: currently there is no plans to add other `AF_*` flags, unless user requests it.
-
-    # types of sockets.
-    enum:
-        # sequenced, reliable, connection-based byte streams.
-        __SOCK_STREAM 'SOCK_STREAM'
-        # connectionless, unreliable datagrams of fixed maximum length.
-        __SOCK_DGRAM 'SOCK_DGRAM'
-        # raw protocol interface.
-        __SOCK_RAW 'SOCK_RAW'
-        # reliably-delivered messages.
-        __SOCK_RDM 'SOCK_RDM'
-        # sequenced, reliable, connection-based, datagrams of fixed maximum length.
-        __SOCK_SEQPACKET 'SOCK_SEQPACKET'
-        # datagram congestion control protocol.
-        __SOCK_DCCP 'SOCK_DCCP'
-        # linux specific way of getting packets at the dev level.
-        # for writing rarp and other similar things on the user level.
-        __SOCK_PACKET 'SOCK_PACKET'
-
-        # flags combination with socket type using `|`
-        # atomically set close-on-exec flag for the new descriptor(s).
-        __SOCK_CLOEXEC 'SOCK_CLOEXEC'
-        # atomically mark descriptor(s) as non-blocking.
-        __SOCK_NONBLOCK 'SOCK_NONBLOCK'
-
     ctypedef int socklen_t
     ctypedef int sa_family_t
 
@@ -57,6 +26,7 @@ cdef extern from '<sys/socket.h>' nogil:
                                   int optname,
                                   void *optval,
                                   socklen_t *optlen)
+
     int __getpeername 'getpeername'(int sockfd,
                                     __sockaddr *addr,
                                     socklen_t *addrlen)
@@ -104,18 +74,69 @@ cdef extern from '<netinet/in.h>' nogil:
         uint32_t    sin6_scope_id  # Scope ID (new in 2.4)
 
     struct __msghdr 'msghdr':
-        void       *msg_name        # Address to send to/receive from.
-        socklen_t   msg_namelen     # Length of address data.
-        __iovec    *msg_iov         # Vector of data to send/receive into.
-        size_t      msg_iovlen      # Number of elements in the vector.
-        void       *msg_control     # Ancillary data (eg BSD filedesc passing).
-        size_t      msg_controllen  # Ancillary data buffer length.
-        int         msg_flags       # Flags on received message.
+        void*     msg_name        # Address to send to/receive from.
+        socklen_t msg_namelen     # Length of address data.
+        __iovec*  msg_iov         # Vector of data to send/receive into.
+        size_t    msg_iovlen      # Number of elements in the vector.
+        void*     msg_control     # Ancillary data (eg BSD filedesc passing).
+        size_t    msg_controllen  # Ancillary data buffer length.
+        int       msg_flags       # Flags on received message.
 
     struct __cmsghdr 'cmsghdr':
         size_t cmsg_len    # Length of data in `cmsg_data` plus length of `cmsghdr` structure.
         int    cmsg_level  # Originating protocol.
         int    cmsg_type   # Protocol specific type.
+
+
+cdef extern from '<netdb.h>' nogil:
+    struct __addrinfo 'addrinfo':
+        int         ai_flags      # AI_* Input flags.
+        int         ai_family     # AF_* Protocol family for socket.
+        int         ai_socktype   # SOCK_* Socket type.
+        int         ai_protocol   # Protocol for socket.
+        socklen_t   ai_addrlen    # Length of socket address.
+        __sockaddr* ai_addr       # Socket address for socket.
+        char*       ai_canonname  # Canonical name for service location.
+        __addrinfo* ai_next       # Pointer to next in list.
+
+    int __getaddrinfo 'getaddrinfo'(const char* name,
+                                    const char* service,
+                                    const __addrinfo* req,
+                                    __addrinfo** pai)
+    # Translate a socket address to a location and service name.
+    int __getnameinfo 'getnameinfo'(const __sockaddr* sa,
+                                    socklen_t salen,
+                                    char* host,
+                                    socklen_t hostlen,
+                                    char* serv,
+                                    socklen_t servlen,
+                                    int flags)
+    void __freeaddrinfo 'freeaddrinfo'(__addrinfo *__ai)  # free `addrinfo'
+    const char* __gai_strerror 'gai_strerror'(int ecode)
+
+    # Possible values for `ai_flags' field in `addrinfo' structure.
+    int __AI_PASSIVE 'AI_PASSIVE'           # Socket address is intended for `bind'.
+    int __AI_CANONNAME 'AI_CANONNAME'       # Request for canonical name.
+    int __AI_NUMERICHOST 'AI_NUMERICHOST'   # Don't use name resolution.
+    int __AI_V4MAPPED 'AI_V4MAPPED'         # IPv4 mapped addresses are acceptable.
+    int __AI_ALL 'AI_ALL'                   # Return IPv4 mapped and IPv6 addresses.
+    int __AI_ADDRCONFIG 'AI_ADDRCONFIG'     # Use config of host to choose returned address type.
+    int __AI_IDN 'AI_IDN'                   # IDN encode input before looking it up.
+    int __AI_CANONIDN 'AI_CANONIDN'         # Translate canonical name from IDN format.
+    int __AI_NUMERICSERV 'AI_NUMERICSERV'   # Don't use name resolution.
+
+    enum:
+        # internal use only.
+        __NI_MAXHOST 'NI_MAXHOST'  # 1025
+        __NI_MAXSERV 'NI_MAXSERV'  # 32
+
+        # getnameinfo flags
+        __NI_NUMERICHOST 'NI_NUMERICHOST'   # Don't try to look up hostname.
+        __NI_NUMERICSERV 'NI_NUMERICSERV'   # Don't convert port number to name.
+        __NI_NOFQDN 'NI_NOFQDN'             # Only return nodename portion.
+        __NI_NAMEREQD 'NI_NAMEREQD'         # Don't return numeric addresses.
+        __NI_DGRAM 'NI_DGRAM'               # Look up UDP service rather than TCP.
+        __NI_IDN 'NI_IDN'                   # Convert name from IDN format.
 
 
 cdef extern from '<arpa/inet.h>' nogil:
@@ -140,12 +161,42 @@ cdef extern from '<arpa/inet.h>' nogil:
 
 
 cdef extern from * nogil:  # <sys/socket.h>
+    # socket domain | address families.
     enum:
+        __AF_UNIX 'AF_UNIX'
+        __AF_INET 'AF_INET'
+        __AF_INET6 'AF_INET6'
+        # note: currently there is no plans to add other `AF_*` flags, unless user requests it.
+
+        # types of sockets.
+        # sequenced, reliable, connection-based byte streams.
+        __SOCK_STREAM 'SOCK_STREAM'
+        # connectionless, unreliable datagrams of fixed maximum length.
+        __SOCK_DGRAM 'SOCK_DGRAM'
+        # raw protocol interface.
+        __SOCK_RAW 'SOCK_RAW'
+        # reliably-delivered messages.
+        __SOCK_RDM 'SOCK_RDM'
+        # sequenced, reliable, connection-based, datagrams of fixed maximum length.
+        __SOCK_SEQPACKET 'SOCK_SEQPACKET'
+        # datagram congestion control protocol.
+        __SOCK_DCCP 'SOCK_DCCP'
+        # linux specific way of getting packets at the dev level.
+        # for writing rarp and other similar things on the user level.
+        __SOCK_PACKET 'SOCK_PACKET'
+
+        # flags combination with socket type using `|`
+        # atomically set close-on-exec flag for the new descriptor(s).
+        __SOCK_CLOEXEC 'SOCK_CLOEXEC'
+        # atomically mark descriptor(s) as non-blocking.
+        __SOCK_NONBLOCK 'SOCK_NONBLOCK'
+
+        # shutdown "how" flags
         __SHUT_RD 'SHUT_RD'
         __SHUT_WR 'SHUT_WR'
         __SHUT_RDWR 'SHUT_RDWR'
 
-    enum:
+        # socket
         __SOL_SOCKET 'SOL_SOCKET'
 
         __SO_DEBUG 'SO_DEBUG'
