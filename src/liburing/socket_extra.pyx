@@ -65,6 +65,9 @@ cpdef tuple getnameinfo(sockaddr addr, int flags=0):
             NI_NAMEREQD     # Don't return numeric addresses.
             NI_DGRAM        # Look up UDP service rather than TCP.
             NI_IDN          # Convert name from IDN format.
+
+        Note
+            - return type will depend on content being returned.
     '''
     cdef:
         char host[__NI_MAXHOST]
@@ -72,7 +75,7 @@ cpdef tuple getnameinfo(sockaddr addr, int flags=0):
 
     trap_error(__getnameinfo(<__sockaddr*>addr.ptr, addr.sizeof,
                              host, sizeof(host), service, sizeof(service), flags))
-    return (host, service)
+    return (host, int(service) if service.isdigit() else service)
 
 
 # getaddrinfo/getnameinfo start >>>
