@@ -25,9 +25,7 @@ def test_socket_define():
     assert liburing.SOCKET_URING_OP_GETSOCKOPT == 2
     assert liburing.SOCKET_URING_OP_SETSOCKOPT == 3
 
-
-def test_socket_extra_define():
-    # setsockopt & getsockopt
+    # setsockopt & getsockopt start >>>
     assert liburing.SOL_SOCKET == 1
     assert liburing.SO_DEBUG == 1
     assert liburing.SO_REUSEADDR == 2
@@ -67,3 +65,25 @@ def test_socket_extra_define():
     assert liburing.SO_WIFI_STATUS == 41
     assert liburing.SCM_WIFI_STATUS == liburing.SO_WIFI_STATUS
     assert liburing.SO_PEEK_OFF == 42
+    # setsockopt & getsockopt end <<<
+
+
+def test_socket_extra_define():
+    # getaddrinfo/getnameinfo start >>>
+    assert liburing.AI_PASSIVE == 0x0001
+    assert liburing.AI_CANONNAME == 0x0002
+    assert liburing.AI_NUMERICHOST == 0x0004
+    assert liburing.AI_V4MAPPED == 0x0008
+    assert liburing.AI_ALL == 0x0010
+    assert liburing.AI_ADDRCONFIG == 0x0020
+    assert liburing.AI_IDN == 0x0040
+    assert liburing.AI_CANONIDN == 0x0080
+    assert liburing.AI_NUMERICSERV == 0x0400
+
+    assert liburing.NI_NUMERICHOST == 1
+    assert liburing.NI_NUMERICSERV == 2
+    assert liburing.NI_NOFQDN == 4
+    assert liburing.NI_NAMEREQD == 8
+    assert liburing.NI_DGRAM == 16
+    assert liburing.NI_IDN == 32
+    # getaddrinfo/getnameinfo end <<<

@@ -49,3 +49,47 @@ cpdef tuple[bytes, uint16_t] getsockname(int sockfd, sockaddr addr):
     else:
         raise TypeError('getsockname() - received `addr.family` type not supported!')
     return (ip, port)
+
+
+cpdef tuple getnameinfo(sockaddr addr, int flags=0):
+    '''
+        Example
+            >>> addr = sockaddr(liburing.AF_INET, b'0.0.0.0', 12345)
+            >>> getnameinfo(addr, liburing.NI_NUMERICHOST | liburing.NI_NUMERICSERV)
+            (b'0.0.0.0', b'12345')
+
+        Flags
+            NI_NUMERICHOST  # Don't try to look up hostname.
+            NI_NUMERICSERV  # Don't convert port number to name.
+            NI_NOFQDN       # Only return nodename portion.
+            NI_NAMEREQD     # Don't return numeric addresses.
+            NI_DGRAM        # Look up UDP service rather than TCP.
+            NI_IDN          # Convert name from IDN format.
+    '''
+    cdef:
+        char host[__NI_MAXHOST]
+        char service[__NI_MAXSERV]
+
+    trap_error(__getnameinfo(<__sockaddr*>addr.ptr, addr.sizeof,
+                             host, sizeof(host), service, sizeof(service), flags))
+    return (host, service)
+
+
+# getaddrinfo/getnameinfo start >>>
+AI_PASSIVE = __AI_PASSIVE
+AI_CANONNAME = __AI_CANONNAME
+AI_NUMERICHOST = __AI_NUMERICHOST
+AI_V4MAPPED = __AI_V4MAPPED
+AI_ALL = __AI_ALL
+AI_ADDRCONFIG = __AI_ADDRCONFIG
+AI_IDN = __AI_IDN
+AI_CANONIDN = __AI_CANONIDN
+AI_NUMERICSERV = __AI_NUMERICSERV
+
+NI_NUMERICHOST = __NI_NUMERICHOST
+NI_NUMERICSERV = __NI_NUMERICSERV
+NI_NOFQDN = __NI_NOFQDN
+NI_NAMEREQD = __NI_NAMEREQD
+NI_DGRAM = __NI_DGRAM
+NI_IDN = __NI_IDN
+# getaddrinfo/getnameinfo end <<<
