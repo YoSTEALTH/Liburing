@@ -35,11 +35,6 @@ cdef extern from '<sys/socket.h>' nogil:
                                     socklen_t *addrlen)
 
 
-cdef extern from '<netinet/in.h>' nogil:
-    enum:
-        __INET_ADDRSTRLEN 'INET_ADDRSTRLEN'
-        __INET6_ADDRSTRLEN 'INET6_ADDRSTRLEN'
-
 cdef extern from '<sys/un.h>' nogil:
     # UNIX domain sockets - for local interprocess communication
     struct __sockaddr_un 'sockaddr_un':
@@ -93,10 +88,10 @@ cdef extern from '<netdb.h>' nogil:
         int         ai_flags      # AI_* Input flags.
         int         ai_family     # AF_* Protocol family for socket.
         int         ai_socktype   # SOCK_* Socket type.
-        int         ai_protocol   # Protocol for socket.
-        socklen_t   ai_addrlen    # Length of socket address.
-        __sockaddr* ai_addr       # Socket address for socket.
+        int         ai_protocol   # IPPROTO_* Protocol for socket.
+        socklen_t   ai_addrlen    # Length of `ai_addr` socket address.
         char*       ai_canonname  # Canonical name for service location.
+        __sockaddr* ai_addr       # Socket address for socket.
         __addrinfo* ai_next       # Pointer to next in list.
 
     int __getaddrinfo 'getaddrinfo'(const char* name,
@@ -111,7 +106,7 @@ cdef extern from '<netdb.h>' nogil:
                                     char* serv,
                                     socklen_t servlen,
                                     int flags)
-    void __freeaddrinfo 'freeaddrinfo'(__addrinfo *__ai)  # free `addrinfo'
+    void __freeaddrinfo 'freeaddrinfo'(__addrinfo *ai)  # free `addrinfo'
     const char* __gai_strerror 'gai_strerror'(int ecode)
 
     # Possible values for `ai_flags' field in `addrinfo' structure.
@@ -246,3 +241,40 @@ cdef extern from * nogil:  # <sys/socket.h>
         __SO_TIMESTAMPING 'SO_TIMESTAMPING'
         __SO_RCVTIMEO 'SO_RCVTIMEO'
         __SO_SNDTIMEO 'SO_SNDTIMEO'
+
+
+cdef extern from '<netinet/in.h>' nogil:
+    enum:  # internal use only
+        __INET_ADDRSTRLEN 'INET_ADDRSTRLEN'
+        __INET6_ADDRSTRLEN 'INET6_ADDRSTRLEN'
+
+    # IP protocols.
+    enum:
+        __IPPROTO_IP 'IPPROTO_IP'               # Dummy protocol for TCP
+        __IPPROTO_ICMP 'IPPROTO_ICMP'           # Internet Control Message Protocol
+        __IPPROTO_IGMP 'IPPROTO_IGMP'           # Internet Group Management Protocol
+        __IPPROTO_IPIP 'IPPROTO_IPIP'           # IPIP tunnels (older KA9Q tunnels use 94)
+        __IPPROTO_TCP 'IPPROTO_TCP'             # Transmission Control Protocol
+        __IPPROTO_EGP 'IPPROTO_EGP'             # Exterior Gateway Protocol
+        __IPPROTO_PUP 'IPPROTO_PUP'             # PUP protocol
+        __IPPROTO_UDP 'IPPROTO_UDP'             # User Datagram Protocol
+        __IPPROTO_IDP 'IPPROTO_IDP'             # XNS IDP protocol
+        __IPPROTO_TP 'IPPROTO_TP'               # SO Transport Protocol Class 4
+        __IPPROTO_DCCP 'IPPROTO_DCCP'           # Datagram Congestion Control Protocol
+        __IPPROTO_IPV6 'IPPROTO_IPV6'           # IPv6-in-IPv4 tunnelling
+        __IPPROTO_RSVP 'IPPROTO_RSVP'           # RSVP Protocol
+        __IPPROTO_GRE 'IPPROTO_GRE'             # Cisco GRE tunnels (rfc 1701,1702)
+        __IPPROTO_ESP 'IPPROTO_ESP'             # Encapsulation Security Payload protocol
+        __IPPROTO_AH 'IPPROTO_AH'               # Authentication Header protocol
+        __IPPROTO_MTP 'IPPROTO_MTP'             # Multicast Transport Protocol
+        __IPPROTO_BEETPH 'IPPROTO_BEETPH'       # IP option pseudo header for BEET
+        __IPPROTO_ENCAP 'IPPROTO_ENCAP'         # Encapsulation Header
+        __IPPROTO_PIM 'IPPROTO_PIM'             # Protocol Independent Multicast
+        __IPPROTO_COMP 'IPPROTO_COMP'           # Compression Header Protocol
+        __IPPROTO_L2TP 'IPPROTO_L2TP'           # Layer 2 Tunnelling Protocol
+        __IPPROTO_SCTP 'IPPROTO_SCTP'           # Stream Control Transport Protocol
+        __IPPROTO_UDPLITE 'IPPROTO_UDPLITE'     # UDP-Lite (RFC 3828)
+        __IPPROTO_MPLS 'IPPROTO_MPLS'           # MPLS in IP (RFC 4023)
+        __IPPROTO_ETHERNET 'IPPROTO_ETHERNET'   # Ethernet-within-IPv6 Encapsulation
+        __IPPROTO_RAW 'IPPROTO_RAW'             # Raw IP packets
+        __IPPROTO_MPTCP 'IPPROTO_MPTCP'         # Multipath TCP connection

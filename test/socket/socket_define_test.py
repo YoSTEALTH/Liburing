@@ -67,6 +67,35 @@ def test_socket_define():
     assert liburing.SO_PEEK_OFF == 42
     # setsockopt & getsockopt end <<<
 
+    assert liburing.IPPROTO_IP == 0
+    assert liburing.IPPROTO_ICMP == 1
+    assert liburing.IPPROTO_IGMP == 2
+    assert liburing.IPPROTO_IPIP == 4
+    assert liburing.IPPROTO_TCP == 6
+    assert liburing.IPPROTO_EGP == 8
+    assert liburing.IPPROTO_PUP == 12
+    assert liburing.IPPROTO_UDP == 17
+    assert liburing.IPPROTO_IDP == 22
+    assert liburing.IPPROTO_TP == 29
+    assert liburing.IPPROTO_DCCP == 33
+    assert liburing.IPPROTO_IPV6 == 41
+    assert liburing.IPPROTO_RSVP == 46
+    assert liburing.IPPROTO_GRE == 47
+    assert liburing.IPPROTO_ESP == 50
+    assert liburing.IPPROTO_AH == 51
+    assert liburing.IPPROTO_MTP == 92
+    assert liburing.IPPROTO_BEETPH == 94
+    assert liburing.IPPROTO_ENCAP == 98
+    assert liburing.IPPROTO_PIM == 103
+    assert liburing.IPPROTO_COMP == 108
+    assert liburing.IPPROTO_L2TP == 115
+    assert liburing.IPPROTO_SCTP == 132
+    assert liburing.IPPROTO_UDPLITE == 136
+    assert liburing.IPPROTO_MPLS == 137
+    assert liburing.IPPROTO_ETHERNET == 143
+    assert liburing.IPPROTO_RAW == 255
+    assert liburing.IPPROTO_MPTCP == 262
+
 
 def test_socket_extra_define():
     # getaddrinfo/getnameinfo start >>>
