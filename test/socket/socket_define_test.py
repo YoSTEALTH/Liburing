@@ -88,7 +88,8 @@ def test_socket_define():
     assert liburing.IPPROTO_ENCAP == 98
     assert liburing.IPPROTO_PIM == 103
     assert liburing.IPPROTO_COMP == 108
-    assert liburing.IPPROTO_L2TP == 115
+    # note: not supported
+    # assert liburing.IPPROTO_L2TP == 115
     assert liburing.IPPROTO_SCTP == 132
     assert liburing.IPPROTO_UDPLITE == 136
     assert liburing.IPPROTO_MPLS == 137
