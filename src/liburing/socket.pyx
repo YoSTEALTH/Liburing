@@ -10,6 +10,11 @@ cdef class sockaddr:
             >>> addr = sockaddr(AF_INET, b'0.0.0.0', 12345)
             >>> addr = sockaddr(AF_INET6, b'::1', 12345)
             >>> bind(sockfd, addr)
+
+        Note
+            - `sockaddr()` is low level setup, letting you serve/connect directly using path/ip.
+            If you need higher level features you can use `getaddrinfo()` this lets you connect
+            using domain names, ...
     '''
     def __cinit__(self, sa_family_t family=0, char* addr=b'', in_port_t port=0,
                   uint32_t scope_id=0):
@@ -24,6 +29,7 @@ cdef class sockaddr:
             self.ptr = <void*>sockaddr_un(addr)
             if self.ptr is NULL:
                 memory_error(self)
+            self.free = True
             self.sizeof = sizeof(__sockaddr_un)
             self.family = family
 
@@ -33,6 +39,7 @@ cdef class sockaddr:
             self.ptr = <void*>sockaddr_in(addr, port)
             if self.ptr is NULL:
                 raise ValueError('`sockaddr(AF_INET)` - `addr` did not receive IPv4 address!')
+            self.free = True
             self.sizeof = sizeof(__sockaddr_in)
             self.family = family
 
@@ -42,21 +49,22 @@ cdef class sockaddr:
             self.ptr = <void*>sockaddr_in6(addr, port, scope_id)
             if self.ptr is NULL:
                 raise ValueError('`sockaddr(AF_INET6)` - `addr` did not receive IPv6 address!')
+            self.free = True
             self.sizeof = sizeof(__sockaddr_in6)
             self.family = family
 
-        elif not family:  # incoming
-            raise NotImplementedError
-        else:  # error
+        elif family:  # error
             raise NotImplementedError
 
     def __dealloc__(self):
-        if self.ptr is not NULL:
+        if self.free and self.ptr is not NULL:
             PyMem_RawFree(self.ptr)
             self.ptr = NULL
+            self.free = False
 
-    def __repr__(self):
-        return f'{self.__class__.__name__}({self._test})' 
+    # TODO: return (host, port)
+    # def __repr__(self):
+    #     return f'{self.__class__.__name__}({self._test})' 
 
     @property
     def _test(self)-> dict:
@@ -504,7 +512,7 @@ cpdef enum io_uring_socket_op:
     SOCKET_URING_OP_GETSOCKOPT = __SOCKET_URING_OP_GETSOCKOPT
     SOCKET_URING_OP_SETSOCKOPT = __SOCKET_URING_OP_SETSOCKOPT
 
-# defines
+# setsockopt & getsockopt start >>>
 SOL_SOCKET = __SOL_SOCKET
 SO_DEBUG = __SO_DEBUG
 SO_REUSEADDR = __SO_REUSEADDR
@@ -550,3 +558,34 @@ SO_TIMESTAMPNS = __SO_TIMESTAMPNS
 SO_TIMESTAMPING = __SO_TIMESTAMPING
 SO_RCVTIMEO = __SO_RCVTIMEO
 SO_SNDTIMEO = __SO_SNDTIMEO
+# setsockopt & getsockopt end <<<
+
+cpdef enum SocketProto:
+    IPPROTO_IP = __IPPROTO_IP
+    IPPROTO_ICMP = __IPPROTO_ICMP
+    IPPROTO_IGMP = __IPPROTO_IGMP
+    IPPROTO_IPIP = __IPPROTO_IPIP
+    IPPROTO_TCP = __IPPROTO_TCP
+    IPPROTO_EGP = __IPPROTO_EGP
+    IPPROTO_PUP = __IPPROTO_PUP
+    IPPROTO_UDP = __IPPROTO_UDP
+    IPPROTO_IDP = __IPPROTO_IDP
+    IPPROTO_TP = __IPPROTO_TP
+    IPPROTO_DCCP = __IPPROTO_DCCP
+    IPPROTO_IPV6 = __IPPROTO_IPV6
+    IPPROTO_RSVP = __IPPROTO_RSVP
+    IPPROTO_GRE = __IPPROTO_GRE
+    IPPROTO_ESP = __IPPROTO_ESP
+    IPPROTO_AH = __IPPROTO_AH
+    IPPROTO_MTP = __IPPROTO_MTP
+    IPPROTO_BEETPH = __IPPROTO_BEETPH
+    IPPROTO_ENCAP = __IPPROTO_ENCAP
+    IPPROTO_PIM = __IPPROTO_PIM
+    IPPROTO_COMP = __IPPROTO_COMP
+    IPPROTO_L2TP = __IPPROTO_L2TP
+    IPPROTO_SCTP = __IPPROTO_SCTP
+    IPPROTO_UDPLITE = __IPPROTO_UDPLITE
+    IPPROTO_MPLS = __IPPROTO_MPLS
+    IPPROTO_ETHERNET = __IPPROTO_ETHERNET
+    IPPROTO_RAW = __IPPROTO_RAW
+    IPPROTO_MPTCP = __IPPROTO_MPTCP

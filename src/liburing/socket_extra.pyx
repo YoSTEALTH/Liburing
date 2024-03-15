@@ -1,12 +1,63 @@
 from libc.string cimport memset
 
 
+cdef class getaddrinfo:
+    def __cinit__(self, const char* host, char* port_service,
+                  int family=0, int type=0, int proto=0, int flags=0):
+        '''
+            Example
+                >>> for af_, sock_, proto, canon, addr in getaddrinfo(b'127.0.0.1', b'12345'):
+                ...     ...
+                ...     io_uring_prep_socket(sqe, af_, sock_)
+                ...     ...
+                ...     io_uring_prep_connect(sqe, sockfd, addr)
+                ...     ...
+                ...     break  # if connection successful break, else try next.
+        '''
+        # TODO: `port_service` should handle both `int` & `bytes` types.
+        cdef:
+            int no
+            __addrinfo hints
+
+        memset(&hints, 0, sizeof(__addrinfo))
+        hints.ai_flags = flags
+        hints.ai_family = family
+        hints.ai_socktype = type
+        hints.ai_protocol = proto
+        if no := __getaddrinfo(host, port_service, &hints, &self.ptr):
+            trap_error(no, __gai_strerror(no).decode())
+
+    def __dealloc__(self):
+        if self.ptr is not NULL:
+            __freeaddrinfo(self.ptr)
+            self.ptr = NULL
+
+    def __iter__(self):
+        cdef:
+            __addrinfo* p = self.ptr
+            sockaddr addr
+        while p.ai_next is not NULL:
+            addr = sockaddr()
+            addr.ptr = p.ai_addr
+            addr.family = p.ai_family
+            addr.sizeof = p.ai_addrlen
+            yield (
+                p.ai_family,
+                p.ai_socktype,
+                p.ai_protocol,
+                p.ai_canonname or b'',
+                addr
+            )
+            p = p.ai_next
+
+
 cpdef int bind(int sockfd, sockaddr addr) nogil:
     return trap_error(__bind(sockfd, <__sockaddr*>addr.ptr, addr.sizeof))
 
 cpdef int listen(int sockfd, int backlog) nogil:
     return trap_error(__listen(sockfd, backlog))
 
+# TODO
 cpdef int getpeername(int sockfd, sockaddr addr) nogil:
     ''' TODO '''
     return trap_error(__getpeername(sockfd, <__sockaddr*>addr.ptr, &addr.sizeof))
@@ -49,7 +100,6 @@ cpdef tuple[bytes, uint16_t] getsockname(int sockfd, sockaddr addr):
     else:
         raise TypeError('getsockname() - received `addr.family` type not supported!')
     return (ip, port)
-
 
 cpdef tuple getnameinfo(sockaddr addr, int flags=0):
     '''

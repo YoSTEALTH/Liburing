@@ -3,6 +3,10 @@ from .socket cimport *
 from .error cimport trap_error
 
 
+cdef class getaddrinfo:
+    cdef __addrinfo* ptr
+
+
 cpdef int bind(int sockfd, sockaddr addr) nogil
 cpdef int listen(int sockfd, int backlog) nogil
 cpdef int getpeername(int sockfd, sockaddr addr) nogil

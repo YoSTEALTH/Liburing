@@ -5,6 +5,7 @@ from .queue cimport io_uring_sqe
 
 cdef class sockaddr:
     cdef:
+        bint free
         void* ptr
         socklen_t sizeof
         readonly sa_family_t family
