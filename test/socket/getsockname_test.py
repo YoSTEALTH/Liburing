@@ -38,6 +38,6 @@ def test_getsockname(ring, cqe):
         liburing.io_uring_prep_close(sqe, sockfd)
         sqe.user_data = i+1
         assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
-        sockfd = liburing.trap_error(cqe.res)
+        liburing.trap_error(cqe.res)
         assert cqe.user_data == i+1
         liburing.io_uring_cqe_seen(ring, cqe)
