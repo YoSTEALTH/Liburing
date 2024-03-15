@@ -271,7 +271,8 @@ cdef extern from '<netinet/in.h>' nogil:
         __IPPROTO_ENCAP 'IPPROTO_ENCAP'         # Encapsulation Header
         __IPPROTO_PIM 'IPPROTO_PIM'             # Protocol Independent Multicast
         __IPPROTO_COMP 'IPPROTO_COMP'           # Compression Header Protocol
-        __IPPROTO_L2TP 'IPPROTO_L2TP'           # Layer 2 Tunnelling Protocol
+        # note: not supported
+        # __IPPROTO_L2TP 'IPPROTO_L2TP'           # Layer 2 Tunnelling Protocol
         __IPPROTO_SCTP 'IPPROTO_SCTP'           # Stream Control Transport Protocol
         __IPPROTO_UDPLITE 'IPPROTO_UDPLITE'     # UDP-Lite (RFC 3828)
         __IPPROTO_MPLS 'IPPROTO_MPLS'           # MPLS in IP (RFC 4023)
