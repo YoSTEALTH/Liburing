@@ -7,13 +7,6 @@ cdef class open_how:
     cdef __open_how *ptr
 
 
-cpdef void io_uring_prep_splice(io_uring_sqe sqe,
-                                int fd_in,
-                                int64_t off_in,
-                                int fd_out,
-                                int64_t off_out,
-                                unsigned int nbytes,
-                                unsigned int splice_flags) noexcept nogil
 cpdef void io_uring_prep_tee(io_uring_sqe sqe,
                              int fd_in,
                              int fd_out,

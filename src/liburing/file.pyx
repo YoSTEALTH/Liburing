@@ -78,37 +78,6 @@ cdef class open_how:
         self.ptr.resolve = resolve
 
 
-cpdef inline void io_uring_prep_splice(io_uring_sqe sqe,
-                                       int fd_in,
-                                       int64_t off_in,
-                                       int fd_out,
-                                       int64_t off_out,
-                                       unsigned int nbytes,
-                                       unsigned int splice_flags) noexcept nogil:
-    '''
-        Note
-            `io_uring_prep_splice()` - Either `fd_in` or `fd_out` must be a pipe.
-
-            - If `fd_in` refers to a pipe, `off_in` is ignored and must be set to `-1`.
-
-            - If `fd_in` does not refer to a pipe and `off_in` is `-1`, then `nbytes` are read
-              from `fd_in` starting from the file offset, which is incremented by the
-              number of bytes read.
-
-            - If `fd_in` does not refer to a pipe and `off_in` is not `-1`, then the starting
-              offset of `fd_in` will be `off_in`.
-
-            This splice operation can be used to implement sendfile by splicing to an
-            intermediate pipe first, then splice to the final destination.
-            In fact, the implementation of sendfile in kernel uses splice internally.
-
-            NOTE that even if `fd_in` or `fd_out` refers to a pipe, the splice operation
-            can still fail with `EINVAL` if one of the `fd` doesn't explicitly support splice
-            operation, e.g. reading from terminal is unsupported from kernel 5.7 to 5.11.
-            Check issue #291 for more information.
-    '''
-    __io_uring_prep_splice(sqe.ptr, fd_in, off_in, fd_out, off_out, nbytes, splice_flags)
-
 cpdef inline void io_uring_prep_tee(io_uring_sqe sqe,
                                     int fd_in,
                                     int fd_out,

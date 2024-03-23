@@ -63,3 +63,11 @@ cpdef void io_uring_prep_fallocate(io_uring_sqe sqe,
                                    __u64 len,
                                    __u64 offset=?,
                                    int mode=?) noexcept nogil
+
+cpdef void io_uring_prep_splice(io_uring_sqe sqe,
+                                int fd_in,
+                                int64_t off_in,
+                                int fd_out,
+                                int64_t off_out,
+                                unsigned int nbytes,
+                                unsigned int splice_flags) noexcept nogil
