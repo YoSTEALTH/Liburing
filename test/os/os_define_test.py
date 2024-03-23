@@ -15,3 +15,10 @@ def test_fallocate_define():
     assert liburing.FALLOC_FL_ZERO_RANGE == 0x10
     assert liburing.FALLOC_FL_INSERT_RANGE == 0x20
     assert liburing.FALLOC_FL_UNSHARE_RANGE == 0x40
+
+
+def test_splice_define():
+    assert liburing.SPLICE_F_MOVE == 1
+    assert liburing.SPLICE_F_NONBLOCK == 2
+    assert liburing.SPLICE_F_MORE == 4
+    assert liburing.SPLICE_F_GIFT == 8
