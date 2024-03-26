@@ -10,7 +10,7 @@ from Cython.Distutils import Extension
 # enable `clang` compiler
 # environ['LDSHARED'] = 'clang -shared'  # <- manually uncomment this
 
-debug = True  # <- manually change this
+debug = False  # <- manually change this
 os_liburing = False  # <- manually change this
 # note: OS `liburing` tends to be outdated! Try it, run test, if no error is raised its good :)
 
@@ -24,7 +24,7 @@ uring = 'uring-ffi'
 # compiler options
 if debug:
     Options.warning_errors = True  # turn all warnings into errors.
-    Options.fast_fail = False
+    Options.fast_fail = True
     Options.annotate = True  # generate `*.html` file for debugging & optimization.
 else:
     Options.warning_errors = False
