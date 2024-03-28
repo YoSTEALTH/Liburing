@@ -2,7 +2,7 @@ from .queue cimport *
 
 
 cdef class epoll_event:
-    cdef __epoll_event * ptr
+    cdef __epoll_event* ptr
 
 
 cpdef void io_uring_prep_poll_add(io_uring_sqe sqe,

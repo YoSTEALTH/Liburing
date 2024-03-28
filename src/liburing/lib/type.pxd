@@ -41,8 +41,9 @@ cdef extern from '<linux/version.h>' nogil:
                                                     ((major == LINUX_VERSION_MAJOR) && \
                                                      (minor > LINUX_VERSION_PATCHLEVEL))
     '''
-    __u8 __LINUX_VERSION_MAJOR 'LINUX_VERSION_MAJOR'
-    __u8 __LINUX_VERSION_MINOR 'LINUX_VERSION_PATCHLEVEL'
+    enum:
+        __LINUX_VERSION_MAJOR 'LINUX_VERSION_MAJOR'
+        __LINUX_VERSION_MINOR 'LINUX_VERSION_PATCHLEVEL'
     bint __LINUX_VERSION_CHECK(__u8 major, __u8 minor)
 
 
@@ -116,10 +117,10 @@ cdef extern from '<fcntl.h>' nogil:
         __AT_RECURSIVE 'AT_RECURSIVE'  # Apply to the entire subtree.
 
         # splice flags
-        __SPLICE_F_MOVE 'SPLICE_F_MOVE'
-        __SPLICE_F_NONBLOCK 'SPLICE_F_NONBLOCK'
-        __SPLICE_F_MORE 'SPLICE_F_MORE'
-        __SPLICE_F_GIFT 'SPLICE_F_GIFT'
+        __SPLICE_F_MOVE 'SPLICE_F_MOVE'          # Move pages instead of copying.
+        __SPLICE_F_NONBLOCK 'SPLICE_F_NONBLOCK'  # Don't block on the pipe splicing
+        __SPLICE_F_MORE 'SPLICE_F_MORE'          # Expect more data.
+        __SPLICE_F_GIFT 'SPLICE_F_GIFT'          # Pages passed in are a gift.
 
         # `fallocate` mode
         __FALLOC_FL_KEEP_SIZE 'FALLOC_FL_KEEP_SIZE'

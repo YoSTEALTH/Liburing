@@ -1,6 +1,7 @@
+from cpython.array cimport array
 from .lib.uring cimport *
-from .type cimport iovec
 from .error cimport trap_error
+from .common cimport iovec
 from .queue cimport io_uring
 
 

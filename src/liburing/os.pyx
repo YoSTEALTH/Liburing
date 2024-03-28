@@ -118,10 +118,3 @@ cpdef inline void io_uring_prep_splice(io_uring_sqe sqe,
             Check issue #291 for more information.
     '''
     __io_uring_prep_splice(sqe.ptr, fd_in, off_in, fd_out, off_out, nbytes, splice_flags)
-
-
-# splice flags
-SPLICE_F_MOVE = __SPLICE_F_MOVE
-SPLICE_F_NONBLOCK = __SPLICE_F_NONBLOCK
-SPLICE_F_MORE = __SPLICE_F_MORE
-SPLICE_F_GIFT = __SPLICE_F_GIFT

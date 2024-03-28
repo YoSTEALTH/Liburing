@@ -1,4 +1,6 @@
+from cpython.mem cimport PyMem_RawCalloc
 from .lib.uring cimport *
+from .error cimport trap_error, memory_error
 from .queue cimport io_uring
 
 

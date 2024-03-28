@@ -1,7 +1,3 @@
-from cpython.mem cimport PyMem_RawMalloc, PyMem_RawFree
-from .error cimport memory_error
-
-
 cdef class statx:
     ''' Structures for the extended file attribute retrieval system call `statx()`.
 

@@ -1,3 +1,5 @@
+from cpython.mem cimport PyMem_RawMalloc, PyMem_RawFree
+from .error cimport memory_error
 from .queue cimport *
 
 
@@ -13,7 +15,7 @@ cpdef void io_uring_prep_statx(io_uring_sqe sqe,
                                int dfd=?) noexcept nogil
 
 
-cpdef enum __define__:
+cpdef enum __statx_define__:
     # defines
     STATX_TYPE = __STATX_TYPE
     STATX_MODE = __STATX_MODE

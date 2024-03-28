@@ -1,7 +1,3 @@
-from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
-from .error cimport memory_error, index_error
-
-
 cdef class timespec:
     ''' Kernel Timespec
 

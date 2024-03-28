@@ -1,4 +1,4 @@
-from .error cimport trap_error, memory_error
+# TODO: class/function here have not been organized, yet!
 
 
 cdef class io_uring_buf_ring:
