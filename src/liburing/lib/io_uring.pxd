@@ -14,70 +14,71 @@ cdef extern from 'liburing/io_uring.h' nogil:
     # an available direct descriptor instead of having the application pass one
     # in. The picked direct descriptor will be returned in `cqe->res`, or `-ENFILE`
     # if the space is full.
-    unsigned int __IORING_FILE_INDEX_ALLOC 'IORING_FILE_INDEX_ALLOC'
+    enum:
+        __IORING_FILE_INDEX_ALLOC 'IORING_FILE_INDEX_ALLOC'
 
-    # note: do not need this, its for internal `liburing` use
-    # enum:
-    #     IOSQE_FIXED_FILE_BIT, ...
+        # note: do not need this, its for internal `liburing` use
+        # enum:
+        #     IOSQE_FIXED_FILE_BIT, ...
 
-    # sqe.flags
-    # use fixed file-set
-    unsigned int __IOSQE_FIXED_FILE 'IOSQE_FIXED_FILE'
-    # issue after inflight IO
-    unsigned int __IOSQE_IO_DRAIN 'IOSQE_IO_DRAIN'
-    # links next `sqe`
-    unsigned int __IOSQE_IO_LINK 'IOSQE_IO_LINK'
-    # like LINK, but stronger
-    unsigned int __IOSQE_IO_HARDLINK 'IOSQE_IO_HARDLINK'
-    # always go async
-    unsigned int __IOSQE_ASYNC 'IOSQE_ASYNC'
-    # select buffer from `sqe->buf_group`
-    unsigned int __IOSQE_BUFFER_SELECT 'IOSQE_BUFFER_SELECT'
-    # don't post CQE if request succeeded
-    unsigned int __IOSQE_CQE_SKIP_SUCCESS 'IOSQE_CQE_SKIP_SUCCESS'
+        # sqe.flags
+        # use fixed file-set
+        __IOSQE_FIXED_FILE 'IOSQE_FIXED_FILE'
+        # issue after inflight IO
+        __IOSQE_IO_DRAIN 'IOSQE_IO_DRAIN'
+        # links next `sqe`
+        __IOSQE_IO_LINK 'IOSQE_IO_LINK'
+        # like LINK, but stronger
+        __IOSQE_IO_HARDLINK 'IOSQE_IO_HARDLINK'
+        # always go async
+        __IOSQE_ASYNC 'IOSQE_ASYNC'
+        # select buffer from `sqe->buf_group`
+        __IOSQE_BUFFER_SELECT 'IOSQE_BUFFER_SELECT'
+        # don't post CQE if request succeeded
+        __IOSQE_CQE_SKIP_SUCCESS 'IOSQE_CQE_SKIP_SUCCESS'
 
-    # io_uring_setup() flags
-    unsigned int __IORING_SETUP_IOPOLL 'IORING_SETUP_IOPOLL'  # io_context is polled
-    unsigned int __IORING_SETUP_SQPOLL 'IORING_SETUP_SQPOLL'  # SQ poll thread
-    unsigned int __IORING_SETUP_SQ_AFF 'IORING_SETUP_SQ_AFF'  # sq_thread_cpu is valid
-    unsigned int __IORING_SETUP_CQSIZE 'IORING_SETUP_CQSIZE'  # app defines CQ size
-    unsigned int __IORING_SETUP_CLAMP 'IORING_SETUP_CLAMP'  # clamp SQ/CQ ring sizes
-    unsigned int __IORING_SETUP_ATTACH_WQ 'IORING_SETUP_ATTACH_WQ'  # attach to existing wq
-    unsigned int __IORING_SETUP_R_DISABLED 'IORING_SETUP_R_DISABLED'  # start with ring disabled
-    unsigned int __IORING_SETUP_SUBMIT_ALL 'IORING_SETUP_SUBMIT_ALL'  # continue submit on error
+        # io_uring_setup() flags
+        __IORING_SETUP_IOPOLL 'IORING_SETUP_IOPOLL'  # io_context is polled
+        __IORING_SETUP_SQPOLL 'IORING_SETUP_SQPOLL'  # SQ poll thread
+        __IORING_SETUP_SQ_AFF 'IORING_SETUP_SQ_AFF'  # sq_thread_cpu is valid
+        __IORING_SETUP_CQSIZE 'IORING_SETUP_CQSIZE'  # app defines CQ size
+        __IORING_SETUP_CLAMP 'IORING_SETUP_CLAMP'  # clamp SQ/CQ ring sizes
+        __IORING_SETUP_ATTACH_WQ 'IORING_SETUP_ATTACH_WQ'  # attach to existing wq
+        __IORING_SETUP_R_DISABLED 'IORING_SETUP_R_DISABLED'  # start with ring disabled
+        __IORING_SETUP_SUBMIT_ALL 'IORING_SETUP_SUBMIT_ALL'  # continue submit on error
 
-    # Cooperative task running. When requests complete, they often require
-    # forcing the submitter to transition to the kernel to complete. If this
-    # flag is set, work will be done when the task transitions anyway, rather
-    # than force an inter-processor interrupt reschedule. This avoids interrupting
-    # a task running in userspace, and saves an IPI.
-    unsigned int __IORING_SETUP_COOP_TASKRUN 'IORING_SETUP_COOP_TASKRUN'
+        # Cooperative task running. When requests complete, they often require
+        # forcing the submitter to transition to the kernel to complete. If this
+        # flag is set, work will be done when the task transitions anyway, rather
+        # than force an inter-processor interrupt reschedule. This avoids interrupting
+        # a task running in userspace, and saves an IPI.
+        __IORING_SETUP_COOP_TASKRUN 'IORING_SETUP_COOP_TASKRUN'
 
-    # If `COOP_TASKRUN` is set, get notified if task work is available for
-    # running and a kernel transition would be needed to run it. This sets
-    # `IORING_SQ_TASKRUN` in the sq ring flags. Not valid with `COOP_TASKRUN`.
-    unsigned int __IORING_SETUP_TASKRUN_FLAG 'IORING_SETUP_TASKRUN_FLAG'
-    unsigned int __IORING_SETUP_SQE128 'IORING_SETUP_SQE128'
-    unsigned int __IORING_SETUP_CQE32 'IORING_SETUP_CQE32'
+        # If `COOP_TASKRUN` is set, get notified if task work is available for
+        # running and a kernel transition would be needed to run it. This sets
+        # `IORING_SQ_TASKRUN` in the sq ring flags. Not valid with `COOP_TASKRUN`.
+        __IORING_SETUP_TASKRUN_FLAG 'IORING_SETUP_TASKRUN_FLAG'
+        __IORING_SETUP_SQE128 'IORING_SETUP_SQE128'
+        __IORING_SETUP_CQE32 'IORING_SETUP_CQE32'
 
-    # Only one task is allowed to submit requests
-    unsigned int __IORING_SETUP_SINGLE_ISSUER 'IORING_SETUP_SINGLE_ISSUER'
+        # Only one task is allowed to submit requests
+        __IORING_SETUP_SINGLE_ISSUER 'IORING_SETUP_SINGLE_ISSUER'
 
-    # Defer running task work to get events.
-    # Rather than running bits of task work whenever the task transitions
-    # try to do it just before it is needed.
-    unsigned int __IORING_SETUP_DEFER_TASKRUN 'IORING_SETUP_DEFER_TASKRUN'
+        # Defer running task work to get events.
+        # Rather than running bits of task work whenever the task transitions
+        # try to do it just before it is needed.
+        __IORING_SETUP_DEFER_TASKRUN 'IORING_SETUP_DEFER_TASKRUN'
 
-    # Application provides ring memory
-    unsigned int __IORING_SETUP_NO_MMAP 'IORING_SETUP_NO_MMAP'
+        # Application provides ring memory
+        __IORING_SETUP_NO_MMAP 'IORING_SETUP_NO_MMAP'
 
-    # Register the ring fd in itself for use with
-    # IORING_REGISTER_USE_REGISTERED_RING; return a registered fd index rather
-    # than an fd.
-    unsigned int __IORING_SETUP_REGISTERED_FD_ONLY 'IORING_SETUP_REGISTERED_FD_ONLY'
+        # Register the ring fd in itself for use with
+        # IORING_REGISTER_USE_REGISTERED_RING; return a registered fd index rather
+        # than an fd.
+        __IORING_SETUP_REGISTERED_FD_ONLY 'IORING_SETUP_REGISTERED_FD_ONLY'
 
-    # Removes indirection through the SQ index array.
-    unsigned int __IORING_SETUP_NO_SQARRAY 'IORING_SETUP_NO_SQARRAY'
+        # Removes indirection through the SQ index array.
+        __IORING_SETUP_NO_SQARRAY 'IORING_SETUP_NO_SQARRAY'
 
     enum __io_uring_op 'io_uring_op':
         __IORING_OP_NOP 'IORING_OP_NOP'
@@ -139,89 +140,90 @@ cdef extern from 'liburing/io_uring.h' nogil:
         # this goes last, obviously
         __IORING_OP_LAST 'IORING_OP_LAST'
 
-    # `sqe->uring_cmd_flags`
-    # `IORING_URING_CMD_FIXED` use registered buffer;
-    # pass this flag along with setting `sqe->buf_index`.
-    unsigned int __IORING_URING_CMD_FIXED 'IORING_URING_CMD_FIXED'
+    enum:
+        # `sqe->uring_cmd_flags`
+        # `IORING_URING_CMD_FIXED` use registered buffer;
+        # pass this flag along with setting `sqe->buf_index`.
+        __IORING_URING_CMD_FIXED 'IORING_URING_CMD_FIXED'
 
-    # `sqe->fsync_flags`
-    unsigned int __IORING_FSYNC_DATASYNC 'IORING_FSYNC_DATASYNC'
+        # `sqe->fsync_flags`
+        __IORING_FSYNC_DATASYNC 'IORING_FSYNC_DATASYNC'
 
-    # `sqe->timeout_flags`
-    unsigned int __IORING_TIMEOUT_ABS 'IORING_TIMEOUT_ABS'
-    unsigned int __IORING_TIMEOUT_UPDATE 'IORING_TIMEOUT_UPDATE'
-    unsigned int __IORING_TIMEOUT_BOOTTIME 'IORING_TIMEOUT_BOOTTIME'
-    unsigned int __IORING_TIMEOUT_REALTIME 'IORING_TIMEOUT_REALTIME'
-    unsigned int __IORING_LINK_TIMEOUT_UPDATE 'IORING_LINK_TIMEOUT_UPDATE'
-    unsigned int __IORING_TIMEOUT_ETIME_SUCCESS 'IORING_TIMEOUT_ETIME_SUCCESS'
-    unsigned int __IORING_TIMEOUT_MULTISHOT 'IORING_TIMEOUT_MULTISHOT'
-    unsigned int __IORING_TIMEOUT_CLOCK_MASK 'IORING_TIMEOUT_CLOCK_MASK'
-    unsigned int __IORING_TIMEOUT_UPDATE_MASK 'IORING_TIMEOUT_UPDATE_MASK'
+        # `sqe->timeout_flags`
+        __IORING_TIMEOUT_ABS 'IORING_TIMEOUT_ABS'
+        __IORING_TIMEOUT_UPDATE 'IORING_TIMEOUT_UPDATE'
+        __IORING_TIMEOUT_BOOTTIME 'IORING_TIMEOUT_BOOTTIME'
+        __IORING_TIMEOUT_REALTIME 'IORING_TIMEOUT_REALTIME'
+        __IORING_LINK_TIMEOUT_UPDATE 'IORING_LINK_TIMEOUT_UPDATE'
+        __IORING_TIMEOUT_ETIME_SUCCESS 'IORING_TIMEOUT_ETIME_SUCCESS'
+        __IORING_TIMEOUT_MULTISHOT 'IORING_TIMEOUT_MULTISHOT'
+        __IORING_TIMEOUT_CLOCK_MASK 'IORING_TIMEOUT_CLOCK_MASK'
+        __IORING_TIMEOUT_UPDATE_MASK 'IORING_TIMEOUT_UPDATE_MASK'
 
-    # `sqe->splice_flags`
-    # extends splice(2) flags
-    __u32 __SPLICE_F_FD_IN_FIXED 'SPLICE_F_FD_IN_FIXED'
+        # `sqe->splice_flags`
+        # extends splice(2) flags
+        __SPLICE_F_FD_IN_FIXED 'SPLICE_F_FD_IN_FIXED'
 
-    # POLL_ADD flags. Note that since `sqe->poll_events` is the flag space, the
-    # command flags for POLL_ADD are stored in `sqe->len`.
-    #
-    # `IORING_POLL_ADD_MULTI`   Multishot poll. Sets `IORING_CQE_F_MORE` if
-    #                           the poll handler will continue to report
-    #                           CQEs on behalf of the same SQE.
-    #
-    # `IORING_POLL_UPDATE`      Update existing poll request, matching
-    #                           `sqe->addr` as the old `user_data` field.
-    #
-    # `IORING_POLL_ADD_LEVEL`   Level triggered poll.
-    unsigned int __IORING_POLL_ADD_MULTI 'IORING_POLL_ADD_MULTI'
-    unsigned int __IORING_POLL_UPDATE_EVENTS 'IORING_POLL_UPDATE_EVENTS'
-    unsigned int __IORING_POLL_UPDATE_USER_DATA 'IORING_POLL_UPDATE_USER_DATA'
-    unsigned int __IORING_POLL_ADD_LEVEL 'IORING_POLL_ADD_LEVEL'
+        # POLL_ADD flags. Note that since `sqe->poll_events` is the flag space, the
+        # command flags for POLL_ADD are stored in `sqe->len`.
+        #
+        # `IORING_POLL_ADD_MULTI`   Multishot poll. Sets `IORING_CQE_F_MORE` if
+        #                           the poll handler will continue to report
+        #                           CQEs on behalf of the same SQE.
+        #
+        # `IORING_POLL_UPDATE`      Update existing poll request, matching
+        #                           `sqe->addr` as the old `user_data` field.
+        #
+        # `IORING_POLL_ADD_LEVEL`   Level triggered poll.
+        __IORING_POLL_ADD_MULTI 'IORING_POLL_ADD_MULTI'
+        __IORING_POLL_UPDATE_EVENTS 'IORING_POLL_UPDATE_EVENTS'
+        __IORING_POLL_UPDATE_USER_DATA 'IORING_POLL_UPDATE_USER_DATA'
+        __IORING_POLL_ADD_LEVEL 'IORING_POLL_ADD_LEVEL'
 
-    # ASYNC_CANCEL flags.
-    # Cancel all requests that match the given key
-    unsigned int __IORING_ASYNC_CANCEL_ALL 'IORING_ASYNC_CANCEL_ALL'
-    # Key off `fd` for cancellation rather than the request `user_data`
-    unsigned int __IORING_ASYNC_CANCEL_FD 'IORING_ASYNC_CANCEL_FD'
-    # Match any request
-    unsigned int __IORING_ASYNC_CANCEL_ANY 'IORING_ASYNC_CANCEL_ANY'
-    # 'fd' passed in is a fixed descriptor
-    unsigned int __IORING_ASYNC_CANCEL_FD_FIXED 'IORING_ASYNC_CANCEL_FD_FIXED'
+        # ASYNC_CANCEL flags.
+        # Cancel all requests that match the given key
+        __IORING_ASYNC_CANCEL_ALL 'IORING_ASYNC_CANCEL_ALL'
+        # Key off `fd` for cancellation rather than the request `user_data`
+        __IORING_ASYNC_CANCEL_FD 'IORING_ASYNC_CANCEL_FD'
+        # Match any request
+        __IORING_ASYNC_CANCEL_ANY 'IORING_ASYNC_CANCEL_ANY'
+        # 'fd' passed in is a fixed descriptor
+        __IORING_ASYNC_CANCEL_FD_FIXED 'IORING_ASYNC_CANCEL_FD_FIXED'
 
-    # send/sendmsg and recv/recvmsg flags (sqe->ioprio)
-    #
-    # `IORING_RECVSEND_POLL_FIRST`  If set, instead of first attempting to send
-    #                               or receive and arm poll if that yields an
-    #                               `-EAGAIN` result, arm poll upfront and skip
-    #                               the initial transfer attempt.
-    #
-    # `IORING_RECV_MULTISHOT`       Multishot recv. Sets `IORING_CQE_F_MORE` if
-    #                               the handler will continue to report
-    #                               CQEs on behalf of the same SQE.
-    #
-    # `IORING_RECVSEND_FIXED_BUF`   Use registered buffers,
-    #                               the index is stored in the buf_index field.
-    #
-    # `IORING_SEND_ZC_REPORT_USAGE` If set, SEND[MSG]_ZC should report
-    #                               the zerocopy usage in cqe.res
-    #                               for the `IORING_CQE_F_NOTIF` cqe.
-    #                               `0` is reported if zerocopy was actually possible.
-    #                               `IORING_NOTIF_USAGE_ZC_COPIED` if data was copied
-    #                               (at least partially).
-    unsigned int __IORING_RECVSEND_POLL_FIRST 'IORING_RECVSEND_POLL_FIRST'
-    unsigned int __IORING_RECV_MULTISHOT 'IORING_RECV_MULTISHOT'
-    unsigned int __IORING_RECVSEND_FIXED_BUF 'IORING_RECVSEND_FIXED_BUF'
-    unsigned int __IORING_SEND_ZC_REPORT_USAGE 'IORING_SEND_ZC_REPORT_USAGE'
+        # send/sendmsg and recv/recvmsg flags (sqe->ioprio)
+        #
+        # `IORING_RECVSEND_POLL_FIRST`  If set, instead of first attempting to send
+        #                               or receive and arm poll if that yields an
+        #                               `-EAGAIN` result, arm poll upfront and skip
+        #                               the initial transfer attempt.
+        #
+        # `IORING_RECV_MULTISHOT`       Multishot recv. Sets `IORING_CQE_F_MORE` if
+        #                               the handler will continue to report
+        #                               CQEs on behalf of the same SQE.
+        #
+        # `IORING_RECVSEND_FIXED_BUF`   Use registered buffers,
+        #                               the index is stored in the buf_index field.
+        #
+        # `IORING_SEND_ZC_REPORT_USAGE` If set, SEND[MSG]_ZC should report
+        #                               the zerocopy usage in cqe.res
+        #                               for the `IORING_CQE_F_NOTIF` cqe.
+        #                               `0` is reported if zerocopy was actually possible.
+        #                               `IORING_NOTIF_USAGE_ZC_COPIED` if data was copied
+        #                               (at least partially).
+        __IORING_RECVSEND_POLL_FIRST 'IORING_RECVSEND_POLL_FIRST'
+        __IORING_RECV_MULTISHOT 'IORING_RECV_MULTISHOT'
+        __IORING_RECVSEND_FIXED_BUF 'IORING_RECVSEND_FIXED_BUF'
+        __IORING_SEND_ZC_REPORT_USAGE 'IORING_SEND_ZC_REPORT_USAGE'
 
-    # `cqe.res` for `IORING_CQE_F_NOTIF` if
-    # `IORING_SEND_ZC_REPORT_USAGE` was requested
-    #
-    # It should be treated as a flag, all other
-    # bits of `cqe.res` should be treated as reserved!
-    __u32 __IORING_NOTIF_USAGE_ZC_COPIED 'IORING_NOTIF_USAGE_ZC_COPIED'
+        # `cqe.res` for `IORING_CQE_F_NOTIF` if
+        # `IORING_SEND_ZC_REPORT_USAGE` was requested
+        #
+        # It should be treated as a flag, all other
+        # bits of `cqe.res` should be treated as reserved!
+        __IORING_NOTIF_USAGE_ZC_COPIED 'IORING_NOTIF_USAGE_ZC_COPIED'
 
-    # accept flags stored in `sqe->ioprio`
-    unsigned int __IORING_ACCEPT_MULTISHOT 'IORING_ACCEPT_MULTISHOT'
+        # accept flags stored in `sqe->ioprio`
+        __IORING_ACCEPT_MULTISHOT 'IORING_ACCEPT_MULTISHOT'
 
     # `IORING_OP_MSG_RING` command types, stored in `sqe->addr`
     # TODO: enum __io_uring_msg 'io_uring_msg':
@@ -229,18 +231,19 @@ cdef extern from 'liburing/io_uring.h' nogil:
         __IORING_MSG_DATA 'IORING_MSG_DATA'  # pass `sqe->len` as `res` and `off` as `user_data`
         __IORING_MSG_SEND_FD 'IORING_MSG_SEND_FD'  # send a registered `fd` to another ring
 
-    # `IORING_OP_MSG_RING` flags (`sqe->msg_ring_flags`)
-    #
-    # `IORING_MSG_RING_CQE_SKIP`    Don't post a CQE to the target ring. Not
-    #                               applicable for `IORING_MSG_DATA`, obviously.
-    unsigned int __IORING_MSG_RING_CQE_SKIP 'IORING_MSG_RING_CQE_SKIP'
-    # Pass through the flags from `sqe->file_index` to `cqe->flags`
-    unsigned int __IORING_MSG_RING_FLAGS_PASS 'IORING_MSG_RING_FLAGS_PASS'
+    enum:
+        # `IORING_OP_MSG_RING` flags (`sqe->msg_ring_flags`)
+        #
+        # `IORING_MSG_RING_CQE_SKIP`    Don't post a CQE to the target ring. Not
+        #                               applicable for `IORING_MSG_DATA`, obviously.
+        __IORING_MSG_RING_CQE_SKIP 'IORING_MSG_RING_CQE_SKIP'
+        # Pass through the flags from `sqe->file_index` to `cqe->flags`
+        __IORING_MSG_RING_FLAGS_PASS 'IORING_MSG_RING_FLAGS_PASS'
 
-    # `IORING_OP_FIXED_FD_INSTALL` flags (`sqe->install_fd_flags`)
-    #
-    # `IORING_FIXED_FD_NO_CLOEXEC`   Don't mark the `fd` as `O_CLOEXEC`
-    unsigned int __IORING_FIXED_FD_NO_CLOEXEC 'IORING_FIXED_FD_NO_CLOEXEC'
+        # `IORING_OP_FIXED_FD_INSTALL` flags (`sqe->install_fd_flags`)
+        #
+        # `IORING_FIXED_FD_NO_CLOEXEC`   Don't mark the `fd` as `O_CLOEXEC`
+        __IORING_FIXED_FD_NO_CLOEXEC 'IORING_FIXED_FD_NO_CLOEXEC'
 
     # IO completion data structure (Completion Queue Entry)
     struct __io_uring_cqe "io_uring_cqe":
@@ -252,26 +255,28 @@ cdef extern from 'liburing/io_uring.h' nogil:
         __u64 big_cqe[]
         # __u64   big_cqe[16] ???
 
-    # cqe->flags
-    # If set, the upper 16 bits are the buffer ID
-    unsigned int __IORING_CQE_F_BUFFER 'IORING_CQE_F_BUFFER'
-    # If set, parent SQE will generate more CQE entries
-    unsigned int __IORING_CQE_F_MORE 'IORING_CQE_F_MORE'
-    # If set, more data to read after socket recv
-    unsigned int __IORING_CQE_F_SOCK_NONEMPTY 'IORING_CQE_F_SOCK_NONEMPTY'
-    # Set for notification CQEs. Can be used to distinct them from sends.
-    unsigned int __IORING_CQE_F_NOTIF 'IORING_CQE_F_NOTIF'
+    enum:
+        # cqe->flags
+        # If set, the upper 16 bits are the buffer ID
+        __IORING_CQE_F_BUFFER 'IORING_CQE_F_BUFFER'
+        # If set, parent SQE will generate more CQE entries
+        __IORING_CQE_F_MORE 'IORING_CQE_F_MORE'
+        # If set, more data to read after socket recv
+        __IORING_CQE_F_SOCK_NONEMPTY 'IORING_CQE_F_SOCK_NONEMPTY'
+        # Set for notification CQEs. Can be used to distinct them from sends.
+        __IORING_CQE_F_NOTIF 'IORING_CQE_F_NOTIF'
 
     enum __io_uring_cqe_op 'io_uring_cqe_op':
         __IORING_CQE_BUFFER_SHIFT 'IORING_CQE_BUFFER_SHIFT'
 
     # Magic offsets for the application to mmap the data it needs
-    unsigned long long __IORING_OFF_SQ_RING 'IORING_OFF_SQ_RING'
-    unsigned long long __IORING_OFF_CQ_RING 'IORING_OFF_CQ_RING'
-    unsigned long long __IORING_OFF_SQES 'IORING_OFF_SQES'
-    unsigned long long __IORING_OFF_PBUF_RING 'IORING_OFF_PBUF_RING'
-    unsigned int       __IORING_OFF_PBUF_SHIFT 'IORING_OFF_PBUF_SHIFT'
-    unsigned long long __IORING_OFF_MMAP_MASK 'IORING_OFF_MMAP_MASK'
+    enum:
+        __IORING_OFF_SQ_RING 'IORING_OFF_SQ_RING'
+        __IORING_OFF_CQ_RING 'IORING_OFF_CQ_RING'
+        __IORING_OFF_SQES 'IORING_OFF_SQES'
+        __IORING_OFF_PBUF_RING 'IORING_OFF_PBUF_RING'
+        __IORING_OFF_PBUF_SHIFT 'IORING_OFF_PBUF_SHIFT'
+        __IORING_OFF_MMAP_MASK 'IORING_OFF_MMAP_MASK'
 
     # Filled with the offset for mmap(2)
     struct __io_sqring_offsets "io_sqring_offsets":
@@ -285,10 +290,11 @@ cdef extern from 'liburing/io_uring.h' nogil:
         __u32 resv1
         __u64 user_addr
 
-    # sq_ring->flags
-    unsigned int __IORING_SQ_NEED_WAKEUP 'IORING_SQ_NEED_WAKEUP'  # needs `io_uring_enter` wake-up
-    unsigned int __IORING_SQ_CQ_OVERFLOW 'IORING_SQ_CQ_OVERFLOW'  # CQ ring is overflown
-    unsigned int __IORING_SQ_TASKRUN 'IORING_SQ_TASKRUN'  # task should enter the kernel
+    enum:
+        # sq_ring->flags
+        __IORING_SQ_NEED_WAKEUP 'IORING_SQ_NEED_WAKEUP'  # needs `io_uring_enter` wake-up
+        __IORING_SQ_CQ_OVERFLOW 'IORING_SQ_CQ_OVERFLOW'  # CQ ring is overflown
+        __IORING_SQ_TASKRUN 'IORING_SQ_TASKRUN'          # task should enter the kernel
 
     struct __io_cqring_offsets "io_cqring_offsets":
         __u32 head
@@ -301,16 +307,17 @@ cdef extern from 'liburing/io_uring.h' nogil:
         __u32 resv1
         __u64 user_addr
 
-    # cq_ring->flags
-    # disable eventfd notifications
-    unsigned int __IORING_CQ_EVENTFD_DISABLED 'IORING_CQ_EVENTFD_DISABLED'
+    enum:
+        # cq_ring->flags
+        # disable eventfd notifications
+        __IORING_CQ_EVENTFD_DISABLED 'IORING_CQ_EVENTFD_DISABLED'
 
-    # io_uring_enter(2) flags
-    unsigned int __IORING_ENTER_GETEVENTS 'IORING_ENTER_GETEVENTS'
-    unsigned int __IORING_ENTER_SQ_WAKEUP 'IORING_ENTER_SQ_WAKEUP'
-    unsigned int __IORING_ENTER_SQ_WAIT 'IORING_ENTER_SQ_WAIT'
-    unsigned int __IORING_ENTER_EXT_ARG 'IORING_ENTER_EXT_ARG'
-    unsigned int __IORING_ENTER_REGISTERED_RING 'IORING_ENTER_REGISTERED_RING'
+        # io_uring_enter(2) flags
+        __IORING_ENTER_GETEVENTS 'IORING_ENTER_GETEVENTS'
+        __IORING_ENTER_SQ_WAKEUP 'IORING_ENTER_SQ_WAKEUP'
+        __IORING_ENTER_SQ_WAIT 'IORING_ENTER_SQ_WAIT'
+        __IORING_ENTER_EXT_ARG 'IORING_ENTER_EXT_ARG'
+        __IORING_ENTER_REGISTERED_RING 'IORING_ENTER_REGISTERED_RING'
 
     # Passed in for io_uring_setup(2). Copied back with updated info on success
     struct __io_uring_params "io_uring_params":
@@ -325,21 +332,22 @@ cdef extern from 'liburing/io_uring.h' nogil:
         __io_sqring_offsets   sq_off
         __io_cqring_offsets   cq_off
 
-    # io_uring_params->features flags
-    unsigned int __IORING_FEAT_SINGLE_MMAP 'IORING_FEAT_SINGLE_MMAP'
-    unsigned int __IORING_FEAT_NODROP 'IORING_FEAT_NODROP'
-    unsigned int __IORING_FEAT_SUBMIT_STABLE 'IORING_FEAT_SUBMIT_STABLE'
-    unsigned int __IORING_FEAT_RW_CUR_POS 'IORING_FEAT_RW_CUR_POS'
-    unsigned int __IORING_FEAT_CUR_PERSONALITY 'IORING_FEAT_CUR_PERSONALITY'
-    unsigned int __IORING_FEAT_FAST_POLL 'IORING_FEAT_FAST_POLL'
-    unsigned int __IORING_FEAT_POLL_32BITS 'IORING_FEAT_POLL_32BITS'
-    unsigned int __IORING_FEAT_SQPOLL_NONFIXED 'IORING_FEAT_SQPOLL_NONFIXED'
-    unsigned int __IORING_FEAT_EXT_ARG 'IORING_FEAT_EXT_ARG'
-    unsigned int __IORING_FEAT_NATIVE_WORKERS 'IORING_FEAT_NATIVE_WORKERS'
-    unsigned int __IORING_FEAT_RSRC_TAGS 'IORING_FEAT_RSRC_TAGS'
-    unsigned int __IORING_FEAT_CQE_SKIP 'IORING_FEAT_CQE_SKIP'
-    unsigned int __IORING_FEAT_LINKED_FILE 'IORING_FEAT_LINKED_FILE'
-    unsigned int __IORING_FEAT_REG_REG_RING 'IORING_FEAT_REG_REG_RING'
+    enum:
+        # io_uring_params->features flags
+        __IORING_FEAT_SINGLE_MMAP 'IORING_FEAT_SINGLE_MMAP'
+        __IORING_FEAT_NODROP 'IORING_FEAT_NODROP'
+        __IORING_FEAT_SUBMIT_STABLE 'IORING_FEAT_SUBMIT_STABLE'
+        __IORING_FEAT_RW_CUR_POS 'IORING_FEAT_RW_CUR_POS'
+        __IORING_FEAT_CUR_PERSONALITY 'IORING_FEAT_CUR_PERSONALITY'
+        __IORING_FEAT_FAST_POLL 'IORING_FEAT_FAST_POLL'
+        __IORING_FEAT_POLL_32BITS 'IORING_FEAT_POLL_32BITS'
+        __IORING_FEAT_SQPOLL_NONFIXED 'IORING_FEAT_SQPOLL_NONFIXED'
+        __IORING_FEAT_EXT_ARG 'IORING_FEAT_EXT_ARG'
+        __IORING_FEAT_NATIVE_WORKERS 'IORING_FEAT_NATIVE_WORKERS'
+        __IORING_FEAT_RSRC_TAGS 'IORING_FEAT_RSRC_TAGS'
+        __IORING_FEAT_CQE_SKIP 'IORING_FEAT_CQE_SKIP'
+        __IORING_FEAT_LINKED_FILE 'IORING_FEAT_LINKED_FILE'
+        __IORING_FEAT_REG_REG_RING 'IORING_FEAT_REG_REG_RING'
 
     # io_uring_register(2) opcodes and arguments
     enum __io_uring_register_op 'io_uring_register_op':
@@ -404,9 +412,10 @@ cdef extern from 'liburing/io_uring.h' nogil:
 
     # NOTE: skipping `io_uring_files_update` deprecated
 
-    # Register a fully sparse file space, rather than pass in an array of all
-    # `-1` file descriptors.
-    unsigned int __IORING_RSRC_REGISTER_SPARSE 'IORING_RSRC_REGISTER_SPARSE'
+    enum:
+        # Register a fully sparse file space, rather than pass in an array of all
+        # `-1` file descriptors.
+        __IORING_RSRC_REGISTER_SPARSE 'IORING_RSRC_REGISTER_SPARSE'
 
     struct __io_uring_rsrc_register "io_uring_rsrc_register":
         __u32 nr
@@ -428,10 +437,11 @@ cdef extern from 'liburing/io_uring.h' nogil:
         __u32 nr
         __u32 resv2
 
-    # Skip updating fd indexes set to this value in the fd table
-    int __IORING_REGISTER_FILES_SKIP 'IORING_REGISTER_FILES_SKIP'
+    enum:
+        # Skip updating fd indexes set to this value in the fd table
+        __IORING_REGISTER_FILES_SKIP 'IORING_REGISTER_FILES_SKIP'
 
-    unsigned int __IO_URING_OP_SUPPORTED 'IO_URING_OP_SUPPORTED'
+        __IO_URING_OP_SUPPORTED 'IO_URING_OP_SUPPORTED'
 
     struct __io_uring_probe_op "io_uring_probe_op":
         __u8 op

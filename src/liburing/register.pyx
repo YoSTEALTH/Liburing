@@ -1,6 +1,3 @@
-from cpython.array cimport array
-
-
 cpdef int io_uring_register_buffers(io_uring ring,
                                     iovec iovecs,
                                     unsigned int nr_iovecs) nogil:
@@ -92,8 +89,6 @@ cpdef int io_uring_unregister_napi(io_uring ring, io_uring_napi napi) nogil:
     return trap_error(__io_uring_unregister_napi(ring.ptr, napi.ptr))
 
 
-
-
 cpdef int io_uring_register_files(io_uring ring, list[int] fds):
     ''' Register File Descriptor
 
@@ -141,4 +136,3 @@ cpdef int io_uring_register_files_update(io_uring ring,
                                          int files,
                                          unsigned int nr_files) nogil:
     return trap_error(__io_uring_register_files_update(ring.ptr, off, &files, nr_files))
-

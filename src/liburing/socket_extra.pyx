@@ -1,6 +1,3 @@
-from libc.string cimport memset
-
-
 cdef class getaddrinfo:
     def __cinit__(self, const char* host, char* port_service,
                   int family=0, int type=0, int proto=0, int flags=0):
@@ -12,7 +9,7 @@ cdef class getaddrinfo:
                 ...     ...
                 ...     io_uring_prep_connect(sqe, sockfd, addr)
                 ...     ...
-                ...     break  # if connection successful break, else try next.
+                ...     break  # if connected successfully, break, else try next.
         '''
         # TODO: `port_service` should handle both `int` & `bytes` types.
         cdef:
@@ -126,23 +123,3 @@ cpdef tuple getnameinfo(sockaddr addr, int flags=0):
     trap_error(__getnameinfo(<__sockaddr*>addr.ptr, addr.sizeof,
                              host, sizeof(host), service, sizeof(service), flags))
     return (host, int(service) if service.isdigit() else service)
-
-
-# getaddrinfo/getnameinfo start >>>
-AI_PASSIVE = __AI_PASSIVE
-AI_CANONNAME = __AI_CANONNAME
-AI_NUMERICHOST = __AI_NUMERICHOST
-AI_V4MAPPED = __AI_V4MAPPED
-AI_ALL = __AI_ALL
-AI_ADDRCONFIG = __AI_ADDRCONFIG
-AI_IDN = __AI_IDN
-AI_CANONIDN = __AI_CANONIDN
-AI_NUMERICSERV = __AI_NUMERICSERV
-
-NI_NUMERICHOST = __NI_NUMERICHOST
-NI_NUMERICSERV = __NI_NUMERICSERV
-NI_NOFQDN = __NI_NOFQDN
-NI_NAMEREQD = __NI_NAMEREQD
-NI_DGRAM = __NI_DGRAM
-NI_IDN = __NI_IDN
-# getaddrinfo/getnameinfo end <<<

@@ -1,7 +1,3 @@
-# linux version
-LINUX_VERSION_MAJOR = __LINUX_VERSION_MAJOR
-LINUX_VERSION_MINOR = __LINUX_VERSION_MINOR
-
 cpdef inline bool linux_version_check(__u8 major, __u8 minor=0) noexcept nogil:
     ''' Linux Version Check.
 
@@ -24,7 +20,6 @@ cpdef inline bool linux_version_check(__u8 major, __u8 minor=0) noexcept nogil:
             True
     '''
     return __LINUX_VERSION_CHECK(major, minor)
-
 
 # liburing version
 cpdef __u8 liburing_version_major():

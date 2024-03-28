@@ -1,6 +1,8 @@
+from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
+from cpython.ref cimport Py_INCREF, Py_DECREF
 from .lib.uring cimport *
+from .error cimport trap_error, memory_error, index_error
 from .time cimport timespec
-from .type cimport sigset, siginfo
 
 
 cdef class io_uring:
@@ -20,6 +22,12 @@ cdef class io_uring_params:
 
 cdef class io_uring_buf_ring:
     cdef __io_uring_buf_ring * ptr
+
+cdef class siginfo:
+    cdef siginfo_t *ptr
+
+cdef class sigset:
+    cdef sigset_t *ptr
 
 
 cpdef int io_uring_queue_init_mem(unsigned int entries,
@@ -136,3 +144,15 @@ cpdef int io_uring_buf_ring_available(io_uring ring,
                                       unsigned short bgid) noexcept nogil
 
 cpdef io_uring_sqe io_uring_get_sqe(io_uring ring)
+
+
+cpdef enum __queue_define__:
+    LIBURING_UDATA_TIMEOUT = __LIBURING_UDATA_TIMEOUT
+    # sqe.flags
+    IOSQE_FIXED_FILE = __IOSQE_FIXED_FILE
+    IOSQE_IO_DRAIN = __IOSQE_IO_DRAIN
+    IOSQE_IO_LINK = __IOSQE_IO_LINK
+    IOSQE_IO_HARDLINK = __IOSQE_IO_HARDLINK
+    IOSQE_ASYNC = __IOSQE_ASYNC
+    IOSQE_BUFFER_SELECT = __IOSQE_BUFFER_SELECT
+    IOSQE_CQE_SKIP_SUCCESS = __IOSQE_CQE_SKIP_SUCCESS

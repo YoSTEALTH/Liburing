@@ -109,16 +109,17 @@ cdef extern from '<netdb.h>' nogil:
     void __freeaddrinfo 'freeaddrinfo'(__addrinfo *ai)  # free `addrinfo'
     const char* __gai_strerror 'gai_strerror'(int ecode)
 
-    # Possible values for `ai_flags' field in `addrinfo' structure.
-    int __AI_PASSIVE 'AI_PASSIVE'           # Socket address is intended for `bind'.
-    int __AI_CANONNAME 'AI_CANONNAME'       # Request for canonical name.
-    int __AI_NUMERICHOST 'AI_NUMERICHOST'   # Don't use name resolution.
-    int __AI_V4MAPPED 'AI_V4MAPPED'         # IPv4 mapped addresses are acceptable.
-    int __AI_ALL 'AI_ALL'                   # Return IPv4 mapped and IPv6 addresses.
-    int __AI_ADDRCONFIG 'AI_ADDRCONFIG'     # Use config of host to choose returned address type.
-    int __AI_IDN 'AI_IDN'                   # IDN encode input before looking it up.
-    int __AI_CANONIDN 'AI_CANONIDN'         # Translate canonical name from IDN format.
-    int __AI_NUMERICSERV 'AI_NUMERICSERV'   # Don't use name resolution.
+    enum:
+        # Possible values for `ai_flags' field in `addrinfo' structure.
+        __AI_PASSIVE 'AI_PASSIVE'           # Socket address is intended for `bind'.
+        __AI_CANONNAME 'AI_CANONNAME'       # Request for canonical name.
+        __AI_NUMERICHOST 'AI_NUMERICHOST'   # Don't use name resolution.
+        __AI_V4MAPPED 'AI_V4MAPPED'         # IPv4 mapped addresses are acceptable.
+        __AI_ALL 'AI_ALL'                   # Return IPv4 mapped and IPv6 addresses.
+        __AI_ADDRCONFIG 'AI_ADDRCONFIG'     # Use config of host to choose returned address type.
+        __AI_IDN 'AI_IDN'                   # IDN encode input before looking it up.
+        __AI_CANONIDN 'AI_CANONIDN'         # Translate canonical name from IDN format.
+        __AI_NUMERICSERV 'AI_NUMERICSERV'   # Don't use name resolution.
 
     enum:
         # internal use only.

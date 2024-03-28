@@ -1,5 +1,9 @@
 from .lib.uring cimport *
+from .error cimport trap_error, memory_error
 from .queue cimport io_uring, io_uring_params, io_uring_sqe
+
+
+# TODO: class/function here have not been organized, yet!
 
 
 cdef class io_uring_buf_ring:

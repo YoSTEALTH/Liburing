@@ -1,8 +1,3 @@
-from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
-from cpython.ref cimport Py_INCREF, Py_DECREF
-from .error cimport trap_error, memory_error, index_error
-
-
 cdef class io_uring:
     ''' I/O URing
 
@@ -201,6 +196,13 @@ cdef class io_uring_cqe:
             return self.ptr.flags
         memory_error(self, 'out of `cqe`')
 
+# TODO:
+cdef class siginfo:
+    pass
+
+cdef class sigset:
+    pass
+
 
 cpdef int io_uring_queue_init_mem(unsigned int entries,
                                   io_uring ring,
@@ -308,6 +310,7 @@ cpdef inline object io_uring_cqe_get_data(io_uring_cqe cqe):
     cdef object obj = <object>__io_uring_cqe_get_data(cqe.ptr)
     Py_DECREF(obj)
     return obj
+
 
 cpdef inline void io_uring_sqe_set_data64(io_uring_sqe sqe,
                                           __u64 data) noexcept nogil:
@@ -419,15 +422,3 @@ cpdef inline io_uring_sqe io_uring_get_sqe(io_uring ring):
     cdef io_uring_sqe sqe = io_uring_sqe(0)
     sqe.ptr = __io_uring_get_sqe(ring.ptr)
     return sqe
-
-
-LIBURING_UDATA_TIMEOUT = __LIBURING_UDATA_TIMEOUT
-
-# sqe.flags
-IOSQE_FIXED_FILE = __IOSQE_FIXED_FILE
-IOSQE_IO_DRAIN = __IOSQE_IO_DRAIN
-IOSQE_IO_LINK = __IOSQE_IO_LINK
-IOSQE_IO_HARDLINK = __IOSQE_IO_HARDLINK
-IOSQE_ASYNC = __IOSQE_ASYNC
-IOSQE_BUFFER_SELECT = __IOSQE_BUFFER_SELECT
-IOSQE_CQE_SKIP_SUCCESS = __IOSQE_CQE_SKIP_SUCCESS

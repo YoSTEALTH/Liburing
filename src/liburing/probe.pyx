@@ -1,7 +1,3 @@
-from cpython.mem cimport PyMem_RawCalloc
-from .error cimport trap_error, memory_error
-
-
 cdef class io_uring_probe:
 
     def __cinit__(self, unsigned int num=0):

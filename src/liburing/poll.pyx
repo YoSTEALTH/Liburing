@@ -1,3 +1,7 @@
+cdef class epoll_event:
+    ''' Note: if you want this feature create an Issue/PR. '''
+
+
 cpdef inline void io_uring_prep_poll_add(io_uring_sqe sqe,
                                          int fd,
                                          unsigned int poll_mask) noexcept nogil:
