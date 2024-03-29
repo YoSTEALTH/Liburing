@@ -1,7 +1,7 @@
 |test-status| |downloads|
 
 Liburing (Work in progress ... )
-========
+================================
 
 Liburing is Python + Cython wrapper around `C Liburing`_, which is a helper to setup and tear-down io_uring instances.
 
@@ -54,7 +54,7 @@ To find out all the class, functions and definitions:
     import liburing
 
     print(dir(liburing))  # to see all the importable names (this will not load all the modules)
-    help(liburing)  # to see all the help docs (this will load all the modules.)
+    help(liburing)        # to see all the help docs (this will load all the modules.)
 
 
 Find out which ``io_uring`` operations is supported by the kernel:
