@@ -44,7 +44,8 @@ Install directly from GitHub:
 
 .. code-block:: text
 
-    python3 -m pip install --upgrade git+https://github.com/YoSTEALTH/Liburing
+    # Use multi-thread for faster install. Change `-j4` to higher/lower value.
+    python3 -m pip install --upgrade --config-setting="--build-option=build_ext -j4" git+https://github.com/YoSTEALTH/Liburing
 
 
 To find out all the class, functions and definitions:
