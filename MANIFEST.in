@@ -9,13 +9,10 @@ include libs/liburing/Makefile
 include libs/liburing/Makefile.common
 include libs/liburing/Makefile.quiet
 include libs/liburing/LICENSE
-
-exclude libs/liburing/src/include/liburing/io_uring_version.h
-exclude libs/liburing/src/include/liburing/compat.h
 # C Liburing END <<<
 
 graft example
 graft test
 
 exclude src/liburing/*.c
-global-exclude *.py[cod] *.so # note: must run last to exclude properly
+global-exclude *.py[cod] # note: must run last to exclude properly
