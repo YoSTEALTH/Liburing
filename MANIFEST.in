@@ -1,23 +1,21 @@
-include README.rst
-include LICENSE.txt
+# C Liburing START >>>
+graft libs/liburing/src
 
-# C Liburing
-include libs/liburing/LICENSE
-include libs/liburing/COPYING
-include libs/liburing/COPYING.GPL
 include libs/liburing/configure
-
-graft libs/liburing/src/arch
-
-include libs/liburing/src/include/liburing.h
-include libs/liburing/src/include/liburing/barrier.h
-include libs/liburing/src/include/liburing/io_uring.h
+include libs/liburing/liburing-ffi.pc.in
+include libs/liburing/liburing.pc.in
+include libs/liburing/liburing.spec
+include libs/liburing/Makefile
+include libs/liburing/Makefile.common
+include libs/liburing/Makefile.quiet
+include libs/liburing/LICENSE
 
 exclude libs/liburing/src/include/liburing/io_uring_version.h
 exclude libs/liburing/src/include/liburing/compat.h
+# C Liburing END <<<
 
-graft src/liburing
 graft example
 graft test
 
-global-exclude *.py[cod]  # note: must run last to exclude properly
+exclude src/liburing/*.c
+global-exclude *.py[cod] *.so # note: must run last to exclude properly
