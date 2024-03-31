@@ -1,7 +1,7 @@
 from .type cimport *
 
 
-cdef extern from 'liburing/io_uring.h' nogil:
+cdef extern from '../include/liburing/io_uring.h' nogil:
     # IO submission data structure (Submission Queue Entry)
     struct __io_uring_sqe "io_uring_sqe":
         __u8 flags       # IOSQE_ flags
