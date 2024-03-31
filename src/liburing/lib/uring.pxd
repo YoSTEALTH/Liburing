@@ -7,7 +7,7 @@ from .socket cimport *
 from .io_uring cimport *
 
 
-cdef extern from 'liburing.h' nogil:
+cdef extern from '../include/liburing.h' nogil:
     # Library interface to `io_uring`
     # -------------------------------
     struct __io_uring_sq 'io_uring_sq':
@@ -168,9 +168,10 @@ cdef extern from 'liburing.h' nogil:
                                                                   unsigned int flags)
     int __io_uring_unregister_buf_ring 'io_uring_unregister_buf_ring'(__io_uring* ring,
                                                                       int bgid)
+
     int __io_uring_buf_ring_head 'io_uring_buf_ring_head'(__io_uring* ring,
                                                           int buf_group,
-                                                          unsigned int* head)
+                                                          uint16_t* head)
     int __io_uring_register_sync_cancel 'io_uring_register_sync_cancel'(
                                             __io_uring* ring,
                                             __io_uring_sync_cancel_reg* reg)
