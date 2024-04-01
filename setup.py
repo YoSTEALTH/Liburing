@@ -29,7 +29,8 @@ with TemporaryDirectory() as tmpdir:
                 'libs/liburing/Makefile.common',
                 'libs/liburing/Makefile.quiet'):
         copy2(src, join(tmpdir, src))
-    sub_process_run(['./configure'], cwd=lib, capture_output=True, check=True)
+
+    sub_process_run(['./configure', '--use-libc'], cwd=lib, capture_output=True, check=True)
     sub_process_run(['make', f'--jobs={threads}'], cwd=lib, capture_output=True)
     # note: just runs `configure` & `make`, does not `install`.
 
@@ -42,6 +43,9 @@ with TemporaryDirectory() as tmpdir:
                            extra_compile_args=['-O3', '-g0'])
                  ]  # optimize & remove debug symbols + data.
 
+    # replace temp `include` holder files with actaul `include` content.
+    copytree(libinc, 'src/liburing/include', dirs_exist_ok=True)
+    # install
     setup(ext_modules=cythonize(extension,
                                 nthreads=threads,
                                 compiler_directives={
