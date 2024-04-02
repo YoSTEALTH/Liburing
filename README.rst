@@ -9,21 +9,22 @@ Liburing is Python + Cython wrapper around `C Liburing`_, which is a helper to s
 * ``io_uring`` reduces number of syscalls overhead & context switches, thus improving speed.
 * ...
 
-
 Good(old) documentation `Lord of the io_uring`_
+
+Check out `Shakti`_, it uses ``liburing`` and provides an easy to use Python ``async`` ``await`` Interface.
 
 
 Requires
 --------
 
-    - Linux 6.0+ (6.7+ recommended)
+    - Linux 6.5+ (6.7+ recommended)
     - Python 3.8+
 
 
-Includes
---------
+Includes (battery)
+------------------
 
-    - liburing 2.6+
+    - C liburing 2.6+
 
 
 Install, update & uninstall (Alpha)
@@ -72,7 +73,7 @@ Find out which ``io_uring`` operations is supported by the kernel:
 Simple File Example
 -------------------
 
-.. code-block:: python
+.. code:: python
 
     # example/open_write_read_close.py
     from liburing import O_CREAT, O_RDWR, AT_FDCWD, iovec, io_uring, io_uring_get_sqe, \
@@ -149,7 +150,6 @@ Simple File Example
         main()
 
 
-
 Note
 ----
     - Try not to use ``from liburing import *`` this will load all the modules at once, unless that's what you want!
@@ -157,24 +157,28 @@ Note
 
 Cython Note
 -----------
-    - For hardcore developers that need raw access, there is ``src/liburing/lib`` directory with ``.pxd`` header files. To include ``C liburing`` directly you can ``from liburing.lib.uring cimport *``. Note that all ``C`` function, enum, struct, defines starts with ``__``, not including anything that's ``ctypedef``. This is to prevent naming confusion between whats ``C`` and ``Python`` side.
+    - You can ``cimport`` ``liburing`` directly into your project if you are planning on compiling your project as well.
+    - There is also ``src/liburing/lib`` directory with raw ``.pxd`` header files.
+    - All raw ``C`` wrapped function, enum, struct, defines starts with ``__``, not including anything that's ``ctypedef``. This is to prevent naming confusion between whats ``C`` and ``Cython`` side.
+    - ``liburing`` must be included in both `build-system.requires` and `project.dependencies` in `pyproject.toml` to compile and use properly.
+    - Check out `Shakti`_ to see how to include ``liburing`` using ``cython``.
+
+
+TODO
+----
+    - Backwards Linux compatibility.
+        - For this I have to setup a local testing server with multiple linux versions.
 
 
 License
 -------
 Free, Public Domain (CC0). `Read more`_
 
-
-TODO
-----
-
-    - Move everything to using Cython
-
-
 .. _pip: https://pip.pypa.io/en/stable/getting-started/
 .. _Read more: https://github.com/YoSTEALTH/Liburing/blob/master/LICENSE.txt
 .. _C Liburing: https://github.com/axboe/liburing
 .. _Lord of the io_uring: https://unixism.net/loti/
+.. _Shakti: https://github.com/YoSTEALTH/Shakti
 .. |test-status| image:: https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=master&event=push
     :target: https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml
     :alt: Test status
