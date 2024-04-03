@@ -4,10 +4,11 @@ from .type cimport *
 # note: Linux 6.7+
 #       `io_uring` uses `futex2`, not `futex`
 cdef extern from '<linux/futex.h>' nogil:
-    ''' #ifndef FUTEX2_SIZE_U8
+    ''' #ifndef FUTEX2_PRIVATE
             #include "../include/liburing/compat.h"
 
             #define FUTEX2_PRIVATE
+
             #define FUTEX2_SIZE_U8
             #define FUTEX2_SIZE_U16
             #define FUTEX2_SIZE_U32
