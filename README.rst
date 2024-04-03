@@ -17,7 +17,7 @@ Check out `Shakti`_, it uses ``liburing`` and provides an easy to use Python ``a
 Requires
 --------
 
-    - Linux 6.5+ (6.7+ recommended)
+    - Linux 6.1+ (6.7+ recommended)
     - Python 3.8+
 
 
@@ -73,7 +73,7 @@ Find out which ``io_uring`` operations is supported by the kernel:
 Simple File Example
 -------------------
 
-.. code:: python
+.. code-block:: python
 
     # example/open_write_read_close.py
     from liburing import O_CREAT, O_RDWR, AT_FDCWD, iovec, io_uring, io_uring_get_sqe, \
@@ -166,8 +166,7 @@ Cython Note
 
 TODO
 ----
-    - Backwards Linux compatibility.
-        - For this I have to setup a local testing server with multiple linux versions.
+    - Linux 6.1 Backwards compatibility.
 
 
 License
