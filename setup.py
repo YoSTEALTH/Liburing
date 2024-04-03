@@ -40,10 +40,10 @@ with TemporaryDirectory() as tmpdir:
                            libraries=['uring'],
                            library_dirs=[libsrc],
                            include_dirs=[libinc],
-                           extra_compile_args=['-O3', '-g0'])
-                 ]  # optimize & remove debug symbols + data.
+                           # optimize & remove debug symbols + data.
+                           extra_compile_args=['-O3', '-g0'])]  
 
-    # replace temp `include` holder files with actaul `include` content.
+    # replace `include` placeholder files with actual content.
     copytree(libinc, 'src/liburing/include', dirs_exist_ok=True)
     # install
     setup(ext_modules=cythonize(extension,

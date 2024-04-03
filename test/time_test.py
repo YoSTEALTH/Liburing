@@ -1,16 +1,16 @@
-from liburing import timespec
+import liburing
 
 
 def test_timespec():
-    ts = timespec(1)
+    ts = liburing.timespec(1)
     assert ts.tv_sec == 1
     assert ts.tv_nsec == 0
 
-    ts = timespec(1.5)
+    ts = liburing.timespec(1.5)
     assert ts.tv_sec == 1
     assert ts.tv_nsec == 500000000
 
-    ts = timespec()
+    ts = liburing.timespec()
     assert ts.tv_sec == 0
     assert ts.tv_nsec == 0
     ts.tv_sec = 1
