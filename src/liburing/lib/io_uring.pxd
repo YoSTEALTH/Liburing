@@ -227,7 +227,7 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
 
     # `IORING_OP_MSG_RING` command types, stored in `sqe->addr`
     # TODO: enum __io_uring_msg 'io_uring_msg':
-    enum __io_uring_msg_op 'io_uring_msg_op':
+    enum __io_uring_msg_ring_flags 'io_uring_msg_ring_flags':
         __IORING_MSG_DATA 'IORING_MSG_DATA'  # pass `sqe->len` as `res` and `off` as `user_data`
         __IORING_MSG_SEND_FD 'IORING_MSG_SEND_FD'  # send a registered `fd` to another ring
 
@@ -406,7 +406,7 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_REGISTER_USE_REGISTERED_RING 'IORING_REGISTER_USE_REGISTERED_RING'
 
     # io-wq worker categories
-    enum __io_uring_wq_op 'io_uring_wq_op':
+    enum __io_wq_type 'io_wq_type':
         __IO_WQ_BOUND 'IO_WQ_BOUND'
         __IO_WQ_UNBOUND 'IO_WQ_UNBOUND'
 
@@ -492,7 +492,7 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
     #                           `mmap(2)` with the `offset` set as:
     #                           `IORING_OFF_PBUF_RING` | (`bgid << IORING_OFF_PBUF_SHIFT`)
     #                           to get a virtual mapping for the ring.
-    enum __io_uring_buf_op 'io_uring_buf_op':
+    enum __io_uring_register_pbuf_ring_flags 'io_uring_register_pbuf_ring_flags':
         __IOU_PBUF_RING_MMAP 'IOU_PBUF_RING_MMAP'
 
     # argument for IORING_(UN)REGISTER_PBUF_RING
@@ -517,7 +517,7 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __u64 resv
 
     # `io_uring_restriction->opcode` values
-    enum __io_uring_restriction_op 'io_uring_restriction_op':
+    enum __io_uring_register_restrictions 'io_uring_register_restrictions':
         # Allow an io_uring_register(2) opcode
         __IORING_RESTRICTION_REGISTER_OP 'IORING_RESTRICTION_REGISTER_OP'
         # Allow an sqe opcode

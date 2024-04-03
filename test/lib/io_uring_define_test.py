@@ -129,7 +129,7 @@ def test_io_uring_defines():
     assert liburing.IORING_NOTIF_USAGE_ZC_COPIED == 1 << 31
     assert liburing.IORING_ACCEPT_MULTISHOT == 1 << 0
 
-    # enum: io_uring_msg_op
+    # enum: io_uring_msg_ring_flags
     for i, flag in enumerate((liburing.IORING_MSG_DATA, 
                               liburing.IORING_MSG_SEND_FD)):
         assert i == flag
@@ -143,7 +143,6 @@ def test_io_uring_defines():
     assert liburing.IORING_CQE_F_SOCK_NONEMPTY == 1 << 2
     assert liburing.IORING_CQE_F_NOTIF == 1 << 3
 
-    # enum: io_uring_cqe_op
     assert liburing.IORING_CQE_BUFFER_SHIFT == 16
 
     assert liburing.IORING_OFF_SQ_RING == 0
@@ -216,7 +215,7 @@ def test_io_uring_defines():
         assert i == flag
     assert liburing.IORING_REGISTER_USE_REGISTERED_RING == 2147483648
 
-    # enum: io_uring_wq_op
+    # enum: io_wq_type
     for i, flag in enumerate((liburing.IO_WQ_BOUND,
                               liburing.IO_WQ_UNBOUND)):
         assert i == flag
@@ -226,10 +225,10 @@ def test_io_uring_defines():
     assert liburing.IORING_REGISTER_FILES_SKIP == -2
     assert liburing.IO_URING_OP_SUPPORTED == 1 << 0
 
-    # enum: io_uring_buf_op
+    # enum: io_uring_register_pbuf_ring_flags
     assert liburing.IOU_PBUF_RING_MMAP == 1
 
-    # enum: io_uring_restriction_op
+    # enum: io_uring_register_restrictions
     for i, flag in enumerate((liburing.IORING_RESTRICTION_REGISTER_OP,
                               liburing.IORING_RESTRICTION_SQE_OP,
                               liburing.IORING_RESTRICTION_SQE_FLAGS_ALLOWED,
