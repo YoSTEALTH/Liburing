@@ -517,7 +517,7 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __u64 resv
 
     # `io_uring_restriction->opcode` values
-    enum __io_uring_register_restrictions 'io_uring_register_restrictions':
+    enum __io_uring_restriction_op 'io_uring_restriction_op':
         # Allow an io_uring_register(2) opcode
         __IORING_RESTRICTION_REGISTER_OP 'IORING_RESTRICTION_REGISTER_OP'
         # Allow an sqe opcode

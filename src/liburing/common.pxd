@@ -36,7 +36,7 @@ cpdef enum io_wq_type:
 cpdef enum io_uring_register_pbuf_ring_flags:
     IOU_PBUF_RING_MMAP = __IOU_PBUF_RING_MMAP
 
-cpdef enum io_uring_register_restrictions:
+cpdef enum io_uring_restriction_op:
     IORING_RESTRICTION_REGISTER_OP = __IORING_RESTRICTION_REGISTER_OP
     IORING_RESTRICTION_SQE_OP = __IORING_RESTRICTION_SQE_OP
     IORING_RESTRICTION_SQE_FLAGS_ALLOWED = __IORING_RESTRICTION_SQE_FLAGS_ALLOWED

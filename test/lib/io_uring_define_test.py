@@ -228,7 +228,7 @@ def test_io_uring_defines():
     # enum: io_uring_register_pbuf_ring_flags
     assert liburing.IOU_PBUF_RING_MMAP == 1
 
-    # enum: io_uring_register_restrictions
+    # enum: io_uring_restriction_op
     for i, flag in enumerate((liburing.IORING_RESTRICTION_REGISTER_OP,
                               liburing.IORING_RESTRICTION_SQE_OP,
                               liburing.IORING_RESTRICTION_SQE_FLAGS_ALLOWED,
