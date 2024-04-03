@@ -7,13 +7,13 @@ cdef extern from '<linux/futex.h>' nogil:
     ''' #ifndef FUTEX2_PRIVATE
             #include "../include/liburing/compat.h"
 
-            #define FUTEX2_PRIVATE
+            #define FUTEX2_PRIVATE  0
 
-            #define FUTEX2_SIZE_U8
-            #define FUTEX2_SIZE_U16
-            #define FUTEX2_SIZE_U32
-            #define FUTEX2_SIZE_U64
-            #define FUTEX2_NUMA
+            #define FUTEX2_SIZE_U8  0
+            #define FUTEX2_SIZE_U16 0
+            #define FUTEX2_SIZE_U32 0
+            #define FUTEX2_SIZE_U64 0
+            #define FUTEX2_NUMA     0
         #endif
     '''
     struct __futex_waitv 'futex_waitv':
