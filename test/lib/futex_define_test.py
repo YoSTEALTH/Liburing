@@ -17,7 +17,7 @@ def test_futex_define():
     assert liburing.FUTEX_CMP_REQUEUE_PI == 12
     assert liburing.FUTEX_LOCK_PI2 == 13
 
-    if liburing.linux_version_check(6, 7):
+    if liburing.linux_version_check(6.7):
         assert liburing.FUTEX2_PRIVATE == 0
         assert liburing.FUTEX2_SIZE_U8 == 0
         assert liburing.FUTEX2_SIZE_U16 == 0

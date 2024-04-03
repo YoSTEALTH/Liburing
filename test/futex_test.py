@@ -1,4 +1,4 @@
-import re
+# import re
 import errno
 import pytest
 import liburing
@@ -6,7 +6,7 @@ import liburing
 
 def test_futex_6_7():
     # this should run if linux `< 6.7`
-    if liburing.linux_version_check(6, 7):
+    if liburing.linux_version_check(6.7):
         with pytest.raises(EnvironmentError):
             liburing.futex_state()
 

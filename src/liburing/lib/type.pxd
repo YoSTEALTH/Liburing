@@ -36,17 +36,6 @@ cdef extern from '<linux/types.h>' nogil:
     ctypedef int __kernel_rwf_t
 
 
-cdef extern from '<linux/version.h>' nogil:
-    ''' #define __LINUX_VERSION_CHECK(major, minor) (major > LINUX_VERSION_MAJOR) || \
-                                                    ((major == LINUX_VERSION_MAJOR) && \
-                                                     (minor > LINUX_VERSION_PATCHLEVEL))
-    '''
-    enum:
-        __LINUX_VERSION_MAJOR 'LINUX_VERSION_MAJOR'
-        __LINUX_VERSION_MINOR 'LINUX_VERSION_PATCHLEVEL'
-    bint __LINUX_VERSION_CHECK(__u8 major, __u8 minor)
-
-
 cdef extern from '<sched.h>' nogil:
     ''' const int BITS = __CPU_SETSIZE / __NCPUBITS;
     '''
