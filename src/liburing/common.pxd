@@ -24,21 +24,19 @@ cpdef void io_uring_prep_provide_buffers(io_uring_sqe sqe,
 cpdef void io_uring_prep_remove_buffers(io_uring_sqe sqe, int nr, int bgid) noexcept nogil
 
 
-cpdef enum io_uring_msg_op:
+cpdef enum io_uring_msg_ring_flags:
     IORING_MSG_DATA = __IORING_MSG_DATA
     IORING_MSG_SEND_FD = __IORING_MSG_SEND_FD
 
-cpdef enum io_uring_cqe_op:
-    IORING_CQE_BUFFER_SHIFT = __IORING_CQE_BUFFER_SHIFT
 
-cpdef enum io_uring_wq_op:
+cpdef enum io_wq_type:
     IO_WQ_BOUND = __IO_WQ_BOUND
     IO_WQ_UNBOUND = __IO_WQ_UNBOUND
 
-cpdef enum io_uring_buf_op:
+cpdef enum io_uring_register_pbuf_ring_flags:
     IOU_PBUF_RING_MMAP = __IOU_PBUF_RING_MMAP
 
-cpdef enum io_uring_restriction_op:
+cpdef enum io_uring_register_restrictions:
     IORING_RESTRICTION_REGISTER_OP = __IORING_RESTRICTION_REGISTER_OP
     IORING_RESTRICTION_SQE_OP = __IORING_RESTRICTION_SQE_OP
     IORING_RESTRICTION_SQE_FLAGS_ALLOWED = __IORING_RESTRICTION_SQE_FLAGS_ALLOWED
@@ -46,6 +44,8 @@ cpdef enum io_uring_restriction_op:
     IORING_RESTRICTION_LAST = __IORING_RESTRICTION_LAST
 
 cpdef enum __common_define__:
+    IORING_CQE_BUFFER_SHIFT = __IORING_CQE_BUFFER_SHIFT
+
     # openat, openat2, accept, ...
     IORING_FILE_INDEX_ALLOC = __IORING_FILE_INDEX_ALLOC
 
