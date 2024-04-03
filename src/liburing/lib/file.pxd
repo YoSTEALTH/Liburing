@@ -1,7 +1,7 @@
 from .type cimport *
 
 
-cdef extern from '<linux/openat2.h>' nogil:
+cdef extern from '../include/liburing/compat.h' nogil:
     # Definition of RESOLVE_* constants
     struct __open_how 'open_how':
         __u64   flags

@@ -4,13 +4,15 @@ from .type cimport *
 # note: Linux 6.7+
 #       `io_uring` uses `futex2`, not `futex`
 cdef extern from '<linux/futex.h>' nogil:
-    ''' #if __LINUX_VERSION_CHECK(6, 7)
-            #define FUTEX2_PRIVATE    0
-            #define FUTEX2_SIZE_U8    0
-            #define FUTEX2_SIZE_U16   0
-            #define FUTEX2_SIZE_U32   0
-            #define FUTEX2_SIZE_U64   0
-            #define FUTEX2_NUMA       0
+    ''' #ifndef FUTEX2_SIZE_U8
+            #include '../include/liburing/compat.h'
+
+            #define FUTEX2_PRIVATE
+            #define FUTEX2_SIZE_U8
+            #define FUTEX2_SIZE_U16
+            #define FUTEX2_SIZE_U32
+            #define FUTEX2_SIZE_U64
+            #define FUTEX2_NUMA
         #endif
     '''
     struct __futex_waitv 'futex_waitv':

@@ -90,7 +90,7 @@ cdef extern from '<bits/types/struct_iovec.h>' nogil:
         size_t iov_len
 
 
-cdef extern from '<linux/time_types.h>' nogil:
+cdef extern from '../include/liburing/compat.h' nogil:
     ctypedef int64_t __kernel_time64_t
     struct __kernel_timespec:
         __kernel_time64_t tv_sec      # seconds
