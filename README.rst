@@ -45,8 +45,7 @@ Install directly from GitHub:
 
 .. code-block:: text
 
-    # Use multi-thread for faster install. Change `-j4` to higher/lower value.
-    python3 -m pip install --upgrade --config-setting="--build-option=build_ext -j4" git+https://github.com/YoSTEALTH/Liburing
+    python3 -m pip install --upgrade git+https://github.com/YoSTEALTH/Liburing
 
 
 To find out all the class, functions and definitions:
@@ -160,7 +159,7 @@ Cython Note
     - You can ``cimport`` ``liburing`` directly into your project if you are planning on compiling your project as well.
     - There is also ``src/liburing/lib`` directory with raw ``.pxd`` header files.
     - All raw ``C`` wrapped function, enum, struct, defines starts with ``__``, not including anything that's ``ctypedef``. This is to prevent naming confusion between whats ``C`` and ``Cython`` side.
-    - ``liburing`` must be included in both `build-system.requires` and `project.dependencies` in `pyproject.toml` to compile and use properly.
+    - ``liburing`` must be included in both ``build-system.requires`` and ``project.dependencies`` in ``pyproject.toml`` to compile and use properly.
     - Check out `Shakti`_ to see how to include ``liburing`` using ``cython``.
 
 

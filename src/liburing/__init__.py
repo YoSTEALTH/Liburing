@@ -1,9 +1,9 @@
 from dynamic_import import importer
 
 
-__version__ = '2024.4.3'
+__version__ = '2024.4.4'
 
-importer(cache=True, exclude_dir='lib')
+importer(cache=True, exclude_dir=['lib', 'include'])
 # - `importer()` helps this project manage all import needs. It auto scans for
 # `*.so` files and caches import names for dynamic loading `*.so` files as needed.
 # - `importer()` also makes all import names accessible at top level, regardless of
