@@ -11,7 +11,7 @@ Liburing is Python + Cython wrapper around `C Liburing`_, which is a helper to s
 
 Good(old) documentation `Lord of the io_uring`_
 
-Check out `Shakti`_, it uses ``liburing`` and provides an easy to use Python ``async`` ``await`` Interface.
+Check out `Shakti`_. It uses ``liburing`` and provides an easy to use Python ``async`` ``await`` Interface.
 
 
 Requires

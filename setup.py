@@ -4,7 +4,7 @@ from os.path import join
 from tempfile import TemporaryDirectory
 from subprocess import run as sub_process_run
 from setuptools import setup
-# from setuptools.command.build import build
+from setuptools.command.build import build
 from Cython.Build import cythonize
 from Cython.Compiler import Options
 from Cython.Distutils import Extension
@@ -18,10 +18,10 @@ Options.docstrings = True
 Options.warning_errors = False
 
 
-# class Build(build):
-#     def initialize_options(self):
-#         super().initialize_options()
-#         self.parallel = threads  # manually set
+class Build(build):
+    def initialize_options(self):
+        super().initialize_options()
+        self.parallel = threads  # manually set
 
 
 with TemporaryDirectory() as tmpdir:
@@ -54,7 +54,7 @@ with TemporaryDirectory() as tmpdir:
     # replace `include` placeholder files with actual content.
     copytree(libinc, 'src/liburing/include', dirs_exist_ok=True)
     # install
-    setup(  # cmdclass={'build': Build},
+    setup(cmdclass={'build': Build},
           ext_modules=cythonize(extension,
                                 nthreads=threads,
                                 compiler_directives={
