@@ -1,7 +1,7 @@
 from dynamic_import import importer
 
 
-__version__ = '2024.4.5'
+__version__ = '2024.4.9'
 
 importer(cache=True, exclude_dir=['lib', 'include'])
 # - `importer()` helps this project manage all import needs. It auto scans for

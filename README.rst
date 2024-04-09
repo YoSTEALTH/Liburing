@@ -177,7 +177,7 @@ Free, Public Domain (CC0). `Read more`_
 .. _C Liburing: https://github.com/axboe/liburing
 .. _Lord of the io_uring: https://unixism.net/loti/
 .. _Shakti: https://github.com/YoSTEALTH/Shakti
-.. |test-status| image:: https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=master&event=push
+.. |test-status| image:: https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=master
     :target: https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml
     :alt: Test status
 .. |downloads| image:: https://img.shields.io/pypi/dm/liburing
