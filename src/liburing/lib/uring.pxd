@@ -11,42 +11,42 @@ cdef extern from '../include/liburing.h' nogil:
     # Library interface to `io_uring`
     # -------------------------------
     struct __io_uring_sq 'io_uring_sq':
-        unsigned int* khead
-        unsigned int* ktail
-        unsigned int* kflags
-        unsigned int* kdropped
-        unsigned int* array
+        unsigned int*   khead
+        unsigned int*   ktail
+        unsigned int*   kflags
+        unsigned int*   kdropped
+        unsigned int*   array
         __io_uring_sqe* sqes
-        unsigned int sqe_head
-        unsigned int sqe_tail
-        size_t ring_sz
-        void* ring_ptr
-        unsigned int ring_mask
-        unsigned int ring_entries
-        unsigned int pad[2]
+        unsigned int    sqe_head
+        unsigned int    sqesqe_tail
+        size_t          ring_sz
+        void*           ring_ptr
+        unsigned int    ring_mask
+        unsigned int    ring_entries
+        unsigned int    pad[2]
 
     struct __io_uring_cq 'io_uring_cq':
-        unsigned int* khead
-        unsigned int* ktail
-        unsigned int* kflags
-        unsigned int* koverflow
+        unsigned int*   khead
+        unsigned int*   ktail
+        unsigned int*   kflags
+        unsigned int*   koverflow
         __io_uring_cqe* cqes
-        size_t ring_sz
-        void* ring_ptr
-        unsigned int ring_mask
-        unsigned int ring_entries
-        unsigned int pad[2]
+        size_t          ring_sz
+        void*           ring_ptr
+        unsigned int    ring_mask
+        unsigned int    ring_entries
+        unsigned int    pad[2]
 
     struct __io_uring 'io_uring':
-        __io_uring_sq sq
-        __io_uring_cq cq
-        unsigned int flags
-        int ring_fd
-        unsigned int features
-        int enter_ring_fd
-        __u8 int_flags
-        __u8 pad[3]
-        unsigned int pad2
+        __io_uring_sq   sq
+        __io_uring_cq   cq
+        unsigned int    flags
+        int             ring_fd
+        unsigned int    features
+        int             enter_ring_fd
+        __u8            int_flags
+        __u8            pad[3]
+        unsigned int    pad2
 
     # Library interface
     # -----------------
@@ -168,7 +168,6 @@ cdef extern from '../include/liburing.h' nogil:
                                                                   unsigned int flags)
     int __io_uring_unregister_buf_ring 'io_uring_unregister_buf_ring'(__io_uring* ring,
                                                                       int bgid)
-
     int __io_uring_buf_ring_head 'io_uring_buf_ring_head'(__io_uring* ring,
                                                           int buf_group,
                                                           uint16_t* head)
@@ -256,9 +255,6 @@ cdef extern from '../include/liburing.h' nogil:
 
     void __io_uring_sqe_set_flags 'io_uring_sqe_set_flags'(__io_uring_sqe* sqe,
                                                            unsigned int flags)
-    # note: access to cython users only
-    void __io_uring_set_target_fixed_file(__io_uring_sqe* sqe,
-                                          unsigned int file_index)
     # note: access to cython users only
     void __io_uring_prep_rw 'io_uring_prep_rw'(int op,
                                                __io_uring_sqe* sqe,
