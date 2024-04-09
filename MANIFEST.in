@@ -5,10 +5,10 @@ include libs/liburing/configure
 include libs/liburing/liburing-ffi.pc.in
 include libs/liburing/liburing.pc.in
 include libs/liburing/liburing.spec
+include libs/liburing/LICENSE
 include libs/liburing/Makefile
 include libs/liburing/Makefile.common
 include libs/liburing/Makefile.quiet
-include libs/liburing/LICENSE
 # C Liburing END <<<
 
 graft example
