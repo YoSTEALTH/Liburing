@@ -18,7 +18,7 @@ cdef extern from '../include/liburing.h' nogil:
         unsigned int*   array
         __io_uring_sqe* sqes
         unsigned int    sqe_head
-        unsigned int    sqesqe_tail
+        unsigned int    sqe_tail
         size_t          ring_sz
         void*           ring_ptr
         unsigned int    ring_mask
