@@ -21,7 +21,7 @@ def test_io_uring_sqe():
     with pytest.raises(IndexError):
         assert sqe[2]
 
-    with pytest.raises(OverflowError, match="can't convert negative value to unsigned int"):
+    with pytest.raises(OverflowError, match="can't convert negative value to __u16"):
         liburing.io_uring_sqe(-3)
 
     with pytest.raises(TypeError):
