@@ -46,8 +46,9 @@ def test_sockaddr_class():
         'sin6_family': 10, 'sin6_port': 31488, 'sin6_flowinfo': 0,
         'sin6_addr': {'s6_addr': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
         'sin6_scope_id': 321}
-    assert liburing.sockaddr(liburing.AF_INET6, b'::1', 123, 321)._test == {
-        'sin6_family': 10, 'sin6_port': 31488, 'sin6_flowinfo': 0,
+    assert liburing.sockaddr(liburing.AF_INET6, b'::1', 65535)._test == {
+        'sin6_family': 10, 'sin6_port': 65535, 'sin6_flowinfo': 0,
         'sin6_addr': {'s6_addr': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]},
-        'sin6_scope_id': 321}
+        'sin6_scope_id': 0}
+
 
