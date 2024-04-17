@@ -1,4 +1,4 @@
-cpdef inline bool io_uring_put_sqe(io_uring ring, io_uring_sqe sqe_s) noexcept:
+cpdef inline bool io_uring_put_sqe(io_uring ring, io_uring_sqe sqe_s) noexcept nogil:
     ''' Put `io_uring_sqe` into `io_uring` ring's memory.
 
         Type
@@ -28,31 +28,32 @@ cpdef inline bool io_uring_put_sqe(io_uring ring, io_uring_sqe sqe_s) noexcept:
 
         Note
             - Returns `False` if queue is full. Will need to `io_uring_submit()` and try again.
+            - Returns `False` if `entries` < `len(sqe_s)`
     '''
     cdef:
-        __u32           i
+        __u16           i
         size_t          size
-        io_uring_sqe    sqe
-        __io_uring_sqe* _sqe
+        __io_uring_sqe* sqe
 
     if sqe_s.len == 0:
         return True
         # note:
         #   - its ok to submit `0` sqe thus `True`
         #   - this also accounts for `ptr` gotten from `io_uring_get_sqe`
-        #       as its `len == 0` thus not try to copy memory
+        #       as its `len == 0` thus not try to replace memory by mistake!
     else:
         size = sizeof(__io_uring_sqe)
         if sqe_s.len == 1:
-            if (_sqe := __io_uring_get_sqe(ring.ptr)) is not NULL:
-                memcpy(_sqe, sqe_s.ptr, size)
+            if (sqe := __io_uring_get_sqe(&ring.ptr)) is not NULL:
+                memcpy(sqe, sqe_s.ptr, size)
                 return True
-        elif __io_uring_sq_space_left(ring.ptr) >= sqe_s.len:
+        elif (ring.ptr.sq.ring_entries >= sqe_s.len
+                and __io_uring_sq_space_left(&ring.ptr) >= sqe_s.len):
             for i in range(sqe_s.len):
-                if (_sqe := __io_uring_get_sqe(ring.ptr)) is NULL:
-                    return False  # is triggered when submitting `> entries` can handle!
-                    # TODO: maybe need to set some kind of flag to continue where it was left off?
-                sqe = sqe_s[i]
-                memcpy(_sqe, sqe.ptr, size)
+                if (sqe := __io_uring_get_sqe(&ring.ptr)) is NULL:
+                    return False  # this should ever trigger but just in case!
+                memcpy(sqe, <void*>&sqe_s.ptr[i], size)
             else:
                 return True
+        else:
+            return False
