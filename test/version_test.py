@@ -16,7 +16,7 @@ def test_linux_version():
     assert linux_version_check(f'{major-1 or 1}.{minor or 1}') is False
     assert linux_version_check(f'{major}.{minor}') is False  # current linux version
     assert linux_version_check(major+1) is True
-    assert linux_version_check(f'{major+1}.{minor or 1}') is True
+    assert linux_version_check(float(f'{major+1}.{minor or 1}')) is True
 
 
 def test_liburing_version():
