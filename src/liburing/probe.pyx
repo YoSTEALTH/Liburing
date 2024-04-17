@@ -24,7 +24,7 @@ cdef class io_uring_probe:
 
 cpdef io_uring_probe io_uring_get_probe_ring(io_uring ring):
     cdef io_uring_probe probe = io_uring_probe()
-    probe.ptr = __io_uring_get_probe_ring(ring.ptr)
+    probe.ptr = __io_uring_get_probe_ring(&ring.ptr)
     return probe
 
 cpdef io_uring_probe io_uring_get_probe():
@@ -40,4 +40,4 @@ cpdef inline bool io_uring_opcode_supported(io_uring_probe p, int op):
     return __io_uring_opcode_supported(p.ptr, op)
 
 cpdef int io_uring_register_probe(io_uring ring, io_uring_probe p, unsigned int nr):
-    return trap_error(__io_uring_register_probe(ring.ptr, p.ptr, nr))
+    return trap_error(__io_uring_register_probe(&ring.ptr, p.ptr, nr))

@@ -6,25 +6,33 @@ from .time cimport timespec
 
 
 cdef class io_uring:
-    cdef __io_uring *ptr
+    cdef:
+        __io_uring ptr
+        bint active
+
 
 cdef class io_uring_sqe:
     cdef:
-        __io_uring_sqe * ptr
-        unsigned int len
-        list ref
+        __io_uring_sqe* ptr
+        __u16           len
+        list            ref
+
 
 cdef class io_uring_cqe:
     cdef __io_uring_cqe * ptr
 
+
 cdef class io_uring_params:
     cdef __io_uring_params * ptr
+
 
 cdef class io_uring_buf_ring:
     cdef __io_uring_buf_ring * ptr
 
+
 cdef class siginfo:
     cdef siginfo_t *ptr
+
 
 cdef class sigset:
     cdef sigset_t *ptr
@@ -71,6 +79,8 @@ cpdef int io_uring_close_ring_fd(io_uring ring) nogil
 
 cpdef int io_uring_get_events(io_uring ring) nogil
 cpdef int io_uring_submit_and_get_events(io_uring ring) nogil
+
+cpdef int io_uring_buf_ring_head(io_uring ring, int buf_group, uint16_t head) nogil
 
 cpdef void io_uring_cq_advance(io_uring ring,
                                unsigned int nr) noexcept nogil
