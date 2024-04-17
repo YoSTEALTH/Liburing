@@ -4,24 +4,30 @@ import liburing
 
 
 def test_io_uring_init_exit():
-    ring = liburing.io_uring()    
-    assert ring.flags == 0
-    assert ring.ring_fd == 0
-    assert ring.features == 0
-    assert ring.enter_ring_fd == 0
-    assert ring.int_flags == 0
+    ring = liburing.io_uring()
+    assert ring.flags is None
+    assert ring.ring_fd is None
+    assert ring.features is None
+    assert ring.enter_ring_fd is None
+    assert ring.int_flags is None
+
     assert liburing.io_uring_queue_init(8, ring, 0) == 0
     assert ring.ring_fd > 0
     assert ring.enter_ring_fd > 0
-    assert liburing.io_uring_queue_exit(ring) == 0
+    with pytest.raises(RuntimeError) as e:  # Trying to init again
+        liburing.io_uring_queue_init(4, ring, 0)
     assert str(ring).startswith('io_uring(flags=')
+    assert liburing.io_uring_queue_exit(ring) == 0
+    assert str(ring).startswith('<liburing.queue.io_uring')
+    # Trying to exit again
+    with pytest.raises(RuntimeError) as e:
+        liburing.io_uring_queue_exit(ring)
 
     ring = liburing.io_uring()
     with pytest.raises(OSError) as e:  # Invalid argument
         liburing.io_uring_queue_init(0, ring, 0)
     assert e.value.errno == errno.EINVAL
-    with pytest.raises(ValueError):
-        assert liburing.io_uring_queue_exit(ring) == 0
+    assert liburing.io_uring_queue_exit(ring) == 0
 
 
 def test_setup_iopoll_sqpoll():
@@ -35,8 +41,6 @@ def test_init_max():
     cqe = liburing.io_uring_cqe()
     ring = liburing.io_uring()
     maximum = 32768
-    with pytest.raises(OSError):
-        liburing.io_uring_queue_init(maximum+1, ring)
     liburing.io_uring_queue_init(maximum, ring)
 
     for i in range(maximum-1):
@@ -57,4 +61,12 @@ def test_init_max():
 
     liburing.io_uring_cq_advance(ring, maximum)
     assert liburing.io_uring_peek_cqe(ring, cqe) == -errno.EAGAIN
+    liburing.io_uring_queue_exit(ring)
+
+
+def test_max_entries_plus():
+    max_plus = 32768+1
+    ring = liburing.io_uring()
+    with pytest.raises(OSError):
+        liburing.io_uring_queue_init(max_plus, ring)
     liburing.io_uring_queue_exit(ring)

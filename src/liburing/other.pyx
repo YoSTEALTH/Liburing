@@ -11,7 +11,7 @@ cpdef io_uring_buf_ring io_uring_setup_buf_ring(io_uring ring,
                                                 unsigned int flags,
                                                 int ret):
     cdef io_uring_buf_ring buf = io_uring_buf_ring()
-    buf.ptr = __io_uring_setup_buf_ring(ring.ptr, nentries, bgid, flags, &ret)
+    buf.ptr = __io_uring_setup_buf_ring(&ring.ptr, nentries, bgid, flags, &ret)
     memory_error(buf)
     return buf
 
@@ -19,7 +19,7 @@ cpdef int io_uring_free_buf_ring(io_uring ring,
                                  io_uring_buf_ring br,
                                  unsigned int nentries,
                                  int bgid):
-    cdef int r = __io_uring_free_buf_ring(ring.ptr, br.ptr, nentries, bgid)
+    cdef int r = __io_uring_free_buf_ring(&ring.ptr, br.ptr, nentries, bgid)
     trap_error(r)
     br.ptr = NULL
 
