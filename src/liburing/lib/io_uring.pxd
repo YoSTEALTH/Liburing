@@ -4,8 +4,8 @@ from .type cimport *
 cdef extern from '../include/liburing/io_uring.h' nogil:
     # IO submission data structure (Submission Queue Entry)
     struct __io_uring_sqe "io_uring_sqe":
-        __u8 flags       # IOSQE_ flags
-        __u64 user_data  # data to be passed back at completion time
+        __u8    flags       # IOSQE_ flags
+        __u64   user_data  # data to be passed back at completion time
         # note: other values, embedded union & struct are ignored.
         #   - will add more if someone needs it.
 
@@ -247,13 +247,12 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
 
     # IO completion data structure (Completion Queue Entry)
     struct __io_uring_cqe "io_uring_cqe":
-        __u64 user_data  # `sqe->data` submission passed back
-        __s32 res        # result code for this event
-        __u32 flags
+        __u64   user_data  # `sqe->data` submission passed back
+        __s32   res        # result code for this event
+        __u32   flags
         # If the ring is initialized with `IORING_SETUP_CQE32`, then this field
         # contains 16-bytes of padding, doubling the size of the CQE.
-        __u64 big_cqe[]
-        # __u64   big_cqe[16] ???
+        # __u64   big_cqe[16]
 
     enum:
         # cqe->flags
@@ -280,15 +279,15 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
 
     # Filled with the offset for mmap(2)
     struct __io_sqring_offsets "io_sqring_offsets":
-        __u32 head
-        __u32 tail
-        __u32 ring_mask
-        __u32 ring_entries
-        __u32 flags
-        __u32 dropped
-        __u32 array
-        __u32 resv1
-        __u64 user_addr
+        __u32   head
+        __u32   tail
+        __u32   ring_mask
+        __u32   ring_entries
+        __u32   flags
+        __u32   dropped
+        __u32   array
+        __u32   resv1
+        __u64   user_addr
 
     enum:
         # sq_ring->flags
@@ -297,15 +296,15 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_SQ_TASKRUN 'IORING_SQ_TASKRUN'          # task should enter the kernel
 
     struct __io_cqring_offsets "io_cqring_offsets":
-        __u32 head
-        __u32 tail
-        __u32 ring_mask
-        __u32 ring_entries
-        __u32 overflow
-        __u32 cqes
-        __u32 flags
-        __u32 resv1
-        __u64 user_addr
+        __u32   head
+        __u32   tail
+        __u32   ring_mask
+        __u32   ring_entries
+        __u32   overflow
+        __u32   cqes
+        __u32   flags
+        __u32   resv1
+        __u64   user_addr
 
     enum:
         # cq_ring->flags
@@ -321,16 +320,16 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
 
     # Passed in for io_uring_setup(2). Copied back with updated info on success
     struct __io_uring_params "io_uring_params":
-        __u32   sq_entries
-        __u32   cq_entries
-        __u32   flags
-        __u32   sq_thread_cpu
-        __u32   sq_thread_idle
-        __u32   features
-        __u32   wq_fd
-        __u32   resv[3]
-        __io_sqring_offsets   sq_off
-        __io_cqring_offsets   cq_off
+        __u32                   sq_entries
+        __u32                   cq_entries
+        __u32                   flags
+        __u32                   sq_thread_cpu
+        __u32                   sq_thread_idle
+        __u32                   features
+        __u32                   wq_fd
+        __u32                   resv[3]
+        __io_sqring_offsets     sq_off
+        __io_cqring_offsets     cq_off
 
     enum:
         # io_uring_params->features flags
@@ -418,24 +417,24 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_RSRC_REGISTER_SPARSE 'IORING_RSRC_REGISTER_SPARSE'
 
     struct __io_uring_rsrc_register "io_uring_rsrc_register":
-        __u32 nr
-        __u32 flags
-        __u64 resv2
-        __aligned_u64 data
-        __aligned_u64 tags
+        __u32           nr
+        __u32           flags
+        __u64           resv2
+        __aligned_u64   data
+        __aligned_u64   tags
 
     struct __io_uring_rsrc_update "io_uring_rsrc_update":
-        __u32 offset
-        __u32 resv
-        __aligned_u64 data
+        __u32           offset
+        __u32           resv
+        __aligned_u64   data
 
     struct __io_uring_rsrc_update2 "io_uring_rsrc_update2":
-        __u32 offset
-        __u32 resv
-        __aligned_u64 data
-        __aligned_u64 tags
-        __u32 nr
-        __u32 resv2
+        __u32           offset
+        __u32           resv
+        __aligned_u64   data
+        __aligned_u64   tags
+        __u32           nr
+        __u32           resv2
 
     enum:
         # Skip updating fd indexes set to this value in the fd table
@@ -444,17 +443,17 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IO_URING_OP_SUPPORTED 'IO_URING_OP_SUPPORTED'
 
     struct __io_uring_probe_op "io_uring_probe_op":
-        __u8 op
-        __u8 resv
-        __u16 flags   # IO_URING_OP_* flags
-        __u32 resv2
+        __u8    op
+        __u8    resv
+        __u16   flags   # IO_URING_OP_* flags
+        __u32   resv2
 
     struct __io_uring_probe "io_uring_probe":
-        __u8 last_op   # last opcode supported
-        __u8 ops_len   # length of ops[] array below
-        __u16 resv
-        __u32 resv2[3]
-        __io_uring_probe_op ops[]
+        __u8                 last_op   # last opcode supported
+        __u8                 ops_len   # length of ops[] array below
+        __u16                resv
+        __u32                resv2[3]
+        __io_uring_probe_op  ops[]
 
     struct __io_uring_restriction "io_uring_restriction":
         pass  # TODO:
@@ -467,10 +466,10 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         # __u32   resv2[3]
 
     struct __io_uring_buf "io_uring_buf":
-        __u64 addr
-        __u32 len
-        __u16 bid
-        __u16 resv
+        __u64   addr
+        __u32   len
+        __u16   bid
+        __u16   resv
 
     struct __io_uring_buf_ring "io_uring_buf_ring":
         pass  # TODO:
@@ -497,24 +496,24 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
 
     # argument for IORING_(UN)REGISTER_PBUF_RING
     struct __io_uring_buf_reg "io_uring_buf_reg":
-        __u64 ring_addr
-        __u32 ring_entries
-        __u16 bgid
-        __u16 flags
-        __u64 resv[3]
+        __u64   ring_addr
+        __u32   ring_entries
+        __u16   bgid
+        __u16   flags
+        __u64   resv[3]
 
     # argument for `IORING_REGISTER_PBUF_STATUS`
     struct __io_uring_buf_status 'io_uring_buf_status':
-        __u32 buf_group  # input
-        __u32 head  # output
-        __u32 resv[8]
+        __u32   buf_group  # input
+        __u32   head  # output
+        __u32   resv[8]
 
     # argument for IORING_(UN)REGISTER_NAPI
     struct __io_uring_napi 'io_uring_napi':
-        __u32 busy_poll_to
-        __u8  prefer_busy_poll
-        __u8  pad[3]
-        __u64 resv
+        __u32   busy_poll_to
+        __u8    prefer_busy_poll
+        __u8    pad[3]
+        __u64   resv
 
     # `io_uring_restriction->opcode` values
     enum __io_uring_restriction_op 'io_uring_restriction_op':
@@ -529,31 +528,31 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_RESTRICTION_LAST 'IORING_RESTRICTION_LAST'
 
     struct __io_uring_getevents_arg "io_uring_getevents_arg":
-        __u64 sigmask
-        __u32 sigmask_sz
-        __u32 pad
-        __u64 ts
+        __u64   sigmask
+        __u32   sigmask_sz
+        __u32   pad
+        __u64   ts
 
     # Argument for `IORING_REGISTER_SYNC_CANCEL`
     struct __io_uring_sync_cancel_reg "io_uring_sync_cancel_reg":
-        __u64 addr
-        __s32 fd
-        __u32 flags
-        __kernel_timespec timeout
-        __u64 pad[4]
+        __u64               addr
+        __s32               fd
+        __u32               flags
+        __kernel_timespec   timeout
+        __u64               pad[4]
 
     # Argument for `IORING_REGISTER_FILE_ALLOC_RANGE`
     # The range is specified as [off, off + len)
     struct __io_uring_file_index_range "io_uring_file_index_range":
-        __u32 off
-        __u32 len
-        __u64 resv
+        __u32   off
+        __u32   len
+        __u64   resv
 
     struct __io_uring_recvmsg_out "io_uring_recvmsg_out":
-        __u32 namelen
-        __u32 controllen
-        __u32 payloadlen
-        __u32 flags
+        __u32   namelen
+        __u32   controllen
+        __u32   payloadlen
+        __u32   flags
 
     # Argument for `IORING_OP_URING_CMD` when file is a socket
     enum __io_uring_socket_op 'io_uring_socket_op':
