@@ -56,7 +56,7 @@ cpdef int io_uring_ring_dontfork(io_uring ring) nogil
 cpdef int io_uring_queue_exit(io_uring ring) nogil
 cpdef unsigned int io_uring_peek_batch_cqe(io_uring ring,
                                            io_uring_cqe cqes,
-                                           unsigned int count) nogil
+                                           unsigned int count) noexcept nogil
 cpdef int io_uring_wait_cqes(io_uring ring,
                              io_uring_cqe cqe_ptr,
                              unsigned int wait_nr,
