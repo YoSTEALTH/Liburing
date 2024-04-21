@@ -8,33 +8,50 @@ from .io_uring cimport *
 
 
 cdef extern from '../include/liburing.h' nogil:
+    ''' // macro function
+        static inline void __io_uring_for_each_cqe(struct io_uring*     ring,
+                                                   unsigned int*        head,
+                                                   struct io_uring_cqe* cqe)
+        {
+            io_uring_for_each_cqe(ring, head[0], cqe);
+        }
+    '''
     # Library interface to `io_uring`
     # -------------------------------
     struct __io_uring_sq 'io_uring_sq':
         unsigned int*   khead
         unsigned int*   ktail
+
         unsigned int*   kflags
         unsigned int*   kdropped
         unsigned int*   array
         __io_uring_sqe* sqes
+
         unsigned int    sqe_head
         unsigned int    sqe_tail
+
         size_t          ring_sz
         void*           ring_ptr
+
         unsigned int    ring_mask
         unsigned int    ring_entries
+
         unsigned int    pad[2]
 
     struct __io_uring_cq 'io_uring_cq':
         unsigned int*   khead
         unsigned int*   ktail
+
         unsigned int*   kflags
         unsigned int*   koverflow
         __io_uring_cqe* cqes
+
         size_t          ring_sz
         void*           ring_ptr
+
         unsigned int    ring_mask
         unsigned int    ring_entries
+
         unsigned int    pad[2]
 
     struct __io_uring 'io_uring':
@@ -42,6 +59,7 @@ cdef extern from '../include/liburing.h' nogil:
         __io_uring_cq   cq
         unsigned int    flags
         int             ring_fd
+
         unsigned int    features
         int             enter_ring_fd
         __u8            int_flags
@@ -50,7 +68,6 @@ cdef extern from '../include/liburing.h' nogil:
 
     # Library interface
     # -----------------
-
     # return an allocated io_uring_probe structure, or NULL if probe fails (for
     # example, if it is not available). The caller is responsible for freeing it
     __io_uring_probe* __io_uring_get_probe_ring 'io_uring_get_probe_ring'(__io_uring* ring)
@@ -221,12 +238,12 @@ cdef extern from '../include/liburing.h' nogil:
 
     enum: __LIBURING_UDATA_TIMEOUT 'LIBURING_UDATA_TIMEOUT'
 
-    # TODO: need to properly test these functions.f
-    # Calculates the step size for CQE iteration. For standard CQE's its `1`, for big CQE's its `2`.
-    __io_uring_cqe_shift 'io_uring_cqe_shift'(ring)
-    __io_uring_cqe_index 'io_uring_cqe_index'(ring, ptr, mask)   
-    __io_uring_for_each_cqe 'io_uring_for_each_cqe'(ring, head, cqe)
-    # note: can only call these function directly from cython, not python!
+    # Calculates the step size for CQE iteration.
+    bint __io_uring_cqe_shift 'io_uring_cqe_shift'(__io_uring* ring)
+    int __io_uring_cqe_index 'io_uring_cqe_index'(__io_uring* ring,
+                                                  unsigned int ptr,
+                                                  unsigned int mask)
+    void __io_uring_for_each_cqe(__io_uring* ring, unsigned int* head, __io_uring_cqe* cqe)
 
     # Must be called after `io_uring_for_each_cqe()`
     void __io_uring_cq_advance 'io_uring_cq_advance'(__io_uring* ring,
