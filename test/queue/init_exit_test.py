@@ -70,3 +70,13 @@ def test_max_entries_plus():
     with pytest.raises(OSError):
         liburing.io_uring_queue_init(max_plus, ring)
     liburing.io_uring_queue_exit(ring)
+
+
+def test_io_uring_submit_and_wait(ring, cqe):
+    sqe = liburing.io_uring_get_sqe(ring)
+    sqe.user_data = 123
+    assert liburing.io_uring_sq_ready(ring) == 1
+    assert liburing.io_uring_submit_and_wait(ring, 1) == 1
+    assert liburing.io_uring_sq_ready(ring) == 0
+    liburing.io_uring_peek_cqe(ring, cqe)
+    assert cqe.user_data == 123
