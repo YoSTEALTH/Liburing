@@ -198,6 +198,24 @@ cdef class io_uring_cqe:
             return self.ptr.flags
         memory_error(self, 'out of `cqe`')
 
+    cdef inline tuple[__s32, __u64] get_index(self, unsigned int index) noexcept nogil:
+        ''' Get Index
+
+            Example
+                >>> index = 1
+                >>> cqe.get_result(index)
+                (0, 123)
+
+            Note
+                - Just like `__getitem__` but faster and no error checking!
+        '''
+        if self.active or self.ptr is not NULL:
+            if index == 0:
+                return self.ptr.res, self.ptr.user_data
+            else:
+                return self.ptr[index].res, self.ptr[index].user_data
+        return 0, 0
+
 
 # TODO:
 cdef class siginfo:
