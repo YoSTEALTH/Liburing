@@ -10,6 +10,20 @@ from Cython.Compiler import Options
 from Cython.Distutils import Extension
 
 
+uring = 'uring-ffi'
+tmpdir = mkdtemp()
+threads = cpu_count()
+lib = join(tmpdir, 'libs/liburing')
+libsrc = join(lib, 'src')
+libinc = join(libsrc, 'include')
+
+# compiler options
+Options.annotate = False
+Options.fast_fail = True
+Options.docstrings = True
+Options.warning_errors = False
+
+
 class BuildExt(build_ext):
 
     def initialize_options(self):
@@ -38,20 +52,7 @@ class BuildExt(build_ext):
 
 
 if __name__ == '__main__':
-    # uring = 'uring'
-    uring = 'uring-ffi'
-    tmpdir = mkdtemp()
-    threads = cpu_count()
-    # compiler options
-    Options.annotate = False
-    Options.fast_fail = True
-    Options.docstrings = True
-    Options.warning_errors = False
-
     try:
-        lib = join(tmpdir, 'libs/liburing')
-        libsrc = join(lib, 'src')
-        libinc = join(libsrc, 'include')
         extension = [Extension(name='liburing.*',  # where the `.so` will be saved.
                                sources=['src/liburing/*.pyx'],
                                language='c',
