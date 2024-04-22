@@ -47,6 +47,7 @@ if __name__ == '__main__':
     Options.fast_fail = True
     Options.docstrings = True
     Options.warning_errors = False
+
     try:
         lib = join(tmpdir, 'libs/liburing')
         libsrc = join(lib, 'src')
@@ -63,11 +64,9 @@ if __name__ == '__main__':
         setup(cmdclass={'build_ext': BuildExt},
               ext_modules=cythonize(extension,
                                     nthreads=threads,
-                                    compiler_directives={
-                                        'embedsignature': True,  # show all `__doc__`
-                                        'boundscheck': False,
-                                        'wraparound': False,
-                                        'language_level': 3,
-                                        'show_performance_hints': False}))
+                                    compiler_directives={'embedsignature': True,  # show `__doc__`
+                                                         'boundscheck': False,
+                                                         'wraparound': False,
+                                                         'language_level': 3}))
     finally:
         rmtree(tmpdir)

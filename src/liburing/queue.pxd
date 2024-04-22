@@ -13,9 +13,9 @@ cdef class io_uring:
 
 cdef class io_uring_sqe:
     cdef:
-        __io_uring_sqe*     ptr
-        __u16               len
-        list[io_uring_sqe]  ref
+        __io_uring_sqe* ptr
+        __u16           len
+        list[object]    ref
 
 
 cdef class io_uring_cqe:

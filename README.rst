@@ -1,7 +1,7 @@
 |test-status| |downloads|
 
-Liburing (Work in progress ... )
-================================
+Liburing
+========
 
 Liburing is Python + Cython wrapper around `C Liburing`_, which is a helper to setup and tear-down io_uring instances.
 
@@ -24,7 +24,7 @@ Requires
 Includes (battery)
 ------------------
 
-    - C liburing 2.6+
+    - C liburing 2.5+
 
 
 Install, update & uninstall (Alpha)
@@ -165,6 +165,7 @@ Cython Note
 
 TODO
 ----
+    - Stable Release (currently still in alpha)
     - Linux 6.1 Backwards compatibility.
 
 
