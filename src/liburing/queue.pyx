@@ -207,11 +207,11 @@ cdef class io_uring_cqe:
 
             Example
                 >>> index = 1
-                >>> cqe.get_result(index)
+                >>> cqe.get_index(index)
                 (0, 123)
 
             Note
-                - Just like `__getitem__` but faster and no error checking!
+                - Just like `__getitem__` but faster!
         '''
         if self.active or self.ptr is not NULL:
             if index == 0:
