@@ -13,13 +13,17 @@ cdef class io_uring:
 
 cdef class io_uring_sqe:
     cdef:
-        __io_uring_sqe* ptr
-        __u16           len
-        list            ref
+        __io_uring_sqe*     ptr
+        __u16               len
+        list[io_uring_sqe]  ref
 
 
 cdef class io_uring_cqe:
-    cdef __io_uring_cqe * ptr
+    cdef:
+        __io_uring_cqe* ptr
+        bint            active
+
+    cdef tuple[__s32, __u64] get_index(self, unsigned int index) noexcept nogil
 
 
 cdef class io_uring_params:

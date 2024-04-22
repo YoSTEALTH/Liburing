@@ -47,17 +47,17 @@ def test_init_max():
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_nop(sqe)
         sqe.flags = liburing.IOSQE_IO_LINK | liburing.IOSQE_ASYNC
-        sqe.user_data = i
+        sqe.user_data = i+1  # `sqe.user_data` can not be `0`
     else:  # last
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_nop(sqe)
         sqe.flags = liburing.IOSQE_ASYNC
-        sqe.user_data = i+1
+        sqe.user_data = i+1+1
 
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, maximum) == maximum
 
     for i in range(maximum):
-        assert cqe[i].user_data == i
+        assert cqe[i].user_data == i+1
 
     liburing.io_uring_cq_advance(ring, maximum)
     assert liburing.io_uring_peek_cqe(ring, cqe) == -errno.EAGAIN

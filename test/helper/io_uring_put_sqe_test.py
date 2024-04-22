@@ -19,7 +19,7 @@ def _loop(entries, num):
         sqe = io_uring_sqe(num)
         for i in range(num):
             io_uring_prep_nop(sqe[i])
-            sqe[i].user_data = i
+            sqe[i].user_data = i+1  # user_data can not be `0`
         if io_uring_put_sqe(ring, sqe):
             io_uring_submit(ring)
         else:
@@ -27,7 +27,7 @@ def _loop(entries, num):
         if num:
             assert io_uring_wait_cqes(ring, cqe, num) == 0
             for i in range(num):
-                assert cqe[i].user_data == i
+                assert cqe[i].user_data == i+1
             io_uring_cq_advance(ring, num)
         return True
     finally:

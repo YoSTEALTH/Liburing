@@ -58,11 +58,11 @@ cdef class io_uring_sqe:
 
         Note
             - `io_uring_sqe` is not the same as `io_uring_get_sqe()`.
-            - This class has multiple uses:
+            - This class has dual usage:
                 1. It works as a base class for `io_uring_get_sqe()` return.
                 2. It can also be used as `sqe = io_uring_sqe(<int>)`, rather than "get" sqe(s)
-                you are going to "put" pre-made sqe(s) into the ring later.
-            - Refer to `help(io_uring_put_sqe)` to see more detail.
+                you are going to "put" pre-made sqe(s) into the ring later. Refer to
+                `help(io_uring_put_sqe)` to see more detail.
     '''
     def __cinit__(self, __u16 num=1):
         cdef str msg
@@ -90,7 +90,7 @@ cdef class io_uring_sqe:
 
     def __len__(self):
         return self.len
-        
+
     def __getitem__(self, unsigned int index):
         cdef io_uring_sqe sqe
         if self.ptr is not NULL:
@@ -98,14 +98,12 @@ cdef class io_uring_sqe:
                 return self
             elif self.len and index < self.len:
                 if (sqe := self.ref[index-1]) is not None:
-                    return sqe  # from reference cache
+                    return sqe  # return from reference cache
                 # create new reference class
-                sqe = io_uring_sqe(0)  # `0` is set to indicated `ptr` is being set for internal use
+                sqe = io_uring_sqe(0)  # `0` is set to indicated `ptr` memory is not managed
                 sqe.ptr = &self.ptr[index]
-                if sqe.ptr is not NULL:
-                    # cache sqe as this class attribute
-                    self.ref[index-1] = sqe
-                    return sqe
+                self.ref[index-1] = sqe  # cache sqe as this class attribute
+                return sqe
         index_error(self, index, 'out of `sqe`')
 
     @property
@@ -122,7 +120,12 @@ cdef class io_uring_sqe:
 
     @user_data.setter
     def user_data(self, __u64 data):
-        __io_uring_sqe_set_data64(self.ptr, data)
+        cdef str msg
+        if data != 0:
+            __io_uring_sqe_set_data64(self.ptr, data)
+        else:
+            msg = f'`{self.__class__.__name__}.user_data` can not be {data!r}'
+            raise ValueError(msg)
 
 
 cdef class io_uring_cqe:
@@ -164,37 +167,38 @@ cdef class io_uring_cqe:
         if self.ptr is not NULL:
             if index == 0:
                 return self
-            cqe = io_uring_cqe()
-            cqe.ptr = &self.ptr[index]
-            if cqe.ptr is not NULL:
+            elif self.ptr[index].user_data != 0:
+                cqe = io_uring_cqe()
+                cqe.ptr = &self.ptr[index]
+                cqe.active = True
                 return cqe
         index_error(self, index, 'out of `cqe`')
         # note: no need to cache items since `cqe` is normally called once or passed around.
 
     def __bool__(self):
-        return self.ptr is not NULL
+        return True if self.active else self.ptr is not NULL
 
     def __repr__(self):
-        if self.ptr is not NULL:
+        if self.active or self.ptr is not NULL:
             return f'{self.__class__.__name__}(user_data={self.ptr.user_data!r}, ' \
                    f'res={self.ptr.res!r}, flags={self.ptr.flags!r})'
         memory_error(self, 'out of `cqe`')
 
     @property
     def user_data(self) -> __u64:
-        if self.ptr is not NULL:
+        if self.active or self.ptr is not NULL:
             return self.ptr.user_data
         memory_error(self, 'out of `cqe`')
 
     @property
     def res(self) -> __s32:
-        if self.ptr is not NULL:
+        if self.active or self.ptr is not NULL:
             return self.ptr.res
         memory_error(self, 'out of `cqe`')
 
     @property
     def flags(self) -> __u32:
-        if self.ptr is not NULL:
+        if self.active or self.ptr is not NULL:
             return self.ptr.flags
         memory_error(self, 'out of `cqe`')
 
