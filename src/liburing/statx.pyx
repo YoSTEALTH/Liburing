@@ -55,7 +55,7 @@ cdef class statx:
 
     @property
     def stx_mode(self):
-        return self.ptr.stx_mode & 0o7777
+        return self.ptr.stx_mode
 
     @property
     def stx_ino(self):
