@@ -64,7 +64,7 @@ cdef class io_uring_sqe:
                 you are going to "put" pre-made sqe(s) into the ring later. Refer to
                 `help(io_uring_put_sqe)` to see more detail.
     '''
-    def __cinit__(self, __u16 num=1):
+    def __cinit__(self, __u16 num=1, *args, **kwargs):
         cdef str msg
         if num:
             if num > 1024:

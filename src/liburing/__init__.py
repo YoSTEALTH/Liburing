@@ -1,7 +1,7 @@
 from dynamic_import import importer
 
 
-__version__ = '2024.4.23'
+__version__ = '2024.4.24'
 
 
 importer(exclude_dir=['lib', 'include'])
