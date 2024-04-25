@@ -14,3 +14,5 @@ def test_open_how():
     assert how.flags == O_RDWR
     assert how.mode == 0o777
     assert how.resolve == RESOLVE_CACHED
+
+    assert str(open_how(1, 2, 3)) == 'open_how(flags=1, mode=2, resolve=3)'
