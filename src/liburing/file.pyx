@@ -48,6 +48,12 @@ cdef class open_how:
             PyMem_RawFree(self.ptr)
             self.ptr = NULL
 
+    def __repr__(self):
+        if self.ptr is not NULL:
+            return f'{self.__class__.__name__}(flags={self.ptr.flags!r}, ' \
+                   f'mode={self.ptr.mode!r}, resolve={self.ptr.resolve!r})'
+        return super().__repr__()
+
     @property
     def mode(self):
         return self.ptr.mode
