@@ -24,7 +24,7 @@ Requires
 Includes (battery)
 ------------------
 
-    - C liburing 2.5+
+    - C liburing 2.6+
 
 
 Install, update & uninstall (Alpha)
