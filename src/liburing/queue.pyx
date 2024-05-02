@@ -107,11 +107,11 @@ cdef class io_uring_sqe:
         index_error(self, index, 'out of `sqe`')
 
     @property
-    def flags(self) -> __u8:
+    def flags(self) -> unsigned:
         return self.ptr.flags
 
     @flags.setter
-    def flags(self, __u8 flags):
+    def flags(self, unsigned int flags):
         __io_uring_sqe_set_flags(self.ptr, flags)
 
     @property
