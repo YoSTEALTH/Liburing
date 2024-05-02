@@ -28,8 +28,8 @@ class BuildExt(build_ext):
             copy2(src, join(tmpdir, src))
 
         # note: just runs `configure` & `make`, does not `install`.
-        sub_process_run(['./configure'], cwd=lib, capture_output=False, check=True)
-        sub_process_run(['make', f'--jobs={threads}'], cwd=lib, capture_output=False)
+        sub_process_run(['./configure'], cwd=lib, capture_output=True, check=True)
+        sub_process_run(['make', f'--jobs={threads}'], cwd=lib, capture_output=True)
 
         # replace `include` placeholder files with actual content.
         copytree(libinc, 'src/liburing/include', dirs_exist_ok=True)

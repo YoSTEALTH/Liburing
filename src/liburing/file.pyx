@@ -195,7 +195,7 @@ cpdef inline void io_uring_prep_read(io_uring_sqe sqe,
                                      int fd,
                                      unsigned char[:] buf,  # `void *buf`
                                      unsigned int nbytes,
-                                     __u64 offset) noexcept nogil:
+                                     __u64 offset=0) noexcept nogil:
     __io_uring_prep_read(sqe.ptr, fd, &buf[0], nbytes, offset)
 
 cpdef inline void io_uring_prep_read_multishot(io_uring_sqe sqe,
