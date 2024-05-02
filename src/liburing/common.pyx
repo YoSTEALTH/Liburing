@@ -36,9 +36,9 @@ cdef class iovec:
                 garbage collected before you get the chance to use it!
         '''
         cdef:
-            unsigned int index
-            str error
-            const unsigned char[:] buffer
+            str                     error
+            unsigned int            index, length
+            const unsigned char[:]  buffer
 
         if buffers:
             self.ref = []  # reference holder
@@ -62,8 +62,10 @@ cdef class iovec:
 
             for index in range(self.len):
                 buffer = self.ref[index]
+                if not (length := len(self.ref[index])):
+                    raise ValueError(f'`{self.__class__.__name__}()` can not be length of `0`')
                 self.ptr[index].iov_base = <void*>&buffer[0]  # starting address
-                self.ptr[index].iov_len = len(self.ref[index])
+                self.ptr[index].iov_len = length
 
     def __dealloc__(self):
         if self.ptr is not NULL:
@@ -76,16 +78,16 @@ cdef class iovec:
     def __len__(self):
         return self.len
 
-    @boundscheck(True)
     def __getitem__(self, unsigned int index):
         cdef iovec iov
-        if index:
+        if index == 0:
+            return self
+        elif self.len and index < self.len:
             iov = iovec()
             iov.ptr = &self.ptr[index]
-            if iov.ptr is not NULL:
+            if iov.ptr.iov_len:
                 return iov
-            index_error(self, index)
-        return self
+        index_error(self, index)
 
     @property
     def iov_base(self):

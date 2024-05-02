@@ -43,3 +43,6 @@ def test_iovec():
     error = re.escape(f"`iovec()` - `buffers` length of {iov_max} exceeds `SC_IOV_MAX` limit set by OS of {SC_IOV_MAX}")
     with pytest.raises(OverflowError, match=error):
         iovec(buffers)
+
+    with pytest.raises(ValueError, match=re.escape('`iovec()` can not be length of `0`')):
+        iovec([b''])

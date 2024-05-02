@@ -1,5 +1,6 @@
-from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from posix.unistd cimport _SC_IOV_MAX
+from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
+from libc.string cimport strlen
 from .lib.uring cimport *
 from .error cimport memory_error, index_error
 from .queue cimport io_uring_sqe
