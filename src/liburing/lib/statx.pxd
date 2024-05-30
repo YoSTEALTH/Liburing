@@ -105,13 +105,13 @@ cdef extern from '<linux/stat.h>' nogil:
         __S_IXOTH 'S_IXOTH'
 
     # Macro
-    bint __S_ISLNK 'S_ISLNK'(mode_t m)
-    bint __S_ISREG 'S_ISREG'(mode_t m)
-    bint __S_ISDIR 'S_ISDIR'(mode_t m)
-    bint __S_ISCHR 'S_ISCHR'(mode_t m)
-    bint __S_ISBLK 'S_ISBLK'(mode_t m)
-    bint __S_ISFIFO 'S_ISFIFO'(mode_t m)
-    bint __S_ISSOCK 'S_ISSOCK'(mode_t m)
+    int __S_ISLNK 'S_ISLNK'(mode_t m)
+    int __S_ISREG 'S_ISREG'(mode_t m)
+    int __S_ISDIR 'S_ISDIR'(mode_t m)
+    int __S_ISCHR 'S_ISCHR'(mode_t m)
+    int __S_ISBLK 'S_ISBLK'(mode_t m)
+    int __S_ISFIFO 'S_ISFIFO'(mode_t m)
+    int __S_ISSOCK 'S_ISSOCK'(mode_t m)
 
 
 cdef extern from * nogil:  # '<fcntl.h>'

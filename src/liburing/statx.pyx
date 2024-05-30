@@ -20,7 +20,7 @@ cdef class statx:
                 https://man7.org/linux/man-pages/man7/inode.7.html
     '''
     def __cinit__(self):
-        self.ptr = <__statx*>PyMem_RawMalloc(sizeof(__statx))
+        self.ptr = <__statx*>PyMem_RawCalloc(1, sizeof(__statx))
         if self.ptr is NULL:
             memory_error(self)
 
@@ -131,47 +131,47 @@ cdef class statx:
     @property
     def islink(self) -> bool:
         ''' Return True if mode is from a symbolic link. '''
-        return __S_ISLNK(self.ptr.stx_mode)
+        return __S_ISLNK(self.ptr.stx_mode) == 1
 
     @property
     def isfile(self) -> bool:
         ''' Return True if mode is from a regular file. '''
-        return __S_ISREG(self.ptr.stx_mode)
+        return __S_ISREG(self.ptr.stx_mode) == 1
 
     @property
     def isreg(self) -> bool:
         ''' Return True if mode is from a regular file. '''
-        return __S_ISREG(self.ptr.stx_mode)
+        return __S_ISREG(self.ptr.stx_mode) == 1
 
     @property
     def isdir(self) -> bool:
         ''' Return True if mode is from a directory. '''
-        return __S_ISDIR(self.ptr.stx_mode)
+        return __S_ISDIR(self.ptr.stx_mode) == 1
 
     @property
     def ischr(self) -> bool:
         ''' Return True if mode is from a character special device file. '''
-        return __S_ISCHR(self.ptr.stx_mode)
+        return __S_ISCHR(self.ptr.stx_mode) == 1
 
     @property
     def isblk(self) -> bool:
         ''' Return True if mode is from a block special device file. '''
-        return __S_ISBLK(self.ptr.stx_mode)
+        return __S_ISBLK(self.ptr.stx_mode) == 1
 
     @property
     def isfifo(self) -> bool:
         ''' Return True if mode is from a FIFO (named pipe). '''
-        return __S_ISFIFO(self.ptr.stx_mode)
+        return __S_ISFIFO(self.ptr.stx_mode) == 1
 
     @property
     def issock(self) -> bool:
         ''' Return True if mode is from a socket. '''
-        return __S_ISSOCK(self.ptr.stx_mode)
+        return __S_ISSOCK(self.ptr.stx_mode) == 1
 
 
 cpdef inline void io_uring_prep_statx(io_uring_sqe sqe,
                                       statx statxbuf,
-                                      const char *path,
+                                      const char* path,
                                       int flags=0,
                                       unsigned int mask=0,
                                       int dfd=__AT_FDCWD) noexcept nogil:

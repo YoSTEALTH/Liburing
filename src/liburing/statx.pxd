@@ -1,10 +1,10 @@
-from cpython.mem cimport PyMem_RawMalloc, PyMem_RawFree
+from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from .error cimport memory_error
 from .queue cimport *
 
 
 cdef class statx:
-    cdef __statx *ptr
+    cdef __statx* ptr
 
 
 cpdef void io_uring_prep_statx(io_uring_sqe sqe,

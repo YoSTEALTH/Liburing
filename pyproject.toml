@@ -10,7 +10,7 @@ readme = {file="README.rst", content-type="text/x-rst"}
 license = {file="LICENSE.txt", content-type="text"}
 requires-python = ">=3.8"
 dependencies = ["dynamic-import"]
-description = "..."
+description = "Liburing is Python + Cython wrapper around C Liburing, which is a helper to setup and tear-down io_uring instances."
 classifiers = ["Topic :: Software Development",
                "License :: Public Domain",
                "Intended Audience :: Developers",
