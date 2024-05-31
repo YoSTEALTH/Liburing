@@ -17,8 +17,10 @@ def probe() -> dict:
     '''
     r = {}
     p = io_uring_get_probe()
-    for i in io_uring_op:
-        if i.name != 'IORING_OP_LAST':
-            r[i.name] = io_uring_opcode_supported(p, i)
-    io_uring_free_probe(p)
+    try:
+        for i in io_uring_op:
+            if i.name != 'IORING_OP_LAST':
+                r[i.name] = io_uring_opcode_supported(p, i)
+    finally:
+        io_uring_free_probe(p)
     return r
