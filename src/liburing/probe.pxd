@@ -1,11 +1,13 @@
-from cpython.mem cimport PyMem_RawCalloc
+from cpython.mem cimport PyMem_RawCalloc, PyMem_RawFree
 from .lib.uring cimport *
 from .error cimport trap_error, memory_error
 from .queue cimport io_uring
 
 
 cdef class io_uring_probe:
-    cdef __io_uring_probe *ptr
+    cdef:
+        __io_uring_probe*   ptr
+        unsigned int        len
 
 cpdef io_uring_probe io_uring_get_probe_ring(io_uring ring)
 cpdef io_uring_probe io_uring_get_probe()

@@ -2,25 +2,29 @@ cdef class io_uring_probe:
 
     def __cinit__(self, unsigned int num=0):
         if num:
-            self.ptr = <__io_uring_probe*>PyMem_RawCalloc(num, sizeof(__io_uring_probe))
+            self.ptr = <__io_uring_probe*>PyMem_RawCalloc(
+                num, sizeof(__io_uring_probe) + num * sizeof(__io_uring_probe_op)
+            )
             if self.ptr is NULL:
                 memory_error(self)
+            self.len = num
 
     def __dealloc__(self):
-        if self.ptr is not NULL:
-            # just in case user forgets to call `io_uring_free_probe` or error happened
-            __io_uring_free_probe(self.ptr)
+        if self.len and self.ptr is not NULL:
+            PyMem_RawFree(self.ptr)
             self.ptr = NULL
 
     @property
     def last_op(self):
         if self.ptr is not NULL:
             return self.ptr.last_op
+        memory_error(self)
 
     @property
     def ops_len(self):
         if self.ptr is not NULL:
             return self.ptr.ops_len
+        memory_error(self)
 
 cpdef io_uring_probe io_uring_get_probe_ring(io_uring ring):
     cdef io_uring_probe probe = io_uring_probe()
