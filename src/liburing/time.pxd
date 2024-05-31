@@ -5,7 +5,7 @@ from .queue cimport io_uring_sqe
 
 
 cdef class timespec:
-    cdef __kernel_timespec *ptr
+    cdef __kernel_timespec* ptr
 
 
 cpdef void io_uring_prep_timeout(io_uring_sqe sqe,

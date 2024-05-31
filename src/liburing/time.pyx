@@ -28,18 +28,26 @@ cdef class timespec:
 
     @property
     def tv_sec(self):
+        if self.ptr is NULL:
+            memory_error(self)
         return self.ptr.tv_sec
 
     @tv_sec.setter
     def tv_sec(self, int64_t second):
+        if self.ptr is NULL:
+            memory_error(self)
         self.ptr.tv_sec = second
 
     @property
     def tv_nsec(self):
+        if self.ptr is NULL:
+            memory_error(self)
         return self.ptr.tv_nsec
 
     @tv_nsec.setter
     def tv_nsec(self, long long nanosecond):
+        if self.ptr is NULL:
+            memory_error(self)
         self.ptr.tv_nsec = nanosecond
 
 
