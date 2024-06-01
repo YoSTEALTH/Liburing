@@ -159,9 +159,8 @@ cpdef int io_uring_buf_ring_available(io_uring ring,
 
 cpdef io_uring_sqe io_uring_get_sqe(io_uring ring)
 
-cpdef unsigned int io_uring_for_each_cqe(io_uring ring,
-                                         io_uring_cqe cqe,
-                                         unsigned int head=?) nogil
+cpdef unsigned int io_uring_for_each_cqe(io_uring ring, io_uring_cqe cqe) noexcept nogil
+
 
 cpdef enum __queue_define__:
     LIBURING_UDATA_TIMEOUT = __LIBURING_UDATA_TIMEOUT
