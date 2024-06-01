@@ -22,7 +22,7 @@ def test_io_uring_for_each_cqe(ring, cqe):
     sqe.user_data = 3
 
     liburing.io_uring_submit_and_wait_timeout(ring, cqe, 2)
-    assert liburing.io_uring_for_each_cqe(ring, cqe) == 3
+    assert liburing.io_uring_for_each_cqe(ring, cqe) == 2
     assert cqe.res == 0
     assert cqe.user_data == 2
     assert cqe[0].user_data == 2

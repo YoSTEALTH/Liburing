@@ -9,11 +9,16 @@ from .io_uring cimport *
 
 cdef extern from '../include/liburing.h' nogil:
     ''' // macro function
-        static inline void __io_uring_for_each_cqe(struct io_uring*     ring,
-                                                   unsigned int*        head,
+        static inline unsigned __io_uring_for_each_cqe(struct io_uring* ring,
                                                    struct io_uring_cqe* cqe)
         {
-            io_uring_for_each_cqe(ring, head[0], cqe);
+            unsigned head;
+            unsigned count = 0;
+
+            io_uring_for_each_cqe(ring, head, cqe){
+                count++;
+            }
+            return count;
         }
     '''
     # Library interface to `io_uring`
@@ -243,7 +248,7 @@ cdef extern from '../include/liburing.h' nogil:
     int __io_uring_cqe_index 'io_uring_cqe_index'(__io_uring* ring,
                                                   unsigned int ptr,
                                                   unsigned int mask)
-    void __io_uring_for_each_cqe(__io_uring* ring, unsigned int* head, __io_uring_cqe* cqe)
+    unsigned int __io_uring_for_each_cqe(__io_uring* ring, __io_uring_cqe* cqe)
 
     # Must be called after `io_uring_for_each_cqe()`
     void __io_uring_cq_advance 'io_uring_cq_advance'(__io_uring* ring,

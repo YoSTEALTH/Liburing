@@ -449,9 +449,11 @@ cpdef inline io_uring_sqe io_uring_get_sqe(io_uring ring):
     sqe.ptr = __io_uring_get_sqe(&ring.ptr)
     return sqe
 
-
-cpdef inline unsigned int io_uring_for_each_cqe(io_uring ring,
-                                                io_uring_cqe cqe,
-                                                unsigned int head=0) nogil:
-    __io_uring_for_each_cqe(&ring.ptr, &head, cqe.ptr)
-    return head
+cpdef inline unsigned int io_uring_for_each_cqe(io_uring ring, io_uring_cqe cqe) noexcept nogil:
+    '''
+        Example
+            >>> for i in range(io_uring_for_each_cqe(ring, cqe)):
+            ...     cqe[i].res, cqe[i].user_data
+            123, 123
+    '''
+    return __io_uring_for_each_cqe(&ring.ptr, cqe.ptr)
