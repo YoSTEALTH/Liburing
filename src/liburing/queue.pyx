@@ -277,8 +277,8 @@ cpdef int io_uring_queue_exit(io_uring ring) nogil:
 
 cpdef unsigned int io_uring_peek_batch_cqe(io_uring ring,
                                            io_uring_cqe cqes,
-                                           unsigned int count) noexcept nogil:
-    return __io_uring_peek_batch_cqe(&ring.ptr, &cqes.ptr, count)
+                                           unsigned int count) nogil:
+    return trap_error(__io_uring_peek_batch_cqe(&ring.ptr, &cqes.ptr, count))
 
 cpdef int io_uring_wait_cqes(io_uring ring,
                              io_uring_cqe cqe_ptr,
@@ -324,8 +324,8 @@ cpdef int io_uring_buf_ring_head(io_uring ring, int buf_group, uint16_t head) no
 cpdef inline void io_uring_cq_advance(io_uring ring, unsigned int nr) noexcept nogil:
     __io_uring_cq_advance(&ring.ptr, nr)
 
-cpdef inline void io_uring_cqe_seen(io_uring ring, io_uring_cqe nr) noexcept nogil:
-    __io_uring_cqe_seen(&ring.ptr, nr.ptr)
+cpdef inline void io_uring_cqe_seen(io_uring ring, io_uring_cqe cqe) noexcept nogil:
+    __io_uring_cqe_seen(&ring.ptr, cqe.ptr)
 
 
 # Command prep helpers

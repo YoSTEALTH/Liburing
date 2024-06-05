@@ -38,7 +38,7 @@ def tmp_dir():
 def ring():
     ring = liburing.io_uring()
     try:
-        liburing.io_uring_queue_init(32, ring)
+        liburing.io_uring_queue_init(1024, ring)
         yield ring
     finally:
         liburing.io_uring_queue_exit(ring)
