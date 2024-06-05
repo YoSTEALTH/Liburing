@@ -13,7 +13,7 @@ def test_for_each(ring, cqe):
 
     # >>> difference START 
     cq_ready = 0
-    for index in range(liburing.io_uring_for_each_cqe(ring, cqe)):
+    for i in range(liburing.io_uring_for_each_cqe(ring, cqe)):
         assert cqe[i].user_data == i+1
         cq_ready += 1
     # <<< difference END
