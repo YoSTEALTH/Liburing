@@ -278,6 +278,9 @@ cpdef int io_uring_queue_exit(io_uring ring) nogil:
 cpdef unsigned int io_uring_peek_batch_cqe(io_uring ring,
                                            io_uring_cqe cqes,
                                            unsigned int count) nogil:
+    '''
+        WARNING: currently there is a bug with `io_uring_peek_batch_cqe()` leading to segfault!!!
+    '''
     return trap_error(__io_uring_peek_batch_cqe(&ring.ptr, &cqes.ptr, count))
 
 cpdef int io_uring_wait_cqes(io_uring ring,
