@@ -13,26 +13,14 @@ cdef extern from '<sys/socket.h>' nogil:
         sa_family_t sa_family
         char        sa_data[14]  # protocol-specific address
 
-    int __bind 'bind'(int sockfd, const __sockaddr *addr, socklen_t addrlen)
+    int __bind 'bind'(int sockfd, const __sockaddr* addr, socklen_t addrlen)
     int __listen 'listen'(int sockfd, int backlog)
-
-    int __setsockopt 'setsockopt'(int sockfd,
-                                  int level,
-                                  int optname,
-                                  const void *optval,
-                                  socklen_t optlen)
-    int __getsockopt 'getsockopt'(int sockfd,
-                                  int level,
-                                  int optname,
-                                  void *optval,
-                                  socklen_t *optlen)
-
     int __getpeername 'getpeername'(int sockfd,
-                                    __sockaddr *addr,
-                                    socklen_t *addrlen)
+                                    __sockaddr* addr,
+                                    socklen_t* addrlen)
     int __getsockname 'getsockname'(int sockfd,
-                                    __sockaddr *addr,
-                                    socklen_t *addrlen)
+                                    __sockaddr* addr,
+                                    socklen_t* addrlen)
 
 
 cdef extern from '<sys/un.h>' nogil:
@@ -49,7 +37,7 @@ cdef extern from '<netinet/in.h>' nogil:
     # IPv4 - Internet address
     # -----------------------
     struct __in_addr 'in_addr':
-        in_addr_t s_addr  # Address in network byte order */
+        in_addr_t s_addr  # Address in network byte order
 
     struct __sockaddr_in 'sockaddr_in':
         sa_family_t sin_family  # address family: AF_INET
@@ -106,7 +94,7 @@ cdef extern from '<netdb.h>' nogil:
                                     char* serv,
                                     socklen_t servlen,
                                     int flags)
-    void __freeaddrinfo 'freeaddrinfo'(__addrinfo *ai)  # free `addrinfo'
+    void __freeaddrinfo 'freeaddrinfo'(__addrinfo* ai)  # free `addrinfo'
     const char* __gai_strerror 'gai_strerror'(int ecode)
 
     enum:
@@ -137,15 +125,10 @@ cdef extern from '<netdb.h>' nogil:
 
 cdef extern from '<arpa/inet.h>' nogil:
     # converts to network address
-    int __inet_pton 'inet_pton'(int af,
-                                const char *src,  # restrict
-                                void *dst)        # restrict
+    int __inet_pton 'inet_pton'(int af, const char* src, void* dst)
 
     # converts network address to address family
-    const char *__inet_ntop 'inet_ntop'(int af,
-                                        const void *src,  # restrict
-                                        char *dst,        # restrict
-                                        socklen_t size)
+    const char* __inet_ntop 'inet_ntop'(int af, const void* src, char* dst, socklen_t size)
 
     # converting host to network order.
     uint16_t __htons 'htons'(uint16_t hostshort)
