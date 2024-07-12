@@ -14,6 +14,7 @@ cpdef int getpeername(int sockfd, sockaddr addr) nogil
 cpdef tuple[bytes, uint16_t] getsockname(int sockfd, sockaddr addr)
 
 cpdef tuple getnameinfo(sockaddr addr, int flags=?)
+cpdef bint isIP(sa_family_t family, char* value) noexcept nogil
 
 cpdef enum __extra_define__:
     # getaddrinfo/getnameinfo start >>>
