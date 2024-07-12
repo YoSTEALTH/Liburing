@@ -13,8 +13,8 @@ cdef class getaddrinfo:
         '''
         # TODO: `port_service` should handle both `int` & `bytes` types.
         cdef:
-            int no
-            __addrinfo hints
+            int         no
+            __addrinfo  hints
 
         memset(&hints, 0, sizeof(__addrinfo))
         hints.ai_flags = flags
@@ -123,3 +123,29 @@ cpdef tuple getnameinfo(sockaddr addr, int flags=0):
     trap_error(__getnameinfo(<__sockaddr*>addr.ptr, addr.sizeof,
                              host, sizeof(host), service, sizeof(service), flags))
     return (host, int(service) if service.isdigit() else service)
+
+
+cpdef bint isIP(sa_family_t family, char* value) noexcept nogil:
+    '''
+        Example
+            >>> isIP(AF_INET, b'0.0.0.0')
+            True
+            >>> isIP(AF_INET6, b'::1')
+            True
+            >>> isIP(AF_INET6, b'domain.ext')
+            False
+            >>> isIP(AF_INET, b'domain.ext')
+            False
+            >>> isIP(AF_UNIX, b'/path/socket')
+            False
+    '''
+    cdef:
+        __sockaddr_in  ptr_in
+        __sockaddr_in6 ptr_in6
+
+    if family == __AF_INET:
+        return __inet_pton(family, value, &ptr_in.sin_addr)
+    elif family == __AF_INET6:
+        return __inet_pton(family, value, &ptr_in6.sin6_addr)
+    else:
+        return False
