@@ -2,7 +2,7 @@ from liburing import O_CREAT, O_RDWR, AT_FDCWD, iovec, io_uring, io_uring_get_sq
                      io_uring_prep_openat, io_uring_prep_write, io_uring_prep_read, \
                      io_uring_prep_close, io_uring_submit, io_uring_wait_cqe, \
                      io_uring_cqe_seen, io_uring_cqe, io_uring_queue_init, io_uring_queue_exit, \
-                     trap_error
+                     io_uring_sqe_set_data64, trap_error
 
 
 def open(ring, cqe, path, flags, mode=0o660, dir_fd=AT_FDCWD):
@@ -11,7 +11,10 @@ def open(ring, cqe, path, flags, mode=0o660, dir_fd=AT_FDCWD):
     # to current working directory. Also `_path` must be in bytes
 
     sqe = io_uring_get_sqe(ring)  # sqe(submission queue entry)
-    io_uring_prep_openat(sqe, dir_fd, _path, flags, mode)
+    io_uring_prep_openat(sqe, _path, flags, mode, dir_fd)
+    # set submit entry identifier as `1` which is returned back in `cqe.user_data`
+    # so you can keep track of submit/completed entries.
+    io_uring_sqe_set_data64(sqe, 1)
     return _submit_and_wait(ring, cqe)  # returns fd
 
 
@@ -19,6 +22,7 @@ def write(ring, cqe, fd, data, offset=0):
     iov = iovec(data)  # or iovec([bytearray(data)])
     sqe = io_uring_get_sqe(ring)
     io_uring_prep_write(sqe, fd, iov.iov_base, iov.iov_len, offset)
+    io_uring_sqe_set_data64(sqe, 2)
     return _submit_and_wait(ring, cqe)  # returns length(s) of bytes written
 
 
@@ -26,6 +30,7 @@ def read(ring, cqe, fd, length, offset=0):
     iov = iovec(bytearray(length))  # or [bytearray(length)]
     sqe = io_uring_get_sqe(ring)
     io_uring_prep_read(sqe, fd, iov.iov_base, iov.iov_len, offset)
+    io_uring_sqe_set_data64(sqe, 3)
     _submit_and_wait(ring, cqe)  # get actual length of file read.
     return iov.iov_base
 
@@ -33,6 +38,7 @@ def read(ring, cqe, fd, length, offset=0):
 def close(ring, cqe, fd):
     sqe = io_uring_get_sqe(ring)
     io_uring_prep_close(sqe, fd)
+    io_uring_sqe_set_data64(sqe, 4)
     _submit_and_wait(ring, cqe)  # no error means success!
 
 
@@ -51,7 +57,7 @@ def main():
     ring = io_uring()
     cqe = io_uring_cqe()  # completion queue entry
     try:
-        io_uring_queue_init(8, ring, 0)
+        io_uring_queue_init(32, ring, 0)
 
         fd = open(ring, cqe, '/tmp/liburing-test-file.txt', O_CREAT | O_RDWR)
         print('fd:', fd)
