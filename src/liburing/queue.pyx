@@ -33,9 +33,9 @@ cdef class io_uring:
 
     def __repr__(self)-> str:
         if self.active:
-            return f'{self.__class__.__name__}(flags={self.flags!r}, ' \
-                   f'ring_fd={self.ring_fd!r}, features={self.features!r}, ' \
-                   f'enter_ring_fd={self.enter_ring_fd!r}, int_flags={self.int_flags!r}) '
+            return f'{self.__class__.__name__}(flags={self.ptr.flags!r}, ' \
+                   f'ring_fd={self.ptr.ring_fd!r}, features={self.ptr.features!r}, ' \
+                   f'enter_ring_fd={self.ptr.enter_ring_fd!r}, int_flags={self.ptr.int_flags!r}) '
         return super().__repr__()
 
 
@@ -65,7 +65,7 @@ cdef class io_uring_sqe:
                 `help(io_uring_put_sqe)` to see more detail.
     '''
     def __cinit__(self, __u16 num=1, *args, **kwargs):
-        cdef str msg
+        cdef unicode msg
         if num:
             if num > 1024:
                 msg = f'`{self.__class__.__name__}(num)` is limited to 1024, received {num!r}'
@@ -74,11 +74,9 @@ cdef class io_uring_sqe:
             if self.ptr is NULL:
                 memory_error(self)
             if num > 1:
-                self.ref = [None]*(num-1)  # do not hold `0` reference.
-        else:
-            self.ptr = NULL
-        self.len = num
-        # note: if `self.len` is not set it means its for internally `ptr` reference use.
+                self.ref = [None]*(num-1)  # does not hold index `0` reference.
+            self.len = num
+            # note: if `self.len` is not set it means its for internally `ptr` reference use.
 
     def __dealloc__(self):
         if self.len and self.ptr is not NULL:
@@ -120,7 +118,7 @@ cdef class io_uring_sqe:
 
     @user_data.setter
     def user_data(self, __u64 data):
-        cdef str msg
+        cdef unicode msg
         if data != 0:
             __io_uring_sqe_set_data64(self.ptr, data)
         else:
@@ -162,43 +160,47 @@ cdef class io_uring_cqe:
             - `cqes = io_uring_cqe()` only needs to be defined once, and reused.
             - Use `io_uring_cq_ready(ring)` to figure out how many cqe's are ready.
     '''
+    def __cinit__(self):
+        self.ptr = NULL
+
     def __getitem__(self, unsigned int index):
         cdef io_uring_cqe cqe
-        if self.ptr is not NULL:
+        if self.ptr is not NULL and self.ptr.user_data:
             if index == 0:
                 return self
-            elif self.ptr[index].user_data != 0:
+            elif self.ptr[index].user_data:
                 cqe = io_uring_cqe()
                 cqe.ptr = &self.ptr[index]
-                cqe.active = True
                 return cqe
         index_error(self, index, 'out of `cqe`')
         # note: no need to cache items since `cqe` is normally called once or passed around.
 
     def __bool__(self):
-        return True if self.active else self.ptr is not NULL
+        if self.ptr is NULL:
+            return False
+        return True if self.ptr.user_data else False
 
     def __repr__(self):
-        if self.active or self.ptr is not NULL:
+        if self.ptr is not NULL and self.ptr.user_data:
             return f'{self.__class__.__name__}(user_data={self.ptr.user_data!r}, ' \
                    f'res={self.ptr.res!r}, flags={self.ptr.flags!r})'
-        memory_error(self, 'out of `cqe`')
+        return super().__repr__()
 
     @property
     def user_data(self) -> __u64:
-        if self.active or self.ptr is not NULL:
+        if self.ptr is not NULL and self.ptr.user_data:
             return self.ptr.user_data
         memory_error(self, 'out of `cqe`')
 
     @property
     def res(self) -> __s32:
-        if self.active or self.ptr is not NULL:
+        if self.ptr is not NULL and self.ptr.user_data:
             return self.ptr.res
         memory_error(self, 'out of `cqe`')
 
     @property
     def flags(self) -> __u32:
-        if self.active or self.ptr is not NULL:
+        if self.ptr is not NULL and self.ptr.user_data:
             return self.ptr.flags
         memory_error(self, 'out of `cqe`')
 
@@ -207,17 +209,16 @@ cdef class io_uring_cqe:
 
             Example
                 >>> index = 1
-                >>> cqe.get_index(index)
-                (0, 123)
+                >>> res, user_data = cqe.get_index(index)
+                >>> if user_data:
+                ...     res, user_data
+                0 123
 
             Note
                 - Just like `__getitem__` but faster!
         '''
-        if self.active or self.ptr is not NULL:
-            if index == 0:
-                return self.ptr.res, self.ptr.user_data
-            else:
-                return self.ptr[index].res, self.ptr[index].user_data
+        if self.ptr is not NULL:
+            return self.ptr[index].res, self.ptr[index].user_data
         return 0, 0
 
 
