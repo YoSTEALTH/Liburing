@@ -48,18 +48,11 @@ cdef class getaddrinfo:
             p = p.ai_next
 
 
-cpdef int bind(int sockfd, sockaddr addr) nogil:
-    return trap_error(__bind(sockfd, <__sockaddr*>addr.ptr, addr.sizeof))
-
-cpdef int listen(int sockfd, int backlog) nogil:
-    return trap_error(__listen(sockfd, backlog))
-
-# TODO
 cpdef int getpeername(int sockfd, sockaddr addr) nogil:
     ''' TODO '''
     return trap_error(__getpeername(sockfd, <__sockaddr*>addr.ptr, &addr.sizeof))
 
-cpdef tuple[bytes, uint16_t] getsockname(int sockfd, sockaddr addr):
+cpdef tuple getsockname(int sockfd, sockaddr addr):
     '''
         Example
             >>> addr = sockaddr(b'127.0.0.1', 0)

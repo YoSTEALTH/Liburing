@@ -23,7 +23,14 @@ def test_getsockname(ring, cqe):
         assert cqe.user_data == i+1
         liburing.io_uring_cqe_seen(ring, cqe)
 
-        liburing.bind(sockfd, addr)
+        # bind
+        sqe = liburing.io_uring_get_sqe(ring)
+        liburing.io_uring_prep_bind(sqe, sockfd, addr)
+        sqe.user_data = i+1
+        assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
+        liburing.trap_error(cqe.res)
+        assert cqe.user_data == i+1
+        liburing.io_uring_cqe_seen(ring, cqe)
 
         ip, port = liburing.getsockname(sockfd, addr)
         if i:
