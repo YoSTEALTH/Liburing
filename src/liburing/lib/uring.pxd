@@ -26,7 +26,8 @@ cdef extern from '../include/liburing.h' nogil:
     struct __io_uring_sq 'io_uring_sq':
         unsigned int*   khead
         unsigned int*   ktail
-
+        # unsigned int*   kring_mask      # Deprecated: use `ring_mask` instead of `*kring_mask`
+        # unsigned int*   kring_entries   # Deprecated: use `ring_entries` instead of `*kring_entries`
         unsigned int*   kflags
         unsigned int*   kdropped
         unsigned int*   array
@@ -45,8 +46,9 @@ cdef extern from '../include/liburing.h' nogil:
 
     struct __io_uring_cq 'io_uring_cq':
         unsigned int*   khead
-        unsigned int*   ktail
-
+        unsigned int*   ktail    
+        # unsigned int*   kring_mask      # Deprecated: use `ring_mask` instead of `*kring_mask`
+        # unsigned int*   kring_entries   # Deprecated: use `ring_entries` instead of `*kring_entries`
         unsigned int*   kflags
         unsigned int*   koverflow
         __io_uring_cqe* cqes
@@ -81,8 +83,7 @@ cdef extern from '../include/liburing.h' nogil:
     # frees a probe allocated through `io_uring_get_probe()` or `io_uring_get_probe_ring()`
     void __io_uring_free_probe 'io_uring_free_probe'(__io_uring_probe* probe)
 
-    bint __io_uring_opcode_supported 'io_uring_opcode_supported'(__io_uring_probe* p,
-                                                                 int op)
+    bint __io_uring_opcode_supported 'io_uring_opcode_supported'(__io_uring_probe* p, int op)
 
     int __io_uring_queue_init_mem 'io_uring_queue_init_mem'(unsigned int entries,
                                                             __io_uring* ring,
@@ -92,35 +93,56 @@ cdef extern from '../include/liburing.h' nogil:
     int __io_uring_queue_init_params 'io_uring_queue_init_params'(unsigned int entries,
                                                                   __io_uring* ring,
                                                                   __io_uring_params* p)
-    int __io_uring_queue_init 'io_uring_queue_init'(unsigned int entries,
-                                                    __io_uring* ring,
-                                                    unsigned int flags)
+    int __io_uring_queue_init 'io_uring_queue_init'(unsigned int entries, __io_uring* ring, unsigned int flags)
     int __io_uring_queue_mmap 'io_uring_queue_mmap'(int fd,
                                                     __io_uring_params* p,
                                                     __io_uring* ring)
     int __io_uring_ring_dontfork 'io_uring_ring_dontfork'(__io_uring* ring)
     void __io_uring_queue_exit 'io_uring_queue_exit'(__io_uring* ring)
+
     unsigned int __io_uring_peek_batch_cqe 'io_uring_peek_batch_cqe'(__io_uring* ring,
-                                                                     __io_uring_cqe **cqes,
+                                                                     __io_uring_cqe** cqes,
                                                                      unsigned int count)
     int __io_uring_wait_cqes 'io_uring_wait_cqes'(__io_uring* ring,
-                                                  __io_uring_cqe **cqe_ptr,
+                                                  __io_uring_cqe** cqe_ptr,
                                                   unsigned int wait_nr,
                                                   __kernel_timespec* ts,
                                                   sigset_t* sigmask)
+    int __io_uring_wait_cqes_min_timeout 'io_uring_wait_cqes_min_timeout'(__io_uring* ring,
+                                                                          __io_uring_cqe** cqe_ptr,
+                                                                          unsigned int wait_nr,
+                                                                          __kernel_timespec* ts,
+                                                                          unsigned int min_ts_usec,
+                                                                          sigset_t* sigmask)
     int __io_uring_wait_cqe_timeout 'io_uring_wait_cqe_timeout'(__io_uring* ring,
-                                                                __io_uring_cqe **cqe_ptr,
+                                                                __io_uring_cqe** cqe_ptr,
                                                                 __kernel_timespec* ts)
     int __io_uring_submit 'io_uring_submit'(__io_uring* ring)
-    int __io_uring_submit_and_wait 'io_uring_submit_and_wait'(__io_uring* ring,
-                                                              unsigned int wait_nr)
-    int __io_uring_submit_and_wait_timeout 'io_uring_submit_and_wait_timeout'(
-                                                __io_uring* ring,
-                                                __io_uring_cqe **cqe_ptr,
-                                                unsigned int wait_nr,
-                                                __kernel_timespec* ts,
-                                                sigset_t* sigmask)
+    int __io_uring_submit_and_wait 'io_uring_submit_and_wait'(__io_uring* ring, unsigned int wait_nr)
+    int __io_uring_submit_and_wait_timeout 'io_uring_submit_and_wait_timeout'(__io_uring* ring,
+                                                                              __io_uring_cqe** cqe_ptr,
+                                                                              unsigned int wait_nr,
+                                                                              __kernel_timespec* ts,
+                                                                              sigset_t* sigmask)
+    int __io_uring_submit_and_wait_min_timeout 'io_uring_submit_and_wait_min_timeout'(__io_uring* ring,
+                                                                                      __io_uring_cqe** cqe_ptr,
+                                                                                      unsigned int wait_nr,
+                                                                                      __kernel_timespec* ts,
+                                                                                      unsigned int min_wait,
+                                                                                      sigset_t* sigmask)
+    int __io_uring_submit_and_wait_reg 'io_uring_submit_and_wait_reg'(__io_uring* ring,
+                                                                      __io_uring_cqe** cqe_ptr,
+                                                                      unsigned int wait_nr,
+                                                                      int reg_index)
 
+    int __io_uring_register_wait_reg 'io_uring_register_wait_reg'(__io_uring* ring, __io_uring_reg_wait* reg, int nr)
+    int __io_uring_resize_rings 'io_uring_resize_rings'(__io_uring* ring, __io_uring_params* p)
+    int __io_uring_clone_buffers_offset 'io_uring_clone_buffers_offset'(__io_uring* dst, __io_uring* src,
+                                                                        unsigned int dst_off,
+                                                                        unsigned int src_off,
+                                                                        unsigned int nr,
+                                                                        unsigned int flags)
+    int __io_uring_clone_buffers 'io_uring_clone_buffers'(__io_uring* dst, __io_uring* src)
     int __io_uring_register_buffers 'io_uring_register_buffers'(__io_uring* ring,
                                                                 const __iovec* iovecs,
                                                                 unsigned int nr_iovecs)
@@ -128,84 +150,64 @@ cdef extern from '../include/liburing.h' nogil:
                                                                           const __iovec* iovecs,
                                                                           const __u64* tags,
                                                                           unsigned int nr)
-    int __io_uring_register_buffers_sparse 'io_uring_register_buffers_sparse'(__io_uring* ring,
-                                                                              unsigned int nr)
-    int __io_uring_register_buffers_update_tag 'io_uring_register_buffers_update_tag'(
-                                                    __io_uring* ring,
-                                                    unsigned int off,
-                                                    const __iovec* iovecs,
-                                                    const __u64* tags,
-                                                    unsigned int nr)
+    int __io_uring_register_buffers_sparse 'io_uring_register_buffers_sparse'(__io_uring* ring, unsigned int nr)
+    int __io_uring_register_buffers_update_tag 'io_uring_register_buffers_update_tag'(__io_uring* ring,
+                                                                                      unsigned int off,
+                                                                                      const __iovec* iovecs,
+                                                                                      const __u64* tags,
+                                                                                      unsigned int nr)
     int __io_uring_unregister_buffers 'io_uring_unregister_buffers'(__io_uring* ring)
 
-    int __io_uring_register_files 'io_uring_register_files'(__io_uring* ring,
-                                                            const int* files,
-                                                            unsigned int nr_files)
+    int __io_uring_register_files 'io_uring_register_files'(__io_uring* ring, const int* files, unsigned int nr_files)
     int __io_uring_register_files_tags 'io_uring_register_files_tags'(__io_uring* ring,
                                                                       const int* files,
                                                                       const __u64* tags,
                                                                       unsigned int nr)
-    int __io_uring_register_files_sparse 'io_uring_register_files_sparse'(__io_uring* ring,
-                                                                          unsigned int nr)
-    int __io_uring_register_files_update_tag 'io_uring_register_files_update_tag'(
-                                                __io_uring* ring,
-                                                unsigned int off,
-                                                const int* files,
-                                                const __u64* tags,
-                                                unsigned int nr_files)
+    int __io_uring_register_files_sparse 'io_uring_register_files_sparse'(__io_uring* ring, unsigned int nr)
+    int __io_uring_register_files_update_tag 'io_uring_register_files_update_tag'(__io_uring* ring,
+                                                                                  unsigned int off,
+                                                                                  const int* files,
+                                                                                  const __u64* tags,
+                                                                                  unsigned int nr_files)
     
     int __io_uring_unregister_files 'io_uring_unregister_files'(__io_uring* ring)
     int __io_uring_register_files_update 'io_uring_register_files_update'(__io_uring* ring,
                                                                           unsigned int off,
                                                                           const int* files,
                                                                           unsigned int nr_files)
-    int __io_uring_register_eventfd 'io_uring_register_eventfd'(__io_uring* ring,
-                                                                int fd)
-    int __io_uring_register_eventfd_async 'io_uring_register_eventfd_async'(__io_uring* ring,
-                                                                            int fd)
+    int __io_uring_register_eventfd 'io_uring_register_eventfd'(__io_uring* ring, int fd)
+    int __io_uring_register_eventfd_async 'io_uring_register_eventfd_async'(__io_uring* ring, int fd)
     int __io_uring_unregister_eventfd 'io_uring_unregister_eventfd'(__io_uring* ring)
-    int __io_uring_register_probe 'io_uring_register_probe'(__io_uring* ring,
-                                                            __io_uring_probe* p,
-                                                            unsigned int nr)
+    int __io_uring_register_probe 'io_uring_register_probe'(__io_uring* ring, __io_uring_probe* p, unsigned int nr)
     int __io_uring_register_personality 'io_uring_register_personality'(__io_uring* ring)
-    int __io_uring_unregister_personality 'io_uring_unregister_personality'(__io_uring* ring,
-                                                                            int id)
-    int __io_uring_register_restrictions 'io_uring_register_restrictions'(
-                                            __io_uring* ring,
-                                            __io_uring_restriction* res,
-                                            unsigned int nr_res)
+    int __io_uring_unregister_personality 'io_uring_unregister_personality'(__io_uring* ring, int id)
+    int __io_uring_register_restrictions 'io_uring_register_restrictions'(__io_uring* ring,
+                                                                          __io_uring_restriction* res,
+                                                                          unsigned int nr_res)
     int __io_uring_enable_rings 'io_uring_enable_rings'(__io_uring* ring)
-    int __io_uring_register_iowq_aff 'io_uring_register_iowq_aff'(__io_uring* ring,
-                                                                  size_t cpusz,
-                                                                  const cpu_set_t* mask)
+
+    int __io_uring_register_iowq_aff 'io_uring_register_iowq_aff'(__io_uring* ring, size_t cpusz, const cpu_set_t* mask)
+
     int __io_uring_unregister_iowq_aff 'io_uring_unregister_iowq_aff'(__io_uring* ring)
-    int __io_uring_register_iowq_max_workers 'io_uring_register_iowq_max_workers'(
-            __io_uring* ring,
-            unsigned int* values)
+    int __io_uring_register_iowq_max_workers 'io_uring_register_iowq_max_workers'(__io_uring* ring,
+                                                                                  unsigned int* values)
     int __io_uring_register_ring_fd 'io_uring_register_ring_fd'(__io_uring* ring)
     int __io_uring_unregister_ring_fd 'io_uring_unregister_ring_fd'(__io_uring* ring)
     int __io_uring_close_ring_fd 'io_uring_close_ring_fd'(__io_uring* ring)
     int __io_uring_register_buf_ring 'io_uring_register_buf_ring'(__io_uring* ring,
                                                                   __io_uring_buf_reg* reg,
                                                                   unsigned int flags)
-    int __io_uring_unregister_buf_ring 'io_uring_unregister_buf_ring'(__io_uring* ring,
-                                                                      int bgid)
-    int __io_uring_buf_ring_head 'io_uring_buf_ring_head'(__io_uring* ring,
-                                                          int buf_group,
-                                                          uint16_t* head)
-    int __io_uring_register_sync_cancel 'io_uring_register_sync_cancel'(
-                                            __io_uring* ring,
-                                            __io_uring_sync_cancel_reg* reg)
+    int __io_uring_unregister_buf_ring 'io_uring_unregister_buf_ring'(__io_uring* ring, int bgid)
+    int __io_uring_buf_ring_head 'io_uring_buf_ring_head'(__io_uring* ring, int buf_group, uint16_t* head)
+    int __io_uring_register_sync_cancel 'io_uring_register_sync_cancel'(__io_uring* ring,
+                                                                        __io_uring_sync_cancel_reg* reg)
 
-    int __io_uring_register_file_alloc_range 'io_uring_register_file_alloc_range'(
-            __io_uring* ring,
-            unsigned int off,
-            unsigned int len)
+    int __io_uring_register_file_alloc_range 'io_uring_register_file_alloc_range'(__io_uring* ring,
+                                                                                  unsigned int off,
+                                                                                  unsigned int len)
 
-    int __io_uring_register_napi 'io_uring_register_napi'(__io_uring* ring,
-                                                          __io_uring_napi* napi)
-    int __io_uring_unregister_napi 'io_uring_unregister_napi'(__io_uring* ring,
-                                                              __io_uring_napi* napi)
+    int __io_uring_register_napi 'io_uring_register_napi'(__io_uring* ring, __io_uring_napi* napi)
+    int __io_uring_unregister_napi 'io_uring_unregister_napi'(__io_uring* ring, __io_uring_napi* napi)
 
     int __io_uring_get_events 'io_uring_get_events'(__io_uring* ring)
     int __io_uring_submit_and_get_events 'io_uring_submit_and_get_events'(__io_uring* ring)
@@ -222,61 +224,67 @@ cdef extern from '../include/liburing.h' nogil:
                                             unsigned int flags,
                                             sigset_t* sig,
                                             size_t sz)
-    int __io_uring_setup 'io_uring_setup'(unsigned int entries,
-                                          __io_uring_params* p)
+    int __io_uring_setup 'io_uring_setup'(unsigned int entries, __io_uring_params* p)
     int __io_uring_register 'io_uring_register'(unsigned int fd,
                                                 unsigned int opcode,
                                                 const void* arg,
                                                 unsigned int nr_args)
 
+    # Mapped/registered regions
+    int __io_uring_register_region 'io_uring_register_region'(__io_uring* ring, __io_uring_mem_region_reg* reg);
+
     # Mapped buffer ring alloc/register + unregister/free helpers
-    __io_uring_buf_ring* __io_uring_setup_buf_ring 'io_uring_setup_buf_ring'(
-        __io_uring* ring,
-        unsigned int nentries,
-        int bgid,
-        unsigned int flags,
-        int* ret)
+    __io_uring_buf_ring* __io_uring_setup_buf_ring 'io_uring_setup_buf_ring'(__io_uring* ring,
+                                                                             unsigned int nentries,
+                                                                             int bgid,
+                                                                             unsigned int flags,
+                                                                             int* ret)
     int __io_uring_free_buf_ring 'io_uring_free_buf_ring'(__io_uring* ring,
                                                           __io_uring_buf_ring* br,
                                                           unsigned int nentries,
                                                           int bgid)
 
+    # Helper for the peek/wait single cqe functions. Exported because of that,
+    # but probably shouldn't be used directly in an application.
+    int __io_uring_get_cqe(__io_uring* ring,
+                           __io_uring_cqe** cqe_ptr,
+                           unsigned int submit,
+                           unsigned int wait_nr,
+                           sigset_t* sigmask)
+
     enum: __LIBURING_UDATA_TIMEOUT 'LIBURING_UDATA_TIMEOUT'
 
-    # Calculates the step size for CQE iteration.
+    # Calculates the step size for CQE iteration. Fixed: For standard CQE's its `0`, for big CQE's its `1`.
     bint __io_uring_cqe_shift 'io_uring_cqe_shift'(__io_uring* ring)
-    int __io_uring_cqe_index 'io_uring_cqe_index'(__io_uring* ring,
-                                                  unsigned int ptr,
-                                                  unsigned int mask)
+    int __io_uring_cqe_index 'io_uring_cqe_index'(__io_uring* ring, unsigned int ptr, unsigned int mask)
+    # macro for `io_uring_for_each_cqe(ring, head, cqe)`
     unsigned int __io_uring_for_each_cqe(__io_uring* ring, __io_uring_cqe* cqe)
 
     # Must be called after `io_uring_for_each_cqe()`
-    void __io_uring_cq_advance 'io_uring_cq_advance'(__io_uring* ring,
-                                                     unsigned int nr)
+    void __io_uring_cq_advance 'io_uring_cq_advance'(__io_uring* ring, unsigned int nr)
     # Must be called after `io_uring_{peek,wait}_cqe()` after the cqe has
     # been processed by the application.
-    void __io_uring_cqe_seen 'io_uring_cqe_seen'(__io_uring* ring,
-                                                 __io_uring_cqe* cqe)
+    void __io_uring_cqe_seen 'io_uring_cqe_seen'(__io_uring* ring, __io_uring_cqe* cqe)
 
     # Command prep helpers
     # --------------------
     # Associate pointer `data` with the `sqe`, for later retrieval from the `cqe`
     # at command completion time with `io_uring_cqe_get_data()`.
-    void __io_uring_sqe_set_data 'io_uring_sqe_set_data'(__io_uring_sqe* sqe,
-                                                         void* data)
+    void __io_uring_sqe_set_data 'io_uring_sqe_set_data'(__io_uring_sqe* sqe, void* data)
     void* __io_uring_cqe_get_data 'io_uring_cqe_get_data'(const __io_uring_cqe* cqe)
     # Assign a 64-bit value to this `sqe`, which can get retrieved at completion
     # time with `io_uring_cqe_get_data64`. Just like the non-64 variants, except
     # these store a 64-bit type rather than a data pointer.
-    void __io_uring_sqe_set_data64 'io_uring_sqe_set_data64'(__io_uring_sqe* sqe,
-                                                             __u64 data)
+    void __io_uring_sqe_set_data64 'io_uring_sqe_set_data64'(__io_uring_sqe* sqe, __u64 data)
     __u64 __io_uring_cqe_get_data64 'io_uring_cqe_get_data64'(const __io_uring_cqe* cqe)
 
     # Tell the app whether to use 64-bit variants of the `get/set->userdata`
     bint __LIBURING_HAVE_DATA64 'LIBURING_HAVE_DATA64'
 
-    void __io_uring_sqe_set_flags 'io_uring_sqe_set_flags'(__io_uring_sqe* sqe,
-                                                           unsigned int flags)
+    void __io_uring_sqe_set_flags 'io_uring_sqe_set_flags'(__io_uring_sqe* sqe, unsigned int flags)
+    void __io_uring_sqe_set_buf_group 'io_uring_sqe_set_buf_group'(__io_uring_sqe* sqe, int bgid)
+    # void __io_uring_set_target_fixed_file(__io_uring_sqe* sqe, unsigned int file_index)
+    void __io_uring_initialize_sqe 'io_uring_initialize_sqe'(__io_uring_sqe* sqe)
     # note: access to cython users only
     void __io_uring_prep_rw 'io_uring_prep_rw'(int op,
                                                __io_uring_sqe* sqe,
@@ -300,9 +308,10 @@ cdef extern from '../include/liburing.h' nogil:
     # intermediate pipe first, then splice to the final destination.
     # In fact, the implementation of sendfile in kernel uses splice internally.
     #
-    # NOTE that even if `fd_in` or `fd_out` refers to a pipe, the splice operation
-    # can still fail with `EINVAL` if one of the `fd_*` doesn't explicitly support splice
-    # operation
+    # NOTE that even if fd_in or fd_out refers to a pipe, the splice operation
+    # can still fail with EINVAL if one of the fd doesn't explicitly support splice
+    # operation, e.g. reading from terminal is unsupported from kernel 5.7 to 5.11.
+    # Check issue #291 for more information.
     void __io_uring_prep_splice 'io_uring_prep_splice'(__io_uring_sqe* sqe,
                                                        int fd_in,
                                                        int64_t off_in,
@@ -349,10 +358,7 @@ cdef extern from '../include/liburing.h' nogil:
                                                                  __u64 offset,
                                                                  int buf_index)
 
-    void __io_uring_prep_recvmsg 'io_uring_prep_recvmsg'(__io_uring_sqe* sqe,
-                                                         int fd,
-                                                         __msghdr* msg,
-                                                         unsigned int flags)
+    void __io_uring_prep_recvmsg 'io_uring_prep_recvmsg'(__io_uring_sqe* sqe, int fd, __msghdr* msg, unsigned int flags)
     void __io_uring_prep_recvmsg_multishot 'io_uring_prep_recvmsg_multishot'(__io_uring_sqe* sqe,
                                                                              int fd, 
                                                                              __msghdr* msg,
@@ -362,23 +368,19 @@ cdef extern from '../include/liburing.h' nogil:
                                                          const __msghdr* msg,
                                                          unsigned int flags)
 
-    void __io_uring_prep_poll_add 'io_uring_prep_poll_add'(__io_uring_sqe* sqe,
-                                                           int fd,
-                                                           unsigned int poll_mask)
+    unsigned int __io_uring_prep_poll_mask(unsigned int poll_mask)
+    void __io_uring_prep_poll_add 'io_uring_prep_poll_add'(__io_uring_sqe* sqe, int fd, unsigned int poll_mask)
     void __io_uring_prep_poll_multishot 'io_uring_prep_poll_multishot'(__io_uring_sqe* sqe,
                                                                        int fd,
                                                                        unsigned int poll_mask)
-    void __io_uring_prep_poll_remove 'io_uring_prep_poll_remove'(__io_uring_sqe* sqe,
-                                                                 __u64 user_data)
+    void __io_uring_prep_poll_remove 'io_uring_prep_poll_remove'(__io_uring_sqe* sqe, __u64 user_data)
     void __io_uring_prep_poll_update 'io_uring_prep_poll_update'(__io_uring_sqe* sqe,
                                                                  __u64 old_user_data,
                                                                  __u64 new_user_data,
                                                                  unsigned int poll_mask,
                                                                  unsigned int flags)
 
-    void __io_uring_prep_fsync 'io_uring_prep_fsync'(__io_uring_sqe* sqe,
-                                                     int fd,
-                                                     unsigned int fsync_flags)
+    void __io_uring_prep_fsync 'io_uring_prep_fsync'(__io_uring_sqe* sqe, int fd, unsigned int fsync_flags)
     void __io_uring_prep_nop 'io_uring_prep_nop'(__io_uring_sqe* sqe)
 
     void __io_uring_prep_timeout 'io_uring_prep_timeout'(__io_uring_sqe* sqe,
@@ -418,15 +420,9 @@ cdef extern from '../include/liburing.h' nogil:
                                                     socklen_t* addrlen,
                                                     int flags)
 
-    void __io_uring_prep_cancel64 'io_uring_prep_cancel64'(__io_uring_sqe* sqe,
-                                                           __u64 user_data,
-                                                           int flags)
-    void __io_uring_prep_cancel 'io_uring_prep_cancel'(__io_uring_sqe* sqe,
-                                                       void* user_data,
-                                                       int flags)
-    void __io_uring_prep_cancel_fd 'io_uring_prep_cancel_fd'(__io_uring_sqe* sqe,
-                                                             int fd,
-                                                             unsigned int flags)
+    void __io_uring_prep_cancel64 'io_uring_prep_cancel64'(__io_uring_sqe* sqe, __u64 user_data, int flags)
+    void __io_uring_prep_cancel 'io_uring_prep_cancel'(__io_uring_sqe* sqe, void* user_data, int flags)
+    void __io_uring_prep_cancel_fd 'io_uring_prep_cancel_fd'(__io_uring_sqe* sqe, int fd, unsigned int flags)
 
     void __io_uring_prep_link_timeout 'io_uring_prep_link_timeout'(__io_uring_sqe* sqe,
                                                                    __kernel_timespec* ts,
@@ -436,6 +432,8 @@ cdef extern from '../include/liburing.h' nogil:
                                                          int fd,
                                                          const __sockaddr* addr,
                                                          socklen_t addrlen)
+    void __io_uring_prep_bind 'io_uring_prep_bind'(__io_uring_sqe* sqe, int fd, __sockaddr* addr, socklen_t addrlen)
+    void __io_uring_prep_listen 'io_uring_prep_listen'(__io_uring_sqe* sqe, int fd, int backlog)
 
     void __io_uring_prep_files_update 'io_uring_prep_files_update'(__io_uring_sqe* sqe,
                                                                    int* fds,
@@ -460,10 +458,15 @@ cdef extern from '../include/liburing.h' nogil:
                                                                      int flags,
                                                                      mode_t mode,
                                                                      unsigned int file_index)
-    void __io_uring_prep_close 'io_uring_prep_close'(__io_uring_sqe* sqe,
-                                                     int fd)
-    void __io_uring_prep_close_direct 'io_uring_prep_close_direct'(__io_uring_sqe* sqe,
-                                                                   unsigned int file_index)
+    void __io_uring_prep_open 'io_uring_prep_open'(__io_uring_sqe* sqe, const char* path, int flags, mode_t mode)
+    # open directly into the fixed file table
+    void __io_uring_prep_open_direct 'io_uring_prep_open_direct'(__io_uring_sqe* sqe,
+                                                                 const char* path,
+                                                                 int flags,
+                                                                 mode_t mode,
+                                                                 unsigned int file_index)
+    void __io_uring_prep_close 'io_uring_prep_close'(__io_uring_sqe* sqe, int fd)
+    void __io_uring_prep_close_direct 'io_uring_prep_close_direct'(__io_uring_sqe* sqe, unsigned int file_index)
     void __io_uring_prep_read 'io_uring_prep_read'(__io_uring_sqe* sqe,
                                                    int fd,
                                                    void* buf,
@@ -492,16 +495,20 @@ cdef extern from '../include/liburing.h' nogil:
                                                          __u64 offset,
                                                          off_t len,
                                                          int advice)
-    void __io_uring_prep_madvise 'io_uring_prep_madvise'(__io_uring_sqe* sqe,
-                                                         void* addr,
-                                                         off_t length,
-                                                         int advice)
+    void __io_uring_prep_madvise 'io_uring_prep_madvise'(__io_uring_sqe* sqe, void* addr, off_t length, int advice)
+    void __io_uring_prep_fadvise64 'io_uring_prep_fadvise64'(__io_uring_sqe* sqe,
+                                                             int fd,
+                                                             __u64 offset,
+                                                             off_t len,
+                                                             int advice)
+    void __io_uring_prep_madvise64 'io_uring_prep_madvise64'(__io_uring_sqe* sqe, void* addr, off_t length, int advice)
 
     void __io_uring_prep_send 'io_uring_prep_send'(__io_uring_sqe* sqe,
                                                    int sockfd,
                                                    const void* buf,
                                                    size_t len,
                                                    int flags)
+    void __io_uring_prep_send_bundle 'io_uring_prep_send_bundle'(__io_uring_sqe* sqe, int sockfd, size_t len, int flags)
     void __io_uring_prep_send_set_addr 'io_uring_prep_send_set_addr'(__io_uring_sqe* sqe,
                                                                      const __sockaddr* dest_addr,
                                                                      __u16 addr_len)
@@ -539,24 +546,19 @@ cdef extern from '../include/liburing.h' nogil:
                                                                        void* buf,
                                                                        size_t len,
                                                                        int flags)
-    __io_uring_recvmsg_out* __io_uring_recvmsg_validate 'io_uring_recvmsg_validate'(
-                                                            void* buf,
-                                                            int buf_len,
-                                                            __msghdr* msgh)
+    __io_uring_recvmsg_out* __io_uring_recvmsg_validate 'io_uring_recvmsg_validate'(void* buf,
+                                                                                    int buf_len,
+                                                                                    __msghdr* msgh)
     void* __io_uring_recvmsg_name 'io_uring_recvmsg_name'(__io_uring_recvmsg_out* o)
-    __cmsghdr* __io_uring_recvmsg_cmsg_firsthdr 'io_uring_recvmsg_cmsg_firsthdr'(
-                                                    __io_uring_recvmsg_out* o,
-                                                    __msghdr* msgh)
-    __cmsghdr* __io_uring_recvmsg_cmsg_nexthdr 'io_uring_recvmsg_cmsg_nexthdr'(
-                                                    __io_uring_recvmsg_out* o,
-                                                    __msghdr* msgh,
-                                                    __cmsghdr* cmsg)
-    void* __io_uring_recvmsg_payload 'io_uring_recvmsg_payload'(__io_uring_recvmsg_out* o,
-                                                                __msghdr* msgh)
-    unsigned int __io_uring_recvmsg_payload_length 'io_uring_recvmsg_payload_length'(
-                                                        __io_uring_recvmsg_out* o,
-                                                        int buf_len,
-                                                        __msghdr* msgh)
+    __cmsghdr* __io_uring_recvmsg_cmsg_firsthdr 'io_uring_recvmsg_cmsg_firsthdr'(__io_uring_recvmsg_out* o,
+                                                                                 __msghdr* msgh)
+    __cmsghdr* __io_uring_recvmsg_cmsg_nexthdr 'io_uring_recvmsg_cmsg_nexthdr'(__io_uring_recvmsg_out* o,
+                                                                               __msghdr* msgh,
+                                                                               __cmsghdr* cmsg)
+    void* __io_uring_recvmsg_payload 'io_uring_recvmsg_payload'(__io_uring_recvmsg_out* o, __msghdr* msgh)
+    unsigned int __io_uring_recvmsg_payload_length 'io_uring_recvmsg_payload_length'(__io_uring_recvmsg_out* o,
+                                                                                     int buf_len,
+                                                                                     __msghdr* msgh)
 
     void __io_uring_prep_openat2 'io_uring_prep_openat2'(__io_uring_sqe* sqe,
                                                          int dfd,
@@ -580,49 +582,31 @@ cdef extern from '../include/liburing.h' nogil:
                                                                          int nr,
                                                                          int bgid,
                                                                          int bid)
-    void __io_uring_prep_remove_buffers 'io_uring_prep_remove_buffers'(__io_uring_sqe* sqe,
-                                                                       int nr,
-                                                                       int bgid)
+    void __io_uring_prep_remove_buffers 'io_uring_prep_remove_buffers'(__io_uring_sqe* sqe, int nr, int bgid)
 
-    void __io_uring_prep_shutdown 'io_uring_prep_shutdown'(__io_uring_sqe* sqe,
-                                                           int fd,
-                                                           int how)
+    void __io_uring_prep_shutdown 'io_uring_prep_shutdown'(__io_uring_sqe* sqe, int fd, int how)
     
-    void __io_uring_prep_unlinkat 'io_uring_prep_unlinkat'(__io_uring_sqe* sqe,
-                                                           int dfd,
-                                                           const char* path,
-                                                           int flags)
-    void __io_uring_prep_unlink 'io_uring_prep_unlink'(__io_uring_sqe* sqe,
-                                                       const char* path,
-                                                       int flags)
+    void __io_uring_prep_unlinkat 'io_uring_prep_unlinkat'(__io_uring_sqe* sqe, int dfd, const char* path, int flags)
+    void __io_uring_prep_unlink 'io_uring_prep_unlink'(__io_uring_sqe* sqe, const char* path, int flags)
     void __io_uring_prep_renameat 'io_uring_prep_renameat'(__io_uring_sqe* sqe,
                                                            int olddfd,
                                                            const char* oldpath,
                                                            int newdfd,
                                                            const char* newpath,
                                                            unsigned int flags)
-    void __io_uring_prep_rename 'io_uring_prep_rename'(__io_uring_sqe* sqe,
-                                                       const char* oldpath,
-                                                       const char* newpath)
+    void __io_uring_prep_rename 'io_uring_prep_rename'(__io_uring_sqe* sqe, const char* oldpath, const char* newpath)
     void __io_uring_prep_sync_file_range 'io_uring_prep_sync_file_range'(__io_uring_sqe* sqe,
                                                                          int fd,
                                                                          unsigned int len,
                                                                          __u64 offset,
                                                                          int flags)
-    void __io_uring_prep_mkdirat 'io_uring_prep_mkdirat'(__io_uring_sqe* sqe,
-                                                         int dfd,
-                                                         const char* path,
-                                                         mode_t mode)
-    void __io_uring_prep_mkdir 'io_uring_prep_mkdir'(__io_uring_sqe* sqe,
-                                                     const char* path,
-                                                     mode_t mode)
+    void __io_uring_prep_mkdirat 'io_uring_prep_mkdirat'(__io_uring_sqe* sqe, int dfd, const char* path, mode_t mode)
+    void __io_uring_prep_mkdir 'io_uring_prep_mkdir'(__io_uring_sqe* sqe, const char* path, mode_t mode)
     void __io_uring_prep_symlinkat 'io_uring_prep_symlinkat'(__io_uring_sqe* sqe,
                                                              const char* target,
                                                              int newdirfd,
                                                              const char* linkpath)
-    void __io_uring_prep_symlink 'io_uring_prep_symlink'(__io_uring_sqe* sqe,
-                                                         const char* target,
-                                                         const char* linkpath)
+    void __io_uring_prep_symlink 'io_uring_prep_symlink'(__io_uring_sqe* sqe, const char* target, const char* linkpath)
     void __io_uring_prep_linkat 'io_uring_prep_linkat'(__io_uring_sqe* sqe,
                                                        int olddfd,
                                                        const char* oldpath,
@@ -634,13 +618,12 @@ cdef extern from '../include/liburing.h' nogil:
                                                    const char* newpath,
                                                    int flags)
 
-    void __io_uring_prep_msg_ring_cqe_flags 'io_uring_prep_msg_ring_cqe_flags'(
-                                                __io_uring_sqe* sqe,
-                                                int fd,
-                                                unsigned int len,
-                                                __u64 data,
-                                                unsigned int flags,
-                                                unsigned int cqe_flags)
+    void __io_uring_prep_msg_ring_cqe_flags 'io_uring_prep_msg_ring_cqe_flags'(__io_uring_sqe* sqe,
+                                                                               int fd,
+                                                                               unsigned int len,
+                                                                               __u64 data,
+                                                                               unsigned int flags,
+                                                                               unsigned int cqe_flags)
     void __io_uring_prep_msg_ring 'io_uring_prep_msg_ring'(__io_uring_sqe* sqe,
                                                            int fd,
                                                            unsigned int len,
@@ -693,12 +676,11 @@ cdef extern from '../include/liburing.h' nogil:
                                                                      int protocol,
                                                                      unsigned int file_index,
                                                                      unsigned int flags)
-    void __io_uring_prep_socket_direct_alloc 'io_uring_prep_socket_direct_alloc'(
-                                                __io_uring_sqe* sqe,
-                                                int domain,
-                                                int type,
-                                                int protocol,
-                                                unsigned int flags)
+    void __io_uring_prep_socket_direct_alloc 'io_uring_prep_socket_direct_alloc'(__io_uring_sqe* sqe,
+                                                                                 int domain,
+                                                                                 int type,
+                                                                                 int protocol,
+                                                                                 unsigned int flags)
 
     # Prepare commands for sockets
     void __io_uring_prep_cmd_sock 'io_uring_prep_cmd_sock'(__io_uring_sqe* sqe,
@@ -737,9 +719,13 @@ cdef extern from '../include/liburing.h' nogil:
                                                                            int fd,
                                                                            unsigned int flags)
 
-    void __io_uring_prep_ftruncate 'io_uring_prep_ftruncate'(__io_uring_sqe* sqe,
-                                                             int fd,
-                                                             loff_t len)
+    #ifdef _GNU_SOURCE
+    void __io_uring_prep_ftruncate 'io_uring_prep_ftruncate'(__io_uring_sqe* sqe, int fd, loff_t len)
+    #endif
+    void __io_uring_prep_cmd_discard 'io_uring_prep_cmd_discard'(__io_uring_sqe* sqe,
+                                                                 int fd,
+                                                                 uint64_t offset,
+                                                                 uint64_t nbytes)
 
     # Returns number of unconsumed (if SQPOLL) or unsubmitted entries exist in the SQ ring
     unsigned int __io_uring_sq_ready 'io_uring_sq_ready'(const __io_uring* ring)
@@ -759,22 +745,17 @@ cdef extern from '../include/liburing.h' nogil:
     bint __io_uring_cq_eventfd_enabled 'io_uring_cq_eventfd_enabled'(const __io_uring* ring)
 
     # Toggle eventfd notification on or off, if an eventfd is registered with the ring.
-    int __io_uring_cq_eventfd_toggle 'io_uring_cq_eventfd_toggle'(__io_uring* ring,
-                                                                  bint enabled)
+    int __io_uring_cq_eventfd_toggle 'io_uring_cq_eventfd_toggle'(__io_uring* ring, bint enabled)
     # Return an IO completion, waiting for `wait_nr` completions if one isn't
     # readily available. Returns `0` with `cqe_ptr` filled in on success, `-errno` on
     # failure.
-    int __io_uring_wait_cqe_nr 'io_uring_wait_cqe_nr'(__io_uring* ring,
-                                                      __io_uring_cqe **cqe_ptr,
-                                                      unsigned int wait_nr)
+    int __io_uring_wait_cqe_nr 'io_uring_wait_cqe_nr'(__io_uring* ring, __io_uring_cqe** cqe_ptr, unsigned int wait_nr)
     # Return an IO completion, if one is readily available. Returns `0` with
     # `cqe_ptr` filled in on success, `-errno` on failure.
-    int __io_uring_peek_cqe 'io_uring_peek_cqe'(__io_uring* ring,
-                                                __io_uring_cqe **cqe_ptr)
+    int __io_uring_peek_cqe 'io_uring_peek_cqe'(__io_uring* ring,  __io_uring_cqe** cqe_ptr)
     # Return an IO completion, waiting for it if necessary. Returns `0` with
     # `cqe_ptr` filled in on success, `-errno` on failure.
-    int __io_uring_wait_cqe 'io_uring_wait_cqe'(__io_uring* ring,
-                                                __io_uring_cqe **cqe_ptr)
+    int __io_uring_wait_cqe 'io_uring_wait_cqe'(__io_uring* ring, __io_uring_cqe** cqe_ptr)
     # Return the appropriate mask for a buffer ring of size `ring_entries`
     int __io_uring_buf_ring_mask 'io_uring_buf_ring_mask'(__u32 ring_entries)
     void __io_uring_buf_ring_init 'io_uring_buf_ring_init'(__io_uring_buf_ring* br)
@@ -787,8 +768,7 @@ cdef extern from '../include/liburing.h' nogil:
                                                          int buf_offset)
     # Make 'count' new buffers visible to the kernel. Called after
     # `io_uring_buf_ring_add()` has been called `count` times to fill in new buffers.
-    void __io_uring_buf_ring_advance 'io_uring_buf_ring_advance'(__io_uring_buf_ring* br,
-                                                                 int count)
+    void __io_uring_buf_ring_advance 'io_uring_buf_ring_advance'(__io_uring_buf_ring* br, int count)
     # Make `count` new buffers visible to the kernel while at the same time
     # advancing the CQ ring seen entries. This can be used when the application
     # is using ring provided buffers and returns buffers while processing CQEs,
@@ -807,10 +787,8 @@ cdef extern from '../include/liburing.h' nogil:
     # Returns a vacant `sqe`, or `NULL` if we're full.
     __io_uring_sqe* __io_uring_get_sqe 'io_uring_get_sqe'(__io_uring* ring)
 
-    ssize_t __io_uring_mlock_size 'io_uring_mlock_size'(unsigned int entries,
-                                                        unsigned int flags)
-    ssize_t __io_uring_mlock_size_params 'io_uring_mlock_size_params'(unsigned int entries,
-                                                                      __io_uring_params* p)
+    ssize_t __io_uring_mlock_size 'io_uring_mlock_size'(unsigned int entries, unsigned int flags)
+    ssize_t __io_uring_mlock_size_params 'io_uring_mlock_size_params'(unsigned int entries, __io_uring_params* p)
 
     # Versioning information for liburing.
     # Use `io_uring_check_version()` for runtime checks of the version of

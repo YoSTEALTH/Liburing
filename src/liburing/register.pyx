@@ -136,3 +136,6 @@ cpdef int io_uring_register_files_update(io_uring ring,
                                          int files,
                                          unsigned int nr_files) nogil:
     return trap_error(__io_uring_register_files_update(&ring.ptr, off, &files, nr_files))
+
+cpdef int io_uring_register_region(io_uring ring, io_uring_mem_region_reg reg) nogil:
+    return trap_error(__io_uring_register_region(&ring.ptr, reg.ptr))

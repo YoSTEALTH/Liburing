@@ -57,13 +57,13 @@ cdef extern from '<signal.h>' nogil:
         si_value value
 
     ctypedef struct siginfo_t:
-        int si_signo     # Signal number
-        int si_code      # Signal code
-        pid_t si_pid     # Sending process ID
-        uid_t si_uid     # Real user ID of sending process
-        void *si_addr    # Address of faulting instruction
-        int si_status    # Exit value or signal
-        sigval si_value  # Signal value
+        int     si_signo     # Signal number
+        int     si_code      # Signal code
+        pid_t   si_pid     # Sending process ID
+        uid_t   si_uid     # Real user ID of sending process
+        void*   si_addr    # Address of faulting instruction
+        int     si_status    # Exit value or signal
+        sigval  si_value  # Signal value
 
 
 cdef extern from '<bits/types/sigset_t.h>' nogil:
@@ -75,15 +75,15 @@ cdef extern from '<bits/types/sigset_t.h>' nogil:
 
 cdef extern from '<bits/types/struct_iovec.h>' nogil:
     struct __iovec 'iovec':
-        void *iov_base
-        size_t iov_len
+        void*   iov_base
+        size_t  iov_len
 
 
 cdef extern from '../include/liburing/compat.h' nogil:
     ctypedef int64_t __kernel_time64_t
     struct __kernel_timespec:
-        __kernel_time64_t tv_sec      # seconds
-        long long tv_nsec     # nanoseconds
+        __kernel_time64_t   tv_sec      # seconds
+        long long           tv_nsec     # nanoseconds
 
 
 cdef extern from '<stdio.h>' nogil:

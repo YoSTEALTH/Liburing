@@ -17,6 +17,9 @@ cdef class io_uring_sync_cancel_reg:
 cdef class io_uring_napi:
     cdef __io_uring_napi * ptr
 
+cdef class io_uring_mem_region_reg:
+    cdef __io_uring_mem_region_reg * ptr
+
 
 cpdef int io_uring_register_buffers(io_uring ring,
                                     iovec iovecs,
@@ -85,3 +88,5 @@ cpdef int io_uring_register_files_update(io_uring ring,
                                          unsigned int off,
                                          int files,
                                          unsigned int nr_files) nogil
+
+cpdef int io_uring_register_region(io_uring ring, io_uring_mem_region_reg reg) nogil

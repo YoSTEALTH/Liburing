@@ -290,6 +290,14 @@ cpdef int io_uring_wait_cqes(io_uring ring,
                              sigset sigmask=None) nogil:
     return trap_error(__io_uring_wait_cqes(&ring.ptr, &cqe_ptr.ptr, wait_nr, ts.ptr, sigmask.ptr))
 
+cpdef int io_uring_wait_cqes_min_timeout(io_uring ring,
+                                         io_uring_cqe cqe_ptr,
+                                         unsigned int wait_nr,
+                                         timespec ts,
+                                         unsigned int min_ts_usec,
+                                         sigset sigmask=None) nogil:
+    return trap_error(__io_uring_wait_cqes_min_timeout(&ring.ptr, &cqe_ptr.ptr, wait_nr, ts.ptr, min_ts_usec, sigmask.ptr))
+
 cpdef int io_uring_wait_cqe_timeout(io_uring ring, io_uring_cqe cqe_ptr, timespec ts) nogil:
     return trap_error(__io_uring_wait_cqe_timeout(&ring.ptr, &cqe_ptr.ptr, ts.ptr))
 
@@ -304,9 +312,40 @@ cpdef int io_uring_submit_and_wait_timeout(io_uring ring,
                                            unsigned int wait_nr,
                                            timespec ts=None,
                                            sigset sigmask=None) nogil:
-    return trap_error(__io_uring_submit_and_wait_timeout(&ring.ptr, &cqe_ptr.ptr, wait_nr, ts.ptr,
-                                                         sigmask.ptr))
+    return trap_error(__io_uring_submit_and_wait_timeout(&ring.ptr, &cqe_ptr.ptr, wait_nr, ts.ptr, sigmask.ptr))
 
+cpdef int io_uring_submit_and_wait_min_timeout(io_uring ring,
+                                               io_uring_cqe cqe_ptr,
+                                               unsigned int wait_nr,
+                                               timespec ts,
+                                               unsigned int min_wait,
+                                              sigset sigmask=None) nogil:
+    return trap_error(__io_uring_submit_and_wait_min_timeout(&ring.ptr,
+                                                             &cqe_ptr.ptr,
+                                                             wait_nr,
+                                                             ts.ptr,
+                                                             min_wait,
+                                                             sigmask.ptr))
+
+cpdef int io_uring_submit_and_wait_reg(io_uring ring, io_uring_cqe cqe_ptr, unsigned int wait_nr, int reg_index) nogil:
+    return trap_error(__io_uring_submit_and_wait_reg(&ring.ptr, &cqe_ptr.ptr, wait_nr, reg_index))
+
+cpdef int io_uring_register_wait_reg(io_uring ring, io_uring_reg_wait reg, int nr) nogil:
+    return trap_error(__io_uring_register_wait_reg(&ring.ptr, reg.ptr, nr))
+
+cpdef int io_uring_resize_rings(io_uring ring, io_uring_params p) nogil:
+    return trap_error(__io_uring_resize_rings(&ring.ptr, p.ptr))
+
+cpdef int io_uring_clone_buffers_offset(io_uring dst,
+                                        io_uring src,
+                                        unsigned int dst_off,
+                                        unsigned int src_off,
+                                        unsigned int nr,
+                                        unsigned int flags) nogil:
+    return trap_error(__io_uring_clone_buffers_offset(&dst.ptr, &src.ptr, dst_off, src_off, nr, flags))
+
+cpdef int io_uring_clone_buffers(io_uring dst, io_uring src) nogil:
+    return trap_error(__io_uring_clone_buffers(&dst.ptr, &src.ptr))
 
 cpdef int io_uring_enable_rings(io_uring ring) nogil:
     return trap_error(__io_uring_enable_rings(&ring.ptr))
@@ -351,6 +390,12 @@ cpdef inline __u64 io_uring_cqe_get_data64(io_uring_cqe cqe) noexcept nogil:
 
 cpdef inline void io_uring_sqe_set_flags(io_uring_sqe sqe, unsigned int flags) noexcept nogil:
     __io_uring_sqe_set_flags(sqe.ptr, flags)
+
+cpdef inline void io_uring_sqe_set_buf_group(io_uring_sqe sqe, int bgid) noexcept nogil:
+    __io_uring_sqe_set_buf_group(sqe.ptr, bgid)
+    
+cpdef inline void io_uring_initialize_sqe(io_uring_sqe sqe) noexcept nogil:
+    __io_uring_initialize_sqe(sqe.ptr)
 
 cpdef inline void io_uring_prep_nop(io_uring_sqe sqe) noexcept nogil:
     __io_uring_prep_nop(sqe.ptr)

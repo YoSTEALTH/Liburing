@@ -21,25 +21,27 @@ cdef class io_uring_sqe:
 cdef class io_uring_cqe:
     cdef:
         __io_uring_cqe* ptr
-        bint            active
+        
+        inline tuple[__s32, __u64] get_index(self, unsigned int index) noexcept nogil
 
-    cdef tuple[__s32, __u64] get_index(self, unsigned int index) noexcept nogil
+cdef class io_uring_reg_wait:
+    cdef __io_uring_reg_wait* ptr
 
 
 cdef class io_uring_params:
-    cdef __io_uring_params * ptr
+    cdef __io_uring_params* ptr
 
 
 cdef class io_uring_buf_ring:
-    cdef __io_uring_buf_ring * ptr
+    cdef __io_uring_buf_ring* ptr
 
 
 cdef class siginfo:
-    cdef siginfo_t *ptr
+    cdef siginfo_t* ptr
 
 
 cdef class sigset:
-    cdef sigset_t *ptr
+    cdef sigset_t* ptr
 
 
 cpdef int io_uring_queue_init_mem(unsigned int entries,
@@ -66,17 +68,36 @@ cpdef int io_uring_wait_cqes(io_uring ring,
                              unsigned int wait_nr,
                              timespec ts=?,
                              sigset sigmask=?) nogil
-cpdef int io_uring_wait_cqe_timeout(io_uring ring,
-                                    io_uring_cqe cqe_ptr,
-                                    timespec ts) nogil
+cpdef int io_uring_wait_cqes_min_timeout(io_uring ring,
+                                         io_uring_cqe cqe_ptr,
+                                         unsigned int wait_nr,
+                                         timespec ts,
+                                         unsigned int min_ts_usec,
+                                         sigset sigmask=?) nogil
+cpdef int io_uring_wait_cqe_timeout(io_uring ring, io_uring_cqe cqe_ptr, timespec ts) nogil
 cpdef int io_uring_submit(io_uring ring) nogil
-cpdef int io_uring_submit_and_wait(io_uring ring,
-                                   unsigned int wait_nr) nogil
+cpdef int io_uring_submit_and_wait(io_uring ring, unsigned int wait_nr) nogil
 cpdef int io_uring_submit_and_wait_timeout(io_uring ring,
                                            io_uring_cqe cqe_ptr,
                                            unsigned int wait_nr,
                                            timespec ts=?,
                                            sigset sigmask=?) nogil
+cpdef int io_uring_submit_and_wait_min_timeout(io_uring ring,
+                                               io_uring_cqe cqe_ptr,
+                                               unsigned int wait_nr,
+                                               timespec ts,
+                                               unsigned int min_wait,
+                                              sigset sigmask=?) nogil
+cpdef int io_uring_submit_and_wait_reg(io_uring ring, io_uring_cqe cqe_ptr, unsigned int wait_nr, int reg_index) nogil
+cpdef int io_uring_register_wait_reg(io_uring ring, io_uring_reg_wait reg, int nr) nogil
+cpdef int io_uring_resize_rings(io_uring ring, io_uring_params p) nogil
+cpdef int io_uring_clone_buffers_offset(io_uring dst,
+                                        io_uring src,
+                                        unsigned int dst_off,
+                                        unsigned int src_off,
+                                        unsigned int nr,
+                                        unsigned int flags) nogil
+cpdef int io_uring_clone_buffers(io_uring dst, io_uring src) nogil
 
 cpdef int io_uring_enable_rings(io_uring ring) nogil
 cpdef int io_uring_close_ring_fd(io_uring ring) nogil
