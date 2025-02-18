@@ -8,10 +8,8 @@ cdef class getaddrinfo:
     cdef __addrinfo* ptr
 
 
-cpdef int bind(int sockfd, sockaddr addr) nogil
-cpdef int listen(int sockfd, int backlog) nogil
 cpdef int getpeername(int sockfd, sockaddr addr) nogil
-cpdef tuple[bytes, uint16_t] getsockname(int sockfd, sockaddr addr)
+cpdef tuple getsockname(int sockfd, sockaddr addr)
 
 cpdef tuple getnameinfo(sockaddr addr, int flags=?)
 cpdef bint isIP(sa_family_t family, char* value) noexcept nogil

@@ -7,15 +7,15 @@ from .queue cimport io_uring_sqe
 
 cdef class sockaddr:
     cdef:
-        bint free
-        void* ptr
-        socklen_t sizeof
-        readonly sa_family_t family
+        bint                    free
+        void*                   ptr
+        socklen_t               sizeof
+        readonly sa_family_t    family
 
 
 cdef __sockaddr_un* sockaddr_un(char* path) noexcept nogil
 cdef __sockaddr_in* sockaddr_in(char* addr, in_port_t port) noexcept nogil
-cdef __sockaddr_in6* sockaddr_in6(char *addr, in_port_t port, uint32_t scope_id) noexcept nogil
+cdef __sockaddr_in6* sockaddr_in6(char* addr, in_port_t port, uint32_t scope_id) noexcept nogil
 
 
 cdef class msghdr:
@@ -75,9 +75,9 @@ cpdef void io_uring_prep_multishot_accept_direct(io_uring_sqe sqe,
                                                  int fd,
                                                  sockaddr addr=?,
                                                  int flags=?) noexcept nogil
-cpdef void io_uring_prep_connect(io_uring_sqe sqe,
-                                 int fd,
-                                 sockaddr addr) noexcept
+cpdef void io_uring_prep_connect(io_uring_sqe sqe, int fd, sockaddr addr) noexcept
+cpdef void io_uring_prep_bind(io_uring_sqe sqe, int fd, sockaddr addr) noexcept nogil
+cpdef void io_uring_prep_listen(io_uring_sqe sqe, int fd, int backlog) noexcept nogil
 cpdef void io_uring_prep_send(io_uring_sqe sqe,
                               int sockfd,
                               const unsigned char[:] buf,

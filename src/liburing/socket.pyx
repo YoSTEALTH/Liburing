@@ -287,10 +287,14 @@ cpdef inline void io_uring_prep_multishot_accept_direct(io_uring_sqe sqe,
                                                         int flags=0) noexcept nogil:
     __io_uring_prep_multishot_accept_direct(sqe.ptr, fd, <__sockaddr*>addr.ptr, &addr.sizeof, flags)
 
-cpdef inline void io_uring_prep_connect(io_uring_sqe sqe,
-                                        int fd,
-                                        sockaddr addr) noexcept:
+cpdef inline void io_uring_prep_connect(io_uring_sqe sqe, int fd, sockaddr addr) noexcept:
     __io_uring_prep_connect(sqe.ptr, fd, <__sockaddr*>addr.ptr, addr.sizeof)
+
+cpdef inline void io_uring_prep_bind(io_uring_sqe sqe, int fd, sockaddr addr) noexcept nogil:
+    __io_uring_prep_bind(sqe.ptr, fd, <__sockaddr*>addr.ptr, addr.sizeof)
+
+cpdef inline void io_uring_prep_listen(io_uring_sqe sqe, int fd, int backlog) noexcept nogil:
+    __io_uring_prep_listen(sqe.ptr, fd, backlog)
 
 cpdef inline void io_uring_prep_send(io_uring_sqe sqe,
                                      int sockfd,
