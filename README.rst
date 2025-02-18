@@ -17,14 +17,14 @@ Check out `Shakti`_. It uses ``liburing`` and provides an easy to use Python ``a
 Requires
 --------
 
-    - Linux 6.1+ (6.7+ recommended)
-    - Python 3.8+
+    - Linux 6.11+
+    - Python 3.9+
 
 
 Includes (battery)
 ------------------
 
-    - C liburing 2.6+
+    - C liburing 2.9+
 
 
 Install, update & uninstall (Alpha)
