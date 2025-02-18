@@ -80,6 +80,9 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         # Removes indirection through the SQ index array.
         __IORING_SETUP_NO_SQARRAY 'IORING_SETUP_NO_SQARRAY'
 
+        # Use hybrid poll in iopoll process
+        __IORING_SETUP_HYBRID_IOPOLL 'IORING_SETUP_HYBRID_IOPOLL'
+
     enum __io_uring_op 'io_uring_op':
         __IORING_OP_NOP 'IORING_OP_NOP'
         __IORING_OP_READV 'IORING_OP_READV'
@@ -137,6 +140,8 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_OP_FUTEX_WAITV 'IORING_OP_FUTEX_WAITV'
         __IORING_OP_FIXED_FD_INSTALL 'IORING_OP_FIXED_FD_INSTALL'
         __IORING_OP_FTRUNCATE 'IORING_OP_FTRUNCATE'
+        __IORING_OP_BIND 'IORING_OP_BIND'
+        __IORING_OP_LISTEN 'IORING_OP_LISTEN'
         # this goes last, obviously
         __IORING_OP_LAST 'IORING_OP_LAST'
 
@@ -145,6 +150,7 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         # `IORING_URING_CMD_FIXED` use registered buffer;
         # pass this flag along with setting `sqe->buf_index`.
         __IORING_URING_CMD_FIXED 'IORING_URING_CMD_FIXED'
+        __IORING_URING_CMD_MASK 'IORING_URING_CMD_MASK'
 
         # `sqe->fsync_flags`
         __IORING_FSYNC_DATASYNC 'IORING_FSYNC_DATASYNC'
@@ -189,6 +195,10 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_ASYNC_CANCEL_ANY 'IORING_ASYNC_CANCEL_ANY'
         # 'fd' passed in is a fixed descriptor
         __IORING_ASYNC_CANCEL_FD_FIXED 'IORING_ASYNC_CANCEL_FD_FIXED'
+        # Match on user_data, default for no other key
+        __IORING_ASYNC_CANCEL_USERDATA 'IORING_ASYNC_CANCEL_USERDATA'
+        # Match request based on opcode
+        __IORING_ASYNC_CANCEL_OP 'IORING_ASYNC_CANCEL_OP'
 
         # send/sendmsg and recv/recvmsg flags (sqe->ioprio)
         #
@@ -214,6 +224,7 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_RECV_MULTISHOT 'IORING_RECV_MULTISHOT'
         __IORING_RECVSEND_FIXED_BUF 'IORING_RECVSEND_FIXED_BUF'
         __IORING_SEND_ZC_REPORT_USAGE 'IORING_SEND_ZC_REPORT_USAGE'
+        __IORING_RECVSEND_BUNDLE 'IORING_RECVSEND_BUNDLE'
 
         # `cqe.res` for `IORING_CQE_F_NOTIF` if
         # `IORING_SEND_ZC_REPORT_USAGE` was requested
@@ -224,6 +235,8 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
 
         # accept flags stored in `sqe->ioprio`
         __IORING_ACCEPT_MULTISHOT 'IORING_ACCEPT_MULTISHOT'
+        __IORING_ACCEPT_DONTWAIT 'IORING_ACCEPT_DONTWAIT'
+        __IORING_ACCEPT_POLL_FIRST 'IORING_ACCEPT_POLL_FIRST'
 
     # `IORING_OP_MSG_RING` command types, stored in `sqe->addr`
     # TODO: enum __io_uring_msg 'io_uring_msg':
@@ -233,7 +246,6 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
 
     enum:
         # `IORING_OP_MSG_RING` flags (`sqe->msg_ring_flags`)
-        #
         # `IORING_MSG_RING_CQE_SKIP`    Don't post a CQE to the target ring. Not
         #                               applicable for `IORING_MSG_DATA`, obviously.
         __IORING_MSG_RING_CQE_SKIP 'IORING_MSG_RING_CQE_SKIP'
@@ -241,9 +253,12 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_MSG_RING_FLAGS_PASS 'IORING_MSG_RING_FLAGS_PASS'
 
         # `IORING_OP_FIXED_FD_INSTALL` flags (`sqe->install_fd_flags`)
-        #
         # `IORING_FIXED_FD_NO_CLOEXEC`   Don't mark the `fd` as `O_CLOEXEC`
         __IORING_FIXED_FD_NO_CLOEXEC 'IORING_FIXED_FD_NO_CLOEXEC'
+
+        # IORING_OP_NOP flags (sqe->nop_flags)
+        # Inject result from sqe->result
+        __IORING_NOP_INJECT_RESULT 'IORING_NOP_INJECT_RESULT'
 
     # IO completion data structure (Completion Queue Entry)
     struct __io_uring_cqe "io_uring_cqe":
@@ -264,12 +279,20 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_CQE_F_SOCK_NONEMPTY 'IORING_CQE_F_SOCK_NONEMPTY'
         # Set for notification CQEs. Can be used to distinct them from sends.
         __IORING_CQE_F_NOTIF 'IORING_CQE_F_NOTIF'
+        # If set, the buffer ID set in the completion will get
+        # more completions. In other words, the buffer is being
+        # partially consumed, and will be used by the kernel for
+        # more completions. This is only set for buffers used via
+        # the incremental buffer consumption, as provided by
+        # a ring buffer setup with IOU_PBUF_RING_INC. For any
+        # other provided buffer type, all completions with a
+        # buffer passed back is automatically returned to the
+        # application.
+        __IORING_CQE_F_BUF_MORE 'IORING_CQE_F_BUF_MORE'
 
-    enum __io_uring_cqe_op 'io_uring_cqe_op':
         __IORING_CQE_BUFFER_SHIFT 'IORING_CQE_BUFFER_SHIFT'
 
-    # Magic offsets for the application to mmap the data it needs
-    enum:
+        # Magic offsets for the application to mmap the data it needs
         __IORING_OFF_SQ_RING 'IORING_OFF_SQ_RING'
         __IORING_OFF_CQ_RING 'IORING_OFF_CQ_RING'
         __IORING_OFF_SQES 'IORING_OFF_SQES'
@@ -317,6 +340,8 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_ENTER_SQ_WAIT 'IORING_ENTER_SQ_WAIT'
         __IORING_ENTER_EXT_ARG 'IORING_ENTER_EXT_ARG'
         __IORING_ENTER_REGISTERED_RING 'IORING_ENTER_REGISTERED_RING'
+        __IORING_ENTER_ABS_TIMER 'IORING_ENTER_ABS_TIMER'
+        __IORING_ENTER_EXT_ARG_REG 'IORING_ENTER_EXT_ARG_REG'
 
     # Passed in for io_uring_setup(2). Copied back with updated info on success
     struct __io_uring_params "io_uring_params":
@@ -347,6 +372,8 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_FEAT_CQE_SKIP 'IORING_FEAT_CQE_SKIP'
         __IORING_FEAT_LINKED_FILE 'IORING_FEAT_LINKED_FILE'
         __IORING_FEAT_REG_REG_RING 'IORING_FEAT_REG_REG_RING'
+        __IORING_FEAT_RECVSEND_BUNDLE 'IORING_FEAT_RECVSEND_BUNDLE'
+        __IORING_FEAT_MIN_TIMEOUT 'IORING_FEAT_MIN_TIMEOUT'
 
     # io_uring_register(2) opcodes and arguments
     enum __io_uring_register_op 'io_uring_register_op':
@@ -398,6 +425,12 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_REGISTER_NAPI 'IORING_REGISTER_NAPI'
         __IORING_UNREGISTER_NAPI 'IORING_UNREGISTER_NAPI'
 
+        __IORING_REGISTER_CLOCK 'IORING_REGISTER_CLOCK'
+        # clone registered buffers from source ring to current ring
+        __IORING_REGISTER_CLONE_BUFFERS 'IORING_REGISTER_CLONE_BUFFERS'
+        __IORING_REGISTER_RESIZE_RINGS 'IORING_REGISTER_RESIZE_RINGS'
+        __IORING_REGISTER_MEM_REGION 'IORING_REGISTER_MEM_REGION'
+
         # this goes last
         __IORING_REGISTER_LAST 'IORING_REGISTER_LAST'
 
@@ -409,7 +442,27 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IO_WQ_BOUND 'IO_WQ_BOUND'
         __IO_WQ_UNBOUND 'IO_WQ_UNBOUND'
 
-    # NOTE: skipping `io_uring_files_update` deprecated
+
+    enum:
+        # initialise with user provided memory pointed by user_addr
+        __IORING_MEM_REGION_TYPE_USER 'IORING_MEM_REGION_TYPE_USER'
+
+    struct __io_uring_region_desc 'io_uring_region_desc':
+        __u64   user_addr
+        __u64   size
+        __u32   flags
+        __u32   id
+        __u64   mmap_offset
+        __u64   __resv[4]
+
+    enum:
+        # expose the region as registered wait arguments
+        __IORING_MEM_REGION_REG_WAIT_ARG 'IORING_MEM_REGION_REG_WAIT_ARG'
+
+    struct __io_uring_mem_region_reg 'io_uring_mem_region_reg':
+        __u64   region_uptr # struct io_uring_region_desc
+        __u64   flags
+        __u64   __resv[2]
 
     enum:
         # Register a fully sparse file space, rather than pass in an array of all
@@ -465,6 +518,22 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         # __u8    resv
         # __u32   resv2[3]
 
+    struct __io_uring_clock_register 'io_uring_clock_register':
+        __u32   clockid
+        __u32   __resv[3]
+
+    enum:
+        __IORING_REGISTER_SRC_REGISTERED 'IORING_REGISTER_SRC_REGISTERED'
+        __IORING_REGISTER_DST_REPLACE 'IORING_REGISTER_DST_REPLACE'
+
+    struct __io_uring_clone_buffer 'io_uring_clone_buffers':  # note: removed "s" as the end conflicts with function name. 
+        __u32   src_fd
+        __u32   flags
+        __u32   src_off
+        __u32   dst_off
+        __u32   nr
+        __u32   pad[3]
+
     struct __io_uring_buf "io_uring_buf":
         __u64   addr
         __u32   len
@@ -484,15 +553,22 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         #     struct io_uring_buf bufs[0]
 
     # Flags for `IORING_REGISTER_PBUF_RING`.
-    #
-    # `IOU_PBUF_RING_MMAP`:     If set, kernel will allocate the memory for the ring.
-    #                           The application must not set a ring_addr in struct
-    #                           `io_uring_buf_reg`, instead it must subsequently call
-    #                           `mmap(2)` with the `offset` set as:
-    #                           `IORING_OFF_PBUF_RING` | (`bgid << IORING_OFF_PBUF_SHIFT`)
-    #                           to get a virtual mapping for the ring.
     enum __io_uring_register_pbuf_ring_flags 'io_uring_register_pbuf_ring_flags':
+        # If set, kernel will allocate the memory for the ring.
+        # The application must not set a ring_addr in struct
+        # `io_uring_buf_reg`, instead it must subsequently call
+        # `mmap(2)` with the `offset` set as:
+        # `IORING_OFF_PBUF_RING` | (`bgid << IORING_OFF_PBUF_SHIFT`)
+        # to get a virtual mapping for the ring.
         __IOU_PBUF_RING_MMAP 'IOU_PBUF_RING_MMAP'
+        # If set, buffers consumed from this buffer ring can be
+        # consumed incrementally. Normally one (or more) buffers
+        # are fully consumed. With incremental consumptions, it's
+        # feasible to register big ranges of buffers, and each
+        # use of it will consume only as much as it needs. This
+        # requires that both the kernel and application keep
+        # track of where the current read/recv index is at.
+        __IOU_PBUF_RING_INC 'IOU_PBUF_RING_INC'
 
     # argument for IORING_(UN)REGISTER_PBUF_RING
     struct __io_uring_buf_reg "io_uring_buf_reg":
@@ -527,6 +603,34 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __IORING_RESTRICTION_SQE_FLAGS_REQUIRED 'IORING_RESTRICTION_SQE_FLAGS_REQUIRED'
         __IORING_RESTRICTION_LAST 'IORING_RESTRICTION_LAST'
 
+        # enum:
+        __IORING_REG_WAIT_TS 'IORING_REG_WAIT_TS'
+
+    # Argument for IORING_REGISTER_CQWAIT_REG, registering a region of
+    # struct io_uring_reg_wait that can be indexed when io_uring_enter(2) is
+    # called rather than pass in a wait argument structure separately.
+    struct __io_uring_cqwait_reg_arg 'io_uring_cqwait_reg_arg':
+        __u32   flags
+        __u32   struct_size
+        __u32   nr_entries
+        __u32   pad
+        __u64   user_addr
+        __u64   pad2[3]
+
+    # Argument for io_uring_enter(2) with
+    # IORING_GETEVENTS | IORING_ENTER_EXT_ARG_REG set, where the actual argument
+    # is an index into a previously registered fixed wait region described by
+    # the below structure.
+    struct __io_uring_reg_wait 'io_uring_reg_wait':
+        __kernel_timespec   ts
+        __u32               min_wait_usec
+        __u32               flags
+        __u64               sigmask
+        __u32               sigmask_sz
+        __u32               pad[3]
+        __u64               pad2[2]
+
+    # Argument for io_uring_enter(2) with IORING_GETEVENTS | IORING_ENTER_EXT_ARG
     struct __io_uring_getevents_arg "io_uring_getevents_arg":
         __u64   sigmask
         __u32   sigmask_sz
@@ -539,7 +643,9 @@ cdef extern from '../include/liburing/io_uring.h' nogil:
         __s32               fd
         __u32               flags
         __kernel_timespec   timeout
-        __u64               pad[4]
+        __u8                opcode
+        __u8                pad[7]
+        __u64               pad2[3]
 
     # Argument for `IORING_REGISTER_FILE_ALLOC_RANGE`
     # The range is specified as [off, off + len)

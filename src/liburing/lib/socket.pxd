@@ -13,8 +13,6 @@ cdef extern from '<sys/socket.h>' nogil:
         sa_family_t sa_family
         char        sa_data[14]  # protocol-specific address
 
-    int __bind 'bind'(int sockfd, const __sockaddr* addr, socklen_t addrlen)
-    int __listen 'listen'(int sockfd, int backlog)
     int __getpeername 'getpeername'(int sockfd,
                                     __sockaddr* addr,
                                     socklen_t* addrlen)

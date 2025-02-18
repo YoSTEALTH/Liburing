@@ -32,6 +32,7 @@ def test_io_uring_defines():
     assert liburing.IORING_SETUP_NO_MMAP == 1 << 14
     assert liburing.IORING_SETUP_REGISTERED_FD_ONLY == 1 << 15
     assert liburing.IORING_SETUP_NO_SQARRAY == 1 << 16
+    assert liburing.IORING_SETUP_HYBRID_IOPOLL == 1 << 17
 
     # enum: io_uring_op
     for i, flag in enumerate((liburing.IORING_OP_NOP,
@@ -90,10 +91,13 @@ def test_io_uring_defines():
                               liburing.IORING_OP_FUTEX_WAITV,
                               liburing.IORING_OP_FIXED_FD_INSTALL,
                               liburing.IORING_OP_FTRUNCATE,
+                              liburing.IORING_OP_BIND,
+                              liburing.IORING_OP_LISTEN,
                               liburing.IORING_OP_LAST)):
         assert i == flag
 
     assert liburing.IORING_URING_CMD_FIXED == 1 << 0
+    assert liburing.IORING_URING_CMD_MASK == liburing.IORING_URING_CMD_FIXED
     assert liburing.IORING_FSYNC_DATASYNC == 1 << 0
 
     # `sqe->timeout_flags`
@@ -120,14 +124,19 @@ def test_io_uring_defines():
     assert liburing.IORING_ASYNC_CANCEL_FD == 1 << 1
     assert liburing.IORING_ASYNC_CANCEL_ANY == 1 << 2
     assert liburing.IORING_ASYNC_CANCEL_FD_FIXED == 1 << 3
+    assert liburing.IORING_ASYNC_CANCEL_USERDATA == 1 << 4
+    assert liburing.IORING_ASYNC_CANCEL_OP == 1 << 5
 
     assert liburing.IORING_RECVSEND_POLL_FIRST == 1 << 0
     assert liburing.IORING_RECV_MULTISHOT == 1 << 1
     assert liburing.IORING_RECVSEND_FIXED_BUF == 1 << 2
     assert liburing.IORING_SEND_ZC_REPORT_USAGE == 1 << 3
+    assert liburing.IORING_RECVSEND_BUNDLE == 1 << 4
 
     assert liburing.IORING_NOTIF_USAGE_ZC_COPIED == 1 << 31
     assert liburing.IORING_ACCEPT_MULTISHOT == 1 << 0
+    assert liburing.IORING_ACCEPT_DONTWAIT == 1 << 1
+    assert liburing.IORING_ACCEPT_POLL_FIRST == 1 << 2
 
     # enum: io_uring_msg_ring_flags
     for i, flag in enumerate((liburing.IORING_MSG_DATA,
@@ -137,11 +146,13 @@ def test_io_uring_defines():
     assert liburing.IORING_MSG_RING_CQE_SKIP == 1 << 0
     assert liburing.IORING_MSG_RING_FLAGS_PASS == 1 << 1
     assert liburing.IORING_FIXED_FD_NO_CLOEXEC == 1 << 0
+    assert liburing.IORING_NOP_INJECT_RESULT == 1 << 0
 
     assert liburing.IORING_CQE_F_BUFFER == 1 << 0
     assert liburing.IORING_CQE_F_MORE == 1 << 1
     assert liburing.IORING_CQE_F_SOCK_NONEMPTY == 1 << 2
     assert liburing.IORING_CQE_F_NOTIF == 1 << 3
+    assert liburing.IORING_CQE_F_BUF_MORE == 1 << 4
 
     assert liburing.IORING_CQE_BUFFER_SHIFT == 16
 
@@ -164,6 +175,8 @@ def test_io_uring_defines():
     assert liburing.IORING_ENTER_SQ_WAIT == 1 << 2
     assert liburing.IORING_ENTER_EXT_ARG == 1 << 3
     assert liburing.IORING_ENTER_REGISTERED_RING == 1 << 4
+    assert liburing.IORING_ENTER_ABS_TIMER == 1 << 5
+    assert liburing.IORING_ENTER_EXT_ARG_REG == 1 << 6
 
     # io_uring_params->features flags
     assert liburing.IORING_FEAT_SINGLE_MMAP == 1 << 0
@@ -180,39 +193,48 @@ def test_io_uring_defines():
     assert liburing.IORING_FEAT_CQE_SKIP == 1 << 11
     assert liburing.IORING_FEAT_LINKED_FILE == 1 << 12
     assert liburing.IORING_FEAT_REG_REG_RING == 1 << 13
+    assert liburing.IORING_FEAT_RECVSEND_BUNDLE == 1 << 14
+    assert liburing.IORING_FEAT_MIN_TIMEOUT == 1 << 15
+
+    assert liburing.IORING_MEM_REGION_TYPE_USER == 1
+    assert liburing.IORING_MEM_REGION_REG_WAIT_ARG == 1
 
     # enum: io_uring_register_op
-    for i, flag in enumerate((liburing.IORING_REGISTER_BUFFERS,
-                              liburing.IORING_UNREGISTER_BUFFERS,
-                              liburing.IORING_REGISTER_FILES,
-                              liburing.IORING_UNREGISTER_FILES,
-                              liburing.IORING_REGISTER_EVENTFD,
-                              liburing.IORING_UNREGISTER_EVENTFD,
-                              liburing.IORING_REGISTER_FILES_UPDATE,
-                              liburing.IORING_REGISTER_EVENTFD_ASYNC,
-                              liburing.IORING_REGISTER_PROBE,
-                              liburing.IORING_REGISTER_PERSONALITY,
-                              liburing.IORING_UNREGISTER_PERSONALITY,
-                              liburing.IORING_REGISTER_RESTRICTIONS,
-                              liburing.IORING_REGISTER_ENABLE_RINGS,
-                              liburing.IORING_REGISTER_FILES2,
-                              liburing.IORING_REGISTER_FILES_UPDATE2,
-                              liburing.IORING_REGISTER_BUFFERS2,
-                              liburing.IORING_REGISTER_BUFFERS_UPDATE,
-                              liburing.IORING_REGISTER_IOWQ_AFF,
-                              liburing.IORING_UNREGISTER_IOWQ_AFF,
-                              liburing.IORING_REGISTER_IOWQ_MAX_WORKERS,
-                              liburing.IORING_REGISTER_RING_FDS,
-                              liburing.IORING_UNREGISTER_RING_FDS,
-                              liburing.IORING_REGISTER_PBUF_RING,
-                              liburing.IORING_UNREGISTER_PBUF_RING,
-                              liburing.IORING_REGISTER_SYNC_CANCEL,
-                              liburing.IORING_REGISTER_FILE_ALLOC_RANGE,
-                              liburing.IORING_REGISTER_PBUF_STATUS,
-                              liburing.IORING_REGISTER_NAPI,
-                              liburing.IORING_UNREGISTER_NAPI,
-                              liburing.IORING_REGISTER_LAST)):
-        assert i == flag
+    for flag, i in ((liburing.IORING_REGISTER_BUFFERS, 0),
+                    (liburing.IORING_UNREGISTER_BUFFERS, 1),
+                    (liburing.IORING_REGISTER_FILES, 2),
+                    (liburing.IORING_UNREGISTER_FILES, 3),
+                    (liburing.IORING_REGISTER_EVENTFD, 4),
+                    (liburing.IORING_UNREGISTER_EVENTFD, 5),
+                    (liburing.IORING_REGISTER_FILES_UPDATE, 6),
+                    (liburing.IORING_REGISTER_EVENTFD_ASYNC, 7),
+                    (liburing.IORING_REGISTER_PROBE, 8),
+                    (liburing.IORING_REGISTER_PERSONALITY, 9),
+                    (liburing.IORING_UNREGISTER_PERSONALITY, 10),
+                    (liburing.IORING_REGISTER_RESTRICTIONS, 11),
+                    (liburing.IORING_REGISTER_ENABLE_RINGS, 12),
+                    (liburing.IORING_REGISTER_FILES2, 13),
+                    (liburing.IORING_REGISTER_FILES_UPDATE2, 14),
+                    (liburing.IORING_REGISTER_BUFFERS2, 15),
+                    (liburing.IORING_REGISTER_BUFFERS_UPDATE, 16),
+                    (liburing.IORING_REGISTER_IOWQ_AFF, 17),
+                    (liburing.IORING_UNREGISTER_IOWQ_AFF, 18),
+                    (liburing.IORING_REGISTER_IOWQ_MAX_WORKERS, 19),
+                    (liburing.IORING_REGISTER_RING_FDS, 20),
+                    (liburing.IORING_UNREGISTER_RING_FDS, 21),
+                    (liburing.IORING_REGISTER_PBUF_RING, 22),
+                    (liburing.IORING_UNREGISTER_PBUF_RING, 23),
+                    (liburing.IORING_REGISTER_SYNC_CANCEL, 24),
+                    (liburing.IORING_REGISTER_FILE_ALLOC_RANGE, 25),
+                    (liburing.IORING_REGISTER_PBUF_STATUS, 26),
+                    (liburing.IORING_REGISTER_NAPI, 27),
+                    (liburing.IORING_UNREGISTER_NAPI, 28),
+                    (liburing.IORING_REGISTER_CLOCK, 29),
+                    (liburing.IORING_REGISTER_CLONE_BUFFERS, 30),
+                    (liburing.IORING_REGISTER_RESIZE_RINGS, 33),
+                    (liburing.IORING_REGISTER_MEM_REGION, 34),
+                    (liburing.IORING_REGISTER_LAST, 35)):
+        assert flag == i
     assert liburing.IORING_REGISTER_USE_REGISTERED_RING == 2147483648
 
     # enum: io_wq_type
@@ -227,6 +249,7 @@ def test_io_uring_defines():
 
     # enum: io_uring_register_pbuf_ring_flags
     assert liburing.IOU_PBUF_RING_MMAP == 1
+    assert liburing.IOU_PBUF_RING_INC == 2
 
     # enum: io_uring_restriction_op
     for i, flag in enumerate((liburing.IORING_RESTRICTION_REGISTER_OP,
@@ -235,6 +258,8 @@ def test_io_uring_defines():
                               liburing.IORING_RESTRICTION_SQE_FLAGS_REQUIRED,
                               liburing.IORING_RESTRICTION_LAST)):
         assert i == flag
+
+    assert liburing.IORING_REG_WAIT_TS == 1 << 0
 
     # enum: io_uring_socket_op
     for i, flag in enumerate((liburing.SOCKET_URING_OP_SIOCINQ,
