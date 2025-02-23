@@ -10,6 +10,11 @@ def test_io_uring_put_sqe():
     assert _loop(1, 0) is True  # sqe = 0, its ok to submit 0 entries
     assert _loop(1024, 1024) is True
 
+    # note: entries is rounded up to the nearest power of `2`
+    assert _loop(3, 4) is True
+    assert _loop(3, 5) is False
+    assert _loop(5, 8) is True
+
 
 def _loop(entries, num):
     ring = io_uring()
