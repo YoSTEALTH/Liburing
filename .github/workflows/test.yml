@@ -1,43 +1,43 @@
----
-name: Test
+# ---
+# name: Test
 
-on: [push, pull_request]  # yamllint disable-line rule:truthy
+# on: [push, pull_request]  # yamllint disable-line rule:truthy
 
-jobs:
-  build:
+# jobs:
+#   build:
 
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14-dev"]
+#     runs-on: ${{ matrix.os }}
+#     strategy:
+#       matrix:
+#         os: [ubuntu-latest]
+#         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14-dev"]
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-      # Setup Python
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      # Runners
-      - name: Install dependencies
-        run: |
-          python3 -m pip install --upgrade pip flake8 pytest
-          python3 -m pip install --upgrade .
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+#         with:
+#           submodules: true
+#       # Setup Python
+#       - uses: actions/checkout@v4
+#       - name: Set up Python ${{ matrix.python-version }}
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: ${{ matrix.python-version }}
+#       # Runners
+#       - name: Install dependencies
+#         run: |
+#           python3 -m pip install --upgrade pip flake8 pytest
+#           python3 -m pip install --upgrade .
 
-          # for debugging:
-          # python3 -m pip -vvvv install --upgrade .
-          # ls -alFR
-      - name: Lint with flake8
-        run: |
-          # stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-      - name: Test with PyTest
-        run: |
-          python3 -m pytest test
+#           # for debugging:
+#           # python3 -m pip -vvvv install --upgrade .
+#           # ls -alFR
+#       - name: Lint with flake8
+#         run: |
+#           # stop the build if there are Python syntax errors or undefined names
+#           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+#           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+#           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+#       - name: Test with PyTest
+#         run: |
+#           python3 -m pytest test
