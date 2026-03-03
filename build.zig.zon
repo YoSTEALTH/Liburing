@@ -1,0 +1,17 @@
+.{
+    .name = .liburing,
+    .version = "2026.3.3",
+    .fingerprint = 0x26de882ff0030dfe,
+    .dependencies = .{
+        .PyOZ = .{
+            .url = "https://github.com/dzonerzy/PyOZ/archive/refs/tags/v0.11.5.tar.gz",
+            .hash = "PyOZ-0.11.5-ntlpPtb7FQCt7YNT0U98khyAKo0v4AlpEwX29zJrW9Eg",
+        },
+        // .PyOZ = .{ .path = "../PyOZ" }, // local debug
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "liburing",
+    },
+}
