@@ -34,7 +34,7 @@ jobs:
               run: |
                   python3 -m pip install pytest pyoz
                   python3 -m pyoz build
-                  pyhton3 -m pip install dist/*.whl
+                  python3 -m pip install dist/*.whl
 
             - name: Test with PyTest
               run: |
