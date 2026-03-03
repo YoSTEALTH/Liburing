@@ -1,0 +1,63 @@
+[build-system]
+requires = ["pyoz"]
+build-backend = "pyoz.backend"
+
+[project]
+name = "liburing"
+readme = "README.md"
+license = "CC0-1.0"
+version = "2026.3.3"
+authors = [{name="Ritesh"}]
+keywords = ["python", "socket", "async", "cython", "file", "python3", "io", "syscall", "futex", "statx",
+            "io-uring", "uring", "liburing"]
+requires-python = ">=3.10"
+license-files = ["LICENSE.txt"]
+description = "Liburing is Python + Zig wrapper around C Liburing, which is a helper to setup and tear-down io_uring instances."
+classifiers = ["Topic :: Software Development",
+               "Intended Audience :: Developers",
+               "Operating System :: POSIX :: Linux",
+               "Programming Language :: Python :: 3.10",
+               "Programming Language :: Python :: 3.11",
+               "Programming Language :: Python :: 3.12",
+               "Programming Language :: Python :: 3.13",
+               "Programming Language :: Python :: 3.14",
+               "Development Status :: 2 - Pre-Alpha"]
+               # 1 - Planning
+               # 2 - Pre-Alpha
+               # 3 - Alpha
+               # 4 - Beta
+               # 5 - Production/Stable
+               # 6 - Mature
+               # 7 - Inactive
+
+[project.urls]
+Homepage = "https://github.com/YoSTEALTH/Liburing"
+Issues = "https://github.com/YoSTEALTH/Liburing/issues"
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.pyoz]
+# Path to your Zig source file
+module-path = "liburing/root.zig"
+
+# Native module name (underscore prefix for package layout)
+module-name = "_liburing"
+
+# Python package directory to include in the wheel
+py-packages = ["liburing"]
+
+# Optimization level for release builds: "Debug", "ReleaseSafe", "ReleaseFast", "ReleaseSmall"
+optimize = "Debug"
+
+# Strip debug symbols in release builds
+# strip = true
+
+# File extensions to include from py-packages (default: .py only)
+# Use ["*"] to include all files
+include-ext = ["py", "zig"]
+
+# Linux platform tag for wheel builds (default: "linux_x86_64" or "linux_aarch64")
+# Use manylinux tags only if building in a manylinux container
+# linux-platform-tag = "manylinux_2_17_x86_64"
+
