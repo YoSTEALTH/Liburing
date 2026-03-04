@@ -17,7 +17,7 @@ pub fn build(b: *std.Build) !void {
 
     // Create the user's lib module (shared between library and stub generator)
     const lib_mod = b.createModule(.{
-        .root_source_file = b.path("liburing/root.zig"),
+        .root_source_file = b.path("src/liburing/root.zig"),
         .target = target,
         .optimize = optimize,
         .strip = strip,

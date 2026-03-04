@@ -39,7 +39,7 @@ test = ["pytest"]
 
 [tool.pyoz]
 # Path to your Zig source file
-module-path = "liburing/root.zig"
+module-path = "src/liburing/root.zig"
 
 # Native module name (underscore prefix for package layout)
 module-name = "_liburing"
