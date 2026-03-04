@@ -4,14 +4,14 @@
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
         .PyOZ = .{
-            .url = "https://github.com/dzonerzy/PyOZ/archive/refs/tags/v0.11.5.tar.gz",
-            .hash = "PyOZ-0.11.5-ntlpPtb7FQCt7YNT0U98khyAKo0v4AlpEwX29zJrW9Eg",
+            .url = "https://github.com/pyozig/PyOZ/archive/refs/tags/v0.12.0.tar.gz",
+            .hash = "PyOZ-0.12.0-ntlpPsKLFwAague1IZwoTyqrhDuks8uD9oPMeY2EZ8rw",
         },
         // .PyOZ = .{ .path = "../PyOZ" }, // local debug
     },
     .paths = .{
         "build.zig",
         "build.zig.zon",
-        "liburing",
+        "src/liburing",
     },
 }

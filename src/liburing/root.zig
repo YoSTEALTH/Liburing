@@ -9,8 +9,8 @@ const consts = @import("const.zig");
 const errors = @import("error.zig");
 const helper = @import("helper.zig");
 
-pub const Liburing = oz.module(.{
-    .name = "liburing",
+pub const Module = oz.module(.{
+    .name = "_liburing",
     .doc = "Zig wrapper around C Liburing, which is a helper to setup and tear-down io_uring instances.",
     .funcs = &(uring.Functions ++ helper.Functions ++ errors.Functions),
     .classes = &(class.Classes ++ socket.Classes ++ statx.Classes),
@@ -19,6 +19,6 @@ pub const Liburing = oz.module(.{
 });
 
 // Module initialization function
-pub export fn PyInit__liburing() ?*oz.PyObject {
-    return Liburing.init();
-}
+// pub export fn PyInit__liburing() ?*oz.PyObject {
+//     return Module.init();
+// }
