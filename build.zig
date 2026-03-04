@@ -5,26 +5,22 @@ const builtin = @import("builtin");
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const static_path = "lib/liburing/src/liburing-ffi.a";
 
     // Strip option (can be set via -Dstrip=true or from pyoz CLI)
     const strip = b.option(bool, "strip", "Strip debug symbols from the binary") orelse false;
 
     // Get PyOZ dependency
-    const pyoz_dep = b.dependency("PyOZ", .{
-        .target = target,
-        .optimize = optimize,
-    });
+    const pyoz_dep = b.dependency("PyOZ", .{ .target = target, .optimize = optimize });
 
     // Create the user's lib module (shared between library and stub generator)
     const user_lib_mod = b.createModule(.{
         .root_source_file = b.path("src/liburing/root.zig"),
-        .target = target,
         .optimize = optimize,
+        .target = target,
         .strip = strip,
         .imports = &.{.{ .name = "PyOZ", .module = pyoz_dep.module("PyOZ") }},
     });
-
-    const static_path = "lib/liburing/src/liburing-ffi.a";
 
     std.fs.cwd().access(static_path, .{}) catch |e| switch (e) {
         error.FileNotFound => {
@@ -35,6 +31,8 @@ pub fn build(b: *std.Build) !void {
     };
 
     user_lib_mod.addObjectFile(b.path(static_path));
+    user_lib_mod.addIncludePath(b.path("lib/liburing/src/include"));
+    user_lib_mod.link_libc = true;
 
     // Generate a bridge module that forces analysis of all pub decls in the
     // user's code. This triggers @export inside pyoz.module() so the PyInit_
@@ -50,43 +48,29 @@ pub fn build(b: *std.Build) !void {
     );
     const bridge_mod = b.createModule(.{
         .root_source_file = bridge_source,
-        .target = target,
         .optimize = optimize,
+        .target = target,
         .strip = strip,
-        .imports = &.{
-            .{ .name = "_pyoz_mod", .module = user_lib_mod },
-        },
+        .imports = &.{.{ .name = "_pyoz_mod", .module = user_lib_mod }},
     });
 
     // Build the Python extension as a dynamic library
     // Note: underscore prefix separates the .so from the Python package directory
     const lib = b.addLibrary(.{
-        .name = "_liburing",
+        .name = "liburing",
         .linkage = .dynamic,
         .root_module = bridge_mod,
     });
 
     // Link libc (required for Python C API)
-    lib.linkLibC();
-    lib.root_module.addIncludePath(b.path("lib/liburing/src/include"));
+    // lib.linkLibC();
 
-    // On Windows, link against the Python stable ABI library (python3.lib).
-    // These options are passed automatically by `pyoz build`.
-    // For manual `zig build` on Windows, pass: -Dpython-lib-dir=<path> -Dpython-lib-name=python3
-    if (b.option([]const u8, "python-lib-dir", "Python library directory")) |lib_dir| {
-        lib.addLibraryPath(.{ .cwd_relative = lib_dir });
-    }
-    if (b.option([]const u8, "python-lib-name", "Python library name")) |lib_name| {
-        lib.linkSystemLibrary(lib_name);
-    }
-
-    // Determine extension based on target OS (.pyd for Windows, .so otherwise)
-    const ext = if (builtin.os.tag == .windows) ".pyd" else ".so";
+    // Link libc (required for Python C API)
+    // lib.root_module.link_libc = true;
+    // lib.root_module.addIncludePath(b.path("lib/liburing/src/include"));
 
     // Install the shared library
-    const install = b.addInstallArtifact(lib, .{
-        .dest_sub_path = "_liburing" ++ ext,
-    });
+    const install = b.addInstallArtifact(lib, .{ .dest_sub_path = "liburing.so" });
     b.getInstallStep().dependOn(&install.step);
 }
 
