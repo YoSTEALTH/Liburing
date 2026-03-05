@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+__all__ = 'LINUX_VERSION_MAJOR', 'LINUX_VERSION_MINOR', 'linux_version_check'
 
 LINUX_VERSION_MAJOR = 0
 LINUX_VERSION_MINOR = 0
@@ -15,7 +16,7 @@ def _set_linux_version():
         LINUX_VERSION_MINOR = int(minor)
 
 
-_set_linux_version()  # init
+_set_linux_version()  # initialize
 
 
 @lru_cache
@@ -27,7 +28,8 @@ def linux_version_check(version):
         return:  bool
 
     Example
-        # assuming your linux is 6.7
+        # note: assuming your linux is 6.7
+        
         >>> linux_version_check(5)
         False
         >>> linux_version_check('6.6')

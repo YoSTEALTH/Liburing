@@ -3,72 +3,39 @@ const c = @import("c.zig").c;
 const oz = @import("PyOZ");
 const std = @import("std");
 
-pub const Classes = .{
-    oz.class("iovec", Iovec),
-    oz.class("kernel_timespec", Timespec),
-    oz.class("io_uring", Ring),
-    oz.class("CQE", CQE),
-    oz.class("io_uring_cqe", Cqe),
-    oz.class("io_uring_cqe_iter", CqeIter),
-    oz.class("SQE", SQE),
-    oz.class("io_uring_sqe", Sqe),
-    oz.class("io_uring_probe", Probe),
-    oz.class("io_uring_params", Param),
-    oz.class("io_uring_reg_wait", RegWait),
-    oz.class("io_uring_restriction", Restriction),
-    oz.class("io_uring_buf_reg", BufReg),
-    oz.class("io_uring_sync_cancel_reg", SyncCancelReg),
-    oz.class("io_uring_napi", Napi),
-    oz.class("io_uring_zcrx_ifq_reg", ZcrxIfqReg),
-    oz.class("io_uring_clock_register", ClockRegister),
-    oz.class("io_uring_bpf", Bpf),
-    oz.class("sigset_t", SigsetT),
-    oz.class("io_uring_mem_region_reg", MemRegionReg),
-    oz.class("io_uring_buf_ring", BufRing),
-    oz.class("cmsghdr", Cmsghdr),
-    oz.class("msghdr", Msghdr),
-    oz.class("epoll_event", EpollEvent),
-    oz.class("io_uring_recvmsg_out", RecvmsgOut),
-    oz.class("open_how", OpenHow),
-    // oz.class("futex_state", Futex),
-};
-
+///Vector I/O data structure
+///
+///Type
+///    buffers: Union[bytes, bytearray, memoryview, List[...], Tuple[...]]
+///    return:  None
+///
+///Example
+///    # read single
+///    # -----------
+///    >>> iov_read = Iovec(bytearray(11))
+///    >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
+///
+///    # read multiple
+///    # -------------
+///    >>> iov_read = Iovec([bytearray(1), bytearray(2), bytearray(3)])
+///    >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
+///
+///    # write single
+///    # ------------
+///    >>> iov_write = Iovec(b'hello world')
+///    >>> io_uring_prep_readv(sqe, fd, iov_write, ...)
+///
+///    # write multiple
+///    # --------------
+///    >>> iov_write = Iovec([b'1', b'22', b'333'])
+///    >>> io_uring_prep_readv(sqe, fd, iov_write, ...)
+///
+///Note
+///    - Make sure to hold on to variable you are passing into `Iovec` so it does not get
+///    garbage collected before you get the chance to use it!
 pub const Iovec = extern struct {
     _len: usize = 0,
     _iovec: ?[*]c.iovec = null,
-
-    pub const __doc__: [*:0]const u8 =
-        \\Vector I/O data structure
-        \\
-        \\Type
-        \\    buffers: Union[bytes, bytearray, memoryview, List[...], Tuple[...]]
-        \\    return:  None
-        \\
-        \\Example
-        \\    # read single
-        \\    # -----------
-        \\    >>> iov_read = iovec(bytearray(11))
-        \\    >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
-        \\
-        \\    # read multiple
-        \\    # -------------
-        \\    >>> iov_read = iovec([bytearray(1), bytearray(2), bytearray(3)])
-        \\    >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
-        \\
-        \\    # write single
-        \\    # ------------
-        \\    >>> iov_write = iovec(b'hello world')
-        \\    >>> io_uring_prep_readv(sqe, fd, iov_write, ...)
-        \\
-        \\    # write multiple
-        \\    # --------------
-        \\    >>> iov_write = iovec([b'1', b'22', b'333'])
-        \\    >>> io_uring_prep_readv(sqe, fd, iov_write, ...)
-        // \\
-        // \\Note
-        // \\    - Make sure to hold on to variable you are passing into `iovec` so it does not get
-        // \\    garbage collected before you get the chance to use it!
-    ;
 
     const Self = @This();
 
@@ -131,6 +98,16 @@ pub const Iovec = extern struct {
     }
 };
 
+///Kernel Timespec
+///
+///Example
+///    >>> ts = timespec(2)
+///    >>> ts.sec
+///    2
+///    >>> ts.nsec
+///    0
+///    >>> ts.sec = 1           # second
+///    >>> ts.nsec = 500000000  # nanosecond
 pub const Timespec = extern struct {
     _timespec: ?*c.__kernel_timespec = null,
 
@@ -171,22 +148,18 @@ pub const Timespec = extern struct {
     }
 };
 
-// io_uring()
+///I/O URing
+///
+///Example
+///    >>> ring = Ring()
+///    >>> io_uring_queue_init(8, ring)
+///    >>> io_uring_queue_exit(ring)
 pub const Ring = extern struct {
     _io_uring: ?*c.io_uring,
 
-    pub const __doc__: [*:0]const u8 =
-        \\I/O URing
-        \\
-        \\Example
-        \\    >>> ring = io_uring()
-        \\    >>> io_uring_queue_init(8, ring)
-        \\    >>> io_uring_queue_exit(ring)
-    ;
-
     pub fn __new__() ?Ring {
         const io_uring: *c.io_uring = std.heap.c_allocator.create(c.io_uring) catch {
-            return oz.raiseMemoryError("`io_uring()` - Out of Memory!");
+            return oz.raiseMemoryError("`Ring()` - Out of Memory!");
         };
         io_uring.* = std.mem.zeroes(c.io_uring); // set default value to `0`
         return .{ ._io_uring = io_uring };
@@ -222,8 +195,8 @@ pub const Ring = extern struct {
     }
 };
 
+/// Completion Queue Entry (CQE)
 pub const CQE = extern struct {
-    // _cqe: ?*c.io_uring_cqe = null,
     _cqe: *c.io_uring_cqe,
 
     const Self = @This();
@@ -232,20 +205,14 @@ pub const CQE = extern struct {
 
     pub fn get_user_data(self: *const Self) u64 {
         return self._cqe.user_data;
-        // if (self._cqe) |cqe| return cqe.user_data;
-        // return oz.raiseMemoryError("`cqe.user_data` memory already freed or not set!");
     }
 
     pub fn get_res(self: *const Self) i32 {
         return self._cqe.res;
-        // if (self._cqe) |cqe| return cqe.res;
-        // return oz.raiseMemoryError("`cqe.res` memory already freed or not set!");
     }
 
     pub fn get_flags(self: *const Self) u32 {
         return self._cqe.flags;
-        // if (self._cqe) |cqe| return cqe.flags;
-        // return oz.raiseMemoryError("`cqe.flags` memory already freed or not set!");
     }
 
     pub fn get_big_cqe(_: *const Self) ?void {
@@ -254,29 +221,27 @@ pub const CQE = extern struct {
     }
 };
 
+///I/O completion data structure (Completion Queue Entry) (CQE)
+///
+///Example
+///    >>> cqe = Cqe()
+///    ...
+///    >>> io_uring_wait_cqe(ring, cqe)
+///    >>> ready = io_uring_cq_ready(ring)
+///
+///    >>> for i in range(ready):
+///    ...     cqe[i] # do stuff
+///
+///    >>> io_uring_cq_advance(ready) # free cqe already viewed.
+///
+///Note
+///    - `cqe` items e.g: `cqe[0], cqe[1], ...` are not cached (should be called/used only once) and
+///    is very dynamic, so make copy if you want to keep data alive for longer use.
 pub const Cqe = extern struct {
     // TODO:
     // _array: ?[*]CQE = null, // custom memory for batch cqe
     _io_uring_cqe: ?[*]c.io_uring_cqe, // Note: Memory is managed by `io_uring`
 
-    pub const __doc__: [*:0]const u8 =
-        \\I/O completion data structure (Completion Queue Entry) (CQE)
-        \\
-        \\Example
-        \\    >>> cqe = io_uring_cqe()
-        \\    ...
-        \\    >>> io_uring_wait_cqe(ring, cqe)
-        \\    >>> ready = io_uring_cq_ready(ring)
-        \\
-        \\    >>> for i in range(ready):
-        \\    ...     cqe[i] # do stuff
-        \\
-        \\    >>> io_uring_cq_advance(ready) # free cqe already viewed.
-        \\
-        \\Note
-        \\    - `cqe` items e.g: `cqe[0], cqe[1], ...` are not cached (should be called/used only once) and
-        \\    is very dynamic, so make copy if you want to keep data alive for longer use.
-    ;
     // TODO:
     pub fn __new__(no: ?u32) ?Cqe {
         if (no) |_| return oz.raiseNotImplementedError("`Cqe(no)` - Custom memory allocation not coded yet!");
@@ -296,21 +261,18 @@ pub const Cqe = extern struct {
     }
 };
 
+///Example
+///    >>> for i in CqeIter(ring, cqe):
+///    >>>     cqe[0].user_data == i  # do stuff
+///
+///Note
+///    - Only `cqe[0]` gets updated with new completed entry value.
 pub const CqeIter = extern struct {
     _io_uring_cqe_iter: c.io_uring_cqe_iter,
     _index: usize = 0,
     _cqe: ?*Cqe = null,
 
     const Self = @This();
-
-    pub const __doc__: [*:0]const u8 =
-        \\Example
-        \\    >>> for i in io_uring_cqe_iter(ring, cqe):
-        \\    >>>     cqe[0].user_data == i  # do stuff
-        \\
-        \\Note
-        \\    - Only `cqe[0]` gets updated with new completed entry value.
-    ;
 
     pub fn __new__(ring: *Ring, cqe: *Cqe, index: ?usize) Self {
         const _index = index orelse 0;
@@ -332,6 +294,7 @@ pub const CqeIter = extern struct {
     }
 };
 
+/// Submission Queue Entry (SQE)
 pub const SQE = extern struct {
     _sqe: *c.io_uring_sqe,
 
@@ -381,6 +344,32 @@ pub const SQE = extern struct {
     }
 };
 
+///IO submission data structure (Submission Queue Entry) (SQE)
+///
+///Example
+///    # single
+///    >>> sqe = Sqe()  # defaults to `Sqe(1)`
+///    >>> io_uring_prep_read(sqe, ...)
+///    >>> sqe.user_data = 1
+///
+///    # multiple
+///    >>> sqe = Sqe(2)
+///    >>> io_uring_prep_write(sqe[0], ...)
+///    >>> sqe[0].user_data = 1
+///    >>> io_uring_prep_read(sqe[1], ...)
+///    >>> sqe[1].user_data = 2
+///
+///    # *** MUST DO ***
+///    >>> if io_uring_put_sqe(ring, sqe):
+///    ...     io_uring_submit(ring)
+///
+///Note
+///    - This class has dual usage:
+///        1. It works as a base class for `io_uring_get_sqe()` return.
+///        2. It can also be used as `sqe = Sqe(<int>)`, rather than "get" sqe(s)
+///        you are going to "put" pre-made sqe(s) into the ring later. Refer to
+///        `help(io_uring_put_sqe)` to see more detail.
+///    - `Sqe(no)` is limited to max `0-255` items.
 pub const Sqe = extern struct {
     _parent: SQE,
     _len: u8 = 0,
@@ -391,36 +380,6 @@ pub const Sqe = extern struct {
     const Self = @This();
 
     pub const __base__ = oz.base(SQE);
-
-    pub const __doc__: [*:0]const u8 =
-        \\IO submission data structure (Submission Queue Entry) (SQE)
-        \\
-        \\Example
-        \\    # single
-        \\    >>> sqe = io_uring_sqe()  # defaults to `io_uring_sqe(1)`
-        \\    >>> io_uring_prep_read(sqe, ...)
-        \\    >>> sqe.user_data = 1
-        \\
-        \\    # multiple
-        \\    >>> sqe = io_uring_sqe(2)
-        \\    >>> io_uring_prep_write(sqe[0], ...)
-        \\    >>> sqe[0].user_data = 1
-        \\    >>> io_uring_prep_read(sqe[1], ...)
-        \\    >>> sqe[1].user_data = 2
-        \\
-        \\    # *** MUST DO ***
-        \\    >>> if io_uring_put_sqe(ring, sqe):
-        \\    ...     io_uring_submit(ring)
-        \\
-        \\Note
-        \\    - `io_uring_sqe` is not the same as `io_uring_get_sqe()`.
-        \\    - This class has dual usage:
-        \\        1. It works as a base class for `io_uring_get_sqe()` return.
-        \\        2. It can also be used as `sqe = io_uring_sqe(<int>)`, rather than "get" sqe(s)
-        \\        you are going to "put" pre-made sqe(s) into the ring later. Refer to
-        \\        `help(io_uring_put_sqe)` to see more detail.
-        \\    - `io_uring_sqe(no)` is limited to max `0-255` items.
-    ;
 
     pub fn __new__(no: ?u8) ?Self {
         const _no = if (no) |n| n else 1; // no = null/None/1 == 1
@@ -471,7 +430,7 @@ pub const Probe = extern struct {
     const Self = @This();
 
     pub fn __new__() ?Self {
-        return oz.raiseNotImplementedError("`io_uring_probe()`");
+        return oz.raiseNotImplementedError("`Probe()`");
         // if (no) |_no| {
         //     if (_no > 0) {
         //         if (std.heap.c_allocator.alloc(c.io_uring_probe, _no)) |probe| {
@@ -494,12 +453,12 @@ pub const Probe = extern struct {
 
     pub fn get_last_op(self: *const Self) ?u8 {
         if (self._io_uring_probe) |p| return p.last_op;
-        return oz.raiseMemoryError("`io_uring_probe()` is null!");
+        return oz.raiseMemoryError("`Probe()` is null!");
     }
 
     pub fn get_ops_len(self: *const Self) ?u8 {
         if (self._io_uring_probe) |p| return p.ops_len;
-        return oz.raiseMemoryError("`io_uring_probe()` is null!");
+        return oz.raiseMemoryError("`Probe()` is null!");
     }
 };
 
@@ -510,40 +469,41 @@ pub const Param = extern struct {
 
     pub fn get_sq_entries(self: *const Self) ?u32 {
         if (self._io_uring_params) |p| return p.sq_entries;
-        return oz.raiseRuntimeError("`io_uring_params()` not initialized properly!");
+        return oz.raiseRuntimeError("`Param()` not initialized properly!");
     }
 
     pub fn get_cq_entries(self: *const Self) ?u32 {
         if (self._io_uring_params) |p| return p.cq_entries;
-        return oz.raiseRuntimeError("`io_uring_params()` not initialized properly!");
+        return oz.raiseRuntimeError("`Param()` not initialized properly!");
     }
 
     pub fn get_flags(self: *const Self) ?u32 {
         if (self._io_uring_params) |p| return p.flags;
-        return oz.raiseRuntimeError("`io_uring_params()` not initialized properly!");
+        return oz.raiseRuntimeError("`Param()` not initialized properly!");
     }
 
     pub fn get_sq_thread_cpu(self: *const Self) ?u32 {
         if (self._io_uring_params) |p| return p.sq_thread_cpu;
-        return oz.raiseRuntimeError("`io_uring_params()` not initialized properly!");
+        return oz.raiseRuntimeError("`Param()` not initialized properly!");
     }
 
     pub fn get_sq_thread_idle(self: *const Self) ?u32 {
         if (self._io_uring_params) |p| return p.sq_thread_idle;
-        return oz.raiseRuntimeError("`io_uring_params()` not initialized properly!");
+        return oz.raiseRuntimeError("`Param()` not initialized properly!");
     }
 
     pub fn get_features(self: *const Self) ?u32 {
         if (self._io_uring_params) |p| return p.features;
-        return oz.raiseRuntimeError("`io_uring_params()` not initialized properly!");
+        return oz.raiseRuntimeError("`Param()` not initialized properly!");
     }
 
     pub fn get_wq_fd(self: *const Self) ?u32 {
         if (self._io_uring_params) |p| return p.wq_fd;
-        return oz.raiseRuntimeError("`io_uring_params()` not initialized properly!");
+        return oz.raiseRuntimeError("`Param()` not initialized properly!");
     }
 };
 
+///RegWait
 pub const RegWait = extern struct {
     _io_uring_reg_wait: ?*c.io_uring_reg_wait = null,
 
@@ -554,6 +514,7 @@ pub const RegWait = extern struct {
     }
 };
 
+///Restriction
 pub const Restriction = extern struct {
     _len: usize = 0,
     _io_uring_restriction: ?[*]c.io_uring_restriction = null,
@@ -565,6 +526,7 @@ pub const Restriction = extern struct {
     }
 };
 
+///BufReg
 pub const BufReg = extern struct {
     _io_uring_buf_reg: ?*c.io_uring_buf_reg = null,
 
@@ -575,6 +537,7 @@ pub const BufReg = extern struct {
     }
 };
 
+///SyncCancelReg
 pub const SyncCancelReg = extern struct {
     _io_uring_sync_cancel_reg: ?*c.io_uring_sync_cancel_reg = null,
 
@@ -585,6 +548,7 @@ pub const SyncCancelReg = extern struct {
     }
 };
 
+///Napi
 pub const Napi = extern struct {
     _io_uring_napi: ?*c.io_uring_napi = null,
 
@@ -595,6 +559,7 @@ pub const Napi = extern struct {
     }
 };
 
+///ZcrxIfqReg
 pub const ZcrxIfqReg = extern struct {
     _io_uring_zcrx_ifq_reg: ?*c.io_uring_zcrx_ifq_reg = null,
 
@@ -605,6 +570,7 @@ pub const ZcrxIfqReg = extern struct {
     }
 };
 
+///ClockRegister
 pub const ClockRegister = extern struct {
     _io_uring_clock_register: ?*c.io_uring_clock_register = null,
 
@@ -615,6 +581,7 @@ pub const ClockRegister = extern struct {
     }
 };
 
+///Bpf
 pub const Bpf = extern struct {
     _io_uring_bpf: ?*c.io_uring_bpf = null,
 
@@ -625,6 +592,7 @@ pub const Bpf = extern struct {
     }
 };
 
+///SigsetT
 pub const SigsetT = extern struct {
     _sigset_t: ?*c.__sigset_t = null,
 
@@ -635,6 +603,7 @@ pub const SigsetT = extern struct {
     }
 };
 
+///MemRegionReg
 pub const MemRegionReg = extern struct {
     _io_uring_mem_region_reg: ?*c.io_uring_mem_region_reg = null,
 
@@ -645,11 +614,13 @@ pub const MemRegionReg = extern struct {
     }
 };
 
+///BufRing
 pub const BufRing = extern struct {
     _io_uring_buf_ring: [*]c.io_uring_buf_ring,
     // note: `io_uring_free_buf_ring()` should be called manually to free the memory.
 };
 
+///Cmsghdr
 pub const Cmsghdr = extern struct {
     _cmsghdr: *c.cmsghdr,
 
@@ -665,6 +636,7 @@ pub const Cmsghdr = extern struct {
     // }
 };
 
+///Msghdr
 pub const Msghdr = extern struct {
     _msghdr: *c.msghdr,
 
@@ -684,10 +656,12 @@ pub const Msghdr = extern struct {
     // }
 };
 
+///EpollEvent
 pub const EpollEvent = extern struct {
     _epoll_event: *c.epoll_event,
 };
 
+///RecvmsgOut
 pub const RecvmsgOut = extern struct {
     _recvmsg_out: *c.io_uring_recvmsg_out,
 
@@ -698,46 +672,43 @@ pub const RecvmsgOut = extern struct {
     // }
 };
 
+///How to Open a Path
+///
+///Example
+///    >>> how = OpenHow(O_CREAT | O_RDWR, 0o777, RESOLVE_CACHED)
+///    >>> io_uring_prep_openat2(..., how)
+///
+///    # or
+///
+///    >>> how = OpenHow()
+///    >>> how.flags   = O_CREAT | O_RDWR
+///    >>> how.mode    = 0
+///    >>> how.resolve = RESOLVE_CACHED
+///    >>> io_uring_prep_openat2(..., how)
+///
+///flags
+///    O_CREAT
+///    O_RDWR
+///    O_RDONLY
+///    O_WRONLY
+///    O_TMPFILE
+///    ...
+///
+///Resolve
+///    RESOLVE_BENEATH
+///    RESOLVE_IN_ROOT
+///    RESOLVE_NO_MAGICLINKS
+///    RESOLVE_NO_SYMLINKS
+///    RESOLVE_NO_XDEV
+///    RESOLVE_CACHED
+///
+///Note
+///    - `mode` is only to set when creating new or temp file.
+///    - You can use same `OpenHow()` reference if opening multiple files with same settings.
 pub const OpenHow = extern struct {
     _open_how: *c.open_how,
 
     const Self = @This();
-
-    pub const __doc__: [*:0]const u8 =
-        \\How to Open a Path
-        \\
-        \\Example
-        \\    >>> how = open_how(O_CREAT | O_RDWR, 0o777, RESOLVE_CACHED)
-        \\    >>> io_uring_prep_openat2(..., how)
-        \\
-        \\    # or
-        \\
-        \\    >>> how = open_how()
-        \\    >>> how.flags   = O_CREAT | O_RDWR
-        \\    >>> how.mode    = 0
-        \\    >>> how.resolve = RESOLVE_CACHED
-        \\    >>> io_uring_prep_openat2(..., how)
-        \\
-        \\flags
-        \\    O_CREAT
-        \\    O_RDWR
-        \\    O_RDONLY
-        \\    O_WRONLY
-        \\    O_TMPFILE
-        \\    ...
-        \\
-        \\Resolve
-        \\    RESOLVE_BENEATH
-        \\    RESOLVE_IN_ROOT
-        \\    RESOLVE_NO_MAGICLINKS
-        \\    RESOLVE_NO_SYMLINKS
-        \\    RESOLVE_NO_XDEV
-        \\    RESOLVE_CACHED
-        \\
-        \\Note
-        \\    - `mode` is only to set when creating new or temp file.
-        \\    - You can use same `open_how()` reference if opening multiple files with same settings.
-    ;
 
     pub fn __new__(flags: ?u64, mode: ?u64, resolve: ?u64) !OpenHow {
         const how: *c.open_how = try std.heap.c_allocator.create(c.open_how);
@@ -755,7 +726,7 @@ pub const OpenHow = extern struct {
     }
 
     pub fn __repr__(self: *const Self) [*:0]const u8 {
-        return oz.fmt("open_how(flags={}, mode={}, resolve={})", .{
+        return oz.fmt("OpenHow(flags={}, mode={}, resolve={})", .{
             self._open_how.flags,
             self._open_how.mode,
             self._open_how.resolve,

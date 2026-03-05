@@ -1,11 +1,11 @@
 .{
     .name = .liburing,
-    .version = "2026.3.4",
+    .version = "2026.3.5",
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
         .PyOZ = .{
-            .url = "https://github.com/pyozig/PyOZ/archive/refs/tags/v0.12.0.tar.gz",
-            .hash = "PyOZ-0.12.0-ntlpPsKLFwAague1IZwoTyqrhDuks8uD9oPMeY2EZ8rw",
+            .url = "https://github.com/pyozig/PyOZ/archive/refs/tags/v0.12.1.tar.gz",
+            .hash = "PyOZ-0.12.1-ntlpPs_QFwBp3dGeIawKDmexqEg-cTl96X3_j4Eq_pVV",
         },
         // .PyOZ = .{ .path = "../PyOZ" }, // local debug
     },

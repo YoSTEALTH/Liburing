@@ -1,10 +1,6 @@
 const c = @import("c.zig").c;
 const oz = @import("PyOZ");
 
-pub const Enums = .{
-    oz.enumDef("io_uring_op", io_uring_op),
-};
-
 pub const io_uring_op = enum(u8) {
     IORING_OP_NOP,
     IORING_OP_READV,

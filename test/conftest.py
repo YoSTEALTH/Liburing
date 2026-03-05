@@ -36,7 +36,7 @@ def tmp_dir():
 # liburing start >>>
 @pytest.fixture
 def ring():
-    ring = liburing.io_uring()
+    ring = liburing.Ring()
     try:
         liburing.io_uring_queue_init(1024, ring)
         yield ring
@@ -46,42 +46,50 @@ def ring():
 
 @pytest.fixture
 def cqe():
-    return liburing.io_uring_cqe()
+    return liburing.Cqe()
+
 
 # liburing end <<<
 
 
 # linux version start >>>
-LINUX_VERSION = f'{liburing.LINUX_VERSION_MAJOR}.{liburing.LINUX_VERSION_MINOR}'
+LINUX_VERSION = f"{liburing.LINUX_VERSION_MAJOR}.{liburing.LINUX_VERSION_MINOR}"
 
 
 @pytest.fixture(autouse=True)
 def skip_by_platform(request):
-    '''
-        Example
-            >>> @pytest.mark.skip_linux(6.7)
-            >>> def test_function():
-            ...
-            test.py::test_function SKIPPED (Linux `6.7 < 6.8`)
+    """
+    Example
+        >>> @pytest.mark.skip_linux(6.7)
+        >>> def test_function():
+        ...
+        test.py::test_function SKIPPED (Linux `6.7 < 6.8`)
 
-            >>> @pytest.mark.skip_linux(6.7, 'custom message')
-            >>> def test_function():
-            ...
-            test.py::test_function SKIPPED (custom message)
+        >>> @pytest.mark.skip_linux(6.7, 'custom message')
+        >>> def test_function():
+        ...
+        test.py::test_function SKIPPED (custom message)
 
-            >>> @pytest.mark.skip_linux('6.7', '')
-            >>> def test_function():
-            ...
-            test.py::test_function SKIPPED
-    '''
-    if r := request.node.get_closest_marker('skip_linux'):
+        >>> @pytest.mark.skip_linux('6.7', '')
+        >>> def test_function():
+        ...
+        test.py::test_function SKIPPED
+    """
+    if r := request.node.get_closest_marker("skip_linux"):
         if liburing.linux_version_check(version := r.args[0]):
-            msg = r.args[1] if len(r.args) > 1 else f'Kernel `{LINUX_VERSION} < {version}`'
+            msg = (
+                r.args[1]
+                if len(r.args) > 1
+                else f"Kernel `{LINUX_VERSION} < {version}`"
+            )
             pytest.skip(msg)
 
 
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
-        "skip_linux(version:str|float|int, message:str): skipping linux version not supported.")
-# # linux version end <<<
+        "skip_linux(version:str|float|int, message:str): skipping linux version not supported.",
+    )
+
+
+# linux version end <<<

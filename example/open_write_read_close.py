@@ -1,66 +1,3 @@
-# Liburing (Work in Process...)
-
-Liburing is Python + Zig wrapper around C Liburing, which is a helper to setup and tear-down io_uring instances.
-
-- Fast & scalable asynchronous I/O (storage, networking, ...) interface.
-- io_uring reduces number of syscalls overhead & context switches, thus improving speed.
-
-Good(old) documentation [Lord of the io_uring]https://unixism.net/loti/
-
-
-## Requires
- - Linux 6.11+
- - Python 3.10+
-
-## Includes (battery)
- - C liburing 2.15
-
-
-## Install, update & uninstall (Alpha):
-
-Use [pip]https://pip.pypa.io/en/stable/getting-started/ to install, upgrade & uninstall Python wrapper:
-
-```bash
-python3 -m pip install liburing             # install
-
-python3 -m pip install --upgrade liburing   # upgrade
-
-python3 -m pip uninstall liburing           # uninstall
-```
-
-## Install directly from GitHub:
-
-```bash
-python3 -m pip install --upgrade git+https://github.com/YoSTEALTH/Liburing
-```
-
-## To find out all the class, functions and definitions:
-
-```python
-import liburing
-
-# To see all the importable names (this will not load all the modules)
-print(dir(liburing))
-
-# To see all the help docs (this will load all the modules.)
-help(liburing)
-```
-
-## Find out which `io_uring` operations is supported by the kernel:
-
-```python
-# example/probe.py
-import liburing
-
-for k, v in liburing.probe().items():
-    print(k, v)
-
-```
-
-## Simple File Example:
-
-```python
-# example/open_write_read_close.py.py
 from liburing import O_CREAT, O_RDWR, Ring, Cqe, io_uring_get_sqe, \
                      io_uring_prep_open, io_uring_prep_write, io_uring_prep_read, \
                      io_uring_prep_close, io_uring_submit, io_uring_wait_cqe, \
@@ -134,12 +71,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-```
-
-## Check Out:
-<!-- - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
-- [PyOZ](https://github.com/dzonerzy/PyOZ)
-
-## License:
-Free, Public Domain (CC0). [Read more](https://github.com/YoSTEALTH/Liburing/blob/dev/LICENSE.txt)
