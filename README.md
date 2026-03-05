@@ -26,12 +26,6 @@ python3 -m pip install --upgrade liburing   # upgrade
 python3 -m pip uninstall liburing           # uninstall
 ```
 
-### Install directly from GitHub
-
-```bash
-python3 -m pip install --upgrade git+https://github.com/YoSTEALTH/Liburing
-```
-
 ### To find out all the class, functions and definitions
 
 ```python
@@ -145,3 +139,26 @@ if __name__ == '__main__':
 
 ### License
 Free, Public Domain (CC0). [Read more](https://github.com/YoSTEALTH/Liburing/blob/dev/LICENSE.txt)
+
+### Install directly from GitHub
+
+```bash
+# Note:
+#   - Make sure you have Zig 0.15.2 installed on your system.
+#   - Change bellow code to your Python setup.
+
+python3 -m pip install --upgrade pyoz
+
+cd /tmp
+
+git clone --recurse-submodules https://github.com/YoSTEALTH/Liburing
+
+cd Liburing
+
+python3 -m pyoz build
+
+python3 -m pip install dist/*.whl
+
+# To Uninstall
+python3 -m pip uninstall liburing
+```
