@@ -45,9 +45,9 @@ help(liburing)
 ```
 
 ### Find out which `io_uring` operations is supported by the kernel
-`example/probe.py`
-```python
 
+```python
+# example/probe.py
 import liburing
 
 for k, v in liburing.probe().items():
@@ -56,9 +56,9 @@ for k, v in liburing.probe().items():
 ```
 
 ### Simple File Example
-`example/open_write_read_close.py.py`
-```python
 
+```python
+# example/open_write_read_close.py
 from liburing import O_CREAT, O_RDWR, Ring, Cqe, io_uring_get_sqe, \
                      io_uring_prep_open, io_uring_prep_write, io_uring_prep_read, \
                      io_uring_prep_close, io_uring_submit, io_uring_wait_cqe, \
