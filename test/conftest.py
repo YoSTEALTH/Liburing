@@ -77,11 +77,7 @@ def skip_by_platform(request):
     """
     if r := request.node.get_closest_marker("skip_linux"):
         if liburing.linux_version_check(version := r.args[0]):
-            msg = (
-                r.args[1]
-                if len(r.args) > 1
-                else f"Kernel `{LINUX_VERSION} < {version}`"
-            )
+            msg = r.args[1] if len(r.args) > 1 else f"Kernel `{LINUX_VERSION} < {version}`"
             pytest.skip(msg)
 
 

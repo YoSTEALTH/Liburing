@@ -37,6 +37,9 @@ Issues = "https://github.com/YoSTEALTH/Liburing/issues"
 [project.optional-dependencies]
 test = ["pytest"]
 
+[tool.ruff]
+line-length = 120
+
 [tool.pyoz]
 # Path to your Zig source file
 module-path = "src/liburing/root.zig"
