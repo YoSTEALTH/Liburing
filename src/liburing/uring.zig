@@ -5,9 +5,8 @@ const oz = @import("PyOZ");
 const std = @import("std");
 const class = @import("class.zig");
 const Statx = @import("statx.zig").Statx;
+const AT_FDCWD = @import("const.zig").AT_FDCWD;
 const Sockaddr = @import("socket.zig").Sockaddr;
-
-const AT_FDCWD = std.os.linux.AT.FDCWD;
 
 const IntStr = union(enum) {
     Int: *c_int,
@@ -90,7 +89,7 @@ pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) ?i32
 }
 
 ///Setup `Ring` Submission & Completion Queues
-///    
+///
 ///Example
 ///    >>> ring = Ring()
 ///    >>> try:
@@ -307,19 +306,7 @@ pub fn io_uring_register_files(ring: *Ring, files: oz.ListView(i32), tags: ?u64)
         _tags,
         @intCast(files.len()),
     ));
-} // TODO: not sure if this works! needs to be tested
-// fn registerFiles(ring: *Ring, files: oz.ListView(i32), tags: ?u64) ?i32 {
-//     const _tags: u64 = if (tags) |t| t else 0;
-//     const _len = files.len();
-//     const _data = oz.py.c.PyList_GetSlice(files.py_list, 0, @intCast(_len));
-
-//     return e.trap_error(c.io_uring_register_files_tags(
-//         ring._io_uring,
-//         @ptrCast(_data),
-//         _tags,
-//         @intCast(_len),
-//     ));
-// } // TODO: not sure if this works! needs to be tested
+}
 
 pub fn io_uring_register_files_sparse(ring: *Ring, nr: u32) ?i32 {
     return e.trap_error(c.io_uring_register_files_sparse(ring._io_uring, nr));
@@ -986,27 +973,13 @@ pub inline fn io_uring_prep_close_direct(sqe: *SQE, file_index: u32) void {
 ///    ... ...
 ///    >>> buf
 ///    bytearray(b'hi...')
-///    
+///
 ///Warning
 ///    - Coded but not tested!!!
 pub inline fn io_uring_prep_read(sqe: *SQE, fd: i32, buf: oz.Bytes, offset: ?u64) ?void {
     const _offset = offset orelse 0;
     c.io_uring_prep_read(sqe._sqe, fd, @ptrCast(@constCast(buf.data)), @intCast(buf.data.len), _offset);
 }
-// pub inline fn io_uring_prep_read(args: oz.Args(struct{sqe: *SQE, fd: i32, buf: *oz.py.PyObject, offset: u64 = 0})) ?void {
-//     const arg = args.value;
-//     const msg = "`io_uring_prep_read` - `buf` type not supported, only `bytes`, `bytearray`, `memoryview`";
-//     // const _offset = offset orelse 0;
-
-//     // check if bytes, bytearray or memoryview
-//     if (oz.py.PyBytes_Check(arg.buf) | oz.py.PyByteArray_Check(arg.buf) | oz.py.PyMemoryView_Check(arg.buf)) {
-//         const length: c_uint = @intCast(oz.py.c.PyObject_Length(arg.buf)); // length of byte string.
-
-//         if (oz.py.c.PyLong_AsVoidPtr(arg.buf)) |ptr| {
-//             c.io_uring_prep_read(arg.sqe._sqe, arg.fd, ptr, length, arg.offset);
-//         } else return null;
-//     } else return oz.raiseTypeError(msg);
-// }
 
 ///Note
 ///    - Function arguments position has changed for C origin for better usability.
@@ -1025,31 +998,19 @@ pub inline fn io_uring_prep_read_multishot(sqe: *SQE, fd: i32, buf_group: i32, n
 ///    ... ...
 ///    >>> cqe.res
 ///    5
-///    
+///
 ///Warning
 ///    - Coded but not tested!!!
 pub inline fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: oz.Bytes, offset: ?u64) ?void {
-    // const msg = "`io_uring_prep_write` - `buf` type not supported, only `bytes`, `bytearray`, `memoryview`";
     const _offset = offset orelse 0;
     c.io_uring_prep_write(sqe._sqe, fd, @ptrCast(buf.data), @intCast(buf.data.len), _offset);
 }
-// inline fn prepWrite(sqe: *SQE, fd: i32, buf: *oz.py.PyObject, offset: ?u64) ?void {
-//     const msg = "`io_uring_prep_write` - `buf` type not supported, only `bytes`, `bytearray`, `memoryview`";
-//     const _offset = offset orelse 0;
 
-//     // check if bytes, bytearray or memoryview
-//     if (oz.py.PyBytes_Check(buf) | oz.py.PyByteArray_Check(buf) | oz.py.PyMemoryView_Check(buf)) {
-//         const length: c_uint = @intCast(oz.py.c.PyObject_Length(buf)); // length of byte string.
-
-//         if (oz.py.c.PyLong_AsVoidPtr(buf)) |ptr| {
-//             c.io_uring_prep_write(sqe._sqe, fd, ptr, length, _offset);
-//         } else return null;
-//     } else return oz.raiseTypeError(msg);
-// }
-
+///Statx
+///
 ///Type
-///    sqe:    io_uring_sqe
-///    stat:   statx
+///    sqe:    SQE
+///    stat:   Statx
 ///    path:   str
 ///    flags:  int
 ///    mask:   int
@@ -1675,7 +1636,7 @@ pub fn io_uring_get_sqe(ring: *Ring) ?Sqe {
 //     return null; // None
 // }
 
-///Liburing Version Major 
+///Liburing Version Major
 ///
 ///Note
 ///    - `io_uring_major_version` has been renamed to `liburing_version_major`
@@ -1683,7 +1644,7 @@ pub inline fn liburing_version_major() i32 {
     return c.io_uring_major_version();
 }
 
-///Liburing Version Minor 
+///Liburing Version Minor
 ///
 ///Note
 ///    - `io_uring_minor_version` has been renamed to `liburing_version_minor`

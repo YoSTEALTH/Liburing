@@ -8,7 +8,7 @@ def test_io_uring_prep_statx(tmp_dir, ring, cqe):
     file_path = tmp_dir / "statx_test.txt"
     file_path.write_text("hi... bye!")
 
-    statx = liburing.statx()
+    statx = liburing.Statx()
     assert statx.mask == 0
     assert statx.blksize == 0
     assert statx.attributes == 0
@@ -42,7 +42,7 @@ def test_io_uring_prep_statx(tmp_dir, ring, cqe):
     assert statx.issock is False
 
     sqe = liburing.io_uring_get_sqe(ring)
-    with pytest.raises(OverflowError):
+    with pytest.raises(TypeError):
         liburing.io_uring_prep_statx(sqe, statx, file_path, 0, -1)
     liburing.io_uring_prep_statx(
         sqe,

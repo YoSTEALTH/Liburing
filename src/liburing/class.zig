@@ -57,10 +57,10 @@ pub const Iovec = extern struct {
         } else if (oz.py.PyList_Check(data) | oz.py.PyTuple_Check(data)) { // list[bytes, ...] | tuple[...]
             _len = @intCast(oz.py.c.PyObject_Length(data)); // length of sequence.
             if (_len == -1) return oz.raiseTypeError(msg);
-            if (_len == 0) return oz.raiseValueError("`iovec(data)` - received `0` length sequence!");
+            if (_len == 0) return oz.raiseValueError("`Iovec(data)` - received `0` length sequence!");
             if (_len > std.posix.IOV_MAX) {
                 return oz.raiseValueError(oz.fmt(
-                    "`iovec(data)` - length of {d} exceeds `IOV_MAX` limit set by OS of {d}",
+                    "`Iovec(data)` - length of {d} exceeds `IOV_MAX` limit set by OS of {d}",
                     .{ _len, std.posix.IOV_MAX },
                 ));
             }

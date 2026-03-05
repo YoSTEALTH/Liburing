@@ -23,12 +23,6 @@ def test_timespec():
     assert ts.sec == 1
     assert ts.nsec == 500_000
 
-    # class
     with raises(MemoryError):
-        ts = liburing.kernel_timespec()
+        ts = liburing.Timespec()
         assert ts.sec == 123
-
-    # TODO: test bottom with io_uring
-    # ts = liburing.timespec(-1.87)
-
-    # assert False

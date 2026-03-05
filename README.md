@@ -5,20 +5,18 @@ Liburing is Python + Zig wrapper around C Liburing, which is a helper to setup a
 - Fast & scalable asynchronous I/O (storage, networking, ...) interface.
 - io_uring reduces number of syscalls overhead & context switches, thus improving speed.
 
-Good(old) documentation [Lord of the io_uring]https://unixism.net/loti/
+Good(old) documentation [Lord of the io_uring](https://unixism.net/loti/)
 
-
-## Requires
+### Requires
  - Linux 6.11+
  - Python 3.10+
 
-## Includes (battery)
- - C liburing 2.15
+### Includes (battery)
+ - C liburing 2.15+
 
+### Install, update & uninstall (Alpha)
 
-## Install, update & uninstall (Alpha):
-
-Use [pip]https://pip.pypa.io/en/stable/getting-started/ to install, upgrade & uninstall Python wrapper:
+Use [pip](https://pip.pypa.io/en/stable/getting-started/) to install, upgrade & uninstall Python wrapper
 
 ```bash
 python3 -m pip install liburing             # install
@@ -28,28 +26,28 @@ python3 -m pip install --upgrade liburing   # upgrade
 python3 -m pip uninstall liburing           # uninstall
 ```
 
-## Install directly from GitHub:
+### Install directly from GitHub
 
 ```bash
 python3 -m pip install --upgrade git+https://github.com/YoSTEALTH/Liburing
 ```
 
-## To find out all the class, functions and definitions:
+### To find out all the class, functions and definitions
 
 ```python
 import liburing
 
-# To see all the importable names (this will not load all the modules)
+# To see all the importable names
 print(dir(liburing))
 
-# To see all the help docs (this will load all the modules.)
+# To see all the help docs
 help(liburing)
 ```
 
-## Find out which `io_uring` operations is supported by the kernel:
-
+### Find out which `io_uring` operations is supported by the kernel
+`example/probe.py`
 ```python
-# example/probe.py
+
 import liburing
 
 for k, v in liburing.probe().items():
@@ -57,10 +55,10 @@ for k, v in liburing.probe().items():
 
 ```
 
-## Simple File Example:
-
+### Simple File Example
+`example/open_write_read_close.py.py`
 ```python
-# example/open_write_read_close.py.py
+
 from liburing import O_CREAT, O_RDWR, Ring, Cqe, io_uring_get_sqe, \
                      io_uring_prep_open, io_uring_prep_write, io_uring_prep_read, \
                      io_uring_prep_close, io_uring_submit, io_uring_wait_cqe, \
@@ -137,9 +135,13 @@ if __name__ == '__main__':
 
 ```
 
-## Check Out:
-<!-- - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
-- [PyOZ](https://github.com/dzonerzy/PyOZ)
+### Note
+ - This project has been moved to using Zig as back-end, thus leading to breaking changes from previous release.
+ - Try using latest Linux if possible to enable all `io_uring` features.
 
-## License:
+### Check Out
+<!-- - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
+- [PyOZ](https://pyoz.dev/)
+
+### License
 Free, Public Domain (CC0). [Read more](https://github.com/YoSTEALTH/Liburing/blob/dev/LICENSE.txt)
