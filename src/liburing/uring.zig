@@ -542,23 +542,10 @@ pub inline fn io_uring_cqe_get_data(cqe: *CQE) ?*oz.py.PyObject {
     if (data == null) return null;
     defer oz.py.Py_DecRef(data);
     return data;
-    // return oz.raiseValueError("`io_uring_cqe_get_data()` - `cqe` is `null`");
-
-    // if (cqe._cqe) |q| {
-    //     const ptr: ?*anyopaque = c.io_uring_cqe_get_data(q); // NOTE: This can return garbage data!
-    //     if (ptr == null) return oz.raiseValueError("`io_uring_cqe_get_data()` - received `null`");
-    //     const data: ?*oz.py.PyObject = oz.py.c.PyLong_FromVoidPtr(ptr);
-    //     if (data == null) return null;
-    //     defer oz.py.Py_DecRef(data);
-    //     return data;
-    // }
-    // return oz.raiseValueError("`io_uring_cqe_get_data()` - `cqe` is `null`");
 }
 
 ///>>> io_uring_sqe_set_data64(sqe, 123)
 pub inline fn io_uring_sqe_set_data64(sqe: *SQE, data: u64) ?void {
-    // TODO: remove this later!
-    // if (data == 0) return oz.raiseValueError("`io_uring_sqe_set_data64(sqe, 0)` - `sqe.user_data` can not be set to `0`");
     c.io_uring_sqe_set_data64(sqe._sqe, data);
 }
 
@@ -643,7 +630,14 @@ pub inline fn io_uring_prep_read_fixed(sqe: *SQE, fd: i32, buffer: *oz.PyObject,
 ///
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_readv_fixed(sqe: *SQE, fd: i32, buffer: *oz.PyObject, buf_index: i32, offset: ?u64, flags: ?i32) ?void {
+pub inline fn io_uring_prep_readv_fixed(
+    sqe: *SQE,
+    fd: i32,
+    buffer: *oz.PyObject,
+    buf_index: i32,
+    offset: ?u64,
+    flags: ?i32,
+) ?void {
     const _offset = offset orelse 0;
     const _flags = flags orelse 0;
     if (Iovec.__new__(buffer)) |iov| {
@@ -697,7 +691,14 @@ pub inline fn io_uring_prep_write_fixed(sqe: *SQE, fd: i32, buffer: *oz.PyObject
 ///
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_writev_fixed(sqe: *SQE, fd: i32, buffer: *oz.PyObject, buf_index: i32, offset: ?u64, flags: ?i32) ?void {
+pub inline fn io_uring_prep_writev_fixed(
+    sqe: *SQE,
+    fd: i32,
+    buffer: *oz.PyObject,
+    buf_index: i32,
+    offset: ?u64,
+    flags: ?i32,
+) ?void {
     const _offset = offset orelse 0;
     const _flags = flags orelse 0;
     if (Iovec.__new__(buffer)) |iov| {
@@ -746,7 +747,13 @@ pub inline fn io_uring_prep_poll_remove(sqe: *SQE, user_data: u64) ?void {
 
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_poll_update(sqe: *SQE, old_user_data: u64, new_user_data: u64, poll_mask: u32, flags: ?u32) void {
+pub inline fn io_uring_prep_poll_update(
+    sqe: *SQE,
+    old_user_data: u64,
+    new_user_data: u64,
+    poll_mask: u32,
+    flags: ?u32,
+) void {
     const _flags = flags orelse 0;
     c.io_uring_prep_poll_update(sqe._sqe, old_user_data, new_user_data, poll_mask, _flags);
 }
@@ -835,7 +842,15 @@ pub inline fn io_uring_prep_multishot_accept(sqe: *SQE, fd: i32, addr: ?*Sockadd
 ///    - Coded but not tested!!!
 pub inline fn io_uring_prep_multishot_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) void {
     const _flags = flags orelse 0;
-    if (addr) |a| return c.io_uring_prep_multishot_accept_direct(sqe._sqe, fd, @ptrFromInt(a._sockaddr), a._socklen, _flags);
+    if (addr) |a| {
+        return c.io_uring_prep_multishot_accept_direct(
+            sqe._sqe,
+            fd,
+            @ptrFromInt(a._sockaddr),
+            a._socklen,
+            _flags,
+        );
+    }
     c.io_uring_prep_multishot_accept_direct(sqe._sqe, fd, null, null, _flags);
 }
 
@@ -1146,7 +1161,14 @@ pub inline fn io_uring_prep_send_zc(sqe: *SQE, sockfd: i32, buf: oz.Bytes, flags
 ///
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_send_zc_fixed(sqe: *SQE, sockfd: i32, buf: oz.Bytes, buf_index: ?u32, flags: ?i32, zc_flags: ?u32) void {
+pub inline fn io_uring_prep_send_zc_fixed(
+    sqe: *SQE,
+    sockfd: i32,
+    buf: oz.Bytes,
+    buf_index: ?u32,
+    flags: ?i32,
+    zc_flags: ?u32,
+) void {
     c.io_uring_prep_send_zc_fixed(
         sqe._sqe,
         sockfd,
@@ -1289,7 +1311,14 @@ pub inline fn io_uring_prep_unlink(sqe: *SQE, path: oz.Path, flags: ?i32, dfd: ?
 ///
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_rename(sqe: *SQE, oldpath: oz.Path, newpath: oz.Path, flags: ?u32, olddfd: ?i32, newdfd: ?i32) void {
+pub inline fn io_uring_prep_rename(
+    sqe: *SQE,
+    oldpath: oz.Path,
+    newpath: oz.Path,
+    flags: ?u32,
+    olddfd: ?i32,
+    newdfd: ?i32,
+) void {
     const _flags = flags orelse 0;
     const _olddfd = olddfd orelse AT_FDCWD;
     const _newdfd = newdfd orelse AT_FDCWD;
@@ -1335,7 +1364,14 @@ pub inline fn io_uring_prep_symlink(sqe: *SQE, target: oz.Path, linkpath: oz.Pat
 ///
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_link(sqe: *SQE, oldpath: oz.Path, newpath: oz.Path, flags: ?i32, olddfd: ?i32, newdfd: ?i32) void {
+pub inline fn io_uring_prep_link(
+    sqe: *SQE,
+    oldpath: oz.Path,
+    newpath: oz.Path,
+    flags: ?i32,
+    olddfd: ?i32,
+    newdfd: ?i32,
+) void {
     const _olddfd = olddfd orelse AT_FDCWD;
     const _newdfd = newdfd orelse AT_FDCWD;
     const _flags = flags orelse 0;
@@ -1344,7 +1380,14 @@ pub inline fn io_uring_prep_link(sqe: *SQE, oldpath: oz.Path, newpath: oz.Path, 
 
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_msg_ring_cqe_flags(sqe: *SQE, fd: i32, len: u32, data: u64, flags: u32, cqe_flags: u32) void {
+pub inline fn io_uring_prep_msg_ring_cqe_flags(
+    sqe: *SQE,
+    fd: i32,
+    len: u32,
+    data: u64,
+    flags: u32,
+    cqe_flags: u32,
+) void {
     c.io_uring_prep_msg_ring_cqe_flags(sqe._sqe, fd, len, data, flags, cqe_flags);
 }
 
@@ -1356,7 +1399,14 @@ pub inline fn io_uring_prep_msg_ring(sqe: *SQE, fd: i32, len: u32, data: u64, fl
 
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_msg_ring_fd(sqe: *SQE, fd: i32, source_fd: i32, target_fd: i32, data: u64, flags: ?u32) void {
+pub inline fn io_uring_prep_msg_ring_fd(
+    sqe: *SQE,
+    fd: i32,
+    source_fd: i32,
+    target_fd: i32,
+    data: u64,
+    flags: ?u32,
+) void {
     c.io_uring_prep_msg_ring_fd(sqe._sqe, fd, source_fd, target_fd, data, flags orelse 0);
 }
 
@@ -1374,7 +1424,14 @@ pub inline fn io_uring_prep_getxattr(sqe: *SQE, name: [*]const u8, value: [*]u8,
 
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_setxattr(sqe: *SQE, name: [*]const u8, value: [*]u8, path: oz.Path, flags: i32, len: u32) void {
+pub inline fn io_uring_prep_setxattr(
+    sqe: *SQE,
+    name: [*]const u8,
+    value: [*]u8,
+    path: oz.Path,
+    flags: i32,
+    len: u32,
+) void {
     c.io_uring_prep_setxattr(
         sqe._sqe,
         name,
@@ -1410,7 +1467,14 @@ pub inline fn io_uring_prep_socket(sqe: *SQE, domain: i32, @"type": i32, protoco
 ///
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_socket_direct(sqe: *SQE, domain: i32, Type: i32, protocol: ?i32, file_index: ?u32, flags: ?u32) void {
+pub inline fn io_uring_prep_socket_direct(
+    sqe: *SQE,
+    domain: i32,
+    Type: i32,
+    protocol: ?i32,
+    file_index: ?u32,
+    flags: ?u32,
+) void {
     const _flags = flags orelse 0;
     const _protocol = protocol orelse 0;
     const _file_index = file_index orelse c.IORING_FILE_INDEX_ALLOC;
@@ -1474,7 +1538,14 @@ pub inline fn io_uring_prep_cmd_getsockname(sqe: *SQE) ?void {
 
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_waitid(sqe: *SQE, idtype: c.idtype_t, id: c.id_t, infop: *SigsetT, options: i32, flags: ?u32) void {
+pub inline fn io_uring_prep_waitid(
+    sqe: *SQE,
+    idtype: c.idtype_t,
+    id: c.id_t,
+    infop: *SigsetT,
+    options: i32,
+    flags: ?u32,
+) void {
     const _flags = flags orelse 0;
     c.io_uring_prep_waitid(sqe._sqe, idtype, id, @ptrCast(infop._sigset_t), options, _flags);
 }
@@ -1482,7 +1553,14 @@ pub inline fn io_uring_prep_waitid(sqe: *SQE, idtype: c.idtype_t, id: c.id_t, in
 // TODO:
 // ///Warning
 // ///    - Coded but not tested!!!
-// pub inline fn io_uring_prep_futex_wake(sqe: *SQE, futex: *const u32, val: u64, mask: u64, futex_flags: ?u32, flags: ?u32) void {
+// pub inline fn io_uring_prep_futex_wake(
+//     sqe: *SQE,
+//     futex: *const u32,
+//     val: u64,
+//     mask: u64,
+//     futex_flags: ?u32,
+//     flags: ?u32,
+// ) void {
 //     const _flags = flags orelse 0;
 //     const _futex_flas = futex_flags orelse 0;
 //     c.io_uring_prep_futex_wake(sqe._sqe, futex._futex, val, mask, _futex_flas, _flags);
@@ -1599,7 +1677,14 @@ pub inline fn io_uring_buf_ring_init(br: *BufRing) void {
 
 pub inline fn io_uring_buf_ring_add(br: *BufRing, addr: oz.Bytes, bid: u16, mask: i32, buf_offset: ?i32) void {
     const _buf_offset = buf_offset orelse 0;
-    c.io_uring_buf_ring_add(br._io_uring_buf_ring, @ptrCast(@constCast(addr.data)), @intCast(addr.data.len), bid, mask, _buf_offset);
+    c.io_uring_buf_ring_add(
+        br._io_uring_buf_ring,
+        @ptrCast(@constCast(addr.data)),
+        @intCast(addr.data.len),
+        bid,
+        mask,
+        _buf_offset,
+    );
 }
 
 pub inline fn io_uring_buf_ring_advance(br: *BufRing, count: i32) void {
