@@ -157,10 +157,8 @@ pub const Timespec = extern struct {
 pub const Ring = extern struct {
     _io_uring: ?*c.io_uring,
 
-    pub fn __new__() ?Ring {
-        const io_uring: *c.io_uring = std.heap.c_allocator.create(c.io_uring) catch {
-            return oz.raiseMemoryError("`Ring()` - Out of Memory!");
-        };
+    pub fn __new__() !Ring {
+        const io_uring: *c.io_uring = try std.heap.c_allocator.create(c.io_uring);
         io_uring.* = std.mem.zeroes(c.io_uring); // set default value to `0`
         return .{ ._io_uring = io_uring };
     }
@@ -260,6 +258,8 @@ pub const Cqe = extern struct {
         return oz.raiseIndexError("`io_uring_cqe` - out of completed entries");
     }
 };
+
+// TODO: Merge `CqeIter` into `Cqe`
 
 ///Example
 ///    >>> for i in CqeIter(ring, cqe):
