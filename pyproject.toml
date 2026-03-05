@@ -48,7 +48,7 @@ module-name = "liburing"
 py-packages = ["liburing"]
 
 # Optimization level for release builds: "Debug", "ReleaseSafe", "ReleaseFast", "ReleaseSmall"
-optimize = "Debug"
+optimize = "ReleaseSafe"
 
 # Strip debug symbols in release builds
 # strip = true
