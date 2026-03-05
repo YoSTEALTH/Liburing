@@ -5,32 +5,25 @@ const std = @import("std");
 
 const AF = std.os.linux.AF;
 
-pub const Classes = .{
-    oz.class("sockaddr", Sockaddr),
-};
-
+///Generic Socket Address.
+///
+///Example
+///    >>> addr = Sockaddr(AF_UNIX, b'./path')
+///    >>> addr = Sockaddr(AF_INET, b'0.0.0.0', 12345)
+///    >>> addr = Sockaddr(AF_INET6, b'::1', 12345)
+///    >>> bind(sockfd, addr)
+///
+///Note
+///    - IPv6 `scope_id` can be added like so `b"ff01::fb%123"`
+///    - `Sockaddr()` is low level setup, letting you serve/connect directly using path/ip.
+///    If you need higher level features you can use `getaddrinfo()` this lets you connect
+///    using domain names, ...
 pub const Sockaddr = extern struct {
     _family: c.sa_family_t,
     _socklen: c.socklen_t,
     _sockaddr: usize, // *c.sockaddr pointer as int
 
     const Self = @This();
-
-    pub const __doc__: [*:0]const u8 =
-        \\Generic Socket Address.
-        \\
-        \\Example
-        \\    >>> addr = sockaddr(AF_UNIX, b'./path')
-        \\    >>> addr = sockaddr(AF_INET, b'0.0.0.0', 12345)
-        \\    >>> addr = sockaddr(AF_INET6, b'::1', 12345)
-        \\    >>> bind(sockfd, addr)
-        \\
-        \\Note
-        \\    - IPv6 `scope_id` can be added like so `b"ff01::fb%123"`
-        \\    - `sockaddr()` is low level setup, letting you serve/connect directly using path/ip.
-        \\    If you need higher level features you can use `getaddrinfo()` this lets you connect
-        \\    using domain names, ...
-    ;
 
     pub fn __new__(family: c.sa_family_t, addr: []const u8, port: ?u16) ?Self {
         var socklen: c.socklen_t = undefined;

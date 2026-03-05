@@ -22,6 +22,7 @@ pub fn build(b: *std.Build) !void {
         .imports = &.{.{ .name = "PyOZ", .module = pyoz_dep.module("PyOZ") }},
     });
 
+    // If not already compiled compile C liburing.
     std.fs.cwd().access(static_path, .{}) catch |e| switch (e) {
         error.FileNotFound => {
             try runCmd(b.allocator, &.{"./configure"}, "lib/liburing");
@@ -62,13 +63,6 @@ pub fn build(b: *std.Build) !void {
         .root_module = bridge_mod,
     });
 
-    // Link libc (required for Python C API)
-    // lib.linkLibC();
-
-    // Link libc (required for Python C API)
-    // lib.root_module.link_libc = true;
-    // lib.root_module.addIncludePath(b.path("lib/liburing/src/include"));
-
     // Install the shared library
     const install = b.addInstallArtifact(lib, .{ .dest_sub_path = "liburing.so" });
     b.getInstallStep().dependOn(&install.step);
@@ -78,6 +72,5 @@ fn runCmd(allocator: std.mem.Allocator, argv: []const []const u8, cwd: []const u
     const output = try std.process.Child.run(.{ .allocator = allocator, .argv = argv, .cwd = cwd });
     defer allocator.free(output.stderr);
     defer allocator.free(output.stdout);
-
     if (output.term.Exited != 0) return error.CommandFailed;
 }

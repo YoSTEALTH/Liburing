@@ -3,33 +3,27 @@ const c = @import("c.zig").c;
 const oz = @import("PyOZ");
 const std = @import("std");
 
-pub const Classes = .{
-    oz.class("statx", Statx),
-};
-
+///Statx - Structures for the extended file attribute retrieval system call `statx()`.
+///
+///Example
+///    >>> stat = Statx()
+///    >>> if sqe := io_uring_get_sqe(ring)
+///    ...     io_uring_prep_statx(sqe, stat, __file__)
+///    ... ...
+///    >>> stat.isfile
+///    True
+///    >>> stat.size
+///    123
+///
+///Note
+///    - For more information visit:
+///        https://man7.org/linux/man-pages/man2/statx.2.html
+///        https://man7.org/linux/man-pages/man7/inode.7.html
 pub const Statx = struct {
     _statx: ?*c.struct_statx,
 
     const Self = @This();
 
-    pub const __doc__: [*:0]const u8 =
-        \\Statx - Structures for the extended file attribute retrieval system call `statx()`.
-        \\
-        \\Example
-        \\    >>> stat = statx()
-        \\    >>> if sqe := io_uring_get_sqe(ring)
-        \\    ...     io_uring_prep_statx(sqe, stat, __file__)
-        \\    ... ...
-        \\    >>> stat.isfile
-        \\    True
-        \\    >>> stat.size
-        \\    123
-        \\
-        \\Note
-        \\    - For more information visit:
-        \\        https://man7.org/linux/man-pages/man2/statx.2.html
-        \\        https://man7.org/linux/man-pages/man7/inode.7.html
-    ;
     pub fn __new__() ?Self {
         const statx = std.heap.c_allocator.create(c.struct_statx) catch {
             return oz.raiseMemoryError("`statx()` - Out of Memory!");
@@ -183,65 +177,63 @@ pub const Statx = struct {
     }
 };
 
-pub const Constants = .{
-    oz.constant("STATX_TYPE", c.STATX_TYPE),
-    oz.constant("STATX_MODE", c.STATX_MODE),
-    oz.constant("STATX_NLINK", c.STATX_NLINK),
-    oz.constant("STATX_UID", c.STATX_UID),
-    oz.constant("STATX_GID", c.STATX_GID),
-    oz.constant("STATX_ATIME", c.STATX_ATIME),
-    oz.constant("STATX_MTIME", c.STATX_MTIME),
-    oz.constant("STATX_CTIME", c.STATX_CTIME),
-    oz.constant("STATX_INO", c.STATX_INO),
-    oz.constant("STATX_SIZE", c.STATX_SIZE),
-    oz.constant("STATX_BLOCKS", c.STATX_BLOCKS),
-    oz.constant("STATX_BASIC_STATS", c.STATX_BASIC_STATS),
-    oz.constant("STATX_BTIME", c.STATX_BTIME),
-    oz.constant("STATX_MNT_ID", c.STATX_MNT_ID),
-    oz.constant("STATX_DIOALIGN", c.STATX_DIOALIGN),
+pub const STATX_TYPE = c.STATX_TYPE;
+pub const STATX_MODE = c.STATX_MODE;
+pub const STATX_NLINK = c.STATX_NLINK;
+pub const STATX_UID = c.STATX_UID;
+pub const STATX_GID = c.STATX_GID;
+pub const STATX_ATIME = c.STATX_ATIME;
+pub const STATX_MTIME = c.STATX_MTIME;
+pub const STATX_CTIME = c.STATX_CTIME;
+pub const STATX_INO = c.STATX_INO;
+pub const STATX_SIZE = c.STATX_SIZE;
+pub const STATX_BLOCKS = c.STATX_BLOCKS;
+pub const STATX_BASIC_STATS = c.STATX_BASIC_STATS;
+pub const STATX_BTIME = c.STATX_BTIME;
+pub const STATX_MNT_ID = c.STATX_MNT_ID;
+pub const STATX_DIOALIGN = c.STATX_DIOALIGN;
 
-    oz.constant("STATX_ALL", c.STATX_ALL),
+pub const STATX_ALL = c.STATX_ALL;
 
-    oz.constant("STATX_ATTR_COMPRESSED", c.STATX_ATTR_COMPRESSED),
-    oz.constant("STATX_ATTR_IMMUTABLE", c.STATX_ATTR_IMMUTABLE),
-    oz.constant("STATX_ATTR_APPEND", c.STATX_ATTR_APPEND),
-    oz.constant("STATX_ATTR_NODUMP", c.STATX_ATTR_NODUMP),
-    oz.constant("STATX_ATTR_ENCRYPTED", c.STATX_ATTR_ENCRYPTED),
-    oz.constant("STATX_ATTR_AUTOMOUNT", c.STATX_ATTR_AUTOMOUNT),
-    oz.constant("STATX_ATTR_MOUNT_ROOT", c.STATX_ATTR_MOUNT_ROOT),
-    oz.constant("STATX_ATTR_VERITY", c.STATX_ATTR_VERITY),
-    oz.constant("STATX_ATTR_DAX", c.STATX_ATTR_DAX),
+pub const STATX_ATTR_COMPRESSED = c.STATX_ATTR_COMPRESSED;
+pub const STATX_ATTR_IMMUTABLE = c.STATX_ATTR_IMMUTABLE;
+pub const STATX_ATTR_APPEND = c.STATX_ATTR_APPEND;
+pub const STATX_ATTR_NODUMP = c.STATX_ATTR_NODUMP;
+pub const STATX_ATTR_ENCRYPTED = c.STATX_ATTR_ENCRYPTED;
+pub const STATX_ATTR_AUTOMOUNT = c.STATX_ATTR_AUTOMOUNT;
+pub const STATX_ATTR_MOUNT_ROOT = c.STATX_ATTR_MOUNT_ROOT;
+pub const STATX_ATTR_VERITY = c.STATX_ATTR_VERITY;
+pub const STATX_ATTR_DAX = c.STATX_ATTR_DAX;
 
-    oz.constant("S_IFMT", c.S_IFMT),
+pub const S_IFMT = c.S_IFMT;
 
-    oz.constant("S_IFSOCK", c.S_IFSOCK),
-    oz.constant("S_IFLNK", c.S_IFLNK),
-    oz.constant("S_IFREG", c.S_IFREG),
-    oz.constant("S_IFBLK", c.S_IFBLK),
-    oz.constant("S_IFDIR", c.S_IFDIR),
-    oz.constant("S_IFCHR", c.S_IFCHR),
-    oz.constant("S_IFIFO", c.S_IFIFO),
+pub const S_IFSOCK = c.S_IFSOCK;
+pub const S_IFLNK = c.S_IFLNK;
+pub const S_IFREG = c.S_IFREG;
+pub const S_IFBLK = c.S_IFBLK;
+pub const S_IFDIR = c.S_IFDIR;
+pub const S_IFCHR = c.S_IFCHR;
+pub const S_IFIFO = c.S_IFIFO;
 
-    oz.constant("S_ISUID", c.S_ISUID),
-    oz.constant("S_ISGID", c.S_ISGID),
-    oz.constant("S_ISVTX", c.S_ISVTX),
+pub const S_ISUID = c.S_ISUID;
+pub const S_ISGID = c.S_ISGID;
+pub const S_ISVTX = c.S_ISVTX;
 
-    oz.constant("S_IRWXU", c.S_IRWXU),
-    oz.constant("S_IRUSR", c.S_IRUSR),
-    oz.constant("S_IWUSR", c.S_IWUSR),
-    oz.constant("S_IXUSR", c.S_IXUSR),
+pub const S_IRWXU = c.S_IRWXU;
+pub const S_IRUSR = c.S_IRUSR;
+pub const S_IWUSR = c.S_IWUSR;
+pub const S_IXUSR = c.S_IXUSR;
 
-    oz.constant("S_IRWXG", c.S_IRWXG),
-    oz.constant("S_IRGRP", c.S_IRGRP),
-    oz.constant("S_IWGRP", c.S_IWGRP),
-    oz.constant("S_IXGRP", c.S_IXGRP),
+pub const S_IRWXG = c.S_IRWXG;
+pub const S_IRGRP = c.S_IRGRP;
+pub const S_IWGRP = c.S_IWGRP;
+pub const S_IXGRP = c.S_IXGRP;
 
-    oz.constant("S_IRWXO", c.S_IRWXO),
-    oz.constant("S_IROTH", c.S_IROTH),
-    oz.constant("S_IWOTH", c.S_IWOTH),
-    oz.constant("S_IXOTH", c.S_IXOTH),
-    oz.constant("AT_STATX_SYNC_TYPE", std.os.linux.AT.STATX_SYNC_TYPE), // skipping: not documented
-    oz.constant("AT_STATX_SYNC_AS_STAT", std.os.linux.AT.STATX_SYNC_AS_STAT),
-    oz.constant("AT_STATX_FORCE_SYNC", std.os.linux.AT.STATX_FORCE_SYNC),
-    oz.constant("AT_STATX_DONT_SYNC", std.os.linux.AT.STATX_DONT_SYNC),
-};
+pub const S_IRWXO = c.S_IRWXO;
+pub const S_IROTH = c.S_IROTH;
+pub const S_IWOTH = c.S_IWOTH;
+pub const S_IXOTH = c.S_IXOTH;
+pub const AT_STATX_SYNC_TYPE = std.os.linux.AT.STATX_SYNC_TYPE; // skipping: not document
+pub const AT_STATX_SYNC_AS_STAT = std.os.linux.AT.STATX_SYNC_AS_STAT;
+pub const AT_STATX_FORCE_SYNC = std.os.linux.AT.STATX_FORCE_SYNC;
+pub const AT_STATX_DONT_SYNC = std.os.linux.AT.STATX_DONT_SYNC;

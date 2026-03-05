@@ -6,26 +6,19 @@ const std = @import("std");
 
 const Timespec = @import("class.zig").Timespec;
 
-pub const Functions = .{
-    oz.func("probe", probe, probeDoc),
-    oz.func("timespec", timespec, timespecDoc),
-};
-
-const probeDoc =
-    \\Probe your system to find out which `io_uring` operations are available.
-    \\
-    \\Example
-    \\    >>> probe()
-    \\    {'IORING_OP_NOP': True, ...}
-    \\
-    \\    # or
-    \\
-    \\    >>> for op, supported in probe().items():
-    \\    ...     op, supported
-    \\    IORING_OP_NOP True
-    \\
-; // probe()
-fn probe() ?oz.Dict([]const u8, bool) {
+///Probe your system to find out which `io_uring` operations are available.
+///
+///Example
+///    >>> probe()
+///    {'IORING_OP_NOP': True, ...}
+///
+///    # or
+///
+///    >>> for op, supported in probe().items():
+///    ...     op, supported
+///    IORING_OP_NOP True
+///
+pub fn probe() ?oz.Dict([]const u8, bool) {
     const last: usize = @intFromEnum(n.io_uring_op.IORING_OP_LAST);
     const items = std.meta.fields(n.io_uring_op);
     var entries: [last]oz.Dict([]const u8, bool).Entry = undefined;
@@ -41,14 +34,13 @@ fn probe() ?oz.Dict([]const u8, bool) {
     return oz.raiseRuntimeError("Linux kernel version does not support `probe()`");
 }
 
-const timespecDoc =
-    \\Kernel Timespec
-    \\
-    \\Example
-    \\    >>> ts = timespec(1)        # int
-    \\    >>> ts = timespec(1.5)      # float
-    \\    >>> io_uring_prep_timeout(sqe, ts, ...)
-;
+///Kernel Timespec
+///
+///Example
+///    >>> ts = timespec(1)        # int
+///    >>> ts = timespec(1.5)      # float
+///    >>> io_uring_prep_timeout(sqe, ts, ...)
+///
 pub fn timespec(second: f64) ?Timespec {
     var ts = std.heap.c_allocator.create(c.__kernel_timespec) catch {
         return oz.raiseMemoryError("`timespec()` - Out of Memory!");
