@@ -506,7 +506,7 @@ pub inline fn io_uring_cqe_iter_init(ring: *Ring) CqeIter {
 ///Note
 ///    - Only `cqe[0]` gets updated with new completed entry value.
 ///    - Getting iter is low level and very touchy must be used as shown in example.
-///    - Consider using `io_uring_cqe_iter` instead, in `for` loop.
+///    - Consider using `CqeIter` instead, in `for` loop.
 pub inline fn io_uring_cqe_iter_next(iter: *CqeIter, cqe: *Cqe) bool {
     return c.io_uring_cqe_iter_next(&iter._io_uring_cqe_iter, &cqe._io_uring_cqe);
 }

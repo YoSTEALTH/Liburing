@@ -252,14 +252,11 @@ pub const Cqe = extern struct {
 
     pub fn __getitem__(self: *const Cqe, index: usize) ?CQE {
         if (self._io_uring_cqe) |cqe| {
-            // if (cqe[index].user_data == 0) return oz.raiseIndexError("index out of range!"); // TODO: should remove.
             return .{ ._cqe = &cqe[index] };
         }
-        return oz.raiseIndexError("`io_uring_cqe` - out of completed entries");
+        return oz.raiseIndexError("`Cqe` - out of completed entries");
     }
 };
-
-// TODO: Merge `CqeIter` into `Cqe`
 
 ///Example
 ///    >>> for i in CqeIter(ring, cqe):
@@ -267,6 +264,7 @@ pub const Cqe = extern struct {
 ///
 ///Note
 ///    - Only `cqe[0]` gets updated with new completed entry value.
+// pub const CqeIter = extern struct {
 pub const CqeIter = extern struct {
     _io_uring_cqe_iter: c.io_uring_cqe_iter,
     _index: usize = 0,
