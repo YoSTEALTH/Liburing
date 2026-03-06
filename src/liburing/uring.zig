@@ -983,17 +983,14 @@ pub inline fn io_uring_prep_close_direct(sqe: *SQE, file_index: u32) void {
 ///    >>> sqe = io_uring_get_sqe(ring)
 ///    >>> io_uring_prep_read(sqe, fd, buf)
 ///    ... ...
-///    >>> cqe.res
+///    >>> cqe[0].res
 ///    5
 ///    ... ...
 ///    >>> buf
 ///    bytearray(b'hi...')
-///
-///Warning
-///    - Coded but not tested!!!
-pub inline fn io_uring_prep_read(sqe: *SQE, fd: i32, buf: oz.Bytes, offset: ?u64) ?void {
+pub inline fn io_uring_prep_read(sqe: *SQE, fd: i32, buf: oz.ByteArray, offset: ?u64) ?void {
     const _offset = offset orelse 0;
-    c.io_uring_prep_read(sqe._sqe, fd, @ptrCast(@constCast(buf.data)), @intCast(buf.data.len), _offset);
+    c.io_uring_prep_read(sqe._sqe, fd, @ptrCast(buf.data), @intCast(buf.data.len), _offset);
 }
 
 ///Note
@@ -1013,9 +1010,6 @@ pub inline fn io_uring_prep_read_multishot(sqe: *SQE, fd: i32, buf_group: i32, n
 ///    ... ...
 ///    >>> cqe.res
 ///    5
-///
-///Warning
-///    - Coded but not tested!!!
 pub inline fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: oz.Bytes, offset: ?u64) ?void {
     const _offset = offset orelse 0;
     c.io_uring_prep_write(sqe._sqe, fd, @ptrCast(buf.data), @intCast(buf.data.len), _offset);
