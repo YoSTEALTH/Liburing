@@ -193,7 +193,7 @@ pub const STATX_BTIME = c.STATX_BTIME;
 pub const STATX_MNT_ID = c.STATX_MNT_ID;
 pub const STATX_DIOALIGN = c.STATX_DIOALIGN;
 
-pub const STATX_ALL = c.STATX_ALL;
+// note: STATX_ALL is depreciated, use: `STATX_BASIC_STATS | STATX_BTIME`
 
 pub const STATX_ATTR_COMPRESSED = c.STATX_ATTR_COMPRESSED;
 pub const STATX_ATTR_IMMUTABLE = c.STATX_ATTR_IMMUTABLE;
@@ -233,6 +233,7 @@ pub const S_IRWXO = c.S_IRWXO;
 pub const S_IROTH = c.S_IROTH;
 pub const S_IWOTH = c.S_IWOTH;
 pub const S_IXOTH = c.S_IXOTH;
+
 pub const AT_STATX_SYNC_TYPE = std.os.linux.AT.STATX_SYNC_TYPE; // skipping: not document
 pub const AT_STATX_SYNC_AS_STAT = std.os.linux.AT.STATX_SYNC_AS_STAT;
 pub const AT_STATX_FORCE_SYNC = std.os.linux.AT.STATX_FORCE_SYNC;
