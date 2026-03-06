@@ -299,11 +299,10 @@ pub fn io_uring_unregister_buffers(ring: *Ring) ?i32 {
 ///Warning
 ///    - Coded but not tested!!!
 pub fn io_uring_register_files(ring: *Ring, files: oz.ListView(i32), tags: ?u64) ?i32 {
-    const _tags: u64 = if (tags) |t| t else 0;
     return e.trap_error(c.io_uring_register_files_tags(
         ring._io_uring,
         @ptrCast(files.py_list),
-        _tags,
+        tags orelse 0,
         @intCast(files.len()),
     ));
 }
@@ -1293,8 +1292,6 @@ pub inline fn io_uring_prep_shutdown(sqe: *SQE, fd: i32, how: i32) void {
 ///    - Function arguments position has changed for C origin for better usability.
 ///    - `io_uring_prep_unlink` includes `io_uring_prep_unlinkat` feature.
 ///
-///Warning
-///    - Coded but not tested!!!
 pub inline fn io_uring_prep_unlink(sqe: *SQE, path: oz.Path, flags: ?i32, dfd: ?i32) void {
     c.io_uring_prep_unlinkat(sqe._sqe, dfd orelse AT_FDCWD, @ptrCast(path.path), flags orelse 0);
 }
