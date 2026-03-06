@@ -260,11 +260,10 @@ pub const Cqe = extern struct {
 
 ///Example
 ///    >>> for i in CqeIter(ring, cqe):
-///    >>>     cqe[0].user_data == i  # do stuff
+///    ...     cqe[0].user_data == i  # do stuff
 ///
 ///Note
 ///    - Only `cqe[0]` gets updated with new completed entry value.
-// pub const CqeIter = extern struct {
 pub const CqeIter = extern struct {
     _io_uring_cqe_iter: c.io_uring_cqe_iter,
     _index: usize = 0,
