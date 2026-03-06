@@ -7,14 +7,14 @@ Liburing is Python + Zig wrapper around C Liburing, which is a helper to setup a
 
 Good(old) documentation [Lord of the io_uring](https://unixism.net/loti/)
 
-### Requires
+## Requires
  - Linux 6.11+
  - Python 3.10+
 
-### Includes (battery)
+## Includes (battery)
  - C liburing 2.15+
 
-### Install, update & uninstall (Alpha)
+## Install, update & uninstall (Alpha)
 
 Use [pip](https://pip.pypa.io/en/stable/getting-started/) to install, upgrade & uninstall Python wrapper
 
@@ -26,7 +26,30 @@ python3 -m pip install --upgrade liburing   # upgrade
 python3 -m pip uninstall liburing           # uninstall
 ```
 
-### To find out all the class, functions and definitions
+## To compile & install directly from GitHub
+
+```bash
+# Note:
+#   - Make sure you have Zig 0.15.2 installed on your system.
+#   - Change bellow code to your Python setup.
+
+python3 -m pip install --upgrade pyoz
+
+cd /tmp
+
+git clone --recurse-submodules https://github.com/YoSTEALTH/Liburing
+
+cd Liburing
+
+python3 -m pyoz build
+
+python3 -m pip install dist/*.whl
+
+# To Uninstall
+python3 -m pip uninstall liburing pyoz
+```
+
+## To find out all the class, functions and definitions
 
 ```python
 import liburing
@@ -38,7 +61,7 @@ print(dir(liburing))
 help(liburing)
 ```
 
-### Find out which `io_uring` operations is supported by the kernel
+## Find out which `io_uring` operations is supported by the kernel
 
 ```python
 # example/probe.py
@@ -49,7 +72,7 @@ for k, v in liburing.probe().items():
 
 ```
 
-### Simple File Example
+## Simple File Example
 
 ```python
 # example/open_write_read_close.py
@@ -129,36 +152,13 @@ if __name__ == '__main__':
 
 ```
 
-### Note
+## Note
  - This project has been moved to using Zig as back-end, thus leading to breaking changes from previous release.
  - Try using latest Linux if possible to enable all `io_uring` features.
 
-### Check Out
+## Check Out
 <!-- - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
 - [PyOZ](https://pyoz.dev/)
 
-### License
+## License
 Free, Public Domain (CC0). [Read more](https://github.com/YoSTEALTH/Liburing/blob/dev/LICENSE.txt)
-
-### Install directly from GitHub
-
-```bash
-# Note:
-#   - Make sure you have Zig 0.15.2 installed on your system.
-#   - Change bellow code to your Python setup.
-
-python3 -m pip install --upgrade pyoz
-
-cd /tmp
-
-git clone --recurse-submodules https://github.com/YoSTEALTH/Liburing
-
-cd Liburing
-
-python3 -m pyoz build
-
-python3 -m pip install dist/*.whl
-
-# To Uninstall
-python3 -m pip uninstall liburing
-```

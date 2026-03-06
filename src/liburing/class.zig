@@ -42,7 +42,7 @@ pub const Iovec = extern struct {
     pub fn __new__(data: *oz.PyObject) ?Self {
         var length: usize = undefined; // base data length.
         var _len: usize = undefined;
-        const msg = "`iovec(data)` type not supported!";
+        const msg = "`Iovec(data)` type not supported!";
 
         // check if bytes, bytearray or memoryview
         if (oz.py.PyBytes_Check(data) | oz.py.PyByteArray_Check(data) | oz.py.PyMemoryView_Check(data)) {
@@ -52,7 +52,7 @@ pub const Iovec = extern struct {
             if (std.heap.c_allocator.alloc(c.iovec, _len)) |iovec| {
                 iovec[0].iov_base = data;
                 iovec[0].iov_len = length;
-                return .{ ._len = _len, ._iovec = iovec.ptr };
+                return .{ ._len = _len, ._iovec = iovec.ptr }; // success
             } else |_| return oz.raiseMemoryError("Out of Memory!");
         } else if (oz.py.PyList_Check(data) | oz.py.PyTuple_Check(data)) { // list[bytes, ...] | tuple[...]
             _len = @intCast(oz.py.c.PyObject_Length(data)); // length of sequence.
@@ -79,7 +79,7 @@ pub const Iovec = extern struct {
                     std.heap.c_allocator.free(iovec[0.._len]);
                     return null;
                 }
-                return .{ ._len = _len, ._iovec = iovec.ptr }; // good
+                return .{ ._len = _len, ._iovec = iovec.ptr }; // success
             } else |_| return oz.raiseMemoryError("Out of Memory!");
         }
         return oz.raiseTypeError(msg);

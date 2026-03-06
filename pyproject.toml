@@ -6,7 +6,7 @@ build-backend = "pyoz.backend"
 name = "liburing"
 readme = "README.md"
 license = "CC0-1.0"
-version = "2026.3.5"
+version = "2026.3.6"
 authors = [{name="Ritesh"}]
 keywords = ["python", "socket", "async", "cython", "file", "python3", "io", "syscall", "futex", "statx",
             "io-uring", "uring", "liburing"]
@@ -41,6 +41,8 @@ test = ["pytest"]
 line-length = 120
 
 [tool.pyoz]
+abi3 = true
+
 # Path to your Zig source file
 module-path = "src/liburing/root.zig"
 

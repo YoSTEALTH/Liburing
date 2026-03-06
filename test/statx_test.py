@@ -3,7 +3,7 @@ import pytest
 import liburing
 
 
-@pytest.mark.skip_linux('5.6')
+@pytest.mark.skip_linux("5.6")
 def test_io_uring_prep_statx(tmp_dir, ring, cqe):
     file_path = tmp_dir / "statx_test.txt"
     file_path.write_text("hi... bye!")
@@ -45,11 +45,7 @@ def test_io_uring_prep_statx(tmp_dir, ring, cqe):
     with pytest.raises(TypeError):
         liburing.io_uring_prep_statx(sqe, statx, file_path, 0, -1)
     liburing.io_uring_prep_statx(
-        sqe,
-        statx,
-        file_path,
-        liburing.AT_STATX_FORCE_SYNC,
-        liburing.STATX_BASIC_STATS | liburing.STATX_BTIME,
+        sqe, statx, file_path, liburing.AT_STATX_FORCE_SYNC, liburing.STATX_BASIC_STATS | liburing.STATX_BTIME
     )
     sqe.user_data = 1
 
