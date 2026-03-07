@@ -13,8 +13,6 @@ const IntStr = union(enum) {
     Str: []u8,
 };
 
-// TODO: const sigset_t = std.posix.sigset_t;
-
 const SyncCancelReg = class.SyncCancelReg;
 const ClockRegister = class.ClockRegister;
 const MemRegionReg = class.MemRegionReg;
@@ -50,11 +48,7 @@ const Bpf = class.Bpf;
 ///Note
 ///    - Don't forget to call `io_uring_free_probe(probe)` after you are done with `probe`.
 pub fn io_uring_get_probe_ring(ring: *Ring) ?Probe {
-    if (c.io_uring_get_probe_ring(ring._io_uring)) |p| {
-        return .{ ._io_uring_probe = p };
-        // return .{ ._parent = .{ ._probe = p }, ._len = 1, ._io_uring_probe = p };
-        // return .{ ._parent = .{._probe = @ptrCast(p[0])}, ._len=1, ._io_uring_probe = p };
-    }
+    if (c.io_uring_get_probe_ring(ring._io_uring)) |p| return .{ ._io_uring_probe = p };
     return oz.raiseRuntimeError("Linux kernel version does not support `io_uring_get_probe_ring()`");
 }
 
@@ -247,15 +241,14 @@ pub fn io_uring_clone_buffers_offset(
     ));
 }
 
-pub fn io_uring_clone_buffers(dst_ring: *Ring, src_ring: *Ring, flags: ?c_uint) ?i32 {
-    const _flags = flags orelse 0;
-    return e.trap_error(c.__io_uring_clone_buffers(dst_ring._io_uring, src_ring._io_uring, _flags));
+pub fn io_uring_clone_buffers(dst_ring: *Ring, src_ring: *Ring, flags: ?u32) ?i32 {
+    return e.trap_error(c.__io_uring_clone_buffers(dst_ring._io_uring, src_ring._io_uring, flags orelse 0));
 }
 
 ///Note
 ///    - `io_uring_register_buffers` includes `io_uring_register_buffers_tags`
 pub fn io_uring_register_buffers(ring: *Ring, iovecs: *const Iovec, tags: ?u64) ?i32 {
-    const _tags = if (tags) |t| t else 0;
+    const _tags = tags orelse 0;
     return e.trap_error(c.io_uring_register_buffers_tags(ring._io_uring, iovecs._iovec, _tags, @intCast(iovecs._len)));
 }
 
@@ -581,23 +574,19 @@ pub inline fn io_uring_prep_tee(sqe: *SQE, fd_in: i32, fd_out: i32, nbytes: u32,
 }
 
 ///Example
-///    >>> buffer = [bytearray(5), bytearray(4)]
-///    >>> io_uring_prep_readv(sqe, fd, buffer)
+///    >>> buffer = [bytearray(6), bytearray(4)]
+///    >>> iovec = Iovec(buffer)
+///    >>> io_uring_prep_readv(sqe, fd, iovec)
 ///    ...
 ///    >>> buffer
-///    [bytearray(b"hi..."), bytearray(b"bye!")]
+///    [bytearray(b"hi... "), bytearray(b"bye!")]
 ///
 ///Note
 ///    - `io_uring_prep_readv` includes `io_uring_prep_readv2` feature as well.
-///
-///Warning
-///    - Coded but not tested!!!
-pub inline fn io_uring_prep_readv(sqe: *SQE, fd: i32, buffer: *oz.PyObject, offset: ?u64, flags: ?i32) ?void {
+pub inline fn io_uring_prep_readv(sqe: *SQE, fd: i32, iovec: Iovec, offset: ?u64, flags: ?i32) ?void {
     const _offset = offset orelse 0;
     const _flags = flags orelse 0;
-    if (Iovec.__new__(buffer)) |iovec| {
-        c.io_uring_prep_readv2(sqe._sqe, fd, iovec._iovec, @intCast(iovec._len), _offset, _flags);
-    } else return null; // raised error.
+    c.io_uring_prep_readv2(sqe._sqe, fd, iovec._iovec, @intCast(iovec._len), _offset, _flags);
 }
 
 ///Example
@@ -610,19 +599,16 @@ pub inline fn io_uring_prep_readv(sqe: *SQE, fd: i32, buffer: *oz.PyObject, offs
 ///
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_read_fixed(sqe: *SQE, fd: i32, buffer: *oz.PyObject, buf_index: i32, offset: ?u64) ?void {
+pub inline fn io_uring_prep_read_fixed(sqe: *SQE, fd: i32, buff: oz.ByteArray, buf_index: i32, offset: ?u64) ?void {
     const _offset = offset orelse 0;
-    if (Iovec.__new__(buffer)) |iov| {
-        if (iov._iovec) |v| {
-            c.io_uring_prep_read_fixed(sqe._sqe, fd, v[0].iov_base, @intCast(v[0].iov_len), _offset, buf_index);
-        } else return null; // raised error. TODO: should raise proper error
-    } else return null; // raised error.
+    c.io_uring_prep_read_fixed(sqe._sqe, fd, @ptrCast(buff.data), @intCast(buff.data.len), _offset, buf_index);
 }
 
 ///Example
 ///    >>> # `buf_index` = registered IO buffer
 ///    >>> buffer = [bytearray(5), bytearray(4)]
-///    >>> io_uring_prep_readv_fixed(sqe, fd, buffer, buf_index)
+///    >>> iovec = Iovec(buffer)
+///    >>> io_uring_prep_readv_fixed(sqe, fd, iovec, buf_index)
 ///    ...
 ///    >>> buffer
 ///    [bytearray(b"hi..."), bytearray(b"bye!")]
@@ -632,77 +618,68 @@ pub inline fn io_uring_prep_read_fixed(sqe: *SQE, fd: i32, buffer: *oz.PyObject,
 pub inline fn io_uring_prep_readv_fixed(
     sqe: *SQE,
     fd: i32,
-    buffer: *oz.PyObject,
+    iovec: Iovec,
     buf_index: i32,
     offset: ?u64,
     flags: ?i32,
 ) ?void {
     const _offset = offset orelse 0;
     const _flags = flags orelse 0;
-    if (Iovec.__new__(buffer)) |iov| {
-        c.io_uring_prep_readv_fixed(sqe._sqe, fd, iov._iovec, @intCast(iov._len), _offset, _flags, buf_index);
-    } else return null; // raised error.
+    c.io_uring_prep_readv_fixed(sqe._sqe, fd, iovec._iovec, @intCast(iovec._len), _offset, _flags, buf_index);
 }
 
 ///Example
-///    >>> buffer = [b'hi...'), b'bye!']
-///    >>> io_uring_prep_writev(sqe, fd, buffer)
+///    >>> buffer = [b'hi... '), b'bye!']
+///    >>> iovec = Iovec(buffer)
+///    >>> io_uring_prep_writev(sqe, fd, iovec)
 ///    ... ...
-///    >>> cqe.res
-///    9
+///    >>> cqe[0].res
+///    10
 ///
 ///Note
 ///    - `io_uring_prep_writev` includes `io_uring_prep_writev2` feature as well.
-///
-///Warning
-///    - Coded but not tested!!!
-pub inline fn io_uring_prep_writev(sqe: *SQE, fd: i32, buffer: *oz.PyObject, offset: ?u64, flags: ?i32) ?void {
+pub inline fn io_uring_prep_writev(sqe: *SQE, fd: i32, iovec: Iovec, offset: ?u64, flags: ?i32) ?void {
     const _offset = offset orelse 0;
     const _flags = flags orelse 0;
-    if (Iovec.__new__(buffer)) |iovec| {
-        c.io_uring_prep_writev2(sqe._sqe, fd, iovec._iovec, @intCast(iovec._len), _offset, _flags);
-    } else return null; // raised error.
+    c.io_uring_prep_writev2(sqe._sqe, fd, iovec._iovec, @intCast(iovec._len), _offset, _flags);
 }
 
 ///Example
 ///    >>> # `buf_index` = registered IO buffer
 ///    >>> io_uring_prep_write_fixed(sqe, fd, b'hi...', buf_index)
 ///    ... ...
-///    >>> cqe.res
+///    >>> cqe[0].res
 ///    5
 ///
 ///Warning
 ///    - Coded but not tested!!!
-pub inline fn io_uring_prep_write_fixed(sqe: *SQE, fd: i32, buffer: *oz.PyObject, buf_index: i32, offset: ?u64) ?void {
+pub inline fn io_uring_prep_write_fixed(sqe: *SQE, fd: i32, buff: oz.Bytes, buf_index: i32, offset: ?u64) ?void {
     const _offset = offset orelse 0;
-    if (Iovec.__new__(buffer)) |iov| {
-        c.io_uring_prep_write_fixed(sqe._sqe, fd, iov._iovec, @intCast(iov._len), _offset, buf_index);
-    } else return null; // raised error.
+    c.io_uring_prep_write_fixed(sqe._sqe, fd, @ptrCast(buff.data), @intCast(buff.data.len), _offset, buf_index);
 }
 
 ///Example
 ///    >>> # `buf_index` = registered IO buffer
-///    >>> buffer = [bytearray(b"hi..."), bytearray(b"bye!")]
-///    >>> io_uring_prep_writev_fixed(sqe, fd, buffer, buf_index)
+///    >>> buffer = [b"hi... ", b"bye!"]
+///    >>> iovec = Iovec(buffer)
+///    >>> io_uring_prep_writev_fixed(sqe, fd, iovec, buf_index)
 ///    ...
-///    >>> cqe.res
-///    9
+///    >>> cqe[0].res
+///    10
 ///
 ///Warning
 ///    - Coded but not tested!!!
 pub inline fn io_uring_prep_writev_fixed(
     sqe: *SQE,
     fd: i32,
-    buffer: *oz.PyObject,
+    iovec: Iovec,
     buf_index: i32,
     offset: ?u64,
     flags: ?i32,
 ) ?void {
     const _offset = offset orelse 0;
     const _flags = flags orelse 0;
-    if (Iovec.__new__(buffer)) |iov| {
-        c.io_uring_prep_writev_fixed(sqe._sqe, fd, iov._iovec, @intCast(iov._len), _offset, _flags, buf_index);
-    } else return null; // TODO: raised error.
+    c.io_uring_prep_writev_fixed(sqe._sqe, fd, iovec._iovec, @intCast(iovec._len), _offset, _flags, buf_index);
 }
 
 ///Warning
@@ -934,9 +911,6 @@ pub inline fn io_uring_prep_fallocate(sqe: *SQE, fd: i32, mode: i32, offset: u64
 ///Note
 ///    - Function argument `dfd` has been moved to end from how it is in C function.
 ///    - `io_uring_prep_open` includes `io_uring_prep_openat` as well.
-///
-///Warning
-///    - Coded but not tested!!!
 pub inline fn io_uring_prep_open(sqe: *SQE, path: oz.Path, flags: ?i32, mode: ?c.mode_t, dfd: ?i32) void {
     const _dfd = dfd orelse AT_FDCWD;
     const _mode = mode orelse 0o777;
