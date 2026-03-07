@@ -1,6 +1,6 @@
-# Liburing (Work in Process...)
+# Liburing (Work in Process...) [![Python](https://img.shields.io/badge/python-3.10--3.14-blue)](https://www.python.org/) [![Zig](https://img.shields.io/badge/zig-0.15.2-orange)](https://ziglang.org/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/liburing)] [![Test status](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml) 
 
-Liburing is Python + Zig wrapper around C Liburing, which is a helper to setup and tear-down io_uring instances.
+Liburing is Python + Zig wrapper around [C Liburing](https://github.com/axboe/Liburing), which is a helper to setup and tear-down io_uring instances.
 
 - Fast & scalable asynchronous I/O (storage, networking, ...) interface.
 - io_uring reduces number of syscalls overhead & context switches, thus improving speed.
