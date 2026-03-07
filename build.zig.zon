@@ -1,6 +1,6 @@
 .{
     .name = .liburing,
-    .version = "2026.3.6",
+    .version = "2026.3.7",
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
         .PyOZ = .{
