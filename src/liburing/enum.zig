@@ -71,3 +71,12 @@ pub const io_uring_op = enum(u8) {
     // /* this goes last, obviously */
     IORING_OP_LAST,
 };
+
+pub const io_uring_socket_op = enum(u8) {
+    SOCKET_URING_OP_SIOCINQ,
+    SOCKET_URING_OP_SIOCOUTQ,
+    SOCKET_URING_OP_GETSOCKOPT,
+    SOCKET_URING_OP_SETSOCKOPT,
+    SOCKET_URING_OP_TX_TIMESTAMP,
+    SOCKET_URING_OP_GETSOCKNAME,
+};
