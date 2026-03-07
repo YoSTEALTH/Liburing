@@ -5,30 +5,18 @@ const std = @import("std");
 
 ///Vector I/O data structure
 ///
-///Type
-///    buffers: Union[bytes, bytearray, memoryview, List[...], Tuple[...]]
-///    return:  None
-///
 ///Example
-///    # read single
-///    # -----------
-///    >>> iov_read = Iovec(bytearray(11))
+////   # Read
+///    # ----
+///    >>> buffer = [bytearray(1), bytearray(2), bytearray(3)]
+///    >>> iov_read = Iovec(buffer)
 ///    >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
 ///
-///    # read multiple
-///    # -------------
-///    >>> iov_read = Iovec([bytearray(1), bytearray(2), bytearray(3)])
-///    >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
-///
-///    # write single
-///    # ------------
-///    >>> iov_write = Iovec(b'hello world')
-///    >>> io_uring_prep_readv(sqe, fd, iov_write, ...)
-///
-///    # write multiple
-///    # --------------
-///    >>> iov_write = Iovec([b'1', b'22', b'333'])
-///    >>> io_uring_prep_readv(sqe, fd, iov_write, ...)
+///    # Write
+///    # -----
+///    >>> buffer = [b'1', b'22', b'333']
+///    >>> iov_write = Iovec(buffer)
+///    >>> io_uring_prep_writev(sqe, fd, iov_write, ...)
 ///
 ///Note
 ///    - Make sure to hold on to variable you are passing into `Iovec` so it does not get
@@ -39,50 +27,25 @@ pub const Iovec = extern struct {
 
     const Self = @This();
 
-    pub fn __new__(data: *oz.PyObject) ?Self {
-        var length: usize = undefined; // base data length.
-        var _len: usize = undefined;
-        const msg = "`Iovec(data)` type not supported!";
-
-        // check if bytes, bytearray or memoryview
-        if (oz.py.PyBytes_Check(data) | oz.py.PyByteArray_Check(data) | oz.py.PyMemoryView_Check(data)) {
-            length = @intCast(oz.py.c.PyObject_Length(data)); // length of byte string.
-            if (length == -1) return oz.raiseTypeError(msg);
-            _len = 1;
-            if (std.heap.c_allocator.alloc(c.iovec, _len)) |iovec| {
-                iovec[0].iov_base = data;
-                iovec[0].iov_len = length;
-                return .{ ._len = _len, ._iovec = iovec.ptr }; // success
-            } else |_| return oz.raiseMemoryError("Out of Memory!");
-        } else if (oz.py.PyList_Check(data) | oz.py.PyTuple_Check(data)) { // list[bytes, ...] | tuple[...]
-            _len = @intCast(oz.py.c.PyObject_Length(data)); // length of sequence.
-            if (_len == -1) return oz.raiseTypeError(msg);
-            if (_len == 0) return oz.raiseValueError("`Iovec(data)` - received `0` length sequence!");
-            if (_len > std.posix.IOV_MAX) {
-                return oz.raiseValueError(oz.fmt(
-                    "`Iovec(data)` - length of {d} exceeds `IOV_MAX` limit set by OS of {d}",
-                    .{ _len, std.posix.IOV_MAX },
-                ));
-            }
-            if (std.heap.c_allocator.alloc(c.iovec, _len)) |iovec| {
-                const r = for (0.._len) |i| {
-                    if (oz.py.c.PySequence_GetItem(data, @intCast(i))) |value| {
-                        if (oz.py.PyBytes_Check(value) | oz.py.PyByteArray_Check(value) | oz.py.PyMemoryView_Check(value)) {
-                            length = @intCast(oz.py.c.PyObject_Length(value)); // length of byte string.
-                            if (length == -1) break oz.raiseTypeError(msg);
-                            iovec[i].iov_base = value;
-                            iovec[i].iov_len = length;
-                        } else break oz.raiseTypeError(msg);
-                    } else break oz.raiseIndexError(msg);
-                };
-                if (r == null) { // error
-                    std.heap.c_allocator.free(iovec[0.._len]);
-                    return null;
-                }
-                return .{ ._len = _len, ._iovec = iovec.ptr }; // success
-            } else |_| return oz.raiseMemoryError("Out of Memory!");
+    pub fn __new__(list: oz.ListView(oz.Bytes)) ?Self {
+        const _len = list.len();
+        if (_len == 0) return oz.raiseValueError("`Iovec(list)` - received `0` length sequence!");
+        if (_len > std.posix.IOV_MAX) {
+            return oz.raiseValueError(oz.fmt(
+                "`Iovec(data)` - length of {d} exceeds `IOV_MAX` limit set by OS of {d}",
+                .{ _len, std.posix.IOV_MAX },
+            ));
         }
-        return oz.raiseTypeError(msg);
+
+        if (std.heap.c_allocator.alloc(c.iovec, _len)) |iovec| {
+            for (0.._len) |i| {
+                if (list.get(i)) |item| {
+                    iovec[i].iov_base = @ptrCast(@constCast(item.data));
+                    iovec[i].iov_len = item.data.len;
+                } else return oz.raiseTypeError("`Iovec` - type not supported!");
+            }
+            return .{ ._len = _len, ._iovec = iovec.ptr };
+        } else |_| return oz.raiseMemoryError("Out of Memory!");
     }
 
     pub fn __len__(self: *const Self) usize {

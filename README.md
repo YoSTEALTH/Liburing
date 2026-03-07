@@ -156,7 +156,7 @@ if __name__ == '__main__':
  - This project has been moved to using Zig as back-end, thus leading to breaking changes from previous release.
  - Try using latest Linux if possible to enable all `io_uring` features.
 
-## Check Out
+## Other Project
 <!-- - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
 - [PyOZ](https://pyoz.dev/)
 
