@@ -97,3 +97,103 @@ pub const Sockaddr = extern struct {
         }
     }
 };
+
+// Socket Family
+pub const AF_UNIX = c.AF_UNIX;
+pub const AF_INET = c.AF_INET;
+pub const AF_INET6 = c.AF_INET6;
+
+// Socket Type
+pub const SOCK_STREAM = c.SOCK_STREAM;
+pub const SOCK_DGRAM = c.SOCK_DGRAM;
+pub const SOCK_RAW = c.SOCK_RAW;
+pub const SOCK_RDM = c.SOCK_RDM;
+pub const SOCK_SEQPACKET = c.SOCK_SEQPACKET;
+pub const SOCK_DCCP = c.SOCK_DCCP;
+pub const SOCK_PACKET = c.SOCK_PACKET;
+pub const SOCK_CLOEXEC = c.SOCK_CLOEXEC;
+pub const SOCK_NONBLOCK = c.SOCK_NONBLOCK;
+
+// Shutdown How
+pub const SHUT_RD = c.SHUT_RD;
+pub const SHUT_WR = c.SHUT_WR;
+pub const SHUT_RDWR = c.SHUT_RDWR;
+
+// Socket Proto
+pub const IPPROTO_IP = IPPROTO_IP;
+pub const IPPROTO_ICMP = IPPROTO_ICMP;
+pub const IPPROTO_IGMP = IPPROTO_IGMP;
+pub const IPPROTO_IPIP = IPPROTO_IPIP;
+pub const IPPROTO_TCP = IPPROTO_TCP;
+pub const IPPROTO_EGP = IPPROTO_EGP;
+pub const IPPROTO_PUP = IPPROTO_PUP;
+pub const IPPROTO_UDP = IPPROTO_UDP;
+pub const IPPROTO_IDP = IPPROTO_IDP;
+pub const IPPROTO_TP = IPPROTO_TP;
+pub const IPPROTO_DCCP = IPPROTO_DCCP;
+pub const IPPROTO_IPV6 = IPPROTO_IPV6;
+pub const IPPROTO_RSVP = IPPROTO_RSVP;
+pub const IPPROTO_GRE = IPPROTO_GRE;
+pub const IPPROTO_ESP = IPPROTO_ESP;
+pub const IPPROTO_AH = IPPROTO_AH;
+pub const IPPROTO_MTP = IPPROTO_MTP;
+pub const IPPROTO_BEETPH = IPPROTO_BEETPH;
+pub const IPPROTO_ENCAP = IPPROTO_ENCAP;
+pub const IPPROTO_PIM = IPPROTO_PIM;
+pub const IPPROTO_COMP = IPPROTO_COMP;
+// # note: not supported
+// pub const IPPROTO_L2TP = IPPROTO_L2TP;
+pub const IPPROTO_SCTP = IPPROTO_SCTP;
+pub const IPPROTO_UDPLITE = IPPROTO_UDPLITE;
+pub const IPPROTO_MPLS = IPPROTO_MPLS;
+pub const IPPROTO_ETHERNET = IPPROTO_ETHERNET;
+pub const IPPROTO_RAW = IPPROTO_RAW;
+pub const IPPROTO_MPTCP = IPPROTO_MPTCP;
+
+// Setsockopt & Getsockopt start >>>
+pub const SOL_SOCKET = SOL_SOCKET;
+pub const SO_DEBUG = SO_DEBUG;
+pub const SO_REUSEADDR = SO_REUSEADDR;
+pub const SO_TYPE = SO_TYPE;
+pub const SO_ERROR = SO_ERROR;
+pub const SO_DONTROUTE = SO_DONTROUTE;
+pub const SO_BROADCAST = SO_BROADCAST;
+pub const SO_SNDBUF = SO_SNDBUF;
+pub const SO_RCVBUF = SO_RCVBUF;
+pub const SO_SNDBUFFORCE = SO_SNDBUFFORCE;
+pub const SO_RCVBUFFORCE = SO_RCVBUFFORCE;
+pub const SO_KEEPALIVE = SO_KEEPALIVE;
+pub const SO_OOBINLINE = SO_OOBINLINE;
+pub const SO_NO_CHECK = SO_NO_CHECK;
+pub const SO_PRIORITY = SO_PRIORITY;
+pub const SO_LINGER = SO_LINGER;
+pub const SO_BSDCOMPAT = SO_BSDCOMPAT;
+pub const SO_REUSEPORT = SO_REUSEPORT;
+pub const SO_PASSCRED = SO_PASSCRED;
+pub const SO_PEERCRED = SO_PEERCRED;
+pub const SO_RCVLOWAT = SO_RCVLOWAT;
+pub const SO_SNDLOWAT = SO_SNDLOWAT;
+pub const SO_BINDTODEVICE = SO_BINDTODEVICE;
+
+// Socket Filtering
+pub const SO_ATTACH_FILTER = SO_ATTACH_FILTER;
+pub const SO_DETACH_FILTER = SO_DETACH_FILTER;
+pub const SO_GET_FILTER = SO_GET_FILTER;
+pub const SO_PEERNAME = SO_PEERNAME;
+pub const SO_ACCEPTCONN = SO_ACCEPTCONN;
+pub const SO_PEERSEC = SO_PEERSEC;
+pub const SO_PASSSEC = SO_PASSSEC;
+pub const SO_MARK = SO_MARK;
+pub const SO_PROTOCOL = SO_PROTOCOL;
+pub const SO_DOMAIN = SO_DOMAIN;
+pub const SO_RXQ_OVFL = SO_RXQ_OVFL;
+pub const SO_WIFI_STATUS = SO_WIFI_STATUS;
+pub const SCM_WIFI_STATUS = SCM_WIFI_STATUS;
+pub const SO_PEEK_OFF = SO_PEEK_OFF;
+
+// not tested
+pub const SO_TIMESTAMP = SO_TIMESTAMP;
+pub const SO_TIMESTAMPNS = SO_TIMESTAMPNS;
+pub const SO_TIMESTAMPING = SO_TIMESTAMPING;
+pub const SO_RCVTIMEO = SO_RCVTIMEO;
+pub const SO_SNDTIMEO = SO_SNDTIMEO;
