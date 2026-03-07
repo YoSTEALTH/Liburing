@@ -86,7 +86,7 @@ pub const RWF_DSYNC = c.RWF_DSYNC;
 pub const RWF_HIPRI = c.RWF_HIPRI;
 pub const RWF_NOWAIT = c.RWF_NOWAIT;
 pub const RWF_SYNC = c.RWF_SYNC;
-pub const RWF_NOAPPEND = c.RWF_NOAPPEND;
+pub const RWF_NOAPPEND = if (@hasDecl(c, "RWF_NOAPPEND")) c.RWF_NOAPPEND else 0;
 pub const RWF_ATOMIC = c.RWF_ATOMIC;
 
 // oz.constant("HELLO", if (@hasDecl(c, "IO_URING_VERSION_MAJOR")) c.IO_URING_VERSION_MAJOR else 0),
