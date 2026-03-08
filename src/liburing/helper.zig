@@ -9,18 +9,24 @@ const Timespec = @import("class.zig").Timespec;
 /// File Descriptors Holder
 ///
 ///Example
-///    >>> fds = liburing.Fds([-1, -1, 3])
+///    >>> fds = Fds([-1, -1, 3])
 ///    >>> fds[1]
 ///    -1
 ///    >>> fds.update([4, 5, 6])
 ///    >>> fds[1]
 ///    5
+///    >>> list(fds)
+///    [4, 5, 6]
+///    >>> for fd in fds:
+///    ...     # do something e.g.`if fd != -1: os.close(fd)`
 ///
 ///Note
-///    - Makes copy of the list provided.
+///    - Makes copy of the list provided & shares it with `io_uring`,
+///    so modifying python list will not effect `Fds` already submitting.
 pub const Fds = extern struct {
     _fds: [*]i32,
     _len: usize,
+    _index: usize,
 
     const Self = @This();
 
@@ -32,7 +38,22 @@ pub const Fds = extern struct {
                 fds[i] = fd;
             } else return error.TypeError;
         }
-        return .{ ._fds = @ptrCast(fds), ._len = _len };
+        return .{ ._fds = @ptrCast(fds), ._len = _len, ._index = 0 };
+    }
+
+    pub fn __del__(self: *Self) void {
+        std.heap.c_allocator.free(self._fds[0..self._len]);
+    }
+
+    pub fn __iter__(self: *Self) *Self {
+        self._index = 0;
+        return self;
+    }
+
+    pub fn __next__(self: *Self) ?i32 {
+        if (self._index >= self._len) return null; // None
+        defer self._index += 1;
+        return self._fds[self._index];
     }
 
     pub fn __getitem__(self: *const Self, index: usize) !i32 {
@@ -49,10 +70,6 @@ pub const Fds = extern struct {
                 self._fds[i] = fd;
             } else return error.ValueError;
         }
-    }
-
-    pub fn __del__(self: *Self) void {
-        std.heap.c_allocator.free(self._fds[0..self._len]);
     }
 };
 
@@ -105,64 +122,3 @@ pub fn timespec(second: f64) ?Timespec {
     }
     return .{ ._timespec = ts };
 }
-
-// TODO:
-//
-// # custom prep function start >>>
-// cpdef inline void io_uring_prep_setsockopt(io_uring_sqe sqe,
-//                                            int sockfd,
-//                                            int level,
-//                                            int optname,
-//                                            array optval):
-//     '''
-//         Example
-//             >>> val = array.array('i', [0])
-//             >>> sqe = io_uring_get_sqe(ring)
-//             >>> io_uring_prep_setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
-
-//             >>> val = array.array('i', [1])
-//             >>> sqe = io_uring_get_sqe(ring)
-//             >>> io_uring_prep_setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
-
-//             >>> val = array.array('B', b'eth1')
-//             >>> sqe = io_uring_get_sqe(ring)
-//             >>> io_uring_prep_setsockopt(sqe, sockfd, SOL_SOCKET, SO_BINDTODEVICE, val)
-
-//         Note
-//             - remember to hold on to `val` reference till `sqe` has been submitted.
-//             - only 'i' and 'B' format is supported.
-//     '''
-//     if optval.typecode not in ('i', 'B'):
-//         raise ValueError('`io_uring_prep_setsockopt()` - only supports type code of "i" & "B"')
-//     cdef int size = sizeof(int) if optval.typecode == 'i' else len(optval)
-//     __io_uring_prep_cmd_sock(sqe.ptr, __SOCKET_URING_OP_SETSOCKOPT,
-//                              sockfd, level, optname, optval.data.as_voidptr, size)
-
-// cpdef inline void io_uring_prep_getsockopt(io_uring_sqe sqe,
-//                                            int sockfd,
-//                                            int level,
-//                                            int optname,
-//                                            array optval):
-//     '''
-//         Example
-//             # assuming `SO_KEEPALIVE` was previous set to `1`
-//             >>> val = array.array('i', [0])
-//             >>> sqe = io_uring_get_sqe(ring)
-//             >>> io_uring_prep_getsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
-//             ... # after submit and wait
-//             >>> val
-//             array('i', [1])
-//             >>> val[0]
-//             1
-
-//         Note
-//             - remember to hold on to `val` as new result will be populated into it.
-//             - `cqe.res` will return `sizeof` populating data.
-//             - only 'i' and 'B' format is supported.
-//     '''
-//     if optval.typecode not in ('i', 'B'):
-//         raise ValueError('`io_uring_prep_getsockopt()` - only supports type code of "i" & "B"')
-//     cdef int size = sizeof(int) if optval.typecode == 'i' else len(optval)
-//     __io_uring_prep_cmd_sock(sqe.ptr, __SOCKET_URING_OP_GETSOCKOPT,
-//                              sockfd, level, optname, optval.data.as_voidptr, size)
-// # custom prep function end <<<

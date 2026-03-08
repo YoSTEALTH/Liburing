@@ -7,6 +7,7 @@ def test_fds():
     assert fds[1] == -1
     fds.update([4, 5, 6])
     assert fds[1] == 5
+    assert list(fds) == [4, 5, 6]
 
     # error
     pytest.skip("PyOZ bug.")
