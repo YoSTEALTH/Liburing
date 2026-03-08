@@ -6,24 +6,24 @@ const std = @import("std");
 
 const Timespec = @import("class.zig").Timespec;
 
-/// File Descriptors Holder
+///File Index
 ///
 ///Example
-///    >>> fds = Fds([-1, -1, 3])
-///    >>> fds[1]
+///    >>> ids = FileIndex([-1, -1, 3])
+///    >>> ids[1]
 ///    -1
-///    >>> fds.update([4, 5, 6])
-///    >>> fds[1]
+///    >>> ids.update([4, 5, 6])
+///    >>> ids[1]
 ///    5
-///    >>> list(fds)
+///    >>> list(ids)
 ///    [4, 5, 6]
-///    >>> for fd in fds:
-///    ...     # do something e.g.`if fd != -1: os.close(fd)`
+///    >>> for id in ids:
+///    ...     # do something e.g.`if id != -1: os.close(id)`
 ///
 ///Note
 ///    - Makes copy of the list provided & shares it with `io_uring`,
-///    so modifying python list will not effect `Fds` already submitting.
-pub const Fds = extern struct {
+///    so modifying python list will not effect `FileIndex` already submitting.
+pub const FileIndex = extern struct {
     _fds: [*]i32,
     _len: usize,
     _index: usize,
