@@ -3,6 +3,7 @@ const c = @import("c.zig").c;
 const e = @import("error.zig");
 const oz = @import("PyOZ");
 const std = @import("std");
+const Fds = @import("helper.zig").Fds;
 const class = @import("class.zig");
 const Statx = @import("statx.zig").Statx;
 const AT_FDCWD = @import("const.zig").AT_FDCWD;
@@ -273,13 +274,12 @@ pub fn io_uring_unregister_buffers(ring: *Ring) ?i32 {
 ///Register File Descriptor
 ///
 ///Example
-///    >>> fds = [1, 2, 3]
+///    >>> fds = Fds([1, 2, 3])
 ///    >>> io_uring_register_files(ring, fds)
 ///    ...
 ///    >>> io_uring_unregister_files(ring)
 ///
 ///Note
-///    - `io_uring_register_files` includes `io_uring_register_files_tags`
 ///    - Hold on to `fds` reference till the submit + wait process is done.
 ///    - "Registered files have less overhead per operation than normal files.
 ///    This is due to the kernel grabbing a reference count on a file when an
@@ -291,22 +291,28 @@ pub fn io_uring_unregister_buffers(ring: *Ring) ?i32 {
 ///
 ///Warning
 ///    - Coded but not tested!!!
-pub fn io_uring_register_files(ring: *Ring, files: oz.ListView(i32), tags: ?u64) ?i32 {
-    return e.trap_error(c.io_uring_register_files_tags(
-        ring._io_uring,
-        @ptrCast(files.py_list),
-        tags orelse 0,
-        @intCast(files.len()),
-    ));
+pub fn io_uring_register_files(ring: *Ring, files: Fds) ?i32 {
+    return e.trap_error(
+        c.io_uring_register_files(ring._io_uring, files._fds, @intCast(files._len)),
+    );
+}
+
+pub fn io_uring_register_files_tags(ring: *Ring, files: Fds, tags: u64) ?i32 {
+    return e.trap_error(
+        c.io_uring_register_files_tags(ring._io_uring, files._fds, tags, @intCast(files._len)),
+    );
 }
 
 pub fn io_uring_register_files_sparse(ring: *Ring, nr: u32) ?i32 {
     return e.trap_error(c.io_uring_register_files_sparse(ring._io_uring, nr));
 }
 
-pub fn io_uring_register_files_update_tag(ring: *Ring, off: u32, files: oz.ListView(i32), tags: *const u64) ?i32 {
+///Note
+///    - Function arguments position has changed for C origin for better usability.
+pub fn io_uring_register_files_update_tag(ring: *Ring, files: Fds, tags: *const u64, offset: ?u32) ?i32 {
+    const _offset = offset orelse 0;
     return e.trap_error(
-        c.io_uring_register_files_update_tag(ring._io_uring, off, @ptrCast(files.py_list), tags, @intCast(files.len())),
+        c.io_uring_register_files_update_tag(ring._io_uring, _offset, files._fds, tags, @intCast(files._len)),
     );
 }
 
@@ -315,13 +321,11 @@ pub fn io_uring_unregister_files(ring: *Ring) ?i32 {
     return e.trap_error(c.io_uring_unregister_files(ring._io_uring));
 }
 
-pub fn io_uring_register_files_update(ring: *Ring, off: u32, files: oz.ListView(i32)) ?i32 {
-    return e.trap_error(c.io_uring_register_files_update(
-        ring._io_uring,
-        off,
-        @ptrCast(files.py_list),
-        @intCast(files.len()),
-    ));
+///Note
+///    - Function arguments position has changed for C origin for better usability.
+pub fn io_uring_register_files_update(ring: *Ring, fds: Fds, offset: ?u32) ?i32 {
+    const _offset = offset orelse 0;
+    return e.trap_error(c.io_uring_register_files_update(ring._io_uring, _offset, fds._fds, @intCast(fds._len)));
 }
 
 ///>>> io_uring_register_eventfd(fd)
