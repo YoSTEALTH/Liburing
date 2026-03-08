@@ -320,7 +320,7 @@ pub const SQE = extern struct {
 ///    >>> sqe[1].user_data = 2
 ///
 ///    # *** MUST DO ***
-///    >>> if io_uring_put_sqe(ring, sqe):
+///    >>> if put_sqe(ring, sqe):
 ///    ...     io_uring_submit(ring)
 ///
 ///Note
@@ -328,7 +328,7 @@ pub const SQE = extern struct {
 ///        1. It works as a base class for `io_uring_get_sqe()` return.
 ///        2. It can also be used as `sqe = Sqe(<int>)`, rather than "get" sqe(s)
 ///        you are going to "put" pre-made sqe(s) into the ring later. Refer to
-///        `help(io_uring_put_sqe)` to see more detail.
+///        `help(put_sqe)` to see more detail.
 ///    - `Sqe(no)` is limited to max `0-255` items.
 pub const Sqe = extern struct {
     _parent: SQE,

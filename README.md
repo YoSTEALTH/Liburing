@@ -1,4 +1,8 @@
-# Liburing (Work in Process...) [![Python](https://img.shields.io/badge/python-3.10--3.14-blue)](https://www.python.org/) [![Zig](https://img.shields.io/badge/zig-0.15.2-orange)](https://ziglang.org/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/liburing)] [![Test status](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml) 
+# Liburing
+[![Python](https://img.shields.io/badge/python-3.10--3.14-blue)](https://www.python.org/)
+[![Zig](https://img.shields.io/badge/zig-0.15.2-orange)](https://ziglang.org/)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/liburing)
+[![Test status](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml) 
 
 Liburing is Python + Zig wrapper around [C Liburing](https://github.com/axboe/Liburing), which is a helper to setup and tear-down io_uring instances.
 
@@ -29,23 +33,17 @@ python3 -m pip uninstall liburing           # uninstall
 ## To compile & install directly from GitHub
 
 ```bash
-# Note:
-#   - Make sure you have Zig 0.15.2 installed on your system.
-#   - Change bellow code to your Python setup.
-
-python3 -m pip install --upgrade pyoz
+# note: make sure you have Zig 0.15.2 installed on your system.
 
 cd /tmp
-
 git clone --recurse-submodules https://github.com/YoSTEALTH/Liburing
-
 cd Liburing
 
+python3 -m pip install pyoz
 python3 -m pyoz build
-
 python3 -m pip install dist/*.whl
 
-# To Uninstall
+# uninstall
 python3 -m pip uninstall liburing pyoz
 ```
 
@@ -156,8 +154,8 @@ if __name__ == '__main__':
  - This project has been moved to using Zig as back-end, thus leading to breaking changes from previous release.
  - Try using latest Linux if possible to enable all `io_uring` features.
 
-## Other Project
-<!-- - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
+## Other Projects
+- [Shakti](https://github.com/YoSTEALTH/Shakti)
 - [PyOZ](https://pyoz.dev/)
 
 ## License

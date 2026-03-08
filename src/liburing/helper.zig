@@ -6,6 +6,56 @@ const std = @import("std");
 
 const Timespec = @import("class.zig").Timespec;
 
+/// File Descriptors Holder
+///
+///Example
+///    >>> fds = liburing.Fds([-1, -1, 3])
+///    >>> fds[1]
+///    -1
+///    >>> fds.update([4, 5, 6])
+///    >>> fds[1]
+///    5
+///
+///Note
+///    - Makes copy of the list provided.
+pub const Fds = extern struct {
+    _fds: [*]i32,
+    _len: usize,
+
+    const Self = @This();
+
+    pub fn __new__(list: oz.ListView(i32)) !Self {
+        const _len = list.len();
+        var fds = try std.heap.c_allocator.alloc(i32, _len);
+        for (0.._len) |i| {
+            if (list.get(i)) |fd| {
+                fds[i] = fd;
+            } else return error.TypeError;
+        }
+        return .{ ._fds = @ptrCast(fds), ._len = _len };
+    }
+
+    pub fn __getitem__(self: *const Self, index: usize) !i32 {
+        if (index < self._len) return self._fds[index];
+        return error.IndexError;
+    }
+
+    pub fn update(self: *Self, list: oz.ListView(i32)) !void {
+        const _len = list.len();
+        if (self._len != _len) return error.ValueError;
+
+        for (0.._len) |i| {
+            if (list.get(i)) |fd| {
+                self._fds[i] = fd;
+            } else return error.ValueError;
+        }
+    }
+
+    pub fn __del__(self: *Self) void {
+        std.heap.c_allocator.free(self._fds[0..self._len]);
+    }
+};
+
 ///Probe your system to find out which `io_uring` operations are available.
 ///
 ///Example

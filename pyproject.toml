@@ -6,7 +6,7 @@ build-backend = "pyoz.backend"
 name = "liburing"
 readme = "README.md"
 license = "CC0-1.0"
-version = "2026.3.7"
+version = "2026.3.8"
 authors = [{name="Ritesh"}]
 keywords = ["python", "socket", "async", "cython", "file", "python3", "io", "syscall", "futex", "statx",
             "io-uring", "uring", "liburing"]
@@ -53,7 +53,7 @@ module-name = "liburing"
 py-packages = ["liburing"]
 
 # Optimization level for release builds: "Debug", "ReleaseSafe", "ReleaseFast", "ReleaseSmall"
-optimize = "ReleaseSafe"
+optimize = "Debug"
 
 # Strip debug symbols in release builds
 # strip = true
