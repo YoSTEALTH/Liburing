@@ -3,16 +3,11 @@ const c = @import("c.zig").c;
 const e = @import("error.zig");
 const oz = @import("PyOZ");
 const std = @import("std");
-const Fds = @import("helper.zig").Fds;
+const FileIndex = @import("helper.zig").FileIndex;
 const class = @import("class.zig");
 const Statx = @import("statx.zig").Statx;
 const AT_FDCWD = @import("const.zig").AT_FDCWD;
 const Sockaddr = @import("socket.zig").Sockaddr;
-
-const IntStr = union(enum) {
-    Int: *c_int,
-    Str: []u8,
-};
 
 const SyncCancelReg = class.SyncCancelReg;
 const ClockRegister = class.ClockRegister;
@@ -40,6 +35,11 @@ const Cqe = class.Cqe;
 const SQE = class.SQE;
 const Sqe = class.Sqe;
 const Bpf = class.Bpf;
+
+const IntStr = union(enum) {
+    Int: *c_int,
+    Str: []u8,
+};
 
 ///Example
 ///    >>> probe = io_uring_get_probe_ring(ring)
@@ -242,12 +242,17 @@ pub fn io_uring_clone_buffers_offset(
     ));
 }
 
+///Warning
+///    - Coded but not tested!!!
 pub fn io_uring_clone_buffers(dst_ring: *Ring, src_ring: *Ring, flags: ?u32) ?i32 {
     return e.trap_error(c.__io_uring_clone_buffers(dst_ring._io_uring, src_ring._io_uring, flags orelse 0));
 }
 
 ///Note
 ///    - `io_uring_register_buffers` includes `io_uring_register_buffers_tags`
+///
+///Warning
+///    - Coded but not tested!!!
 pub fn io_uring_register_buffers(ring: *Ring, iovecs: *const Iovec, tags: ?u64) ?i32 {
     const _tags = tags orelse 0;
     return e.trap_error(c.io_uring_register_buffers_tags(ring._io_uring, iovecs._iovec, _tags, @intCast(iovecs._len)));
@@ -257,10 +262,15 @@ pub fn io_uring_register_buffers_sparse(ring: *Ring, nr: u32) ?i32 {
     return e.trap_error(c.io_uring_register_buffers_sparse(ring._io_uring, nr));
 }
 
-pub fn io_uring_register_buffers_update_tag(ring: *Ring, off: u32, iovecs: *const Iovec, tags: *const u64) ?i32 {
+///Note
+///    - Function arguments position has changed for C origin for better usability.
+///
+///Warning
+///    - Coded but not tested!!!
+pub fn io_uring_register_buffers_update_tag(ring: *Ring, iovecs: *const Iovec, tags: *const u64, offset: ?u32) ?i32 {
     return e.trap_error(c.io_uring_register_buffers_update_tag(
         ring._io_uring,
-        off,
+        offset orelse 0,
         iovecs._iovec,
         tags,
         @intCast(iovecs._len),
@@ -274,13 +284,13 @@ pub fn io_uring_unregister_buffers(ring: *Ring) ?i32 {
 ///Register File Descriptor
 ///
 ///Example
-///    >>> fds = Fds([1, 2, 3])
-///    >>> io_uring_register_files(ring, fds)
+///    >>> ids = FileIndex([1, 2, 3])
+///    >>> io_uring_register_files(ring, ids)
 ///    ...
 ///    >>> io_uring_unregister_files(ring)
 ///
 ///Note
-///    - Hold on to `fds` reference till the submit + wait process is done.
+///    - Hold on to `ids` reference till the submit + wait process is done.
 ///    - "Registered files have less overhead per operation than normal files.
 ///    This is due to the kernel grabbing a reference count on a file when an
 ///    operation begins, and dropping it when it's done. When the process file
@@ -291,13 +301,13 @@ pub fn io_uring_unregister_buffers(ring: *Ring) ?i32 {
 ///
 ///Warning
 ///    - Coded but not tested!!!
-pub fn io_uring_register_files(ring: *Ring, files: Fds) ?i32 {
+pub fn io_uring_register_files(ring: *Ring, files: FileIndex) ?i32 {
     return e.trap_error(
         c.io_uring_register_files(ring._io_uring, files._fds, @intCast(files._len)),
     );
 }
 
-pub fn io_uring_register_files_tags(ring: *Ring, files: Fds, tags: u64) ?i32 {
+pub fn io_uring_register_files_tags(ring: *Ring, files: FileIndex, tags: u64) ?i32 {
     return e.trap_error(
         c.io_uring_register_files_tags(ring._io_uring, files._fds, tags, @intCast(files._len)),
     );
@@ -309,7 +319,7 @@ pub fn io_uring_register_files_sparse(ring: *Ring, nr: u32) ?i32 {
 
 ///Note
 ///    - Function arguments position has changed for C origin for better usability.
-pub fn io_uring_register_files_update_tag(ring: *Ring, files: Fds, tags: *const u64, offset: ?u32) ?i32 {
+pub fn io_uring_register_files_update_tag(ring: *Ring, files: FileIndex, tags: *const u64, offset: ?u32) ?i32 {
     const _offset = offset orelse 0;
     return e.trap_error(
         c.io_uring_register_files_update_tag(ring._io_uring, _offset, files._fds, tags, @intCast(files._len)),
@@ -323,7 +333,7 @@ pub fn io_uring_unregister_files(ring: *Ring) ?i32 {
 
 ///Note
 ///    - Function arguments position has changed for C origin for better usability.
-pub fn io_uring_register_files_update(ring: *Ring, fds: Fds, offset: ?u32) ?i32 {
+pub fn io_uring_register_files_update(ring: *Ring, fds: FileIndex, offset: ?u32) ?i32 {
     const _offset = offset orelse 0;
     return e.trap_error(c.io_uring_register_files_update(ring._io_uring, _offset, fds._fds, @intCast(fds._len)));
 }
@@ -922,14 +932,26 @@ pub inline fn io_uring_prep_open(sqe: *SQE, path: oz.Path, flags: ?i32, mode: ?c
     c.io_uring_prep_openat(sqe._sqe, _dfd, @ptrCast(path.path), _flags, _mode);
 }
 
+///Open Direct
+///
+///Example
+///    >>> indexed = FileIndex([-1, -1, -1, -1])
+///    >>> index = 3  # position of last ---^ `fds` registered
+///    >>> io_uring_register_files(ring, fds)
+///    >>> flags = liburing.O_TMPFILE | liburing.O_WRONLY
+///    >>> sqe = liburing.io_uring_get_sqe(ring)
+///    >>> io_uring_prep_open_direct(sqe, ".", flags, index)
+///    ... ...
+///    >>>.io_uring_prep_close_direct(sqe, index)
+///    ... ...
+///    >>> io_uring_unregister_files(ring)
+///
 ///Note
-///    - Function arguments position has changed for C origin for better usability.
+///    - Open direct does not use `fd` but `index`
 ///    - If `file_index=IORING_FILE_INDEX_ALLOC` free direct descriptor will be auto assigned.
 ///    Allocated descriptor is returned in the `cqe.res`.
+///    - Function arguments position has changed for C origin for better usability.
 ///    - `io_uring_prep_open_direct` includes `io_uring_prep_openat_direct` as well.
-///
-///Warning
-///    - Coded but not tested!!!
 pub inline fn io_uring_prep_open_direct(
     sqe: *SQE,
     path: oz.Path,
@@ -1232,13 +1254,9 @@ pub inline fn io_uring_prep_openat2(sqe: *SQE, path: oz.Path, how: *OpenHow, dfd
 ///Note
 ///    - If `file_index=IORING_FILE_INDEX_ALLOC` free direct descriptor will be auto assigned.
 ///    Allocated descriptor is returned in the `cqe.res`.
-///
-///Warning
-///    - Coded but not tested!!!
 pub inline fn io_uring_prep_openat2_direct(sqe: *SQE, path: oz.Path, how: *OpenHow, file_index: ?u32, dfd: ?i32) void {
     const _dfd = dfd orelse AT_FDCWD;
     const _file_index = file_index orelse c.IORING_FILE_INDEX_ALLOC;
-    // std.debug.print("_file_index: {d}\n", .{_file_index});
     c.io_uring_prep_openat2_direct(sqe._sqe, _dfd, @ptrCast(path.path), how._open_how, _file_index);
 }
 
