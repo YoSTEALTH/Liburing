@@ -3,19 +3,19 @@ import liburing
 
 
 def test_fds():
-    fds = liburing.Fds([-1, -1, 3])
-    assert fds[1] == -1
-    fds.update([4, 5, 6])
-    assert fds[1] == 5
-    assert list(fds) == [4, 5, 6]
+    ids = liburing.FileIndex([-1, -1, 3])
+    assert ids[1] == -1
+    ids.update([4, 5, 6])
+    assert ids[1] == 5
+    assert list(ids) == [4, 5, 6]
 
     # error
     pytest.skip("PyOZ bug.")
     with pytest.raises(ValueError):
-        fds.update([4, 5, 6, 7, 8, 9])  # PyOZ raises `RuntimeError: ValueError`
+        ids.update([4, 5, 6, 7, 8, 9])  # PyOZ raises `RuntimeError: ValueError`
 
     with pytest.raises(TypeError):  # PyOZ raises `RuntimeError: TypeError`
-        fds.update([4, 5, "s"])
+        ids.update([4, 5, "s"])
 
 
 def test_timespec():
