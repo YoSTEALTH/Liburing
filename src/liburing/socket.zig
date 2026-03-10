@@ -2,8 +2,7 @@
 const c = @import("c.zig").c;
 const oz = @import("PyOZ");
 const std = @import("std");
-
-const AF = std.os.linux.AF;
+const SQE = @import("class.zig").SQE;
 
 ///Generic Socket Address.
 ///
@@ -14,7 +13,7 @@ const AF = std.os.linux.AF;
 ///    >>> bind(sockfd, addr)
 ///
 ///Note
-///    - IPv6 `scope_id` can be added like so `b"ff01::fb%123"`
+///    - IPv6 `scope_id` can be added like so `"ff01::fb%123"`
 ///    - `Sockaddr()` is low level setup, letting you serve/connect directly using path/ip.
 ///    If you need higher level features you can use `getaddrinfo()` this lets you connect
 ///    using domain names, ...
@@ -29,43 +28,43 @@ pub const Sockaddr = extern struct {
         var socklen: c.socklen_t = undefined;
         var sockaddr: usize = undefined;
 
-        if (addr.len == 0) return oz.raiseValueError("`sockaddr` - `addr` can not be empty!");
+        if (addr.len == 0) return oz.raiseValueError("`Sockaddr` - `addr` can not be empty!");
 
         switch (family) {
-            AF.UNIX => {
-                if (addr.len > 108) return oz.raiseValueError("`sockaddr` - length of `addr` can not be `> 108`");
+            AF_UNIX => {
+                if (addr.len > 108) return oz.raiseValueError("`Sockaddr` - length of `addr` can not be `> 108`");
 
                 socklen = @sizeOf(c.sockaddr_un);
                 const _sock: *c.sockaddr_un = std.heap.c_allocator.create(c.sockaddr_un) catch {
-                    return oz.raiseMemoryError("`sockaddr()` - Out of Memory!");
+                    return oz.raiseMemoryError("`Sockaddr` - Out of Memory!");
                 };
                 _sock.sun_family = family;
                 @memset(&_sock.sun_path, 0);
                 @memcpy(_sock.sun_path[0..addr.len], addr);
                 sockaddr = @intFromPtr(_sock);
             },
-            AF.INET => {
+            AF_INET => {
                 socklen = @sizeOf(c.sockaddr_in);
                 const _sock: *c.sockaddr_in = std.heap.c_allocator.create(c.sockaddr_in) catch {
-                    return oz.raiseMemoryError("`sockaddr()` - Out of Memory!");
+                    return oz.raiseMemoryError("`Sockaddr` - Out of Memory!");
                 };
 
                 const _result = std.net.Ip4Address.parse(addr, port orelse 0) catch {
-                    return oz.raiseValueError("`sockaddr()` - `addr` or `port` not valid IPv4");
+                    return oz.raiseValueError("`Sockaddr` - `addr` or `port` not valid IPv4");
                 };
                 _sock.sin_family = family;
                 _sock.sin_port = _result.sa.port;
                 _sock.sin_addr.s_addr = _result.sa.addr;
                 sockaddr = @intFromPtr(_sock);
             },
-            AF.INET6 => {
+            AF_INET6 => {
                 socklen = @sizeOf(c.sockaddr_in6);
                 const _sock: *c.sockaddr_in6 = std.heap.c_allocator.create(c.sockaddr_in6) catch {
-                    return oz.raiseMemoryError("`sockaddr()` - Out of Memory!");
+                    return oz.raiseMemoryError("`Sockaddr` - Out of Memory!");
                 };
 
                 const _result = std.net.Ip6Address.parse(addr, port orelse 0) catch {
-                    return oz.raiseValueError("`sockaddr()` - `addr` or `port` not valid IPv6");
+                    return oz.raiseValueError("`Sockaddr` - `addr` or `port` not valid IPv6");
                 };
                 _sock.sin6_family = family;
                 _sock.sin6_port = _result.sa.port;
@@ -74,22 +73,22 @@ pub const Sockaddr = extern struct {
                 _sock.sin6_flowinfo = _result.sa.flowinfo;
                 sockaddr = @intFromPtr(_sock);
             },
-            else => return oz.raiseNotImplementedError(oz.fmt("`sockaddr()` - `family={d}` not supported!", .{family})),
+            else => return oz.raiseNotImplementedError(oz.fmt("`Sockaddr` - `family={d}` not supported!", .{family})),
         }
         return .{ ._sockaddr = sockaddr, ._socklen = socklen, ._family = family };
     }
 
     pub fn __del__(self: *Self) void {
         switch (self._family) {
-            AF.UNIX => {
+            AF_UNIX => {
                 const ptr: *c.sockaddr_un = @ptrFromInt(self._sockaddr);
                 std.heap.c_allocator.destroy(ptr);
             },
-            AF.INET => {
+            AF_INET => {
                 const ptr: *c.sockaddr_in = @ptrFromInt(self._sockaddr);
                 std.heap.c_allocator.destroy(ptr);
             },
-            AF.INET6 => {
+            AF_INET6 => {
                 const ptr: *c.sockaddr_in6 = @ptrFromInt(self._sockaddr);
                 std.heap.c_allocator.destroy(ptr);
             },
@@ -97,6 +96,61 @@ pub const Sockaddr = extern struct {
         }
     }
 };
+
+///Example
+///    >>> val = (1).to_bytes(4, "big")
+///    >>> sqe = io_uring_get_sqe(ring)
+///    >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
+///
+///    >>> val = (0).to_bytes(4, "big")
+///    >>> sqe = io_uring_get_sqe(ring)
+///    >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
+///
+///    >>> val = b"eth1"
+///    >>> sqe = io_uring_get_sqe(ring)
+///    >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_BINDTODEVICE, val)
+///
+///Note
+///    - remember to hold on to `val` reference till `sqe` has been submitted.
+///    - min length of `val` must be `4`.
+///    - watch out for "big" or "little" endian, keep is same or it will switch to systems default.
+pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: oz.Bytes) void {
+    c.io_uring_prep_cmd_sock(
+        sqe._sqe,
+        c.SOCKET_URING_OP_SETSOCKOPT,
+        sockfd,
+        level,
+        optname,
+        @constCast(optval.data.ptr),
+        @intCast(optval.data.len),
+    );
+}
+
+///Example
+///    # assuming `SO_KEEPALIVE` was previous set to `1`
+///    >>> buf = bytearray(4)
+///    >>> sqe = io_uring_get_sqe(ring)
+///    >>> getsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, buf)
+///    ... # after submit and wait
+///    >>> int.from_bytes(buf)
+///    1
+///
+///Note
+///    - remember to hold on to `buf` as new result will be populated into it.
+///    - `cqe.res` will return `len()` of populating data(`buf`).
+///    - min length of `buf` must be `4`.
+///    - watch out for "big" or "little" endian, keep is same or it will switch to systems default.
+pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: oz.ByteArray) void {
+    c.io_uring_prep_cmd_sock(
+        sqe._sqe,
+        c.SOCKET_URING_OP_GETSOCKOPT,
+        sockfd,
+        level,
+        optname,
+        optval.data.ptr,
+        @intCast(optval.data.len),
+    );
+}
 
 // Socket Family
 pub const AF_UNIX = c.AF_UNIX;
@@ -120,80 +174,80 @@ pub const SHUT_WR = c.SHUT_WR;
 pub const SHUT_RDWR = c.SHUT_RDWR;
 
 // Socket Proto
-pub const IPPROTO_IP = IPPROTO_IP;
-pub const IPPROTO_ICMP = IPPROTO_ICMP;
-pub const IPPROTO_IGMP = IPPROTO_IGMP;
-pub const IPPROTO_IPIP = IPPROTO_IPIP;
-pub const IPPROTO_TCP = IPPROTO_TCP;
-pub const IPPROTO_EGP = IPPROTO_EGP;
-pub const IPPROTO_PUP = IPPROTO_PUP;
-pub const IPPROTO_UDP = IPPROTO_UDP;
-pub const IPPROTO_IDP = IPPROTO_IDP;
-pub const IPPROTO_TP = IPPROTO_TP;
-pub const IPPROTO_DCCP = IPPROTO_DCCP;
-pub const IPPROTO_IPV6 = IPPROTO_IPV6;
-pub const IPPROTO_RSVP = IPPROTO_RSVP;
-pub const IPPROTO_GRE = IPPROTO_GRE;
-pub const IPPROTO_ESP = IPPROTO_ESP;
-pub const IPPROTO_AH = IPPROTO_AH;
-pub const IPPROTO_MTP = IPPROTO_MTP;
-pub const IPPROTO_BEETPH = IPPROTO_BEETPH;
-pub const IPPROTO_ENCAP = IPPROTO_ENCAP;
-pub const IPPROTO_PIM = IPPROTO_PIM;
-pub const IPPROTO_COMP = IPPROTO_COMP;
+pub const IPPROTO_IP = c.IPPROTO_IP;
+pub const IPPROTO_ICMP = c.IPPROTO_ICMP;
+pub const IPPROTO_IGMP = c.IPPROTO_IGMP;
+pub const IPPROTO_IPIP = c.IPPROTO_IPIP;
+pub const IPPROTO_TCP = c.IPPROTO_TCP;
+pub const IPPROTO_EGP = c.IPPROTO_EGP;
+pub const IPPROTO_PUP = c.IPPROTO_PUP;
+pub const IPPROTO_UDP = c.IPPROTO_UDP;
+pub const IPPROTO_IDP = c.IPPROTO_IDP;
+pub const IPPROTO_TP = c.IPPROTO_TP;
+pub const IPPROTO_DCCP = c.IPPROTO_DCCP;
+pub const IPPROTO_IPV6 = c.IPPROTO_IPV6;
+pub const IPPROTO_RSVP = c.IPPROTO_RSVP;
+pub const IPPROTO_GRE = c.IPPROTO_GRE;
+pub const IPPROTO_ESP = c.IPPROTO_ESP;
+pub const IPPROTO_AH = c.IPPROTO_AH;
+pub const IPPROTO_MTP = c.IPPROTO_MTP;
+pub const IPPROTO_BEETPH = c.IPPROTO_BEETPH;
+pub const IPPROTO_ENCAP = c.IPPROTO_ENCAP;
+pub const IPPROTO_PIM = c.IPPROTO_PIM;
+pub const IPPROTO_COMP = c.IPPROTO_COMP;
 // # note: not supported
 // pub const IPPROTO_L2TP = IPPROTO_L2TP;
-pub const IPPROTO_SCTP = IPPROTO_SCTP;
-pub const IPPROTO_UDPLITE = IPPROTO_UDPLITE;
-pub const IPPROTO_MPLS = IPPROTO_MPLS;
-pub const IPPROTO_ETHERNET = IPPROTO_ETHERNET;
-pub const IPPROTO_RAW = IPPROTO_RAW;
-pub const IPPROTO_MPTCP = IPPROTO_MPTCP;
+pub const IPPROTO_SCTP = c.IPPROTO_SCTP;
+pub const IPPROTO_UDPLITE = c.IPPROTO_UDPLITE;
+pub const IPPROTO_MPLS = c.IPPROTO_MPLS;
+pub const IPPROTO_ETHERNET = c.IPPROTO_ETHERNET;
+pub const IPPROTO_RAW = c.IPPROTO_RAW;
+pub const IPPROTO_MPTCP = c.IPPROTO_MPTCP;
 
 // Setsockopt & Getsockopt start >>>
-pub const SOL_SOCKET = SOL_SOCKET;
-pub const SO_DEBUG = SO_DEBUG;
-pub const SO_REUSEADDR = SO_REUSEADDR;
-pub const SO_TYPE = SO_TYPE;
-pub const SO_ERROR = SO_ERROR;
-pub const SO_DONTROUTE = SO_DONTROUTE;
-pub const SO_BROADCAST = SO_BROADCAST;
-pub const SO_SNDBUF = SO_SNDBUF;
-pub const SO_RCVBUF = SO_RCVBUF;
-pub const SO_SNDBUFFORCE = SO_SNDBUFFORCE;
-pub const SO_RCVBUFFORCE = SO_RCVBUFFORCE;
-pub const SO_KEEPALIVE = SO_KEEPALIVE;
-pub const SO_OOBINLINE = SO_OOBINLINE;
-pub const SO_NO_CHECK = SO_NO_CHECK;
-pub const SO_PRIORITY = SO_PRIORITY;
-pub const SO_LINGER = SO_LINGER;
-pub const SO_BSDCOMPAT = SO_BSDCOMPAT;
-pub const SO_REUSEPORT = SO_REUSEPORT;
-pub const SO_PASSCRED = SO_PASSCRED;
-pub const SO_PEERCRED = SO_PEERCRED;
-pub const SO_RCVLOWAT = SO_RCVLOWAT;
-pub const SO_SNDLOWAT = SO_SNDLOWAT;
-pub const SO_BINDTODEVICE = SO_BINDTODEVICE;
+pub const SOL_SOCKET = c.SOL_SOCKET;
+pub const SO_DEBUG = c.SO_DEBUG;
+pub const SO_REUSEADDR = c.SO_REUSEADDR;
+pub const SO_TYPE = c.SO_TYPE;
+pub const SO_ERROR = c.SO_ERROR;
+pub const SO_DONTROUTE = c.SO_DONTROUTE;
+pub const SO_BROADCAST = c.SO_BROADCAST;
+pub const SO_SNDBUF = c.SO_SNDBUF;
+pub const SO_RCVBUF = c.SO_RCVBUF;
+pub const SO_SNDBUFFORCE = c.SO_SNDBUFFORCE;
+pub const SO_RCVBUFFORCE = c.SO_RCVBUFFORCE;
+pub const SO_KEEPALIVE = c.SO_KEEPALIVE;
+pub const SO_OOBINLINE = c.SO_OOBINLINE;
+pub const SO_NO_CHECK = c.SO_NO_CHECK;
+pub const SO_PRIORITY = c.SO_PRIORITY;
+pub const SO_LINGER = c.SO_LINGER;
+pub const SO_BSDCOMPAT = c.SO_BSDCOMPAT;
+pub const SO_REUSEPORT = c.SO_REUSEPORT;
+pub const SO_PASSCRED = c.SO_PASSCRED;
+pub const SO_PEERCRED = c.SO_PEERCRED;
+pub const SO_RCVLOWAT = c.SO_RCVLOWAT;
+pub const SO_SNDLOWAT = c.SO_SNDLOWAT;
+pub const SO_BINDTODEVICE = c.SO_BINDTODEVICE;
 
 // Socket Filtering
-pub const SO_ATTACH_FILTER = SO_ATTACH_FILTER;
-pub const SO_DETACH_FILTER = SO_DETACH_FILTER;
-pub const SO_GET_FILTER = SO_GET_FILTER;
-pub const SO_PEERNAME = SO_PEERNAME;
-pub const SO_ACCEPTCONN = SO_ACCEPTCONN;
-pub const SO_PEERSEC = SO_PEERSEC;
-pub const SO_PASSSEC = SO_PASSSEC;
-pub const SO_MARK = SO_MARK;
-pub const SO_PROTOCOL = SO_PROTOCOL;
-pub const SO_DOMAIN = SO_DOMAIN;
-pub const SO_RXQ_OVFL = SO_RXQ_OVFL;
-pub const SO_WIFI_STATUS = SO_WIFI_STATUS;
-pub const SCM_WIFI_STATUS = SCM_WIFI_STATUS;
-pub const SO_PEEK_OFF = SO_PEEK_OFF;
+pub const SO_ATTACH_FILTER = c.SO_ATTACH_FILTER;
+pub const SO_DETACH_FILTER = c.SO_DETACH_FILTER;
+pub const SO_GET_FILTER = c.SO_GET_FILTER;
+pub const SO_PEERNAME = c.SO_PEERNAME;
+pub const SO_ACCEPTCONN = c.SO_ACCEPTCONN;
+pub const SO_PEERSEC = c.SO_PEERSEC;
+pub const SO_PASSSEC = c.SO_PASSSEC;
+pub const SO_MARK = c.SO_MARK;
+pub const SO_PROTOCOL = c.SO_PROTOCOL;
+pub const SO_DOMAIN = c.SO_DOMAIN;
+pub const SO_RXQ_OVFL = c.SO_RXQ_OVFL;
+pub const SO_WIFI_STATUS = c.SO_WIFI_STATUS;
+pub const SCM_WIFI_STATUS = c.SCM_WIFI_STATUS;
+pub const SO_PEEK_OFF = c.SO_PEEK_OFF;
 
 // not tested
-pub const SO_TIMESTAMP = SO_TIMESTAMP;
-pub const SO_TIMESTAMPNS = SO_TIMESTAMPNS;
-pub const SO_TIMESTAMPING = SO_TIMESTAMPING;
-pub const SO_RCVTIMEO = SO_RCVTIMEO;
-pub const SO_SNDTIMEO = SO_SNDTIMEO;
+pub const SO_TIMESTAMP = c.SO_TIMESTAMP;
+pub const SO_TIMESTAMPNS = c.SO_TIMESTAMPNS;
+pub const SO_TIMESTAMPING = c.SO_TIMESTAMPING;
+pub const SO_RCVTIMEO = c.SO_RCVTIMEO;
+pub const SO_SNDTIMEO = c.SO_SNDTIMEO;
