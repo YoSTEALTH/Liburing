@@ -36,11 +36,6 @@ const SQE = class.SQE;
 const Sqe = class.Sqe;
 const Bpf = class.Bpf;
 
-const IntStr = union(enum) {
-    Int: *c_int,
-    Str: []u8,
-};
-
 ///Example
 ///    >>> probe = io_uring_get_probe_ring(ring)
 ///    ... ...
@@ -1481,23 +1476,35 @@ pub inline fn io_uring_prep_uring_cmd128(sqe: *SQE, cmd_op: i32, fd: i32) void {
 }
 
 ///Example
-///    >>> io_uring_prep_cmd_sock(sqe, SOCKET_URING_OP_SETSOCKOPT, sockfd, SOL_SOCKET, SO_KEEPALIVE, 1)
+///    >>> buf = bytearray((1).to_bytes(4, "little"))
+///    >>> io_uring_prep_cmd_sock(sqe, SOCKET_URING_OP_SETSOCKOPT, sockfd, SOL_SOCKET, SO_KEEPALIVE, buf)
 ///    # or
-///    >>> io_uring_prep_cmd_sock(sqe, SOCKET_URING_OP_SETSOCKOPT, sockfd, SOL_SOCKET, ..., 'eth1')
+///    >>> buf = bytearray(b'eth1')
+///    >>> io_uring_prep_cmd_sock(sqe, SOCKET_URING_OP_SETSOCKOPT, sockfd, SOL_SOCKET, ..., buf)
 ///
 ///Opcode
-///    SOCKET_URING_OP_SIOCINQ
-///    SOCKET_URING_OP_SIOCOUTQ
-///    SOCKET_URING_OP_GETSOCKOPT
-///    SOCKET_URING_OP_SETSOCKOPT
+///    io_uring_socket_op
+///        SOCKET_URING_OP_SIOCINQ
+///        SOCKET_URING_OP_SIOCOUTQ
+///        SOCKET_URING_OP_GETSOCKOPT
+///        SOCKET_URING_OP_SETSOCKOPT
+///        SOCKET_URING_OP_TX_TIMESTAMP
+///        SOCKET_URING_OP_GETSOCKNAME
 ///
-///Warning
-///    - Coded but not tested!!!
-pub inline fn io_uring_prep_cmd_sock(sqe: *SQE, cmd_op: i32, fd: i32, level: i32, optname: i32, optval: IntStr) void {
-    switch (optval) {
-        .Int => |val| c.io_uring_prep_cmd_sock(sqe._sqe, cmd_op, fd, level, optname, val, 1),
-        .Str => |val| c.io_uring_prep_cmd_sock(sqe._sqe, cmd_op, fd, level, optname, @ptrCast(val), @intCast(val.len)),
-    }
+///Note
+///    - remember to hold on to `buf` as new result will be populated into it.
+///    - `cqe.res` will return `len()` of populating data(`buf`).
+///    - min length of `buf` must be `4`.
+///    - watch out for "big" or "little" endian, keep is same or it will switch to systems default.
+pub inline fn io_uring_prep_cmd_sock(
+    sqe: *SQE,
+    cmd_op: i32,
+    fd: i32,
+    level: i32,
+    optname: i32,
+    optval: oz.ByteArray,
+) void {
+    c.io_uring_prep_cmd_sock(sqe._sqe, cmd_op, fd, level, optname, optval.data.ptr, @intCast(optval.data.len));
 }
 
 ///Example

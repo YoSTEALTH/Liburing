@@ -11,5 +11,6 @@ pub const Liburing = oz.module(.{
         oz.withSource(@import("helper.zig"), @embedFile("helper.zig")),
         oz.withSource(@import("uring.zig"), @embedFile("uring.zig")),
         oz.withSource(@import("statx.zig"), @embedFile("statx.zig")),
+        oz.withSource(@import("socket.zig"), @embedFile("socket.zig")),
     },
 });
