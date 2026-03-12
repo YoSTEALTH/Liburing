@@ -2,7 +2,7 @@ import pytest
 import liburing
 
 
-def test_fds():
+def test_file_index():
     ids = liburing.FileIndex([-1, -1, 3])
     assert ids[1] == -1
     ids.update([4, 5, 6])
