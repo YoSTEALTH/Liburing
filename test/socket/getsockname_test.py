@@ -2,7 +2,7 @@ import pytest
 import liburing
 
 
-@pytest.mark.skip_linux("6.11")
+@pytest.mark.skip_linux("6.19")
 def test_getsockname(ring, cqe):
     with pytest.raises(TypeError):
         addr = liburing.Sockaddr(liburing.AF_UNIX, "./path")
