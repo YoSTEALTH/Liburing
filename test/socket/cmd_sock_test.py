@@ -86,7 +86,7 @@ def test_cmd_sock(ring, cqe):
     assert liburing.trap_error(entry.res) == 0
     assert entry.user_data == 2
     liburing.io_uring_cqe_seen(ring, entry)
-    assert int.from_bytes(val_set) == 1
+    assert int.from_bytes(val_set, "big") == 1
 
     # get
     val_get = bytearray(4)

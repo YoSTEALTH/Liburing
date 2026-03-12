@@ -1495,7 +1495,7 @@ pub inline fn io_uring_prep_uring_cmd128(sqe: *SQE, cmd_op: i32, fd: i32) void {
 ///    - remember to hold on to `buf` as new result will be populated into it.
 ///    - `cqe.res` will return `len()` of populating data(`buf`).
 ///    - min length of `buf` must be `4`.
-///    - watch out for "big" or "little" endian, keep is same or it will switch to systems default.
+///    - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
 pub inline fn io_uring_prep_cmd_sock(
     sqe: *SQE,
     cmd_op: i32,
@@ -1507,27 +1507,14 @@ pub inline fn io_uring_prep_cmd_sock(
     c.io_uring_prep_cmd_sock(sqe._sqe, cmd_op, fd, level, optname, optval.data.ptr, @intCast(optval.data.len));
 }
 
-///Example
-///    # assuming `SO_KEEPALIVE` was previous set to `1`
-///    >>> sqe = io_uring_get_sqe(ring)
-///    >>> io_uring_prep_getsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, 0)
-///    ... # after submit and wait
-///    >>> val
-///    array('i', [1])
-///    >>> val[0]
-///    1
-///
-///Note
-///    - remember to hold on to `val` as new result will be populated into it.
-///    - `cqe.res` will return `sizeof` populating data.
-///    - only 'i' and 'B' format is supported.
-///
-///Warning
-///    - Coded but not tested!!!
-pub inline fn io_uring_prep_cmd_getsockname(sqe: *SQE) ?void {
-    _ = sqe;
-    return oz.raiseNotImplementedError("io_uring_prep_cmd_getsockname");
-    // c.io_uring_prep_cmd_getsockname(sqe._sqe);
+pub inline fn io_uring_prep_cmd_getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) ?void {
+    c.io_uring_prep_cmd_getsockname(
+        sqe._sqe,
+        fd,
+        @ptrFromInt(sockaddr._sockaddr),
+        &sockaddr._socklen,
+        peer orelse 0,
+    );
 }
 
 ///Warning
