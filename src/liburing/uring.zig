@@ -1507,6 +1507,10 @@ pub inline fn io_uring_prep_cmd_sock(
     c.io_uring_prep_cmd_sock(sqe._sqe, cmd_op, fd, level, optname, optval.data.ptr, @intCast(optval.data.len));
 }
 
+///Example
+///    >>> sockaddr = Sockaddr()
+///    >>> sqe = io_uring_get_sqe(ring)
+///    >>> io_uring_prep_cmd_getsockname(sqe, sockfd, sockaddr)
 pub inline fn io_uring_prep_cmd_getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) ?void {
     c.io_uring_prep_cmd_getsockname(
         sqe._sqe,
@@ -1683,9 +1687,9 @@ pub inline fn io_uring_buf_ring_available(ring: *Ring, br: BufRing, bgid: u16) i
 ///Example
 ///    >>> if sqe := io_uring_get_sqe(ring):
 ///    ...   # do stuff...
-pub fn io_uring_get_sqe(ring: *Ring) ?Sqe {
+pub inline fn io_uring_get_sqe(ring: *Ring) ?Sqe {
     if (c.io_uring_get_sqe(ring._io_uring)) |sqe| {
-        return .{ ._parent = .{ ._sqe = @ptrCast(&sqe[0]) }, ._len = 1, ._io_uring_sqe = sqe };
+        return .{ ._parent = .{ ._sqe = @ptrCast(&sqe[0]) }, ._len = 0, ._io_uring_sqe = sqe };
     }
     return null; // None
 }

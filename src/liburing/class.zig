@@ -332,7 +332,7 @@ pub const SQE = extern struct {
 ///    - `Sqe(no)` is limited to max `0-255` items.
 pub const Sqe = extern struct {
     _parent: SQE,
-    _len: u8 = 0,
+    _len: usize = 0,
     _index: usize = 0,
     _array: ?[*]SQE = null, // alloc memory reference to `SQE` class stored here.
     _io_uring_sqe: ?[*]c.io_uring_sqe = null,
@@ -341,7 +341,7 @@ pub const Sqe = extern struct {
 
     pub const __base__ = oz.base(SQE);
 
-    pub fn __new__(no: ?u8) ?Self {
+    pub fn __new__(no: ?usize) ?Self {
         const _no = if (no) |n| n else 1; // no = null/None/1 == 1
         if (_no > 0) {
             if (std.heap.c_allocator.alloc(c.io_uring_sqe, _no)) |sqes| {
@@ -367,7 +367,7 @@ pub const Sqe = extern struct {
         return oz.raiseIndexError("Index out of range");
     }
 
-    pub fn __len__(self: *const Self) u8 {
+    pub fn __len__(self: *const Self) usize {
         return self._len;
     }
 
