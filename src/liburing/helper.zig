@@ -3,8 +3,11 @@ const c = @import("c.zig").c;
 const n = @import("enum.zig");
 const oz = @import("PyOZ");
 const std = @import("std");
+const class = @import("class.zig");
 
-const Timespec = @import("class.zig").Timespec;
+const Ring = class.Ring;
+const Sqe = class.Sqe;
+const Timespec = class.Timespec;
 
 ///File Index
 ///
@@ -121,4 +124,59 @@ pub fn timespec(second: f64) ?Timespec {
         ts.* = std.mem.zeroes(c.__kernel_timespec); // set default value to `0`
     }
     return .{ ._timespec = ts };
+}
+
+///Put `io_uring_sqe` into `io_uring` ring's memory.
+///
+///Type
+///    ring:   Ring
+///    sqe:    Sqe
+///    return: bool
+///
+///Example
+///    # single
+///    >>> sqe = Sqe()
+///    >>> io_uring_prep_read(sqe, ...)
+///
+///    # multiple
+///    >>> sqe = Sqe(2)
+///    >>> io_uring_prep_read(sqe[0], ...)
+///    >>> io_uring_prep_write(sqe[1], ...)
+///
+///    # back-end single | multiple
+///    >>> if put_sqe(self.ring, sqe):
+///    ...     # do stuff
+///
+///    # failed: `ring` was full, submit and try to again.
+///    >>> if put_sqe(self.ring, sqe):
+///    ...     io_uring_submit(self.ring)
+///    ...     if put_sqe(self.ring, sqe):
+///    ...         # do stuff
+///
+///Note
+///    - Returns `False` if queue is full. Will need to `io_uring_submit()` and try again.
+///    - Returns `False` if `entries` < `len(sqe)`
+pub fn put_sqe(ring: *Ring, sqe: *Sqe) bool {
+    //note:
+    //    - its ok to submit `0` sqe thus `True`
+    //    - this also accounts for `ptr` gotten from `io_uring_get_sqe`
+    //    as its `len == 0` thus not try to replace memory by mistake!
+    if (sqe._len == 0) return true;
+
+    if (sqe._io_uring_sqe) |_sqe| {
+        if (sqe._len == 1) { // single
+            if (c.io_uring_get_sqe(ring._io_uring)) |s| {
+                @memcpy(s, _sqe[0..1]);
+                return true;
+            }
+        } else if (c.io_uring_sq_space_left(ring._io_uring) >= sqe._len) { // multiple
+            for (0..sqe._len) |i| {
+                if (c.io_uring_get_sqe(ring._io_uring)) |s| {
+                    @memcpy(s, _sqe[i .. i + 1]);
+                } // else should not trigger since space left is per-checked!
+            }
+            return true;
+        }
+        return false;
+    } else return false;
 }

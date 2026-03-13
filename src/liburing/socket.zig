@@ -61,12 +61,6 @@ pub const Sockaddr = extern struct {
                 const _result = std.net.Ip4Address.parse(_addr, _port) catch {
                     return oz.raiseValueError("`Sockaddr` - `addr` or `port` not valid IPv4");
                 };
-                // std.debug.print("\n_result: {} {} {} {}\n\n", .{
-                //     @sizeOf(c.sockaddr),
-                //     @sizeOf(c.sockaddr_in),
-                //     @sizeOf(c.sockaddr_in6),
-                //     @sizeOf(c.sockaddr_storage),
-                // });
                 _sock.sin_family = _family;
                 _sock.sin_port = _result.sa.port;
                 _sock.sin_addr.s_addr = _result.sa.addr;
@@ -91,7 +85,6 @@ pub const Sockaddr = extern struct {
                 sockaddr = @intFromPtr(_sock);
             },
             AF_UNSPEC => {
-                // std.debug.print("\ncomes here\n\n", .{});
                 socklen = @sizeOf(c.sockaddr_storage);
                 const _sock: *c.sockaddr_storage = std.heap.c_allocator.create(c.sockaddr_storage) catch {
                     return oz.raiseMemoryError("`Sockaddr` - Out of Memory!");
@@ -119,12 +112,30 @@ pub const Sockaddr = extern struct {
                 std.heap.c_allocator.destroy(ptr);
             },
             AF_UNSPEC => {
-                // std.debug.print("\n__del__ comes here\n\n", .{});
                 const ptr: *c.sockaddr_storage = @ptrFromInt(self._sockaddr);
                 std.heap.c_allocator.destroy(ptr);
             },
             else => {},
         }
+    }
+
+    ///>>> sock.path
+    ///"./path"
+    pub fn get_path(self: *const Self) ?[*:0]const u8 {
+        var _family: c.sa_family_t = undefined;
+
+        if (self._family == AF_UNSPEC) {
+            const ptr: *c.sockaddr_storage = @ptrFromInt(self._sockaddr);
+            _family = ptr.ss_family;
+        } else {
+            _family = self._family;
+        }
+
+        if (_family == AF_UNIX) {
+            const ptr: *c.sockaddr_un = @ptrFromInt(self._sockaddr);
+            return @ptrCast(ptr.sun_path[0..]);
+        }
+        return oz.raiseNotImplementedError(oz.fmt("`Sockaddr` - `path` is not implemented for {}", .{_family}));
     }
 
     ///>>> sock.ip
@@ -156,7 +167,7 @@ pub const Sockaddr = extern struct {
 
     ///>>> sock.port
     ///1234
-    pub fn get_port(self: *const Self) !u16 {
+    pub fn get_port(self: *const Self) ?u16 {
         var _family: c.sa_family_t = undefined;
 
         if (self._family == AF_UNSPEC) {
@@ -175,7 +186,9 @@ pub const Sockaddr = extern struct {
                 const ptr: *c.sockaddr_in6 = @ptrFromInt(self._sockaddr);
                 return std.mem.bigToNative(u16, ptr.sin6_port);
             },
-            else => return error.NotImplementedError,
+            else => return oz.raiseNotImplementedError(
+                oz.fmt("`Sockaddr` - `port` does not support family: {}", .{_family}),
+            ),
         }
     }
 
@@ -248,6 +261,9 @@ pub inline fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optva
 ///    >>> sockaddr = Sockaddr()
 ///    >>> sqe = io_uring_get_sqe(ring)
 ///    >>> getsockname(sqe, sockfd, sockaddr)
+///
+///Note
+///    - This function is an alias of `io_uring_prep_cmd_getsockname`
 pub inline fn getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) void {
     c.io_uring_prep_cmd_getsockname(
         sqe._sqe,

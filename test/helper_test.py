@@ -42,3 +42,40 @@ def test_timespec():
     with pytest.raises(MemoryError):
         ts = liburing.Timespec()
         assert ts.sec == 123
+
+
+def test_put_sqe():
+    assert _loop(1, 2) is False  # entries < sqe
+    assert _loop(2, 2) is True
+    assert _loop(8, 2) is True
+    with pytest.raises(RuntimeError):
+        assert _loop(1, 0) is True
+    assert _loop(1024, 1024) is True
+
+    # note: entries is rounded up to the nearest power of `2`
+    assert _loop(3, 4) is True
+    assert _loop(3, 5) is False
+    assert _loop(5, 8) is True
+
+
+def _loop(entries, num):
+    ring = liburing.Ring()
+    cqe = liburing.Cqe()
+    try:
+        assert liburing.io_uring_queue_init(entries, ring) == 0
+        sqe = liburing.Sqe(num)
+        for i in range(num):
+            liburing.io_uring_prep_nop(sqe[i])
+            sqe[i].user_data = i
+        if liburing.put_sqe(ring, sqe):
+            liburing.io_uring_submit(ring)
+        else:
+            return False
+        if num:
+            assert liburing.io_uring_wait_cqes(ring, cqe, num) == 0
+            for i in range(num):
+                assert cqe[i].user_data == i
+            liburing.io_uring_cq_advance(ring, num)
+        return True
+    finally:
+        liburing.io_uring_queue_exit(ring)
