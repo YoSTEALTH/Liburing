@@ -155,7 +155,7 @@ if __name__ == '__main__':
  - Try using latest Linux if possible to enable all `io_uring` features.
 
 ## Other Projects
-- [Shakti](https://github.com/YoSTEALTH/Shakti)
+<!-- - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
 - [PyOZ](https://pyoz.dev/)
 
 ## License
