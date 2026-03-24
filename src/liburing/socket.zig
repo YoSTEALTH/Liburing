@@ -20,11 +20,11 @@ const SQE = @import("class.zig").SQE;
 pub const Sockaddr = extern struct {
     _family: c.sa_family_t,
     _socklen: c.socklen_t,
-    _sockaddr: usize, // *c.sockaddr pointer as int
+    _sockaddr: usize, // ptr
 
     const Self = @This();
 
-    pub fn __new__(family: ?c.sa_family_t, addr: ?[]const u8, port: ?usize) ?Self {
+    pub fn __new__(family: ?c.sa_family_t, addr: ?oz.Path, port: ?usize) ?Self {
         const _family: c.sa_family_t = family orelse 0;
         var _port: u16 = 0;
         if (port) |p| {
@@ -38,8 +38,8 @@ pub const Sockaddr = extern struct {
         switch (_family) {
             AF_UNIX => {
                 const _addr = addr orelse return oz.raiseValueError("`Sockaddr` - `addr` not provided.");
-                if (_addr.len > 108) return oz.raiseValueError("`Sockaddr` - length of `addr` can not be `> 108`");
-                if (_addr.len == 0) return oz.raiseValueError("`Sockaddr` - `addr` can not be empty.");
+                if (_addr.path.len > 108) return oz.raiseValueError("`Sockaddr` - length of `addr` can not be `> 108`");
+                if (_addr.path.len == 0) return oz.raiseValueError("`Sockaddr` - `addr` can not be empty.");
 
                 socklen = @sizeOf(c.sockaddr_un);
                 const _sock: *c.sockaddr_un = std.heap.c_allocator.create(c.sockaddr_un) catch {
@@ -47,18 +47,18 @@ pub const Sockaddr = extern struct {
                 };
                 _sock.sun_family = _family;
                 @memset(&_sock.sun_path, 0);
-                @memcpy(_sock.sun_path[0.._addr.len], _addr);
+                @memcpy(_sock.sun_path[0.._addr.path.len], _addr.path);
                 sockaddr = @intFromPtr(_sock);
             },
             AF_INET => {
                 const _addr = addr orelse return oz.raiseValueError("`Sockaddr` - `addr` not provided.");
-                if (_addr.len == 0) return oz.raiseValueError("`Sockaddr` - `addr` can not be empty.");
+                if (_addr.path.len == 0) return oz.raiseValueError("`Sockaddr` - `addr` can not be empty.");
 
                 socklen = @sizeOf(c.sockaddr_in);
                 const _sock: *c.sockaddr_in = std.heap.c_allocator.create(c.sockaddr_in) catch {
                     return oz.raiseMemoryError("`Sockaddr` - Out of Memory!");
                 };
-                const _result = std.net.Ip4Address.parse(_addr, _port) catch {
+                const _result = std.net.Ip4Address.parse(_addr.path, _port) catch {
                     return oz.raiseValueError("`Sockaddr` - `addr` or `port` not valid IPv4");
                 };
                 _sock.sin_family = _family;
@@ -68,13 +68,13 @@ pub const Sockaddr = extern struct {
             },
             AF_INET6 => {
                 const _addr = addr orelse return oz.raiseValueError("`Sockaddr` - `addr` not provided.");
-                if (_addr.len == 0) return oz.raiseValueError("`Sockaddr` - `addr` can not be empty.");
+                if (_addr.path.len == 0) return oz.raiseValueError("`Sockaddr` - `addr` can not be empty.");
 
                 socklen = @sizeOf(c.sockaddr_in6);
                 const _sock: *c.sockaddr_in6 = std.heap.c_allocator.create(c.sockaddr_in6) catch {
                     return oz.raiseMemoryError("`Sockaddr` - Out of Memory!");
                 };
-                const _result = std.net.Ip6Address.parse(_addr, _port) catch {
+                const _result = std.net.Ip6Address.parse(_addr.path, _port) catch {
                     return oz.raiseValueError("`Sockaddr` - `addr` or `port` not valid IPv6");
                 };
                 _sock.sin6_family = _family;
