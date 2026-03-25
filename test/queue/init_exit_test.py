@@ -10,10 +10,10 @@ def test_io_uring_init_exit():
     assert ring.enter_ring_fd == 0
     assert ring.int_flags == 0
 
-    with pytest.raises(TypeError):
+    with pytest.raises(OverflowError):
         liburing.io_uring_queue_init(-1, ring, 0)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(OverflowError):
         liburing.io_uring_queue_init(8, ring, -1)
 
     assert liburing.io_uring_queue_init(1, ring, 0) == 0

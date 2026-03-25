@@ -2,6 +2,7 @@
 const c = @import("c.zig").c;
 const oz = @import("PyOZ");
 const std = @import("std");
+const consts = @import("const.zig");
 
 ///Vector I/O data structure
 ///
@@ -23,11 +24,11 @@ const std = @import("std");
 ///    garbage collected before you get the chance to use it!
 pub const Iovec = extern struct {
     _len: usize = 0,
-    _iovec: ?[*]c.iovec = null,
+    _iovec: [*]c.iovec,
 
     const Self = @This();
 
-    pub fn __new__(list: oz.ListView(oz.Bytes)) ?Self {
+    pub fn __new__(list: oz.ListView(oz.BytesLike)) ?Self {
         const _len = list.len();
         if (_len == 0) return oz.raiseValueError("`Iovec(list)` - received `0` length sequence!");
         if (_len > std.posix.IOV_MAX) {
@@ -57,7 +58,7 @@ pub const Iovec = extern struct {
     }
 
     pub fn __del__(self: *const Self) void {
-        if (self._iovec) |iov| std.heap.c_allocator.free(iov[0..self._len]);
+        std.heap.c_allocator.free(self._iovec[0..self._len]);
     }
 };
 
@@ -118,7 +119,7 @@ pub const Timespec = extern struct {
 ///    >>> io_uring_queue_init(8, ring)
 ///    >>> io_uring_queue_exit(ring)
 pub const Ring = extern struct {
-    _io_uring: ?*c.io_uring,
+    _io_uring: *c.io_uring,
 
     pub fn __new__() !Ring {
         const io_uring: *c.io_uring = try std.heap.c_allocator.create(c.io_uring);
@@ -127,32 +128,27 @@ pub const Ring = extern struct {
     }
 
     pub fn __del__(self: *const Ring) void {
-        if (self._io_uring) |io_uring| std.heap.c_allocator.destroy(io_uring);
+        std.heap.c_allocator.destroy(self._io_uring);
     }
 
     pub fn get_flags(self: *const Ring) u32 {
-        if (self._io_uring) |io_uring| return io_uring.flags;
-        return 0;
+        return self._io_uring.flags;
     }
 
     pub fn get_ring_fd(self: *const Ring) i32 {
-        if (self._io_uring) |io_uring| return io_uring.ring_fd;
-        return 0;
+        return self._io_uring.ring_fd;
     }
 
     pub fn get_features(self: *const Ring) u32 {
-        if (self._io_uring) |io_uring| return io_uring.features;
-        return 0;
+        return self._io_uring.features;
     }
 
     pub fn get_int_flags(self: *const Ring) u8 {
-        if (self._io_uring) |io_uring| return io_uring.int_flags;
-        return 0;
+        return self._io_uring.int_flags;
     }
 
     pub fn get_enter_ring_fd(self: *const Ring) i32 {
-        if (self._io_uring) |io_uring| return io_uring.enter_ring_fd;
-        return 0;
+        return self._io_uring.enter_ring_fd;
     }
 };
 
@@ -294,13 +290,10 @@ pub const SQE = extern struct {
 
     pub fn set_flags(self: *Self, flags: u8) void {
         self._sqe.flags = flags;
-        return;
     }
 
-    pub fn set_user_data(self: *Self, data: u64) ?void {
-        // if (data == 0) return oz.raiseValueError("`sqe.user_data` can not be set to `0`"); // TODO: should remove.
+    pub fn set_user_data(self: *Self, data: u64) void {
         self._sqe.user_data = data;
-        return;
     }
 };
 
@@ -357,14 +350,11 @@ pub const Sqe = extern struct {
         return oz.raiseRuntimeError("New `Sqe()` class not created.");
     }
 
-    pub fn __getitem__(self: *const Self, index: u32) ?SQE {
-        if (self._array) |array| {
-            if (index < self._len) return array[index];
-        } else if (index == 0) {
-            if (self._io_uring_sqe) |sqe| return .{ ._sqe = &sqe[0] };
-            return oz.raiseMemoryError("`io_uring_sqe()` is `null`!");
+    pub fn __del__(self: *Self) void {
+        if (self._array) |list| { // clean up locally allocated memory
+            if (self._io_uring_sqe) |items| std.heap.c_allocator.free(items[0..self._len]);
+            std.heap.c_allocator.free(list[0..self._len]);
         }
-        return oz.raiseIndexError("Index out of range");
     }
 
     pub fn __len__(self: *const Self) usize {
@@ -375,11 +365,14 @@ pub const Sqe = extern struct {
         return (self._len > 0);
     }
 
-    pub fn __del__(self: *Self) void {
-        if (self._array) |list| { // clean up locally allocated memory
-            if (self._io_uring_sqe) |items| std.heap.c_allocator.free(items[0..self._len]);
-            std.heap.c_allocator.free(list[0..self._len]);
+    pub fn __getitem__(self: *const Self, index: u32) ?SQE {
+        if (self._array) |array| {
+            if (index < self._len) return array[index];
+        } else if (index == 0) {
+            if (self._io_uring_sqe) |sqe| return .{ ._sqe = &sqe[0] };
+            return oz.raiseMemoryError("`io_uring_sqe()` is `null`!");
         }
+        return oz.raiseIndexError("Index out of range");
     }
 };
 
@@ -670,7 +663,7 @@ pub const OpenHow = extern struct {
 
     const Self = @This();
 
-    pub fn __new__(flags: ?u64, mode: ?u64, resolve: ?u64) !OpenHow {
+    pub fn __new__(flags: ?u64, mode: ?u64, resolve: ?u64) !Self {
         const how: *c.open_how = try std.heap.c_allocator.create(c.open_how);
         how.flags = flags orelse 0;
         how.mode = mode orelse 0;
@@ -720,6 +713,3 @@ pub const OpenHow = extern struct {
         self._open_how.resolve = value;
     }
 };
-
-// TODO:
-// pub const Futex = extern struct {}

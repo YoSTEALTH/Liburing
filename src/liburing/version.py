@@ -1,12 +1,12 @@
 from functools import lru_cache
 
-__all__ = 'LINUX_VERSION_MAJOR', 'LINUX_VERSION_MINOR', 'linux_version_check'
+__all__ = "LINUX_VERSION_MAJOR", "LINUX_VERSION_MINOR", "linux_version_check"
 
 LINUX_VERSION_MAJOR = 0
 LINUX_VERSION_MINOR = 0
 
 
-def _set_linux_version():
+def _set_linux_version() -> None:
     global LINUX_VERSION_MAJOR, LINUX_VERSION_MINOR
     if not LINUX_VERSION_MAJOR:
         with open("/proc/version", "rb") as file:
@@ -20,19 +20,15 @@ _set_linux_version()  # initialize
 
 
 @lru_cache
-def linux_version_check(version):
+def linux_version_check(version: str | int | float) -> bool:
     """Linux Version Check.
-
-    Type
-        version: str | int | float
-        return:  bool
 
     Example
         # note: assuming your linux is 6.7
-        
+
         >>> linux_version_check(5)
         False
-        >>> linux_version_check('6.6')
+        >>> linux_version_check("6.6")
         False
         >>> linux_version_check(6.7)
         False

@@ -7,15 +7,15 @@ def test_iovec():
     assert len(Iovec([b""])) == 1
     assert len(Iovec([bytes(1)])) == 1
     assert len(Iovec([bytearray(2)])) == 1
-    # assert len(Iovec([memoryview(bytearray(3))])) == 1
+    assert len(Iovec([memoryview(bytearray(3))])) == 1
 
     iov_bytes = [bytes(1), bytes(2), b""]
     iov_bytearray = [bytearray(2), bytearray(1)]
-    # iov_memoryview = [memoryview(bytearray(3))]
+    iov_memoryview = [memoryview(bytearray(3))]
 
     assert len(Iovec(iov_bytes)) == 3
     assert len(Iovec(iov_bytearray)) == 2
-    # assert len(Iovec(iov_memoryview)) == 1
+    assert len(Iovec(iov_memoryview)) == 1
 
     # empty for internal use
     with pytest.raises(TypeError):
