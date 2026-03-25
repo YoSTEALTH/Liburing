@@ -42,7 +42,7 @@ def test_io_uring_prep_statx(tmp_dir, ring, cqe):
     assert statx.issock is False
 
     sqe = liburing.io_uring_get_sqe(ring)
-    with pytest.raises(TypeError):
+    with pytest.raises(OverflowError):
         liburing.io_uring_prep_statx(sqe, statx, file_path, 0, -1)
     liburing.io_uring_prep_statx(
         sqe, statx, file_path, liburing.AT_STATX_FORCE_SYNC, liburing.STATX_BASIC_STATS | liburing.STATX_BTIME

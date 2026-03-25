@@ -6,6 +6,7 @@ const std = @import("std");
 const FileIndex = @import("helper.zig").FileIndex;
 const class = @import("class.zig");
 const Statx = @import("statx.zig").Statx;
+const Futex = @import("futex.zig").Futex;
 const AT_FDCWD = @import("const.zig").AT_FDCWD;
 const Sockaddr = @import("socket.zig").Sockaddr;
 
@@ -88,11 +89,8 @@ pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) ?i32
 ///    >>> finally:
 ///    ...     io_uring_queue_exit(ring)
 pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) ?i32 {
-    if (ring._io_uring) |io_uring| {
-        if (io_uring.ring_fd > 0) return oz.raiseRuntimeError("`io_uring_queue_init(ring)` already initialized!");
-        return e.trap_error(c.io_uring_queue_init(entries, io_uring, flags orelse 0));
-    }
-    return oz.raiseRuntimeError("`ring = Ring()` not initialized!");
+    if (ring._io_uring.ring_fd > 0) return oz.raiseRuntimeError("`io_uring_queue_init(ring)` already initialized!");
+    return e.trap_error(c.io_uring_queue_init(entries, ring._io_uring, flags orelse 0));
 }
 
 ///>>> io_uring_queue_mmap(fd, param, ring)
@@ -111,16 +109,14 @@ pub fn io_uring_ring_dontfork(ring: *Ring) ?i32 {
 
 ///>>> io_uring_queue_exit(ring)
 pub fn io_uring_queue_exit(ring: *Ring) ?void {
-    if (ring._io_uring) |io_uring| {
-        if (io_uring.ring_fd > 0) {
-            c.io_uring_queue_exit(io_uring);
-            io_uring.ring_fd = 0;
-            return;
-        }
-    }
-    return oz.raiseRuntimeError("`io_uring_queue_exit(ring)` not initialized or already exited!");
+    if (ring._io_uring.ring_fd > 0) {
+        c.io_uring_queue_exit(ring._io_uring);
+        ring._io_uring.ring_fd = 0;
+    } else return oz.raiseRuntimeError("`io_uring_queue_exit(ring)` not initialized or already exited!");
 }
 
+///TODO
+///
 ///Example
 ///    >>> cqe = Cqe(1024) # custom memory
 ///    ...
@@ -130,7 +126,7 @@ pub fn io_uring_queue_exit(ring: *Ring) ?void {
 ///Warning
 ///    - Don't use this function, till this warning is removed or else its most likely segfault!!!
 pub fn io_uring_peek_batch_cqe(_: *Ring, _: *Cqe, _: u32) ?void {
-    return oz.raiseNotImplementedError("`io_uring_peek_batch_cqe` is fully implemented yet!");
+    return oz.raiseNotImplementedError("`io_uring_peek_batch_cqe`");
     // TODO:
     // fn peekBatchCqe(ring: *Ring, cqe: *Cqe, count: u32) ?void {
     // if (cqe._array) |_| return c.io_uring_peek_batch_cqe(ring._io_uring, &cqe._io_uring_cqe, count);
@@ -364,7 +360,9 @@ pub fn io_uring_unregister_personality(ring: *Ring, id: i32) ?i32 {
 }
 
 pub fn io_uring_register_restrictions(ring: *Ring, res: *Restriction) ?i32 {
-    return e.trap_error(c.io_uring_register_restrictions(ring._io_uring, res._io_uring_restriction, @intCast(res._len)));
+    return e.trap_error(
+        c.io_uring_register_restrictions(ring._io_uring, res._io_uring_restriction, @intCast(res._len)),
+    );
 }
 
 ///>>> io_uring_enable_rings(ring)
@@ -1535,41 +1533,38 @@ pub inline fn io_uring_prep_waitid(
     c.io_uring_prep_waitid(sqe._sqe, idtype, id, @ptrCast(infop._sigset_t), options, _flags);
 }
 
-// TODO:
-// ///Warning
-// ///    - Coded but not tested!!!
-// pub inline fn io_uring_prep_futex_wake(
-//     sqe: *SQE,
-//     futex: *const u32,
-//     val: u64,
-//     mask: u64,
-//     futex_flags: ?u32,
-//     flags: ?u32,
-// ) void {
-//     const _flags = flags orelse 0;
-//     const _futex_flas = futex_flags orelse 0;
-//     c.io_uring_prep_futex_wake(sqe._sqe, futex._futex, val, mask, _futex_flas, _flags);
-// }
+pub inline fn io_uring_prep_futex_wake(
+    sqe: *SQE,
+    futex: *Futex,
+    val: u64,
+    mask: u64,
+    futex_flags: ?u32,
+    flags: ?u32,
+) void {
+    c.io_uring_prep_futex_wake(sqe._sqe, futex._futex, val, mask, futex_flags orelse 0, flags orelse 0);
+}
 
-// TODO:
-// ///Warning
-// ///    - Coded but not tested!!!
-// pub inline fn io_uring_prep_futex_wait(sqe: *SQE) void {
-//     c.io_uring_prep_futex_wait(sqe._sqe);
-// }
+pub inline fn io_uring_prep_futex_wait(
+    sqe: *SQE,
+    futex: *Futex,
+    val: u64,
+    mask: u64,
+    futex_flags: ?u32,
+    flags: ?u32,
+) void {
+    c.io_uring_prep_futex_wait(sqe._sqe, futex._futex, val, mask, futex_flags orelse 0, flags orelse 0);
+}
 
-// TODO:
-// ///Warning
-// ///    - Coded but not tested!!!
-// pub inline fn io_uring_prep_futex_waitv(sqe: *SQE) void {
-//     c.io_uring_prep_futex_waitv(sqe._sqe);
-// }
+pub inline fn io_uring_prep_futex_waitv(sqe: *SQE, futex: *Futex, flags: ?u32) ?void {
+    if (futex._futex_waitv) |v| {
+        c.io_uring_prep_futex_waitv(sqe._sqe, v, futex._len, flags orelse 0);
+    } else return oz.raiseValueError("`io_uring_prep_futex_waitv` - `vector` is not enabled in `Futex`");
+}
 
 ///Warning
 ///    - Coded but not tested!!!
 pub inline fn io_uring_prep_fixed_fd_install(sqe: *SQE, fd: i32, flags: ?u32) void {
-    const _flags = flags orelse 0;
-    c.io_uring_prep_fixed_fd_install(sqe._sqe, fd, _flags);
+    c.io_uring_prep_fixed_fd_install(sqe._sqe, fd, flags orelse 0);
 }
 
 ///Warning
@@ -1687,10 +1682,8 @@ pub inline fn io_uring_buf_ring_available(ring: *Ring, br: BufRing, bgid: u16) i
 ///Example
 ///    >>> if sqe := io_uring_get_sqe(ring):
 ///    ...   # do stuff...
-pub inline fn io_uring_get_sqe(ring: *Ring) ?Sqe {
-    if (c.io_uring_get_sqe(ring._io_uring)) |sqe| {
-        return .{ ._parent = .{ ._sqe = @ptrCast(&sqe[0]) }, ._len = 0, ._io_uring_sqe = sqe };
-    }
+pub inline fn io_uring_get_sqe(ring: *Ring) ?SQE {
+    if (c.io_uring_get_sqe(ring._io_uring)) |sqe| return .{ ._sqe = sqe };
     return null; // None
 }
 

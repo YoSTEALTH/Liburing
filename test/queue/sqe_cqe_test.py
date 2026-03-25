@@ -28,7 +28,7 @@ def test_Sqe():
     with pytest.raises(IndexError):
         assert sqe[2]
 
-    with pytest.raises(TypeError):
+    with pytest.raises(OverflowError):
         liburing.Sqe(-3)
 
 

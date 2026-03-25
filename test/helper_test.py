@@ -10,7 +10,6 @@ def test_file_index():
     assert list(ids) == [4, 5, 6]
 
     # error
-    pytest.skip("PyOZ bug.")
     with pytest.raises(ValueError):
         ids.update([4, 5, 6, 7, 8, 9])  # PyOZ raises `RuntimeError: ValueError`
 

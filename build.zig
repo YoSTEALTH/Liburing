@@ -13,7 +13,7 @@ pub fn build(b: *std.Build) !void {
     // Get PyOZ dependency
     const pyoz_dep = b.dependency("PyOZ", .{ .target = target, .optimize = optimize });
 
-    // Create the user's lib module (shared between library and stub generator)
+    // Create the user's lib module
     const user_lib_mod = b.createModule(.{
         .root_source_file = b.path("src/liburing/root.zig"),
         .optimize = optimize,
@@ -33,35 +33,16 @@ pub fn build(b: *std.Build) !void {
 
     user_lib_mod.addObjectFile(b.path(static_path));
     user_lib_mod.addIncludePath(b.path("lib/liburing/src/include"));
-    user_lib_mod.link_libc = true;
-
-    // Generate a bridge module that forces analysis of all pub decls in the
-    // user's code. This triggers @export inside pyoz.module() so the PyInit_
-    // function is automatically created — no manual boilerplate needed.
-    const bridge_wf = b.addWriteFiles();
-    const bridge_source = bridge_wf.add("_pyoz_bridge.zig",
-        \\const _mod = @import("_pyoz_mod");
-        \\comptime {
-        \\    for (@typeInfo(_mod).@"struct".decls) |decl| {
-        \\        _ = @field(_mod, decl.name);
-        \\    }
-        \\}
-    );
-    const bridge_mod = b.createModule(.{
-        .root_source_file = bridge_source,
-        .optimize = optimize,
-        .target = target,
-        .strip = strip,
-        .imports = &.{.{ .name = "_pyoz_mod", .module = user_lib_mod }},
-    });
 
     // Build the Python extension as a dynamic library
-    // Note: underscore prefix separates the .so from the Python package directory
     const lib = b.addLibrary(.{
         .name = "liburing",
         .linkage = .dynamic,
-        .root_module = bridge_mod,
+        .root_module = user_lib_mod,
     });
+
+    // Link libc (required for Python C API)
+    lib.root_module.link_libc = true;
 
     // Install the shared library
     const install = b.addInstallArtifact(lib, .{ .dest_sub_path = "liburing.so" });
