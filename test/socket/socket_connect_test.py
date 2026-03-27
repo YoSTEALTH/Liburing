@@ -51,7 +51,7 @@ def test_sockadr_un_connect(ring, cqe, tmp_dir):
     sqe.user_data = 1
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    fd = liburing.trap_error(entry.res)
+    fd = entry.res
     assert entry.user_data == 1
     liburing.io_uring_cqe_seen(ring, entry)
 
@@ -61,7 +61,7 @@ def test_sockadr_un_connect(ring, cqe, tmp_dir):
     sqe.user_data = 2
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0
+    assert entry.res == 0
     assert entry.user_data == 2
     liburing.io_uring_cqe_seen(ring, entry)
 

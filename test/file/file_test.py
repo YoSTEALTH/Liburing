@@ -61,7 +61,7 @@ def test_readv_writev(ring, cqe, tmp_dir):
         liburing.io_uring_wait_cqe(ring, cqe)
 
         entry = cqe[0]
-        liburing.trap_error(entry.res)
+        assert entry.res == 10
         assert entry.user_data == 0
         liburing.io_uring_cqe_seen(ring, entry)
 
@@ -79,7 +79,7 @@ def test_readv_writev(ring, cqe, tmp_dir):
         liburing.io_uring_wait_cqe(ring, cqe)
 
         entry = cqe[0]
-        liburing.trap_error(entry.res)
+        assert entry.res == 10
         assert entry.user_data == 1
         liburing.io_uring_cqe_seen(ring, entry)
 
@@ -132,7 +132,7 @@ def _onwait_flag(ring, cqe, path):
                 pass  # print("test_rwf_nowait_flag BlockingIOError", flush=True)
             else:
                 entry = cqe[0]
-                liburing.trap_error(entry.res)
+                assert entry.res == 10
                 assert entry.res == 6 + 4
                 assert entry.user_data == 1
                 assert one == b"hi... "

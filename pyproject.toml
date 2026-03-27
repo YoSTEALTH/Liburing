@@ -6,7 +6,7 @@ build-backend = "pyoz.backend"
 name = "liburing"
 readme = "README.md"
 license = "CC0-1.0"
-version = "2026.3.25"
+version = "2026.3.26"
 authors = [{name="Ritesh"}]
 keywords = ["python", "socket", "async", "cython", "file", "python3", "io", "syscall", "futex", "statx",
             "io-uring", "uring", "liburing"]
@@ -64,5 +64,5 @@ include-ext = ["py", "zig"]
 
 # Linux platform tag for wheel builds (default: "linux_x86_64" or "linux_aarch64")
 # Use manylinux tags only if building in a manylinux container
-# linux-platform-tag = "manylinux_2_17_x86_64"
+linux-platform-tag = "manylinux_2_17_x86_64"
 

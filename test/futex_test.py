@@ -95,7 +95,8 @@ def test_multi_wake(ring, cqe):
     for i in range(3):
         assert liburing.io_uring_wait_cqe(ring, cqe) == 0
         entry = cqe[0]
-        liburing.trap_error(entry.res)
+        if not i:
+            assert entry.res == 2
         liburing.io_uring_cqe_seen(ring, entry)
     try:
         liburing.io_uring_peek_cqe(ring, cqe)
@@ -165,7 +166,8 @@ def test_multi_wake_waitv(ring, cqe):
     for i in range(3):
         assert liburing.io_uring_wait_cqe(ring, cqe) == 0
         entry = cqe[0]
-        liburing.trap_error(entry.res)
+        if not i:
+            assert entry.res == 2
         liburing.io_uring_cqe_seen(ring, entry)
     try:
         liburing.io_uring_peek_cqe(ring, cqe)

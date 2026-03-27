@@ -1,7 +1,19 @@
-from liburing import O_CREAT, O_RDWR, Ring, Cqe, io_uring_get_sqe, \
-                     io_uring_prep_open, io_uring_prep_write, io_uring_prep_read, \
-                     io_uring_prep_close, io_uring_submit, io_uring_wait_cqe, \
-                     io_uring_cqe_seen, io_uring_queue_init, io_uring_queue_exit, trap_error
+from liburing import (
+    O_CREAT,
+    O_RDWR,
+    Ring,
+    Cqe,
+    io_uring_get_sqe,
+    io_uring_prep_open,
+    io_uring_prep_write,
+    io_uring_prep_read,
+    io_uring_prep_close,
+    io_uring_submit,
+    io_uring_wait_cqe,
+    io_uring_cqe_seen,
+    io_uring_queue_init,
+    io_uring_queue_exit,
+)
 
 
 def open(ring, cqe, path, flags):
@@ -40,9 +52,10 @@ def _submit_and_wait(ring, cqe):
     io_uring_submit(ring)  # submit entry
     io_uring_wait_cqe(ring, cqe)  # wait for entry to finish
     entry = cqe[0]
-    result = trap_error(entry.res)  # auto raise appropriate exception if failed
-    # note `entry.res` returns results, if ``< 0`` its an error, if ``>= 0`` its the value
-
+    try:
+        result = entry.res  # auto raises appropriate exception if failed
+    except Exception as e:
+        raise e  # do stuff with error
     # done with current entry so clear it from completion queue.
     io_uring_cqe_seen(ring, entry)
     return result  # type: int
@@ -54,20 +67,20 @@ def main():
     try:
         io_uring_queue_init(8, ring)
 
-        fd = open(ring, cqe, '/tmp/liburing-test-file.txt', O_CREAT | O_RDWR)
-        print('fd:', fd)
+        fd = open(ring, cqe, "/tmp/liburing-test-file.txt", O_CREAT | O_RDWR)
+        print("fd:", fd)
 
-        length = write(ring, cqe, fd, b'hi... bye!')
-        print('wrote:', length)
+        length = write(ring, cqe, fd, b"hi... bye!")
+        print("wrote:", length)
 
         content = read(ring, cqe, fd, length)
-        print('read:', content)
+        print("read:", content)
 
         close(ring, cqe, fd)
-        print('closed.')
+        print("closed.")
     finally:
         io_uring_queue_exit(ring)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

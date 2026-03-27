@@ -28,7 +28,7 @@ def test_unlink(tmp_dir, ring, cqe):
 
     for i in range(2):
         entry = cqe[i]
-        assert liburing.trap_error(entry.res) == 0
+        assert entry.res == 0
         assert entry.user_data == i + 1
     liburing.io_uring_cq_advance(ring, 2)
 
@@ -58,7 +58,7 @@ def test_unlinkat_error(tmp_dir, ring, cqe):
 
     entry = cqe[0]
     with pytest.raises(NotADirectoryError):
-        assert liburing.trap_error(entry.res) == 0
+        assert entry.res == 0
     assert entry.user_data == 1
     liburing.io_uring_cqe_seen(ring, entry)
 
@@ -71,7 +71,7 @@ def test_unlinkat_error(tmp_dir, ring, cqe):
 
     entry = cqe[0]
     with pytest.raises(IsADirectoryError):
-        assert liburing.trap_error(entry.res) == 0
+        assert entry.res == 0
     assert entry.user_data == 1
 
     liburing.io_uring_cqe_seen(ring, entry)
