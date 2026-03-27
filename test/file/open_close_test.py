@@ -12,7 +12,7 @@ def test_open_close(ring, cqe):
     liburing.io_uring_submit(ring)
     liburing.io_uring_wait_cqe(ring, cqe)  # bug: liburing.io_uring_wait_cqe
     entry = cqe[0]
-    fd = liburing.trap_error(entry.res)
+    fd = entry.res
     assert entry.user_data == 123
     liburing.io_uring_cqe_seen(ring, entry)
     # close
@@ -23,7 +23,7 @@ def test_open_close(ring, cqe):
     liburing.io_uring_submit(ring)
     liburing.io_uring_wait_cqe(ring, cqe)
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0
+    assert entry.res == 0
     assert entry.user_data == 321
 
 
@@ -37,7 +37,7 @@ def test_openat2_close(ring, cqe):
     liburing.io_uring_submit(ring)
     liburing.io_uring_wait_cqe(ring, cqe)
     entry = cqe[0]
-    fd = liburing.trap_error(entry.res)
+    fd = entry.res
     assert entry.user_data == 123
     liburing.io_uring_cqe_seen(ring, entry)
     # close
@@ -48,7 +48,7 @@ def test_openat2_close(ring, cqe):
     liburing.io_uring_submit(ring)
     liburing.io_uring_wait_cqe(ring, cqe)
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0
+    assert entry.res == 0
     assert entry.user_data == 321
 
 
@@ -66,7 +66,7 @@ def test_open_close_direct(ring, cqe):
     liburing.io_uring_submit(ring)
     liburing.io_uring_wait_cqe(ring, cqe)
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0
+    assert entry.res == 0
     assert entry.user_data == 123
     liburing.io_uring_cqe_seen(ring, entry)
     # close
@@ -77,7 +77,7 @@ def test_open_close_direct(ring, cqe):
     liburing.io_uring_submit(ring)
     liburing.io_uring_wait_cqe(ring, cqe)
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0
+    assert entry.res == 0
     assert entry.user_data == 321
     # unregister
     liburing.io_uring_unregister_files(ring)
@@ -97,8 +97,7 @@ def test_openat2_close_direct(ring, cqe, tmp_dir):
     liburing.io_uring_submit(ring)
     liburing.io_uring_wait_cqe(ring, cqe)
     entry = cqe[0]
-    result = liburing.trap_error(entry.res)
-    assert result == 0
+    assert entry.res == 0
     assert entry.user_data == 123
     liburing.io_uring_cqe_seen(ring, entry)
     # close
@@ -109,7 +108,7 @@ def test_openat2_close_direct(ring, cqe, tmp_dir):
     liburing.io_uring_submit(ring)
     liburing.io_uring_wait_cqe(ring, cqe)
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0
+    assert entry.res == 0
     assert entry.user_data == 321
     # unregister
     liburing.io_uring_unregister_files(ring)
@@ -128,7 +127,7 @@ def test_openat2_close_direct_auto_file_index_alloc(ring, cqe):
     assert liburing.io_uring_submit(ring) == 1
     assert liburing.io_uring_wait_cqe(ring, cqe) == 0
     entry = cqe[0]
-    find_index = liburing.trap_error(entry.res)
+    find_index = entry.res
     assert entry.user_data == 123
     liburing.io_uring_cqe_seen(ring, entry)
     # close
@@ -139,7 +138,7 @@ def test_openat2_close_direct_auto_file_index_alloc(ring, cqe):
     assert liburing.io_uring_submit(ring) == 1
     assert liburing.io_uring_wait_cqe(ring, cqe) == 0
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0
+    assert entry.res == 0
     assert entry.user_data == 321
     liburing.io_uring_cqe_seen(ring, entry)
     # unregister
@@ -154,4 +153,4 @@ def test_close_error(ring, cqe):
     assert liburing.io_uring_wait_cqe(ring, cqe) == 0
     assert cqe[0].user_data == 123
     with pytest.raises(OSError, match="Bad file descriptor"):
-        liburing.trap_error(cqe[0].res)
+        cqe[0].res

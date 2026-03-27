@@ -21,7 +21,7 @@ def test_getsockname(ring, cqe):
         sqe.user_data = i
         assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
         entry = cqe[0]
-        sockfd = liburing.trap_error(entry.res)
+        sockfd = entry.res
         assert entry.user_data == i
         liburing.io_uring_cqe_seen(ring, entry)
 
@@ -31,7 +31,7 @@ def test_getsockname(ring, cqe):
         sqe.user_data = i + 1
         assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
         entry = cqe[0]
-        liburing.trap_error(entry.res)
+        assert entry.res == 0
         assert entry.user_data == i + 1
         liburing.io_uring_cqe_seen(ring, entry)
 
@@ -42,7 +42,7 @@ def test_getsockname(ring, cqe):
         sqe.user_data = i + 2
         assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
         entry = cqe[0]
-        liburing.trap_error(entry.res)
+        assert entry.res == 0
         assert entry.user_data == i + 2
         liburing.io_uring_cqe_seen(ring, entry)
 
@@ -60,6 +60,6 @@ def test_getsockname(ring, cqe):
         sqe.user_data = i + 1
         assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
         entry = cqe[0]
-        liburing.trap_error(entry.res)
+        assert entry.res == 0
         assert entry.user_data == i + 1
         liburing.io_uring_cqe_seen(ring, entry)

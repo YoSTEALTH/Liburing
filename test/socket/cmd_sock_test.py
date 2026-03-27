@@ -12,7 +12,7 @@ def test_setsockopt_getsockopt(ring, cqe):
     sqe.user_data = 1
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert (sockfd := liburing.trap_error(entry.res)) > 0
+    assert (sockfd := entry.res) > 0
     assert entry.user_data == 1
     liburing.io_uring_cqe_seen(ring, entry)
 
@@ -27,7 +27,7 @@ def test_setsockopt_getsockopt(ring, cqe):
     sqe.user_data = 2
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0  # return `sizeof` int
+    assert entry.res == 0  # return `sizeof` int
     assert entry.user_data == 2
     liburing.io_uring_cqe_seen(ring, entry)
     assert int.from_bytes(val_set, "little") == 1
@@ -39,7 +39,7 @@ def test_setsockopt_getsockopt(ring, cqe):
     sqe.user_data = 3
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 4  # return `sizeof` int
+    assert entry.res == 4  # return `sizeof` int
     assert entry.user_data == 3
     liburing.io_uring_cqe_seen(ring, entry)
     assert int.from_bytes(val_get, "little") == 1
@@ -51,7 +51,7 @@ def test_setsockopt_getsockopt(ring, cqe):
     sqe.user_data = 4
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0
+    assert entry.res == 0
     assert entry.user_data == 4
     liburing.io_uring_cqe_seen(ring, entry)
 
@@ -65,7 +65,7 @@ def test_cmd_sock(ring, cqe):
     sqe.user_data = 1
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert (sockfd := liburing.trap_error(entry.res)) > 0
+    assert (sockfd := entry.res) > 0
     assert entry.user_data == 1
     liburing.io_uring_cqe_seen(ring, entry)
 
@@ -83,7 +83,7 @@ def test_cmd_sock(ring, cqe):
     sqe.user_data = 2
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0
+    assert entry.res == 0
     assert entry.user_data == 2
     liburing.io_uring_cqe_seen(ring, entry)
     assert int.from_bytes(val_set, "big") == 1
@@ -102,7 +102,7 @@ def test_cmd_sock(ring, cqe):
     sqe.user_data = 3
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 4  # return `len()` int
+    assert entry.res == 4  # return `len()` int
     assert entry.user_data == 3
     liburing.io_uring_cqe_seen(ring, entry)
     assert int.from_bytes(val_get, "little") == 1
@@ -113,6 +113,6 @@ def test_cmd_sock(ring, cqe):
     sqe.user_data = 4
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert liburing.trap_error(entry.res) == 0
+    assert entry.res == 0
     assert entry.user_data == 4
     liburing.io_uring_cqe_seen(ring, entry)

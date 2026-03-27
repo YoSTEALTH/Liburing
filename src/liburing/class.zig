@@ -1,5 +1,6 @@
 //! Liburing - io_uring related classes
 const c = @import("c.zig").c;
+const e = @import("error.zig");
 const oz = @import("PyOZ");
 const std = @import("std");
 const consts = @import("const.zig");
@@ -164,8 +165,8 @@ pub const CQE = extern struct {
         return self._cqe.user_data;
     }
 
-    pub fn get_res(self: *const Self) i32 {
-        return self._cqe.res;
+    pub fn get_res(self: *const Self) ?i32 {
+        return e.trap_error(self._cqe.res);
     }
 
     pub fn get_flags(self: *const Self) u32 {
@@ -199,8 +200,8 @@ pub const Cqe = extern struct {
     // _array: ?[*]CQE = null, // custom memory for batch cqe
     _io_uring_cqe: ?[*]c.io_uring_cqe, // Note: Memory is managed by `io_uring`
 
-    // TODO:
     pub fn __new__(no: ?u32) ?Cqe {
+        // TODO: `no` is need to get `io_uring_peek_batch_cqe` working
         if (no) |_| return oz.raiseNotImplementedError("`Cqe(no)` - Custom memory allocation not coded yet!");
         return .{ ._io_uring_cqe = null };
     }
