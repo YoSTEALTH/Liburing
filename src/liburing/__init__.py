@@ -2,4 +2,4 @@ from .liburing import *  # noqa
 from .version import *  # noqa
 
 
-__version__ = "2026.3.26"
+__version__ = "2026.3.30"
