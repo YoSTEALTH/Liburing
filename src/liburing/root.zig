@@ -3,6 +3,11 @@ const oz = @import("PyOZ");
 
 pub const Liburing = oz.module(.{
     .name = "liburing",
+
+    // `uring.py` wraps it.
+    .funcs = &.{
+        oz.func("_io_uring_queue_init_mem", @import("uring.zig")._io_uring_queue_init_mem, null),
+    },
     .from = &.{
         oz.withSource(@import("const.zig"), @embedFile("const.zig")),
         oz.withSource(@import("class.zig"), @embedFile("class.zig")),
