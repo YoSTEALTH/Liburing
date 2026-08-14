@@ -421,6 +421,17 @@ pub const Param = extern struct {
 
     const Self = @This();
 
+    pub fn __new__(flags: ?u32) !Self {
+        const p: *c.io_uring_params = try std.heap.c_allocator.create(c.io_uring_params);
+        p.* = std.mem.zeroes(c.io_uring_params);
+        p.flags = flags orelse 0;
+        return .{ ._io_uring_params = p };
+    }
+
+    pub fn __del__(self: *const Self) void {
+        if (self._io_uring_params) |p| std.heap.c_allocator.destroy(p);
+    }
+
     pub fn get_sq_entries(self: *const Self) ?u32 {
         if (self._io_uring_params) |p| return p.sq_entries;
         return oz.raiseRuntimeError("`Param()` not initialized properly!");

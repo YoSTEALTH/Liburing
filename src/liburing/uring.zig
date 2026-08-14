@@ -69,10 +69,13 @@ pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
     return (c.io_uring_opcode_supported(probe._io_uring_probe, op) == 1);
 }
 
-///Warning
-///    - Coded but not tested!!!
-pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?*anyopaque, buf_size: usize) ?i32 {
-    return e.trap_error(c.io_uring_queue_init_mem(entries, ring._io_uring, p._io_uring_params, buf, buf_size));
+///Internal - wrapped by Python `io_uring_queue_init_mem` (see `uring.py`) which accepts
+///the buffer directly and passes a `memoryview` here. Returns bytes used from `buf`.
+pub fn _io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: oz.MemoryView) ?i32 {
+    if (ring._io_uring.ring_fd > 0) return oz.raiseRuntimeError("`io_uring_queue_init_mem(ring)` already initialized!");
+    const params = p._io_uring_params orelse
+        return oz.raiseValueError("`io_uring_queue_init_mem` - `Param` not initialized!!");
+    return e.trap_error(c.io_uring_queue_init_mem(entries, ring._io_uring, params, @ptrCast(@constCast(buf.data.ptr)), buf.data.len));
 }
 
 pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) ?i32 {
