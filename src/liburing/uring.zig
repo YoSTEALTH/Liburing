@@ -108,6 +108,27 @@ pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.Wr
     return used;
 }
 
+/// Setup `Ring` like `io_uring_queue_init` but with a `Param`, which lets the caller pass
+/// setup flags in and read back what the kernel actually gave.
+///
+/// Note
+///     - The kernel fills `param` in on success: `sq_entries`, `cq_entries` (defaults to `2x`
+///     `sq_entries`), `features` and `flags` (liburing may add its own, e.g. `IORING_SETUP_NO_SQARRAY`).
+///     - `entries` is rounded up to a power of `2` and must be `1-32768`, unless
+///     `IORING_SETUP_CLAMP` is set, which caps it instead of raising `OSError`.
+///     - `IORING_SETUP_DEFER_TASKRUN` requires `IORING_SETUP_SINGLE_ISSUER`.
+///
+/// Example
+///     >>> ring = Ring()
+///     >>> param = Param()
+///     >>> param.flags = IORING_SETUP_SINGLE_ISSUER
+///     >>> try:
+///     ...     io_uring_queue_init_params(1024, ring, param)
+///     ...     param.sq_entries
+///     1024
+///     ...     # do stuff ...
+///     >>> finally:
+///     ...     io_uring_queue_exit(ring)
 pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_params(ring)` already initialized!", .{});
     return support.setup(c.io_uring_queue_init_params(entries, &ring._io_uring, &param._io_uring_params), param._io_uring_params.flags);
