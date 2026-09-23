@@ -153,9 +153,20 @@ pub fn io_uring_queue_mmap(fd: i32, ring: *Ring, param: *Param) py.Error!i32 {
     return py.checkErrno(c.io_uring_queue_mmap(fd, &param._io_uring_params, &ring._io_uring));
 }
 
+/// Apply `madvise(MADV_DONTFORK)` to `ring`'s SQE array, SQ ring and CQ ring, so they are
+/// not mapped into a child process after `fork()`.
+///
+/// By default the rings are `MAP_SHARED`, so a forked child shares them with the parent and both
+/// could submit/reap on the same queue. After this call the child simply has no such memory:
+/// touching `ring` in the child (e.g. `io_uring_get_sqe`) crashes it with `SIGSEGV`.
+/// The parent is not affected and keeps using `ring` as normal.
+///
+/// Note
+///     - `ring` must be initialized, else raises `RuntimeError`.
+///
 /// >>> io_uring_ring_dontfork(ring)
+/// 0
 pub fn io_uring_ring_dontfork(ring: *Ring) py.Error!i32 {
-    // note: currently there is no `test` or `man` page for `io_uring_ring_dontfork` so guessing how it should work!
     return py.checkErrno(c.io_uring_ring_dontfork(try ring.checkedPtr()));
 }
 
