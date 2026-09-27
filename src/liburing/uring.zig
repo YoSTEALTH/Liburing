@@ -170,6 +170,11 @@ pub fn io_uring_ring_dontfork(ring: *Ring) py.Error!i32 {
     return py.checkErrno(c.io_uring_ring_dontfork(try ring.checkedPtr()));
 }
 
+/// Tear down `ring`: unmap its Submission & Completion Queues and close its `fd`.
+///
+/// Note
+///     - Raises `RuntimeError` if `ring` is not initialized or already exited.
+///
 /// >>> io_uring_queue_exit(ring)
 pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
     if (ring._io_uring.ring_fd > 0) {
