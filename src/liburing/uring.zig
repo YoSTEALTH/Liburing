@@ -38,6 +38,7 @@ const ZcrxCtrl = class.ZcrxCtrl;
 const Ring = class.Ring;
 const CQE = class.CQE;
 const Cqe = class.Cqe;
+const CqeBatch = class.CqeBatch;
 const SQE = class.SQE;
 const Sqe = class.Sqe;
 const Bpf = class.Bpf;
@@ -188,22 +189,24 @@ pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
     } else return py.raiseRuntimeError("`io_uring_queue_exit(ring)` not initialized or already exited!", .{});
 }
 
-/// TODO
+/// Peek up to `count` (default: all of `batch`) ready completions without waiting.
+/// Returns how many were placed in `batch`, `0` if none are ready.
 ///
 /// Example
-///     >>> cqe = Cqe(1024) # custom memory
-///     ...
-///     >>> io_uring_peek_batch_cqe(ring, cqe, 1024)
-///     123
+///     >>> batch = CqeBatch(64)
+///     >>> n = io_uring_peek_batch_cqe(ring, batch)
+///     >>> for cqe in batch:
+///     ...     cqe.user_data  # do stuff
+///     >>> io_uring_cq_advance(ring, n)
 ///
-/// Warning
-///     - Don't use this function, till this warning is removed or else its most likely segfault!!!
-pub fn io_uring_peek_batch_cqe(ring: *Ring, cqe: *Cqe, count: u32) py.Error!void {
-    _ = .{ ring, cqe, count };
-    return py.raiseNotImplementedError("`io_uring_peek_batch_cqe`", .{});
-    // TODO:
-    // fn peekBatchCqe(ring: *Ring, cqe: *Cqe, count: u32) py.Error!void {
-    // if (cqe._array) |_| return c.io_uring_peek_batch_cqe(try ring.checkedPtr(), cqe.outFor(ring), count);
+/// Note
+///     - Does not consume them, call `io_uring_cq_advance(ring, n)` after reading.
+pub fn io_uring_peek_batch_cqe(ring: *Ring, batch: *CqeBatch, count: ?u32) py.Error!u32 {
+    const n = count orelse batch._len;
+    if (n > batch._len) return py.raiseValueError("`io_uring_peek_batch_cqe` - `count` larger than `CqeBatch`", .{});
+    batch._count = c.io_uring_peek_batch_cqe(try ring.checkedPtr(), batch._array.?, n);
+    class.setOwned(&batch._ring, class.RingType.object(ring));
+    return batch._count;
 }
 
 /// Example
