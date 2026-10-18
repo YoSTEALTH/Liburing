@@ -214,15 +214,23 @@ pub fn io_uring_peek_batch_cqe(ring: *Ring, batch: *CqeBatch, count: ?u32) py.Er
 ///     # or
 ///     >>> ts = timespec(1.5)  # timeout
 ///     >>>io_uring_wait_cqes(ring, cqe, 123, ts)
-pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec) py.Error!i32 {
-    const _sigmask = null; // TODO
+///
+/// Note
+///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
+///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
+pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, sigmask: ?*SigsetT) py.Error!i32 {
+    const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const _ts = if (ts) |t| t._timespec else null;
     return py.checkErrno(c.io_uring_wait_cqes(try ring.checkedPtr(), cqe.outFor(ring), wait_nr, _ts, _sigmask));
 }
 
 /// >>> io_uring_wait_cqes_min_timeout(ring)
-pub fn io_uring_wait_cqes_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_ts_usec: u32) py.Error!i32 {
-    const _sigmask = null; // TODO
+///
+/// Note
+///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
+///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
+pub fn io_uring_wait_cqes_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_ts_usec: u32, sigmask: ?*SigsetT) py.Error!i32 {
+    const _sigmask = if (sigmask) |s| s._sigset_t else null;
     return py.checkErrno(c.io_uring_wait_cqes_min_timeout(
         try ring.checkedPtr(),
         cqe.outFor(ring),
@@ -256,9 +264,13 @@ pub fn io_uring_submit_and_wait(ring: *Ring, wait_nr: u32) py.Error!i32 {
 /// # or
 /// >>> ts = timespec(0.5)
 /// >>> io_uring_submit_and_wait_timeout(ring, cqe, 1, ts)
-pub fn io_uring_submit_and_wait_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec) py.Error!i32 {
+///
+/// Note
+///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
+///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
+pub fn io_uring_submit_and_wait_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, sigmask: ?*SigsetT) py.Error!i32 {
     defer ring.releaseSubmitted(); // the kernel has read the prepared paths
-    const _sigmask = null; // TODO
+    const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const _ts = if (ts) |t| t._timespec else null;
     return py.checkErrno(c.io_uring_submit_and_wait_timeout(
         try ring.checkedPtr(),
@@ -269,9 +281,12 @@ pub fn io_uring_submit_and_wait_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts
     ));
 }
 
-pub fn io_uring_submit_and_wait_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_wait: u32) py.Error!i32 {
+/// Note
+///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
+///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
+pub fn io_uring_submit_and_wait_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_wait: u32, sigmask: ?*SigsetT) py.Error!i32 {
     defer ring.releaseSubmitted(); // the kernel has read the prepared paths
-    const _sigmask = null; // TODO
+    const _sigmask = if (sigmask) |s| s._sigset_t else null;
 
     return py.checkErrno(c.io_uring_submit_and_wait_min_timeout(
         try ring.checkedPtr(),
@@ -571,8 +586,8 @@ pub fn io_uring_submit_and_get_events(ring: *Ring) py.Error!i32 {
     return py.checkErrno(c.io_uring_submit_and_get_events(try ring.checkedPtr()));
 }
 
-pub fn io_uring_enter(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sig: *SigsetT) py.Error!i32 {
-    return py.checkErrno(c.io_uring_enter(fd, to_submit, min_complete, flags, sig._sigset_t));
+pub fn io_uring_enter(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sig: ?*SigsetT) py.Error!i32 {
+    return py.checkErrno(c.io_uring_enter(fd, to_submit, min_complete, flags, if (sig) |s| s._sigset_t else null));
 }
 
 pub fn io_uring_enter2(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sz: usize, arg: ?usize) py.Error!i32 {
