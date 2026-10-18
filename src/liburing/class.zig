@@ -1299,12 +1299,27 @@ pub const Bpf = struct {
     }
 };
 
-/// SigsetT
+/// Signal set (`sigset_t`), e.g. for `sigmask` of wait functions.
+///
+/// Example
+///     >>> SigsetT([signal.SIGINT, signal.SIGTERM])
+///     >>> SigsetT()  # empty set
 pub const SigsetT = struct {
     _sigset_t: ?*c.__sigset_t = null,
 
-    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
+
+    pub fn __new__(self: *Self, signals: ?py.Sequence(i32)) py.Error!void {
+        const set = std.heap.c_allocator.create(c.__sigset_t) catch return e.raiseMemoryError("Out of Memory!");
+        _ = c.sigemptyset(set);
+        if (signals) |list| for (list.items) |signum| {
+            if (c.sigaddset(set, signum) != 0) {
+                std.heap.c_allocator.destroy(set);
+                return py.raiseValueError("`SigsetT(signals)` - invalid signal {d}", .{signum});
+            }
+        };
+        self._sigset_t = set;
+    }
 
     pub fn __del__(self: *Self) void {
         if (self._sigset_t) |ptr| std.heap.c_allocator.destroy(ptr);
