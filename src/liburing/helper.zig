@@ -1,13 +1,20 @@
 //! Liburing - Helper functions
 const c = @import("c.zig").c;
+const e = @import("error.zig");
 const n = @import("enum.zig");
-const oz = @import("PyOZ");
+const setu = @import("setu");
 const std = @import("std");
 const class = @import("class.zig");
+
+const py = setu.py;
+const sc = setu.c;
+const Object = sc.Object;
 
 const Ring = class.Ring;
 const Sqe = class.Sqe;
 const Timespec = class.Timespec;
+
+pub const FileIndexType = setu.Class(FileIndex, @embedFile("helper.zig"));
 
 ///File Index
 ///
@@ -26,53 +33,50 @@ const Timespec = class.Timespec;
 ///Note
 ///    - Makes copy of the list provided & shares it with `io_uring`,
 ///    so modifying python list will not effect `FileIndex` already submitting.
-pub const FileIndex = extern struct {
-    _fds: [*]i32,
-    _len: usize,
-    _index: usize,
+pub const FileIndex = struct {
+    _fds: ?[*]i32 = null,
+    _len: usize = 0,
+    _index: usize = 0,
 
     const Self = @This();
 
-    pub fn __new__(list: oz.ListView(i32)) !Self {
-        const _len = list.len();
-        var fds = try std.heap.c_allocator.alloc(i32, _len);
-        for (0.._len) |i| {
-            if (list.get(i)) |fd| {
-                fds[i] = fd;
-            } else return error.TypeError;
-        }
-        return .{ ._fds = @ptrCast(fds), ._len = _len, ._index = 0 };
+    pub fn __new__(self: *Self, list: py.Sequence(i32)) py.Error!void {
+        const fds = std.heap.c_allocator.dupe(i32, list.items) catch return e.raiseMemoryError("Out of Memory!");
+        self._fds = fds.ptr;
+        self._len = fds.len;
     }
 
     pub fn __del__(self: *Self) void {
-        std.heap.c_allocator.free(self._fds[0..self._len]);
+        if (self._fds) |fds| std.heap.c_allocator.free(fds[0..self._len]);
     }
 
-    pub fn __iter__(self: *Self) *Self {
-        self._index = 0;
-        return self;
+    pub fn __iter__(self: *Object) *Object {
+        FileIndexType.data(self)._index = 0;
+        return class.keep(self);
     }
 
     pub fn __next__(self: *Self) ?i32 {
-        if (self._index >= self._len) return null; // None
+        if (self._index >= self._len) return null; // StopIteration
         defer self._index += 1;
-        return self._fds[self._index];
+        return self._fds.?[self._index];
     }
 
-    pub fn __getitem__(self: *const Self, index: usize) !i32 {
-        if (index < self._len) return self._fds[index];
-        return error.IndexError;
+    pub fn __getitem__(self: *const Self, index: usize) py.Error!i32 {
+        if (index < self._len) return self._fds.?[index];
+        return py.raiseIndexError("`FileIndex` - index out of range", .{});
     }
 
-    pub fn update(self: *Self, list: oz.ListView(i32)) !void {
-        const _len = list.len();
-        if (self._len != _len) return error.ValueError;
+    pub fn update(self: *Self, list: py.Sequence(i32)) py.Error!void {
+        if (self._len != list.items.len) return py.raiseValueError(
+            "`FileIndex.update(list)` - length of {d} does not match {d}",
+            .{ list.items.len, self._len },
+        );
+        if (self._fds) |fds| @memcpy(fds[0..self._len], list.items);
+    }
 
-        for (0.._len) |i| {
-            if (list.get(i)) |fd| {
-                self._fds[i] = fd;
-            } else return error.ValueError;
-        }
+    /// The registered file descriptors (Zig side).
+    pub fn fdSlice(self: *const Self) []i32 {
+        return if (self._fds) |fds| fds[0..self._len] else &.{};
     }
 };
 
@@ -88,20 +92,24 @@ pub const FileIndex = extern struct {
 ///    ...     op, supported
 ///    IORING_OP_NOP True
 ///
-pub fn probe() ?oz.Dict([]const u8, bool) {
+pub fn probe() py.Error!*Object {
     const last: usize = @intFromEnum(n.io_uring_op.IORING_OP_LAST);
-    const items = std.meta.fields(n.io_uring_op);
-    var entries: [last]oz.Dict([]const u8, bool).Entry = undefined;
+    const items = @typeInfo(n.io_uring_op).@"enum".field_names;
 
-    if (c.io_uring_get_probe()) |p| {
-        defer c.io_uring_free_probe(p);
+    const p = c.io_uring_get_probe() orelse
+        return py.raiseRuntimeError("Linux kernel version does not support `probe()`", .{});
+    defer c.io_uring_free_probe(p);
 
-        inline for (0..last) |i| {
-            entries[i] = .{ .key = items[i].name, .value = (c.io_uring_opcode_supported(p, items[i].value) == 1) };
-        }
-        return .{ .entries = &entries };
+    const dict = sc.PyDict_New() orelse return error.PythonError;
+    errdefer py.decref(dict);
+    inline for (items[0..last]) |name| {
+        const op = @intFromEnum(@field(n.io_uring_op, name));
+        const value = if (c.io_uring_opcode_supported(p, op) == 1) py.trueObj() else py.falseObj();
+        const key = try py.new(name);
+        defer py.decref(key);
+        if (sc.PyDict_SetItem(dict, key, value) < 0) return error.PythonError;
     }
-    return oz.raiseRuntimeError("Linux kernel version does not support `probe()`");
+    return dict;
 }
 
 ///Kernel Timespec
@@ -111,10 +119,11 @@ pub fn probe() ?oz.Dict([]const u8, bool) {
 ///    >>> ts = timespec(1.5)      # float
 ///    >>> io_uring_prep_timeout(sqe, ts, ...)
 ///
-pub fn timespec(second: f64) ?Timespec {
+pub fn timespec(second: f64) py.Error!*Object {
     var ts = std.heap.c_allocator.create(c.__kernel_timespec) catch {
-        return oz.raiseMemoryError("`timespec()` - Out of Memory!");
+        return e.raiseMemoryError("`timespec()` - Out of Memory!");
     };
+    errdefer std.heap.c_allocator.destroy(ts);
     // split float to second & nano second
     if (second != 0.0) {
         ts.tv_sec = @intFromFloat(second);
@@ -123,7 +132,7 @@ pub fn timespec(second: f64) ?Timespec {
     } else {
         ts.* = std.mem.zeroes(c.__kernel_timespec); // set default value to `0`
     }
-    return .{ ._timespec = ts };
+    return class.TimespecType.new(.{ ._timespec = ts });
 }
 
 ///Put `io_uring_sqe` into `io_uring` ring's memory.
@@ -157,6 +166,7 @@ pub fn timespec(second: f64) ?Timespec {
 ///    - Returns `False` if queue is full. Will need to `io_uring_submit()` and try again.
 ///    - Returns `False` if `entries` < `len(sqe)`
 pub fn put_sqe(ring: *Ring, sqe: *Sqe) bool {
+    const io_uring = &ring._io_uring;
     //note:
     //    - its ok to submit `0` sqe thus `True`
     //    - this also accounts for `ptr` gotten from `io_uring_get_sqe`
@@ -165,13 +175,13 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) bool {
 
     if (sqe._io_uring_sqe) |_sqe| {
         if (sqe._len == 1) { // single
-            if (c.io_uring_get_sqe(ring._io_uring)) |s| {
+            if (c.io_uring_get_sqe(io_uring)) |s| {
                 @memcpy(s, _sqe[0..1]);
                 return true;
             }
-        } else if (c.io_uring_sq_space_left(ring._io_uring) >= sqe._len) { // multiple
+        } else if (c.io_uring_sq_space_left(io_uring) >= sqe._len) { // multiple
             for (0..sqe._len) |i| {
-                if (c.io_uring_get_sqe(ring._io_uring)) |s| {
+                if (c.io_uring_get_sqe(io_uring)) |s| {
                     @memcpy(s, _sqe[i .. i + 1]);
                 } // else should not trigger since space left is per-checked!
             }
@@ -179,4 +189,32 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) bool {
         }
         return false;
     } else return false;
+}
+
+/// A path argument (`str` or `os.PathLike`, not `bytes`, as with PyOZ): `path` is the UTF-8 of
+/// the `str` that `os.fspath` gives, so it stays valid while that `str` lives, past the call:
+/// io_uring reads it at submit time, not when the `sqe` is prepared.
+///
+/// Note
+///     - `str` arguments (and `pathlib` paths, which cache their `str`) live as long as the
+///       caller's object; `deinit` drops only the reference this took.
+pub const Path = struct {
+    obj: *Object,
+    path: [:0]const u8,
+
+    pub fn deinit(self: Path) void {
+        py.decref(self.obj);
+    }
+};
+
+extern fn PyOS_FSPath(*Object) ?*Object;
+
+pub fn toPath(obj: *Object) py.Error!Path {
+    if (sc.PyBytes_Check(obj) != 0) return py.raiseTypeError("expected `str` or `os.PathLike`, not `bytes`", .{});
+    const text = PyOS_FSPath(obj) orelse return error.PythonError; // a new reference
+    errdefer py.decref(text);
+    if (sc.PyUnicode_Check(text) == 0) return py.raiseTypeError("expected `str` or `os.PathLike`, not `bytes`", .{});
+    var len: sc.ssize = 0;
+    const ptr = sc.PyUnicode_AsUTF8AndSize(text, &len) orelse return error.PythonError;
+    return .{ .obj = text, .path = ptr[0..@intCast(len) :0] };
 }
