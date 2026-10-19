@@ -308,6 +308,38 @@ pub const Cqe = struct {
         return self.entry(&cqes[pos], ring_obj, ring);
     }
 
+    /// The `user_data` of `cqe[index]`, without creating an entry object.
+    ///
+    /// Example
+    ///     >>> for i in range(io_uring_cq_ready(ring)):
+    ///     ...     cqe.user_data_at(i)
+    pub fn user_data_at(self: *const Cqe, index: isize) py.Error!u64 {
+        return (try self.slotPtr(index)).user_data;
+    }
+
+    /// The `res` of `cqe[index]` (`OSError` if negative, as `CQE.res`), without creating an entry object.
+    pub fn res_at(self: *const Cqe, index: isize) py.Error!i32 {
+        const res = (try self.slotPtr(index)).res;
+        if (res >= 0) return res;
+        return py.checkErrno(res);
+    }
+
+    /// The `index`-th completion after `cqe[0]` in the ring's queue (wrapping), checked like `__getitem__`.
+    inline fn slotPtr(self: *const Cqe, index: isize) py.Error!*c.io_uring_cqe {
+        const first = self._io_uring_cqe orelse return py.raiseIndexError("`Cqe` - out of completed entries", .{});
+        const ring = try RingType.data(self._ring.?).checkedPtr();
+        const cq = &ring.cq;
+        if (index < 0 or index >= cq.ring_entries) return py.raiseIndexError(
+            "`Cqe[{d}]` - out of range, the ring has {d} completion entries",
+            .{ index, cq.ring_entries },
+        );
+        const cqes: [*]c.io_uring_cqe = cq.cqes;
+        const shift: u5 = @intCast(c.io_uring_cqe_shift(ring)); // cast: 0 or 1 (`IORING_SETUP_CQE32`)
+        const slot = (@intFromPtr(first) - @intFromPtr(cqes)) / @sizeOf(c.io_uring_cqe);
+        const pos = (((slot >> shift) + @as(usize, @intCast(index))) & cq.ring_mask) << shift; // cast: 0 <= index
+        return &cqes[pos];
+    }
+
     /// A `CQE` for `cqe` (a new reference): a reused one that only `_reuse` holds (no one can see
     /// it change), else a new one, kept in `_reuse` if there is room.
     fn entry(self: *Cqe, cqe: *c.io_uring_cqe, ring_obj: *Object, ring: *c.io_uring) py.Error!*Object {
