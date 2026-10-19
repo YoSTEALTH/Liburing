@@ -34,24 +34,24 @@ pub const EpollEventType = setu.Class(EpollEvent, @embedFile("class.zig"));
 pub const RecvmsgOutType = setu.Class(RecvmsgOut, @embedFile("class.zig"));
 pub const OpenHowType = setu.Class(OpenHow, @embedFile("class.zig"));
 
-///Vector I/O data structure
+/// Vector I/O data structure
 ///
-///Example
+/// Example
 ////   # Read
-///    # ----
-///    >>> buffer = [bytearray(1), bytearray(2), bytearray(3)]
-///    >>> iov_read = Iovec(buffer)
-///    >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
+///     # ----
+///     >>> buffer = [bytearray(1), bytearray(2), bytearray(3)]
+///     >>> iov_read = Iovec(buffer)
+///     >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
 ///
-///    # Write
-///    # -----
-///    >>> buffer = [b'1', b'22', b'333']
-///    >>> iov_write = Iovec(buffer)
-///    >>> io_uring_prep_writev(sqe, fd, iov_write, ...)
+///     # Write
+///     # -----
+///     >>> buffer = [b'1', b'22', b'333']
+///     >>> iov_write = Iovec(buffer)
+///     >>> io_uring_prep_writev(sqe, fd, iov_write, ...)
 ///
-///Note
-///    - Make sure to hold on to variable you are passing into `Iovec` so it does not get
-///    garbage collected before you get the chance to use it!
+/// Note
+///     - Make sure to hold on to variable you are passing into `Iovec` so it does not get
+///     garbage collected before you get the chance to use it!
 pub const Iovec = struct {
     _len: usize = 0,
     _iovec: ?[*]c.iovec = null,
@@ -90,16 +90,16 @@ pub const Iovec = struct {
     }
 };
 
-///Kernel Timespec
+/// Kernel Timespec
 ///
-///Example
-///    >>> ts = timespec(2)
-///    >>> ts.sec
-///    2
-///    >>> ts.nsec
-///    0
-///    >>> ts.sec = 1           # second
-///    >>> ts.nsec = 500000000  # nanosecond
+/// Example
+///     >>> ts = timespec(2)
+///     >>> ts.sec
+///     2
+///     >>> ts.nsec
+///     0
+///     >>> ts.sec = 1           # second
+///     >>> ts.nsec = 500000000  # nanosecond
 pub const Timespec = struct {
     _timespec: ?*c.__kernel_timespec = null,
 
@@ -141,12 +141,12 @@ pub const Timespec = struct {
     }
 };
 
-///I/O URing
+/// I/O URing
 ///
-///Example
-///    >>> ring = Ring()
-///    >>> io_uring_queue_init(8, ring)
-///    >>> io_uring_queue_exit(ring)
+/// Example
+///     >>> ring = Ring()
+///     >>> io_uring_queue_init(8, ring)
+///     >>> io_uring_queue_exit(ring)
 pub const Ring = struct {
     _io_uring: c.io_uring = std.mem.zeroes(c.io_uring), // lives inside the Python object
     /// Objects the kernel still has to read (path strings, ...): a `list`, dropped once a submit has
@@ -230,22 +230,22 @@ pub const CQE = struct {
     }
 };
 
-///I/O completion data structure (Completion Queue Entry) (CQE)
+/// I/O completion data structure (Completion Queue Entry) (CQE)
 ///
-///Example
-///    >>> cqe = Cqe()
-///    ...
-///    >>> io_uring_wait_cqe(ring, cqe)
-///    >>> ready = io_uring_cq_ready(ring)
+/// Example
+///     >>> cqe = Cqe()
+///     ...
+///     >>> io_uring_wait_cqe(ring, cqe)
+///     >>> ready = io_uring_cq_ready(ring)
 ///
-///    >>> for i in range(ready):
-///    ...     cqe[i] # do stuff
+///     >>> for i in range(ready):
+///     ...     cqe[i] # do stuff
 ///
-///    >>> io_uring_cq_advance(ready) # free cqe already viewed.
+///     >>> io_uring_cq_advance(ready) # free cqe already viewed.
 ///
-///Note
-///    - `cqe` items e.g: `cqe[0], cqe[1], ...` are not cached (should be called/used only once) and
-///    is very dynamic, so make copy if you want to keep data alive for longer use.
+/// Note
+///     - `cqe` items e.g: `cqe[0], cqe[1], ...` are not cached (should be called/used only once) and
+///     is very dynamic, so make copy if you want to keep data alive for longer use.
 pub const Cqe = struct {
     // TODO:
     // _array: ?[*]CQE = null, // custom memory for batch cqe
@@ -268,9 +268,12 @@ pub const Cqe = struct {
         return &self._io_uring_cqe;
     }
 
-    ///Note
-    ///    - `cqe[i]` is the `i`-th entry after `cqe[0]` in the ring's completion queue (wrapping
-    ///      around its end); `IndexError` past the queue size.
+    /// Note
+    ///     - `cqe[i]` is the `i`-th entry after `cqe[0]` in the ring's completion queue (wrapping
+    ///       around its end); `IndexError` past the queue size.
+    ///
+    /// Type
+    ///     return: CQE
     pub fn __getitem__(self: *const Cqe, index: isize) py.Error!*Object {
         const first = self._io_uring_cqe orelse return py.raiseIndexError("`Cqe` - out of completed entries", .{});
         const ring_obj = self._ring.?;
@@ -288,12 +291,12 @@ pub const Cqe = struct {
     }
 };
 
-///Example
-///    >>> for i in CqeIter(ring, cqe):
-///    ...     cqe[0].user_data == i  # do stuff
+/// Example
+///     >>> for i in CqeIter(ring, cqe):
+///     ...     cqe[0].user_data == i  # do stuff
 ///
-///Note
-///    - Only `cqe[0]` gets updated with new completed entry value.
+/// Note
+///     - Only `cqe[0]` gets updated with new completed entry value.
 pub const CqeIter = struct {
     _io_uring_cqe_iter: c.io_uring_cqe_iter = std.mem.zeroes(c.io_uring_cqe_iter),
     _index: usize = 0,
@@ -381,32 +384,32 @@ pub const SQE = struct {
     }
 };
 
-///IO submission data structure (Submission Queue Entry) (SQE)
+/// IO submission data structure (Submission Queue Entry) (SQE)
 ///
-///Example
-///    # single
-///    >>> sqe = Sqe()  # defaults to `Sqe(1)`
-///    >>> io_uring_prep_read(sqe, ...)
-///    >>> sqe.user_data = 1
+/// Example
+///     # single
+///     >>> sqe = Sqe()  # defaults to `Sqe(1)`
+///     >>> io_uring_prep_read(sqe, ...)
+///     >>> sqe.user_data = 1
 ///
-///    # multiple
-///    >>> sqe = Sqe(2)
-///    >>> io_uring_prep_write(sqe[0], ...)
-///    >>> sqe[0].user_data = 1
-///    >>> io_uring_prep_read(sqe[1], ...)
-///    >>> sqe[1].user_data = 2
+///     # multiple
+///     >>> sqe = Sqe(2)
+///     >>> io_uring_prep_write(sqe[0], ...)
+///     >>> sqe[0].user_data = 1
+///     >>> io_uring_prep_read(sqe[1], ...)
+///     >>> sqe[1].user_data = 2
 ///
-///    # *** MUST DO ***
-///    >>> if put_sqe(ring, sqe):
-///    ...     io_uring_submit(ring)
+///     # *** MUST DO ***
+///     >>> if put_sqe(ring, sqe):
+///     ...     io_uring_submit(ring)
 ///
-///Note
-///    - This class has dual usage:
-///        1. It works as a base class for `io_uring_get_sqe()` return.
-///        2. It can also be used as `sqe = Sqe(<int>)`, rather than "get" sqe(s)
-///        you are going to "put" pre-made sqe(s) into the ring later. Refer to
-///        `help(put_sqe)` to see more detail.
-///    - `Sqe(no)` is limited to max `0-255` items.
+/// Note
+///     - This class has dual usage:
+///         1. It works as a base class for `io_uring_get_sqe()` return.
+///         2. It can also be used as `sqe = Sqe(<int>)`, rather than "get" sqe(s)
+///         you are going to "put" pre-made sqe(s) into the ring later. Refer to
+///         `help(put_sqe)` to see more detail.
+///     - `Sqe(no)` is limited to max `0-255` items.
 pub const Sqe = struct {
     _len: usize = 0,
     _io_uring_sqe: ?[*]c.io_uring_sqe = null, // allocated here, `_len` entries
@@ -440,6 +443,8 @@ pub const Sqe = struct {
         return (self._len > 0);
     }
 
+    /// Type
+    ///     return: SQE
     pub fn __getitem__(self: *Object, index: isize) py.Error!*Object {
         const d = SqeType.data(self);
         if (d._io_uring_sqe) |array| {
@@ -517,7 +522,7 @@ pub const Param = struct {
     }
 };
 
-///RegWait
+/// RegWait
 pub const RegWait = struct {
     _io_uring_reg_wait: ?*c.io_uring_reg_wait = null,
 
@@ -529,7 +534,7 @@ pub const RegWait = struct {
     }
 };
 
-///Restriction
+/// Restriction
 pub const Restriction = struct {
     _len: usize = 0,
     _io_uring_restriction: ?[*]c.io_uring_restriction = null,
@@ -542,7 +547,7 @@ pub const Restriction = struct {
     }
 };
 
-///BufReg
+/// BufReg
 pub const BufReg = struct {
     _io_uring_buf_reg: ?*c.io_uring_buf_reg = null,
 
@@ -554,7 +559,7 @@ pub const BufReg = struct {
     }
 };
 
-///SyncCancelReg
+/// SyncCancelReg
 pub const SyncCancelReg = struct {
     _io_uring_sync_cancel_reg: ?*c.io_uring_sync_cancel_reg = null,
 
@@ -566,7 +571,7 @@ pub const SyncCancelReg = struct {
     }
 };
 
-///Napi
+/// Napi
 pub const Napi = struct {
     _io_uring_napi: ?*c.io_uring_napi = null,
 
@@ -578,7 +583,7 @@ pub const Napi = struct {
     }
 };
 
-///ZcrxIfqReg
+/// ZcrxIfqReg
 pub const ZcrxIfqReg = struct {
     _io_uring_zcrx_ifq_reg: ?*c.io_uring_zcrx_ifq_reg = null,
 
@@ -590,7 +595,7 @@ pub const ZcrxIfqReg = struct {
     }
 };
 
-///ClockRegister
+/// ClockRegister
 pub const ClockRegister = struct {
     _io_uring_clock_register: ?*c.io_uring_clock_register = null,
 
@@ -602,7 +607,7 @@ pub const ClockRegister = struct {
     }
 };
 
-///Bpf
+/// Bpf
 pub const Bpf = struct {
     _io_uring_bpf: ?*c.io_uring_bpf = null,
 
@@ -614,7 +619,7 @@ pub const Bpf = struct {
     }
 };
 
-///SigsetT
+/// SigsetT
 pub const SigsetT = struct {
     _sigset_t: ?*c.__sigset_t = null,
 
@@ -626,7 +631,7 @@ pub const SigsetT = struct {
     }
 };
 
-///MemRegionReg
+/// MemRegionReg
 pub const MemRegionReg = struct {
     _io_uring_mem_region_reg: ?*c.io_uring_mem_region_reg = null,
 
@@ -638,7 +643,7 @@ pub const MemRegionReg = struct {
     }
 };
 
-///BufRing
+/// BufRing
 pub const BufRing = struct {
     _io_uring_buf_ring: ?[*]c.io_uring_buf_ring = null,
     // note: `io_uring_free_buf_ring()` should be called manually to free the memory.
@@ -646,7 +651,7 @@ pub const BufRing = struct {
     pub const instantiable = false;
 };
 
-///Cmsghdr
+/// Cmsghdr
 pub const Cmsghdr = struct {
     _cmsghdr: ?*c.cmsghdr = null,
 
@@ -658,7 +663,7 @@ pub const Cmsghdr = struct {
     // cmsg_type: c_int            // Protocol specific type.
 };
 
-///Msghdr
+/// Msghdr
 pub const Msghdr = struct {
     _msghdr: ?*c.msghdr = null,
 
@@ -674,53 +679,53 @@ pub const Msghdr = struct {
     // msg_flags: c_int,           // Flags on received message.
 };
 
-///EpollEvent
+/// EpollEvent
 pub const EpollEvent = struct {
     _epoll_event: ?*c.epoll_event = null,
 
     pub const instantiable = false;
 };
 
-///RecvmsgOut
+/// RecvmsgOut
 pub const RecvmsgOut = struct {
     _recvmsg_out: ?*c.io_uring_recvmsg_out = null,
 
     pub const instantiable = false;
 };
 
-///How to Open a Path
+/// How to Open a Path
 ///
-///Example
-///    >>> how = OpenHow(O_CREAT | O_RDWR, 0o777, RESOLVE_CACHED)
-///    >>> io_uring_prep_openat2(..., how)
+/// Example
+///     >>> how = OpenHow(O_CREAT | O_RDWR, 0o777, RESOLVE_CACHED)
+///     >>> io_uring_prep_openat2(..., how)
 ///
-///    # or
+///     # or
 ///
-///    >>> how = OpenHow()
-///    >>> how.flags   = O_CREAT | O_RDWR
-///    >>> how.mode    = 0
-///    >>> how.resolve = RESOLVE_CACHED
-///    >>> io_uring_prep_openat2(..., how)
+///     >>> how = OpenHow()
+///     >>> how.flags   = O_CREAT | O_RDWR
+///     >>> how.mode    = 0
+///     >>> how.resolve = RESOLVE_CACHED
+///     >>> io_uring_prep_openat2(..., how)
 ///
-///flags
-///    O_CREAT
-///    O_RDWR
-///    O_RDONLY
-///    O_WRONLY
-///    O_TMPFILE
-///    ...
+/// flags
+///     O_CREAT
+///     O_RDWR
+///     O_RDONLY
+///     O_WRONLY
+///     O_TMPFILE
+///     ...
 ///
-///Resolve
-///    RESOLVE_BENEATH
-///    RESOLVE_IN_ROOT
-///    RESOLVE_NO_MAGICLINKS
-///    RESOLVE_NO_SYMLINKS
-///    RESOLVE_NO_XDEV
-///    RESOLVE_CACHED
+/// Resolve
+///     RESOLVE_BENEATH
+///     RESOLVE_IN_ROOT
+///     RESOLVE_NO_MAGICLINKS
+///     RESOLVE_NO_SYMLINKS
+///     RESOLVE_NO_XDEV
+///     RESOLVE_CACHED
 ///
-///Note
-///    - `mode` is only to set when creating new or temp file.
-///    - You can use same `OpenHow()` reference if opening multiple files with same settings.
+/// Note
+///     - `mode` is only to set when creating new or temp file.
+///     - You can use same `OpenHow()` reference if opening multiple files with same settings.
 pub const OpenHow = struct {
     _open_how: c.open_how = std.mem.zeroes(c.open_how), // lives inside the Python object
 

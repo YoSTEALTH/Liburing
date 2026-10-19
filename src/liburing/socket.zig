@@ -14,19 +14,24 @@ pub const SockaddrType = setu.Class(Sockaddr, @embedFile("socket.zig"));
 /// libc: an interface name (`eth0`) to its index, `0` if unknown.
 extern fn if_nametoindex(name: [*:0]const u8) c_uint;
 
-///Generic Socket Address.
+/// Generic Socket Address.
 ///
-///Example
-///    >>> addr = Sockaddr(AF_UNIX, './path')
-///    >>> addr = Sockaddr(AF_INET, '0.0.0.0', 12345)
-///    >>> addr = Sockaddr(AF_INET6, '::1', 12345)
-///    >>> bind(sockfd, addr)
+/// Example
+///     >>> addr = Sockaddr(AF_UNIX, './path')
+///     >>> addr = Sockaddr(AF_INET, '0.0.0.0', 12345)
+///     >>> addr = Sockaddr(AF_INET6, '::1', 12345)
+///     >>> bind(sockfd, addr)
 ///
-///Note
-///    - IPv6 `scope_id` can be added like so `"ff01::fb%123"`
-///    - `Sockaddr()` is low level setup, letting you serve/connect directly using path/ip.
-///    If you need higher level features you can use `getaddrinfo()` this lets you connect
-///    using domain names, ...
+/// Note
+///     - IPv6 `scope_id` can be added like so `"ff01::fb%123"`
+///     - `Sockaddr()` is low level setup, letting you serve/connect directly using path/ip.
+///     If you need higher level features you can use `getaddrinfo()` this lets you connect
+///     using domain names, ...
+///
+/// Type
+///     family: int
+///     addr:   str | os.PathLike[str]
+///     port:   int
 pub const Sockaddr = struct {
     _family: c.sa_family_t = AF_UNSPEC,
     _socklen: c.socklen_t = @sizeOf(c.sockaddr_storage),
@@ -102,16 +107,19 @@ pub const Sockaddr = struct {
         return if (self._family == AF_UNSPEC) self._storage.ss_family else self._family;
     }
 
-    ///>>> sock.path
-    ///"./path"
+    /// >>> sock.path
+    /// "./path"
     pub fn get_path(self: *Self) py.Error![]const u8 {
         const _family = self.currentFamily();
         if (_family == AF_UNIX) return std.mem.sliceTo(&self.as(c.sockaddr_un).sun_path, 0);
         return py.raiseNotImplementedError("`Sockaddr` - `path` is not implemented for {}", .{_family});
     }
 
-    ///>>> sock.ip
-    ///"1.2.3.4"
+    /// >>> sock.ip
+    /// "1.2.3.4"
+    ///
+    /// Type
+    ///     return: str
     pub fn get_ip(self: *Self) py.Error!*Object {
         const _family = self.currentFamily();
         switch (_family) {
@@ -126,8 +134,8 @@ pub const Sockaddr = struct {
         }
     }
 
-    ///>>> sock.port
-    ///1234
+    /// >>> sock.port
+    /// 1234
     pub fn get_port(self: *Self) py.Error!u16 {
         const _family = self.currentFamily();
         switch (_family) {
@@ -137,8 +145,8 @@ pub const Sockaddr = struct {
         }
     }
 
-    ///>>> sock.family
-    ///1
+    /// >>> sock.family
+    /// 1
     pub fn get_family(self: *const Self) i32 {
         return self.currentFamily();
     }
@@ -163,23 +171,23 @@ fn scopeId(text: []const u8) py.Error!u32 {
     return index;
 }
 
-///Example
-///    >>> val = (1).to_bytes(4, "big")
-///    >>> sqe = io_uring_get_sqe(ring)
-///    >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
+/// Example
+///     >>> val = (1).to_bytes(4, "big")
+///     >>> sqe = io_uring_get_sqe(ring)
+///     >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
 ///
-///    >>> val = (0).to_bytes(4, "big")
-///    >>> sqe = io_uring_get_sqe(ring)
-///    >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
+///     >>> val = (0).to_bytes(4, "big")
+///     >>> sqe = io_uring_get_sqe(ring)
+///     >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
 ///
-///    >>> val = b"eth1"
-///    >>> sqe = io_uring_get_sqe(ring)
-///    >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_BINDTODEVICE, val)
+///     >>> val = b"eth1"
+///     >>> sqe = io_uring_get_sqe(ring)
+///     >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_BINDTODEVICE, val)
 ///
-///Note
-///    - remember to hold on to `val` reference till `sqe` has been submitted.
-///    - min length of `val` must be `4`.
-///    - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
+/// Note
+///     - remember to hold on to `val` reference till `sqe` has been submitted.
+///     - min length of `val` must be `4`.
+///     - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
 pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.Buffer) py.Error!void {
     c.io_uring_prep_cmd_sock(
         try sqe.sqePtr(),
@@ -192,20 +200,20 @@ pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.B
     );
 }
 
-///Example
-///    # assuming `SO_KEEPALIVE` was previous set to `1`
-///    >>> buf = bytearray(4)
-///    >>> sqe = io_uring_get_sqe(ring)
-///    >>> getsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, buf)
-///    ... # after submit and wait
-///    >>> int.from_bytes(buf)
-///    1
+/// Example
+///     # assuming `SO_KEEPALIVE` was previous set to `1`
+///     >>> buf = bytearray(4)
+///     >>> sqe = io_uring_get_sqe(ring)
+///     >>> getsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, buf)
+///     ... # after submit and wait
+///     >>> int.from_bytes(buf)
+///     1
 ///
-///Note
-///    - remember to hold on to `buf` as new result will be populated into it.
-///    - `cqe.res` will return `len()` of populating data(`buf`).
-///    - min length of `buf` must be `4`.
-///    - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
+/// Note
+///     - remember to hold on to `buf` as new result will be populated into it.
+///     - `cqe.res` will return `len()` of populating data(`buf`).
+///     - min length of `buf` must be `4`.
+///     - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
 pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.WritableBuffer) py.Error!void {
     c.io_uring_prep_cmd_sock(
         try sqe.sqePtr(),
@@ -218,13 +226,13 @@ pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.W
     );
 }
 
-///Example
-///    >>> sockaddr = Sockaddr()
-///    >>> sqe = io_uring_get_sqe(ring)
-///    >>> getsockname(sqe, sockfd, sockaddr)
+/// Example
+///     >>> sockaddr = Sockaddr()
+///     >>> sqe = io_uring_get_sqe(ring)
+///     >>> getsockname(sqe, sockfd, sockaddr)
 ///
-///Note
-///    - This function is an alias of `io_uring_prep_cmd_getsockname`
+/// Note
+///     - This function is an alias of `io_uring_prep_cmd_getsockname`
 pub fn getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) py.Error!void {
     c.io_uring_prep_cmd_getsockname(
         try sqe.sqePtr(),

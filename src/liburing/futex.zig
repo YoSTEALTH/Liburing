@@ -49,8 +49,8 @@ pub const FUTEX = struct {
         } else return e.raiseMemoryError("Futex(vector) Memory not set!");
     }
 
-    ///Note
-    ///    - Overwrite `.flags` value.
+    /// Note
+    ///     - Overwrite `.flags` value.
     pub fn set_flags(self: *Self, value: u32) py.Error!void {
         if (self._vector) |v| {
             v.val = value;
@@ -58,41 +58,41 @@ pub const FUTEX = struct {
     }
 };
 
-///Futex State - User Address Memory
+/// Futex State - User Address Memory
 ///
-///Type
-///    no:     int
-///    flags:  int
-///    vector: bool
-///    return: None
+/// Type
+///     no:     int
+///     flags:  int
+///     vector: bool
+///     return: None
 ///
-///Example
-///    >>> futex = Futex()
-///    >>> futex.state
-///    0
-///    >>> futex.private
-///    False
+/// Example
+///     >>> futex = Futex()
+///     >>> futex.state
+///     0
+///     >>> futex.private
+///     False
 ///
-///    >>> io_uring_prep_futex_wait(sqe, futex)
-///    >>> futex.state = 1
-///    >>> io_uring_prep_futex_wake(sqe, futex)
+///     >>> io_uring_prep_futex_wait(sqe, futex)
+///     >>> futex.state = 1
+///     >>> io_uring_prep_futex_wake(sqe, futex)
 ///
-///    >>> futex.state = 0
-///    >>> fwv = Futex()
-///    >>> io_uring_prep_futex_waitv(sqe, fwv)
+///     >>> futex.state = 0
+///     >>> fwv = Futex()
+///     >>> io_uring_prep_futex_waitv(sqe, fwv)
 ///
-///    >>> futex = Futex(2, FUTEX2_PRIVATE | FUTEX2_SIZE_U32)
-///    >>> futex.private
-///    True
+///     >>> futex = Futex(2, FUTEX2_PRIVATE | FUTEX2_SIZE_U32)
+///     >>> futex.private
+///     True
 ///
-///Flags
-///    FUTEX2_SIZE_U32 (default)
-///    FUTEX2_PRIVATE
+/// Flags
+///     FUTEX2_SIZE_U32 (default)
+///     FUTEX2_PRIVATE
 ///
-///Note
-///    - By default `SHARED` memory is created, set `Futex(123, FUTEX2_PRIVATE)` to use `PRIVATE` memory.
-///    - For now only `FUTEX2_SIZE_U32` is supported by Linux https://github.com/axboe/liburing/issues/1556
-///    - Coded and basic test, missing real world testing
+/// Note
+///     - By default `SHARED` memory is created, set `Futex(123, FUTEX2_PRIVATE)` to use `PRIVATE` memory.
+///     - For now only `FUTEX2_SIZE_U32` is supported by Linux https://github.com/axboe/liburing/issues/1556
+///     - Coded and basic test, missing real world testing
 pub const Futex = struct {
     _len: u8 = 0,
     _futex: usize = 0, // `mmap` address of `_len` `u32`s
@@ -162,6 +162,8 @@ pub const Futex = struct {
         return (self._len > 0);
     }
 
+    /// Type
+    ///     return: FUTEX
     pub fn __getitem__(self: *Object, index: isize) py.Error!*Object {
         const d = FutexType.data(self);
         if (index >= 0 and index < d._len) {
