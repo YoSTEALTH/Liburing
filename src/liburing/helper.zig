@@ -93,7 +93,7 @@ pub const FileIndex = struct {
 ///    IORING_OP_NOP True
 ///
 pub fn probe() py.Error!*Object {
-    const last: usize = @intFromEnum(n.io_uring_op.IORING_OP_LAST);
+    const last: usize = @backingInt(n.io_uring_op.IORING_OP_LAST);
     const items = @typeInfo(n.io_uring_op).@"enum".field_names;
 
     const p = c.io_uring_get_probe() orelse
@@ -103,7 +103,7 @@ pub fn probe() py.Error!*Object {
     const dict = sc.PyDict_New() orelse return error.PythonError;
     errdefer py.decref(dict);
     inline for (items[0..last]) |name| {
-        const op = @intFromEnum(@field(n.io_uring_op, name));
+        const op = @backingInt(@field(n.io_uring_op, name));
         const value = if (c.io_uring_opcode_supported(p, op) == 1) py.trueObj() else py.falseObj();
         const key = try py.new(name);
         defer py.decref(key);
