@@ -6,12 +6,15 @@
         .PyOZ = .{
             .url = "https://github.com/pyozig/PyOZ/archive/refs/tags/v0.12.2.tar.gz",
             .hash = "PyOZ-0.12.2-ntlpPuP8FwB3i629dScseeVY-p6-F4DV3nL9awKke0S1",
+            .lazy = true, // unused on Zig 0.17; removed when src/liburing is ported to Setu
         },
         // .PyOZ = .{ .path = "../PyOZ" }, // local debug
+        .setu = .{ .path = "../../../Setu/Zig/Setu" }, // local, until Setu has a tag (plan.md decision 2)
     },
     .paths = .{
         "build.zig",
         "build.zig.zon",
         "src/liburing",
+        "spike",
     },
 }
