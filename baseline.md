@@ -2,38 +2,35 @@
 
 2026-10-19 · branch `zig-0.17-setu`
 
-## What was run, and why it is a proxy
-
-The plan asks for the current PyOZ build on Zig 0.15.2 and Python <= 3.14. On this machine:
-
-- **Zig 0.15.2 is not installed** (only `/usr/bin/zig` 0.17.0), so `python -m pyoz build` could not be run.
-- **Python 3.14.8** (`/usr/bin/python3.14`) has neither `pytest` nor `pyoz` installed.
-
-Nothing was installed system-wide. Instead the baseline uses the prebuilt PyOZ wheel already in `dist/`:
+## Setup
 
 | | |
 | --- | --- |
-| Wheel | `dist/liburing-2026.4.1-cp38-abi3-manylinux_2_17_x86_64.whl` (PyOZ 0.12.2, built 2026-04-04) |
-| Python | 3.15.0 (`/opt/python/3.15/bin/python3`, GIL build), wheel installed into a throwaway venv with `--no-index` |
-| pytest | 9.1.1 |
+| Source | `dev` at a8d074e plus the uncommitted working-tree changes at the branch point (`socket.zig`, `const_test.py`, version bump, the four new test files), built in a separate git worktree; C liburing submodule at 533a772 |
+| Build | `python -m pyoz build` (PyOZ 0.12.2) with Zig 0.15.2 (`/opt/zig/0.15.2/zig`); plain `./configure` + `make library`, as the old `build.zig` does |
+| Python | 3.14.8 (`/opt/python/3.14/bin/python3`), wheel `liburing-2026.4.1-cp38-abi3-manylinux_2_17_x86_64.whl` installed into a throwaway venv with `--no-index` |
+| pytest | 9.1.1, run from the repo root |
 | Kernel | 7.2.11-1-garuda, x86_64 |
-| Tests | working tree of `test/` at the branch point (includes the uncommitted `const_test.py` changes and the new `_get_cqe_test.py`, `_macro_test.py`, `getaddinfo_test.py`, `getnameinfo_test.py`) |
 
-Caveat: the wheel predates the uncommitted `src/liburing/socket.zig` changes, so it is not exactly the
-working-tree source. Each test id was run in its own process so a segfault could not hide later results.
+Each test id ran in its own process, so a crash could not hide later results. Run from the repo root:
+`test_rwf_nowait_flag` writes into the current directory and fails with `EOPNOTSUPP` (errno 95) if that is
+tmpfs, by design of the test.
 
 ## Summary
 
-62 collected: **48 passed, 11 skipped, 3 crashed (SIGSEGV)**, 0 failed.
+62 collected: **51 passed, 11 skipped**, 0 failed, 0 crashed.
 
-The 3 crashes all iterate a PyOZ iterator (`for fd in ids` over `FileIndex`, and the `iter_test.py` CQE
-iteration). The C stack ends in `_PyForIter_VirtualIteratorNext`, i.e. the PyOZ abi3 iterator breaks on 3.15's
-new for-loop path. Not verified on <= 3.14 here; they must pass after the Setu port.
+All 11 skips are `pytest.mark.skip` in the tests themselves (TODO / BUG / "not going to implemented").
 
-All 11 skips are `pytest.mark.skip` in the tests themselves (TODO / BUG / "not going to implemented"), not
-environment skips.
+## Python 3.15 with the PyOZ build (for comparison)
 
-## Per-test results
+The prebuilt 2026.4.1 abi3 wheel in `dist/` (built 2026-04-04, before the uncommitted `socket.zig` changes) on Python 3.15.0 gives 48 passed,
+11 skipped and **3 segfaults**: `test/file/register_test.py::test_register_files`,
+`test/queue/iter_test.py::test_iter_seen` and `test/queue/iter_test.py::test_iter_advance`. All three iterate a
+PyOZ object; the C stack ends in `_PyForIter_VirtualIteratorNext`, so PyOZ's abi3 iterator breaks on 3.15's
+for-loop path. They pass on 3.14 and must pass after the Setu port.
+
+## Per-test results (Python 3.14)
 
 ```
 SKIPPED test/const_test.py::test_enum
@@ -50,7 +47,7 @@ PASSED test/file/open_close_test.py::test_openat2_close_direct_auto_file_index_a
 PASSED test/file/open_close_test.py::test_open_close
 PASSED test/file/open_close_test.py::test_open_close_direct
 PASSED test/file/open_how_test.py::test_open_how
-CRASH(rc=139) test/file/register_test.py::test_register_files
+PASSED test/file/register_test.py::test_register_files
 PASSED test/file/register_test.py::test_register_files_update
 PASSED test/futex_test.py::test_futex_6_7
 PASSED test/futex_test.py::test_futex_define
@@ -77,8 +74,8 @@ PASSED test/queue/init_exit_test.py::test_io_uring_init_exit
 PASSED test/queue/init_exit_test.py::test_io_uring_submit_and_wait
 PASSED test/queue/init_exit_test.py::test_max_entries_plus
 PASSED test/queue/init_exit_test.py::test_setup_iopoll_sqpoll
-CRASH(rc=139) test/queue/iter_test.py::test_iter_advance
-CRASH(rc=139) test/queue/iter_test.py::test_iter_seen
+PASSED test/queue/iter_test.py::test_iter_advance
+PASSED test/queue/iter_test.py::test_iter_seen
 SKIPPED test/queue/_macro_test.py::test_io_uring_cqe_index
 SKIPPED test/queue/_macro_test.py::test_io_uring_cqe_shift
 SKIPPED test/queue/_macro_test.py::test_io_uring_for_each_cqe
