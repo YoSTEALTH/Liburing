@@ -326,14 +326,14 @@ def test_memory_and_mlock_size():
 
 def test_prep_rw():
     sqe = L.Sqe()
-    L.io_uring_prep_rw(sqe, L.io_uring_op.IORING_OP_NOP, 5, None, 7, 9)
+    L.io_uring_prep_rw(sqe, L.io_uring_op.IORING_OP_NOP, 5, 0, 7, 9)
     assert sqe.opcode == L.io_uring_op.IORING_OP_NOP
     assert (sqe.fd, sqe.len) == (5, 7)
 
 
 def test_prep_rw_runs(ring, cqe):
     sqe = L.io_uring_get_sqe(ring)
-    L.io_uring_prep_rw(sqe, L.io_uring_op.IORING_OP_NOP, 0, None, 0, 0)
+    L.io_uring_prep_rw(sqe, L.io_uring_op.IORING_OP_NOP, 0, 0, 0, 0)
     sqe.user_data = 3
     assert L.io_uring_submit(ring) == 1
     assert L.io_uring_wait_cqe(ring, cqe) == 0
