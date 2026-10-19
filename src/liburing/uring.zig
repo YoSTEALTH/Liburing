@@ -795,6 +795,7 @@ pub fn io_uring_prep_nop128(sqe: *SQE) py.Error!void {
 pub fn io_uring_prep_timeout(sqe: *SQE, ts: *Timespec, count: u32, flags: ?u32) py.Error!void {
     const _flags = flags orelse 0;
     c.io_uring_prep_timeout(try sqe.sqePtr(), ts._timespec, count, _flags);
+    try h.keepUntilSubmit(sqe, class.TimespecType.object(ts)); // the kernel reads `ts` at submit
 }
 
 /// Warning
@@ -809,6 +810,7 @@ pub fn io_uring_prep_timeout_remove(sqe: *SQE, user_data: u64, flags: ?u32) py.E
 pub fn io_uring_prep_timeout_update(sqe: *SQE, ts: *Timespec, user_data: u64, flags: ?u32) py.Error!void {
     const _flags = flags orelse 0;
     c.io_uring_prep_timeout_update(try sqe.sqePtr(), ts._timespec, user_data, _flags);
+    try h.keepUntilSubmit(sqe, class.TimespecType.object(ts));
 }
 
 /// Example
@@ -891,18 +893,23 @@ pub fn io_uring_prep_cancel_fd(sqe: *SQE, fd: i32, flags: ?u32) py.Error!void {
 ///     - Coded but not tested!!!
 pub fn io_uring_prep_link_timeout(sqe: *SQE, ts: *Timespec, flags: u32) py.Error!void {
     c.io_uring_prep_link_timeout(try sqe.sqePtr(), ts._timespec, flags);
+    try h.keepUntilSubmit(sqe, class.TimespecType.object(ts));
 }
+
+const SockaddrType = @import("socket.zig").SockaddrType;
 
 /// Warning
 ///     - Coded but not tested!!!
 pub fn io_uring_prep_connect(sqe: *SQE, fd: i32, addr: *Sockaddr) py.Error!void {
     c.io_uring_prep_connect(try sqe.sqePtr(), fd, addr.addrPtr(), addr._socklen);
+    try h.keepUntilSubmit(sqe, SockaddrType.object(addr)); // read at submit
 }
 
 /// Warning
 ///     - Coded but not tested!!!
 pub fn io_uring_prep_bind(sqe: *SQE, fd: i32, addr: *Sockaddr) py.Error!void {
     c.io_uring_prep_bind(try sqe.sqePtr(), fd, addr.addrPtr(), addr._socklen);
+    try h.keepUntilSubmit(sqe, SockaddrType.object(addr));
 }
 
 /// Warning
@@ -1159,6 +1166,7 @@ pub fn io_uring_prep_send_bundle(sqe: *SQE, sockfd: i32, len: ?usize, flags: ?i3
 ///     - Coded but not tested!!!
 pub fn io_uring_prep_send_set_addr(sqe: *SQE, dest_addr: *Sockaddr) py.Error!void {
     c.io_uring_prep_send_set_addr(try sqe.sqePtr(), dest_addr.addrPtr(), @intCast(dest_addr._socklen));
+    try h.keepUntilSubmit(sqe, SockaddrType.object(dest_addr));
 }
 
 /// Note
@@ -1176,6 +1184,7 @@ pub fn io_uring_prep_sendto(sqe: *SQE, sockfd: i32, buf: py.Buffer, addr: *Socka
         addr.addrPtr(),
         addr._socklen,
     );
+    try h.keepUntilSubmit(sqe, SockaddrType.object(addr));
 }
 
 /// Warning
@@ -1326,10 +1335,19 @@ pub fn io_uring_prep_epoll_ctl(sqe: *SQE, epfd: i32, fd: i32, op: i32, ev: *Epol
     c.io_uring_prep_epoll_ctl(try sqe.sqePtr(), epfd, fd, op, ev._epoll_event.?);
 }
 
-/// Warning
-///     - Coded but not tested!!!
+/// Provides `nr` buffers of `len(addr) // nr` bytes each, laid out one after the other in `addr`.
+///
+/// Example
+///     >>> area = bytearray(64)
+///     >>> io_uring_prep_provide_buffers(sqe, area, 4, 1, 0)  # 4 buffers of 16 bytes: group 1, ids 0..3
+///
+/// Note
+///     - Hold on to `addr` while the buffers are in use.
 pub fn io_uring_prep_provide_buffers(sqe: *SQE, addr: py.WritableBuffer, nr: i32, bgid: i32, bid: i32) py.Error!void {
-    c.io_uring_prep_provide_buffers(try sqe.sqePtr(), addr.data.ptr, try py.narrow(c_int, addr.data.len, "`io_uring_prep_provide_buffers(addr)` length"), nr, bgid, bid);
+    if (nr <= 0) return py.raiseValueError("`io_uring_prep_provide_buffers(nr)` must be at least 1", .{});
+    const each = addr.data.len / @as(usize, @intCast(nr)); // cast: nr > 0
+    if (each == 0) return py.raiseValueError("`io_uring_prep_provide_buffers(addr)` is shorter than `nr` buffers", .{});
+    c.io_uring_prep_provide_buffers(try sqe.sqePtr(), addr.data.ptr, try py.narrow(c_int, each, "`io_uring_prep_provide_buffers(addr)` buffer length"), nr, bgid, bid);
 }
 
 /// Warning
@@ -1717,16 +1735,29 @@ pub fn io_uring_prep_cmd_discard(sqe: *SQE, fd: i32, offset: u64, nbytes: u64) p
     c.io_uring_prep_cmd_discard(try sqe.sqePtr(), fd, offset, nbytes);
 }
 
-/// Warning
-///     - Coded but not tested!!!
-pub fn io_uring_prep_pipe(sqe: *SQE, fds: i32, pipe_flags: i32) py.Error!void {
-    c.io_uring_prep_pipe(try sqe.sqePtr(), fds, pipe_flags);
+/// The two fds of the new pipe are written into `fds` (read end, then write end) when the request completes.
+///
+/// Example
+///     >>> fds = array.array("i", [-1, -1])  # or a `bytearray(8)`
+///     >>> io_uring_prep_pipe(sqe, fds, O_CLOEXEC)
+///     ... # after the completion: fds[0], fds[1]
+///
+/// Note
+///     - Hold on to `fds` until the request has completed.
+pub fn io_uring_prep_pipe(sqe: *SQE, fds: py.WritableBuffer, pipe_flags: i32) py.Error!void {
+    c.io_uring_prep_pipe(try sqe.sqePtr(), try pipeFds(fds), pipe_flags);
 }
 
-/// Warning
-///     - Coded but not tested!!!
-pub fn io_uring_prep_pipe_direct(sqe: *SQE, fds: i32, pipe_flags: i32, file_index: u32) py.Error!void {
-    c.io_uring_prep_pipe_direct(try sqe.sqePtr(), fds, pipe_flags, file_index);
+/// Like `io_uring_prep_pipe`, but the pipe's fds go into the registered file table: `fds` gets the two
+/// slots (`file_index` for the read end; `IORING_FILE_INDEX_ALLOC` lets the kernel pick both).
+pub fn io_uring_prep_pipe_direct(sqe: *SQE, fds: py.WritableBuffer, pipe_flags: i32, file_index: ?u32) py.Error!void {
+    c.io_uring_prep_pipe_direct(try sqe.sqePtr(), try pipeFds(fds), pipe_flags, file_index orelse c.IORING_FILE_INDEX_ALLOC);
+}
+
+/// `fds` as the `int[2]` the kernel fills in (`ValueError` if it is too small).
+fn pipeFds(fds: py.WritableBuffer) py.Error![*]c_int {
+    if (fds.data.len < 2 * @sizeOf(c_int)) return py.raiseValueError("`fds` must hold two ints (8 bytes)", .{});
+    return @ptrCast(@alignCast(fds.data.ptr));
 }
 
 /// Warning
