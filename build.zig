@@ -3,6 +3,7 @@
 //!   zig build          the `liburing` extension and its stubs (`liburing.pyi`) into zig-out/lib/
 //!   zig build develop  also copy both into src/liburing/ (for `pytest` from a checkout)
 //!   zig build stubs    write the type stubs to src/liburing/liburing.pyi
+//!   zig build setu-build-sync    copy the pinned Setu's tools/setu_build.py into tools/ (never edit it)
 //!   zig build setu-build-check   check that tools/setu_build.py is the pinned Setu's copy
 //!
 //! Options:
@@ -117,11 +118,9 @@ pub fn build(b: *std.Build) void {
     const pyi_copy = b.addInstallFileWithDir(pyi, .{ .custom = "../src/liburing" }, "liburing.pyi");
     b.step("stubs", "Write the type stubs to src/liburing/liburing.pyi").dependOn(&pyi_copy.step);
 
-    // `tools/setu_build.py` must be the copy in the pinned Setu (it is kept there).
-    const same_script = b.addSystemCommand(&.{"cmp"});
-    same_script.addFileArg(setu_dep.path("tools/setu_build.py"));
-    same_script.addFileArg(b.path("tools/setu_build.py"));
-    b.step("setu-build-check", "Check that tools/setu_build.py is the pinned Setu's copy").dependOn(&same_script.step);
+    // `zig build setu-build-sync` (copy the pinned Setu's `tools/setu_build.py` into tools/) and
+    // `zig build setu-build-check` (compare with it, offline).
+    @import("setu").addSetuBuildSteps(b, setu_dep);
 
     const develop = b.step("develop", "Copy the extension and its stubs into src/liburing/");
     develop.dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .{ .custom = "../src/liburing" }, ext_name).step);

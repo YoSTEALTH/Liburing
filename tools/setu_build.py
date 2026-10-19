@@ -13,6 +13,21 @@ Release wheels are built from the command line, for either ABI and any Linux tar
     python3.15t tools/setu_build.py --abi cp315t --target aarch64-linux-musl -o dist
     python3.15t tools/setu_build.py --all                             # every release wheel -> dist/
 
+A project keeps this file unchanged (Setu tests it, and its tag notes say when it changed). Its
+`build.zig` gets two steps for that (`setu` in its `build.zig.zon`):
+
+    const setu_dep = b.dependency("setu", .{});
+    @import("setu").addSetuBuildSteps(b, setu_dep);
+    // zig build setu-build-sync    copy the pinned Setu's tools/setu_build.py here (after a bump)
+    // zig build setu-build-check   fail if this copy differs from it (in the project's checks)
+
+Settings (`[tool.setu_build]` in `pyproject.toml`; anything project-specific goes there, never in this
+file):
+
+    abis     the ABIs `--all` builds (default `RELEASE_ABIS`: ["cp315t", "cp315"])
+    targets  the Zig targets `--all` builds (default `RELEASE_TARGETS`: glibc 2.28 and musl, x86_64
+             and aarch64)
+
 Note
     - `--target` is a Zig target: `<arch>-linux-gnu.<glibc>` gives a `manylinux_<glibc>`
       wheel, `<arch>-linux-musl` a `musllinux_1_2` one. Without it the wheel is built for
@@ -21,8 +36,6 @@ Note
       needs no Python headers or libraries: one interpreter can build every wheel.
     - Metadata comes from `pyproject.toml`; the version from `build.zig.zon`.
     - `zig build` also writes `<name>.pyi` (type stubs); the wheel ships it with `py.typed`.
-    - `[tool.setu_build]` in `pyproject.toml`: `abis` and `targets` for `--all` (defaults:
-      `RELEASE_ABIS`, `RELEASE_TARGETS`).
 '''
 
 import argparse
