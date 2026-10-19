@@ -222,3 +222,49 @@ def test_cqe_at_after_exit():
         cqe.user_data_at(0)
     with pytest.raises(RuntimeError):
         cqe.res_at(0)
+
+
+# 8. Timeouts and socket addresses are read by the kernel at submit time too.
+
+
+def test_temporary_timespec_survives_until_submit(ring, cqe):
+    sqe = liburing.io_uring_get_sqe(ring)
+    liburing.io_uring_prep_timeout(sqe, liburing.timespec(30), 0)  # a temporary
+    sqe.user_data = 1
+    junk = [liburing.timespec(0) for _ in range(200)]  # reuses the freed memory with zeroes
+    del junk
+    gc.collect()
+    assert liburing.io_uring_submit(ring) == 1
+    with pytest.raises(OSError) as e:  # still pending after 0.2 s: the wait runs out, the timeout did not
+        liburing.io_uring_wait_cqe_timeout(ring, cqe, liburing.timespec(0.2))
+    assert e.value.errno == 62
+    sqe = liburing.io_uring_get_sqe(ring)
+    liburing.io_uring_prep_timeout_remove(sqe, 1)
+    liburing.io_uring_submit(ring)
+    liburing.io_uring_wait_cqe_nr(ring, cqe, 2)
+    liburing.io_uring_cq_advance(ring, 2)
+
+
+def test_temporary_timespec_link_timeout_and_update(ring, cqe):
+    r, w = os.pipe()
+    try:
+        sqe = liburing.io_uring_get_sqe(ring)
+        liburing.io_uring_prep_read(sqe, r, bytearray(1))
+        sqe.flags = liburing.IOSQE_IO_LINK
+        sqe.user_data = 1
+        sqe = liburing.io_uring_get_sqe(ring)
+        liburing.io_uring_prep_link_timeout(sqe, liburing.timespec(30), 0)  # a temporary
+        sqe.user_data = 2
+        junk = [liburing.timespec(0) for _ in range(200)]
+        del junk
+        gc.collect()
+        assert liburing.io_uring_submit(ring) == 2
+        with pytest.raises(OSError) as e:  # neither the read nor the 30 s timeout is done
+            liburing.io_uring_wait_cqe_timeout(ring, cqe, liburing.timespec(0.2))
+        assert e.value.errno == 62
+        os.write(w, b"x")
+        liburing.io_uring_wait_cqe_nr(ring, cqe, 2)
+        liburing.io_uring_cq_advance(ring, 2)
+    finally:
+        os.close(r)
+        os.close(w)
