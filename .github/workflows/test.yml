@@ -1,41 +1,93 @@
----
 name: Test
 
-on: [push, pull_request]
+# Push to dev first; merge/push to main only after this passes.
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-    build:
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-                os: [ubuntu-24.04]  # TODO: [ubuntu-24.04, ubuntu-latest]
-                python-version:
-                    ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15-dev"]
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true  # lib/liburing (C liburing)
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
-              with:
-                  submodules: true
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
 
-            - name: Zig
-              uses: goto-bus-stop/setup-zig@v2
-              with:
-                  version: 0.15.2
+      - name: Python 3.15t (free-threaded)
+        id: py_ft
+        uses: actions/setup-python@v7
+        with:
+          python-version: 3.15t
+          allow-prereleases: true
 
-            # Setup Python
-            - uses: actions/checkout@v4
-            - name: Set up Python ${{ matrix.python-version }}
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ matrix.python-version }}
+      - name: Python 3.15 (GIL)
+        id: py_gil
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
+          allow-prereleases: true
 
-            - name: Install dependencies
-              run: |
-                  python3 -m pip install pytest pyoz
-                  python3 -m pyoz build
-                  python3 -m pip install dist/*.whl
+      - name: Install tools
+        run: |
+          "${{ steps.py_ft.outputs.python-path }}" -m pip install pytest mypy
+          "${{ steps.py_gil.outputs.python-path }}" -m pip install pytest
 
-            - name: Test with PyTest
-              run: |
-                  python3 -m pytest test
+      - name: tools/check.sh
+        env:
+          PY_FT: ${{ steps.py_ft.outputs.python-path }}
+          PY_GIL: ${{ steps.py_gil.outputs.python-path }}
+        run: tools/check.sh
+
+  wheels:
+    # Every release wheel ([tool.setu_build] in pyproject.toml); the x86_64 ones are tested installed.
+    needs: check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+
+      - name: Python 3.15t (free-threaded)
+        id: py_ft
+        uses: actions/setup-python@v7
+        with:
+          python-version: 3.15t
+          allow-prereleases: true
+
+      - name: Python 3.15 (GIL)
+        id: py_gil
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
+          allow-prereleases: true
+
+      - name: Build wheels
+        run: '"${{ steps.py_ft.outputs.python-path }}" tools/setu_build.py --all -o dist'
+
+      - name: Test the installed x86_64 wheels
+        run: |
+          mkdir -p "$RUNNER_TEMP/wheeltest" && cp -r test "$RUNNER_TEMP/wheeltest/"
+          for py in "${{ steps.py_ft.outputs.python-path }}" "${{ steps.py_gil.outputs.python-path }}"; do
+            abi=$("$py" -c 'import sysconfig; print("cp315t" if sysconfig.get_config_var("Py_GIL_DISABLED") else "cp315")')
+            "$py" -m venv "$RUNNER_TEMP/venv-$abi"
+            "$RUNNER_TEMP/venv-$abi/bin/pip" install pytest dist/liburing-*-"$abi"-manylinux_2_28_x86_64.whl
+            (cd "$RUNNER_TEMP/wheeltest" && "$RUNNER_TEMP/venv-$abi/bin/python" -m pytest test -p no:cacheprovider)
+          done
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels
+          path: dist/*.whl
