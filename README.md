@@ -1,6 +1,6 @@
 # Liburing
-[![Python](https://img.shields.io/badge/python-3.10--3.14-blue)](https://www.python.org/)
-[![Zig](https://img.shields.io/badge/zig-0.15.2-orange)](https://ziglang.org/)
+[![Python](https://img.shields.io/badge/python-3.15%20%7C%203.15t-blue)](https://www.python.org/)
+[![Zig](https://img.shields.io/badge/zig-0.17.0-orange)](https://ziglang.org/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/liburing)
 [![Test status](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml) 
 
@@ -13,7 +13,9 @@ Good(old) documentation [Lord of the io_uring](https://unixism.net/loti/)
 
 ## Requires
  - Linux 6.14+
- - Python 3.10+
+ - Python 3.15+ (regular or free-threaded 3.15t)
+
+Note: on Python 3.10 to 3.14, `pip install liburing` installs the last release that supports them.
 
 ## Includes (battery)
  - C liburing 2.15+
@@ -33,18 +35,27 @@ python3 -m pip uninstall liburing           # uninstall
 ## To compile & install directly from GitHub
 
 ```bash
-# note: make sure you have Zig 0.15.2 installed on your system.
+# note: make sure you have Zig 0.17.0 installed on your system (or set `ZIG=/path/to/zig`).
 
 cd /tmp
 git clone --recurse-submodules https://github.com/YoSTEALTH/Liburing
 cd Liburing
 
-python3 -m pip install pyoz
-python3 -m pyoz build
-python3 -m pip install dist/*.whl
+python3.15 -m pip install .     # builds the wheel with `zig build` (tools/setu_build.py), no other dependencies
 
 # uninstall
-python3 -m pip uninstall liburing pyoz
+python3.15 -m pip uninstall liburing
+```
+
+## Development
+
+```bash
+zig build develop                       # extension + `liburing.pyi` into src/liburing/ (for Python 3.15t)
+zig build develop -Dfree-threaded=false # the same, for Python 3.15
+python3.15t -m pytest                   # tests run from the checkout (`pythonpath = ["src"]`)
+tools/check.sh                          # every check: zig fmt, both interpreters, mypy --strict, stubtest
+
+python3.15t tools/setu_build.py --all   # release wheels into dist/: cp315 + cp315t, x86_64 + aarch64
 ```
 
 ## To find out all the class, functions and definitions
@@ -157,7 +168,7 @@ if __name__ == "__main__":
 
 ## Other Projects
 <!-- - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
-- [PyOZ](https://pyoz.dev/)
+- [Setu](https://github.com/YoSTEALTH/Setu) (the Zig <-> CPython binding layer Liburing is built with)
 
 ## License
 Free, Public Domain (CC0). [Read more](https://github.com/YoSTEALTH/Liburing/blob/dev/LICENSE.txt)
