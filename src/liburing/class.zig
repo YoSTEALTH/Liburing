@@ -551,44 +551,61 @@ pub const Probe = struct {
 };
 
 pub const Param = struct {
-    _io_uring_params: ?*c.io_uring_params = null,
+    _io_uring_params: c.io_uring_params = std.mem.zeroes(c.io_uring_params), // lives inside the Python object
 
     pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
-    pub fn get_sq_entries(self: *const Self) py.Error!u32 {
-        if (self._io_uring_params) |p| return p.sq_entries;
-        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
+    pub fn get_sq_entries(self: *const Self) u32 {
+        return self._io_uring_params.sq_entries;
     }
 
-    pub fn get_cq_entries(self: *const Self) py.Error!u32 {
-        if (self._io_uring_params) |p| return p.cq_entries;
-        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
+    pub fn set_sq_entries(self: *Self, value: u32) void {
+        self._io_uring_params.sq_entries = value;
     }
 
-    pub fn get_flags(self: *const Self) py.Error!u32 {
-        if (self._io_uring_params) |p| return p.flags;
-        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
+    pub fn get_cq_entries(self: *const Self) u32 {
+        return self._io_uring_params.cq_entries;
     }
 
-    pub fn get_sq_thread_cpu(self: *const Self) py.Error!u32 {
-        if (self._io_uring_params) |p| return p.sq_thread_cpu;
-        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
+    pub fn set_cq_entries(self: *Self, value: u32) void {
+        self._io_uring_params.cq_entries = value;
     }
 
-    pub fn get_sq_thread_idle(self: *const Self) py.Error!u32 {
-        if (self._io_uring_params) |p| return p.sq_thread_idle;
-        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
+    pub fn get_flags(self: *const Self) u32 {
+        return self._io_uring_params.flags;
     }
 
-    pub fn get_features(self: *const Self) py.Error!u32 {
-        if (self._io_uring_params) |p| return p.features;
-        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
+    pub fn set_flags(self: *Self, value: u32) void {
+        self._io_uring_params.flags = value;
     }
 
-    pub fn get_wq_fd(self: *const Self) py.Error!u32 {
-        if (self._io_uring_params) |p| return p.wq_fd;
-        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
+    pub fn get_sq_thread_cpu(self: *const Self) u32 {
+        return self._io_uring_params.sq_thread_cpu;
+    }
+
+    pub fn set_sq_thread_cpu(self: *Self, value: u32) void {
+        self._io_uring_params.sq_thread_cpu = value;
+    }
+
+    pub fn get_sq_thread_idle(self: *const Self) u32 {
+        return self._io_uring_params.sq_thread_idle;
+    }
+
+    pub fn set_sq_thread_idle(self: *Self, value: u32) void {
+        self._io_uring_params.sq_thread_idle = value;
+    }
+
+    pub fn get_features(self: *const Self) u32 {
+        return self._io_uring_params.features;
+    }
+
+    pub fn get_wq_fd(self: *const Self) u32 {
+        return self._io_uring_params.wq_fd;
+    }
+
+    pub fn set_wq_fd(self: *Self, value: u32) void {
+        self._io_uring_params.wq_fd = value;
     }
 };
 

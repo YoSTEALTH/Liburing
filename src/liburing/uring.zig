@@ -81,11 +81,13 @@ pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
 /// Warning
 ///     - Coded but not tested!!!
 pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf_size: usize, buf: ?usize) py.Error!i32 {
-    return py.checkErrno(c.io_uring_queue_init_mem(entries, &ring._io_uring, p._io_uring_params, if (buf) |b| @ptrFromInt(b) else null, buf_size));
+    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_mem(ring)` already initialized!", .{});
+    return py.checkErrno(c.io_uring_queue_init_mem(entries, &ring._io_uring, &p._io_uring_params, if (buf) |b| @ptrFromInt(b) else null, buf_size));
 }
 
 pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.Error!i32 {
-    return py.checkErrno(c.io_uring_queue_init_params(entries, &ring._io_uring, param._io_uring_params));
+    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_params(ring)` already initialized!", .{});
+    return py.checkErrno(c.io_uring_queue_init_params(entries, &ring._io_uring, &param._io_uring_params));
 }
 
 /// Setup `Ring` Submission & Completion Queues
@@ -107,7 +109,7 @@ pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) py.Error!i32 
 /// Warning
 ///     - Coded but not tested!!!
 pub fn io_uring_queue_mmap(fd: i32, ring: *Ring, param: *Param) py.Error!i32 {
-    return py.checkErrno(c.io_uring_queue_mmap(fd, @ptrCast(&ring._io_uring), @ptrCast(param._io_uring_params)));
+    return py.checkErrno(c.io_uring_queue_mmap(fd, @ptrCast(&ring._io_uring), @ptrCast(&param._io_uring_params)));
 }
 
 /// >>> io_uring_ring_dontfork(ring)
@@ -229,7 +231,7 @@ pub fn io_uring_register_wait_reg(ring: *Ring, reg: *RegWait, nr: i32) py.Error!
 }
 
 pub fn io_uring_resize_rings(ring: *Ring, p: *Param) py.Error!i32 {
-    return py.checkErrno(c.io_uring_resize_rings(try ring.checkedPtr(), p._io_uring_params));
+    return py.checkErrno(c.io_uring_resize_rings(try ring.checkedPtr(), &p._io_uring_params));
 }
 
 pub fn io_uring_clone_buffers_offset(
@@ -471,7 +473,7 @@ pub fn io_uring_enter2(fd: u32, to_submit: u32, min_complete: u32, flags: u32, s
 }
 
 pub fn io_uring_setup(entries: u32, p: *Param) py.Error!i32 {
-    return py.checkErrno(c.io_uring_setup(entries, p._io_uring_params));
+    return py.checkErrno(c.io_uring_setup(entries, &p._io_uring_params));
 }
 
 pub fn io_uring_register(fd: u32, opcode: u32, nr_args: u32, arg: ?usize) py.Error!i32 {
@@ -482,12 +484,17 @@ pub fn io_uring_register_region(ring: *Ring, reg: *MemRegionReg) py.Error!i32 {
     return py.checkErrno(c.io_uring_register_region(try ring.checkedPtr(), reg._io_uring_mem_region_reg));
 }
 
+/// Note
+///     - `OSError` if the kernel refuses (C liburing's `err` out-parameter is the error number).
+///
 /// Type
 ///     return: BufRing
-pub fn io_uring_setup_buf_ring(ring: *Ring, nentries: u32, bgid: i32, flags: u32, err: usize) py.Error!*Object {
-    if (c.io_uring_setup_buf_ring(try ring.checkedPtr(), nentries, bgid, flags, @ptrFromInt(err))) |br| {
+pub fn io_uring_setup_buf_ring(ring: *Ring, nentries: u32, bgid: i32, flags: u32) py.Error!*Object {
+    var err: c_int = 0;
+    if (c.io_uring_setup_buf_ring(try ring.checkedPtr(), nentries, bgid, flags, &err)) |br| {
         return class.BufRingType.new(.{ ._io_uring_buf_ring = br });
     }
+    _ = try py.checkErrno(if (err < 0) err else -err);
     return py.raiseRuntimeError("`io_uring_setup_buf_ring` - could not be initialized!", .{});
 }
 
