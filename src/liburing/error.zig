@@ -23,8 +23,7 @@ const py = setu.py;
 ///    - if `no=-1` it will check with `errno` first to see if proper error is set,
 ///      and raise that as exception
 pub fn trap_error(errno: i32) py.Error!i32 {
-    if (errno < 0) return py.raiseErrno(-errno);
-    return errno;
+    return py.checkErrno(errno);
 }
 
 /// `MemoryError` (Setu's `capi.zig` does not declare it).

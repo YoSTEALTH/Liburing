@@ -26,6 +26,8 @@ pub const Statx = struct {
 
     const Self = @This();
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
+
     pub fn get_mask(self: *const Self) u32 {
         return self._statx.stx_mask;
     }
