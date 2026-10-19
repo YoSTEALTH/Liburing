@@ -1645,15 +1645,6 @@ pub fn io_uring_cqe_nr(cqe: *class.CQE) py.Error!u32 {
     return c.io_uring_cqe_nr(try cqe.cqePtr());
 }
 
-/// `1` if the ring's completion entries are 32 bytes (`IORING_SETUP_CQE32`), else `0`.
-pub fn io_uring_cqe_shift(ring: *Ring) py.Error!u32 {
-    return c.io_uring_cqe_shift(try ring.checkedPtr());
-}
-
-pub fn io_uring_cqe_shift_from_flags(flags: u32) u32 {
-    return c.io_uring_cqe_shift_from_flags(flags);
-}
-
 /// Bytes the kernel needs to map a ring of `entries` with `flags`.
 ///
 /// Example
