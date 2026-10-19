@@ -396,3 +396,46 @@ def test_provide_buffers_arguments(ring):
         L.io_uring_prep_provide_buffers(sqe, bytearray(8), 0, 1, 0)
     with pytest.raises(ValueError):
         L.io_uring_prep_provide_buffers(sqe, bytearray(2), 4, 1, 0)
+
+
+def test_send_set_addr_udp(ring, cqe):
+    rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        rx.bind(("127.0.0.1", 0))
+        addr = L.Sockaddr(L.AF_INET, "127.0.0.1", rx.getsockname()[1])
+        sqe = L.io_uring_get_sqe(ring)
+        L.io_uring_prep_send(sqe, tx.fileno(), b"set-addr")
+        L.io_uring_prep_send_set_addr(sqe, addr)  # a temporary would be fine too: kept until the submit
+        sqe.user_data = 4
+        assert L.io_uring_submit(ring) == 1
+        assert L.io_uring_wait_cqe(ring, cqe) == 0
+        assert cqe[0].res == 8
+        L.io_uring_cqe_seen(ring, cqe[0])
+        assert rx.recv(16) == b"set-addr"
+    finally:
+        rx.close()
+        tx.close()
+
+
+@pytest.mark.skip_linux("6.19")
+def test_cmd_getsockname(ring, cqe, pair):
+    listener, client, _ = pair
+    for peer, expect in ((0, client.getsockname()), (1, client.getpeername())):
+        out = L.Sockaddr()
+        sqe = L.io_uring_get_sqe(ring)
+        L.io_uring_prep_cmd_getsockname(sqe, client.fileno(), out, peer)
+        sqe.user_data = 6
+        assert L.io_uring_submit(ring) == 1
+        assert L.io_uring_wait_cqe(ring, cqe) == 0
+        assert cqe[0].res >= 0
+        L.io_uring_cqe_seen(ring, cqe[0])
+        assert (out.ip, out.port) == expect
+
+
+def test_message_classes_are_not_creatable_yet():
+    # `Msghdr`, `Cmsghdr`, `EpollEvent` and `RecvmsgOut` are not built from Python yet, which blocks the
+    # `sendmsg` / `recvmsg` / `epoll_*` preps and the `io_uring_recvmsg_*` readers from being used (or tested)
+    for cls in (L.Msghdr, L.Cmsghdr, L.EpollEvent, L.RecvmsgOut):
+        with pytest.raises(TypeError):
+            cls()
