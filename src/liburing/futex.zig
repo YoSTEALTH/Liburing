@@ -162,12 +162,13 @@ pub const Futex = struct {
         return (self._len > 0);
     }
 
-    pub fn __getitem__(self: *Object, index: usize) py.Error!*Object {
+    pub fn __getitem__(self: *Object, index: isize) py.Error!*Object {
         const d = FutexType.data(self);
-        if (index < d._len) {
+        if (index >= 0 and index < d._len) {
+            const i: usize = @intCast(index); // cast: checked above
             return FUTEXType.new(.{
-                ._state = @intFromPtr(&@as([*]u32, @ptrFromInt(d._futex))[index]),
-                ._vector = if (d._futex_waitv) |v| &v[index] else null,
+                ._state = @intFromPtr(&@as([*]u32, @ptrFromInt(d._futex))[i]),
+                ._vector = if (d._futex_waitv) |v| &v[i] else null,
                 ._owner = keep(self),
             });
         }

@@ -103,6 +103,7 @@ pub const Iovec = struct {
 pub const Timespec = struct {
     _timespec: ?*c.__kernel_timespec = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *const Self) void {
@@ -148,6 +149,30 @@ pub const Timespec = struct {
 ///    >>> io_uring_queue_exit(ring)
 pub const Ring = struct {
     _io_uring: c.io_uring = std.mem.zeroes(c.io_uring), // lives inside the Python object
+    /// Objects the kernel still has to read (path strings, ...): a `list`, dropped once a submit has
+    /// handed every SQE to the kernel (`releaseSubmitted`). See `keepUntilSubmit`.
+    _keep: ?*Object = null,
+
+    pub fn __new__(_: *Ring) void {}
+
+    /// The `io_uring` for C, or `RuntimeError` if the ring is not initialised (or already exited):
+    /// liburing would read unmapped memory.
+    pub fn checkedPtr(self: *Ring) py.Error!*c.io_uring {
+        if (self._io_uring.ring_fd <= 0) return py.raiseRuntimeError(
+            "`Ring` is not initialized (`io_uring_queue_init`) or already exited (`io_uring_queue_exit`)",
+            .{},
+        );
+        return &self._io_uring;
+    }
+
+    /// After a submit: drops `_keep` once the kernel has consumed every SQE (it read their paths then).
+    pub fn releaseSubmitted(self: *Ring) void {
+        if (self._keep == null or self._io_uring.ring_fd <= 0) return;
+        if (c.io_uring_sq_ready(&self._io_uring) != 0) return; // not all consumed yet (`SQPOLL`)
+        const list = self._keep;
+        self._keep = null;
+        py.decref(list);
+    }
 
     pub fn get_flags(self: *const Ring) u32 {
         return self._io_uring.flags;
@@ -173,6 +198,7 @@ pub const Ring = struct {
 /// Completion Queue Entry (CQE)
 pub const CQE = struct {
     _cqe: ?*c.io_uring_cqe = null,
+    _owner: ?*Object = null, // the `Ring` whose completion queue `_cqe` points into
 
     pub const instantiable = false;
 
@@ -180,16 +206,22 @@ pub const CQE = struct {
 
     // GET
 
-    pub fn get_user_data(self: *const Self) u64 {
-        return self._cqe.?.user_data;
+    /// The entry for C, or `RuntimeError` once its ring has exited (its memory is unmapped).
+    pub fn cqePtr(self: *const Self) py.Error!*c.io_uring_cqe {
+        if (self._owner) |o| _ = try RingType.data(o).checkedPtr();
+        return self._cqe.?;
+    }
+
+    pub fn get_user_data(self: *const Self) py.Error!u64 {
+        return (try self.cqePtr()).user_data;
     }
 
     pub fn get_res(self: *const Self) py.Error!i32 {
-        return e.trap_error(self._cqe.?.res);
+        return py.checkErrno((try self.cqePtr()).res);
     }
 
-    pub fn get_flags(self: *const Self) u32 {
-        return self._cqe.?.flags;
+    pub fn get_flags(self: *const Self) py.Error!u32 {
+        return (try self.cqePtr()).flags;
     }
 
     pub fn get_big_cqe(_: *const Self) py.Error!void {
@@ -218,6 +250,7 @@ pub const Cqe = struct {
     // TODO:
     // _array: ?[*]CQE = null, // custom memory for batch cqe
     _io_uring_cqe: ?[*]c.io_uring_cqe = null, // Note: Memory is managed by `io_uring`
+    _ring: ?*Object = null, // the `Ring` `_io_uring_cqe` points into (set with it)
 
     pub fn __new__(_: *Cqe, no: ?u32) py.Error!void {
         // TODO: `no` is need to get `io_uring_peek_batch_cqe` working
@@ -228,9 +261,30 @@ pub const Cqe = struct {
         return if (self._io_uring_cqe) |_| true else false;
     }
 
-    pub fn __getitem__(self: *const Cqe, index: usize) py.Error!*Object {
-        if (self._io_uring_cqe) |cqe| return CQEType.new(.{ ._cqe = &cqe[index] });
-        return py.raiseIndexError("`Cqe` - out of completed entries", .{});
+    /// The `cqe_ptr` argument for a liburing call on `ring` (Zig side): records the ring, so
+    /// `cqe[i]` can follow its completion queue.
+    pub fn outFor(self: *Cqe, ring: *Ring) *?[*]c.io_uring_cqe {
+        setOwned(&self._ring, RingType.object(ring));
+        return &self._io_uring_cqe;
+    }
+
+    ///Note
+    ///    - `cqe[i]` is the `i`-th entry after `cqe[0]` in the ring's completion queue (wrapping
+    ///      around its end); `IndexError` past the queue size.
+    pub fn __getitem__(self: *const Cqe, index: isize) py.Error!*Object {
+        const first = self._io_uring_cqe orelse return py.raiseIndexError("`Cqe` - out of completed entries", .{});
+        const ring_obj = self._ring.?;
+        const ring = try RingType.data(ring_obj).checkedPtr();
+        const cq = &ring.cq;
+        if (index < 0 or index >= cq.ring_entries) return py.raiseIndexError(
+            "`Cqe[{d}]` - out of range, the ring has {d} completion entries",
+            .{ index, cq.ring_entries },
+        );
+        const cqes: [*]c.io_uring_cqe = cq.cqes;
+        const shift: u5 = @intCast(c.io_uring_cqe_shift(ring)); // cast: 0 or 1 (`IORING_SETUP_CQE32`)
+        const slot = (@intFromPtr(first) - @intFromPtr(cqes)) / @sizeOf(c.io_uring_cqe);
+        const pos = (((slot >> shift) + @as(usize, @intCast(index))) & cq.ring_mask) << shift; // cast: 0 <= index
+        return CQEType.new(.{ ._cqe = &cqes[pos], ._owner = keep(ring_obj) });
     }
 };
 
@@ -248,8 +302,8 @@ pub const CqeIter = struct {
 
     const Self = @This();
 
-    pub fn __new__(self: *Self, ring: *Ring, cqe: *Cqe, index: ?usize) void {
-        self._io_uring_cqe_iter = c.io_uring_cqe_iter_init(&ring._io_uring);
+    pub fn __new__(self: *Self, ring: *Ring, cqe: *Cqe, index: ?usize) py.Error!void {
+        self._io_uring_cqe_iter = c.io_uring_cqe_iter_init(try ring.checkedPtr());
         self._index = index orelse 0;
         self._cqe = keep(CqeType.object(cqe));
         self._ring = keep(RingType.object(ring));
@@ -258,6 +312,7 @@ pub const CqeIter = struct {
     pub fn __next__(self: *Self) ?usize {
         if (self._cqe) |o| {
             const _cqe = CqeType.data(o);
+            if (self._ring) |r| setOwned(&_cqe._ring, r);
             if (c.io_uring_cqe_iter_next(&self._io_uring_cqe_iter, &_cqe._io_uring_cqe)) {
                 defer self._index += 1;
                 return self._index;
@@ -277,44 +332,52 @@ pub const SQE = struct {
 
     const Self = @This();
 
+    /// The entry for C, or `RuntimeError` once its ring has exited (its memory is unmapped).
+    pub fn sqePtr(self: *const Self) py.Error!*c.io_uring_sqe {
+        if (self._owner) |o| if (RingType.check(o)) {
+            _ = try RingType.data(o).checkedPtr();
+        };
+        return self._sqe.?;
+    }
+
     // GET
 
-    pub fn get_opcode(self: *const Self) u8 {
-        return self._sqe.?.opcode;
+    pub fn get_opcode(self: *const Self) py.Error!u8 {
+        return (try self.sqePtr()).opcode;
     }
 
-    pub fn get_flags(self: *const Self) u8 {
-        return self._sqe.?.flags;
+    pub fn get_flags(self: *const Self) py.Error!u8 {
+        return (try self.sqePtr()).flags;
     }
 
-    pub fn get_ioprio(self: *const Self) u16 {
-        return self._sqe.?.ioprio;
+    pub fn get_ioprio(self: *const Self) py.Error!u16 {
+        return (try self.sqePtr()).ioprio;
     }
 
-    pub fn get_fd(self: *const Self) i32 {
-        return self._sqe.?.fd;
+    pub fn get_fd(self: *const Self) py.Error!i32 {
+        return (try self.sqePtr()).fd;
     }
 
-    pub fn get_len(self: *const Self) u32 {
-        return self._sqe.?.len;
+    pub fn get_len(self: *const Self) py.Error!u32 {
+        return (try self.sqePtr()).len;
     }
 
-    pub fn get_user_data(self: *const Self) u64 {
-        return self._sqe.?.user_data;
+    pub fn get_user_data(self: *const Self) py.Error!u64 {
+        return (try self.sqePtr()).user_data;
     }
 
-    pub fn get_personality(self: *const Self) u16 {
-        return self._sqe.?.personality;
+    pub fn get_personality(self: *const Self) py.Error!u16 {
+        return (try self.sqePtr()).personality;
     }
 
     // SET
 
-    pub fn set_flags(self: *Self, flags: u8) void {
-        self._sqe.?.flags = flags;
+    pub fn set_flags(self: *Self, flags: u8) py.Error!void {
+        (try self.sqePtr()).flags = flags;
     }
 
-    pub fn set_user_data(self: *Self, data: u64) void {
-        self._sqe.?.user_data = data;
+    pub fn set_user_data(self: *Self, data: u64) py.Error!void {
+        (try self.sqePtr()).user_data = data;
     }
 };
 
@@ -347,6 +410,8 @@ pub const SQE = struct {
 pub const Sqe = struct {
     _len: usize = 0,
     _io_uring_sqe: ?[*]c.io_uring_sqe = null, // allocated here, `_len` entries
+    /// Like `Ring._keep`, for entries prepared here: `put_sqe` hands them to the ring.
+    _keep: ?*Object = null,
 
     pub const base = SQEType;
 
@@ -375,10 +440,12 @@ pub const Sqe = struct {
         return (self._len > 0);
     }
 
-    pub fn __getitem__(self: *Object, index: usize) py.Error!*Object {
+    pub fn __getitem__(self: *Object, index: isize) py.Error!*Object {
         const d = SqeType.data(self);
         if (d._io_uring_sqe) |array| {
-            if (index < d._len) return SQEType.new(.{ ._sqe = &array[index], ._owner = keep(self) });
+            if (index >= 0 and index < d._len) {
+                return SQEType.new(.{ ._sqe = &array[@intCast(index)], ._owner = keep(self) }); // cast: checked
+            }
         }
         return py.raiseIndexError("Index out of range", .{});
     }
@@ -411,6 +478,7 @@ pub const Probe = struct {
 pub const Param = struct {
     _io_uring_params: ?*c.io_uring_params = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn get_sq_entries(self: *const Self) py.Error!u32 {
@@ -453,6 +521,7 @@ pub const Param = struct {
 pub const RegWait = struct {
     _io_uring_reg_wait: ?*c.io_uring_reg_wait = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *const Self) void {
@@ -465,6 +534,7 @@ pub const Restriction = struct {
     _len: usize = 0,
     _io_uring_restriction: ?[*]c.io_uring_restriction = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *Self) void {
@@ -476,6 +546,7 @@ pub const Restriction = struct {
 pub const BufReg = struct {
     _io_uring_buf_reg: ?*c.io_uring_buf_reg = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *Self) void {
@@ -487,6 +558,7 @@ pub const BufReg = struct {
 pub const SyncCancelReg = struct {
     _io_uring_sync_cancel_reg: ?*c.io_uring_sync_cancel_reg = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *Self) void {
@@ -498,6 +570,7 @@ pub const SyncCancelReg = struct {
 pub const Napi = struct {
     _io_uring_napi: ?*c.io_uring_napi = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *Self) void {
@@ -509,6 +582,7 @@ pub const Napi = struct {
 pub const ZcrxIfqReg = struct {
     _io_uring_zcrx_ifq_reg: ?*c.io_uring_zcrx_ifq_reg = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *Self) void {
@@ -520,6 +594,7 @@ pub const ZcrxIfqReg = struct {
 pub const ClockRegister = struct {
     _io_uring_clock_register: ?*c.io_uring_clock_register = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *Self) void {
@@ -531,6 +606,7 @@ pub const ClockRegister = struct {
 pub const Bpf = struct {
     _io_uring_bpf: ?*c.io_uring_bpf = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *Self) void {
@@ -542,6 +618,7 @@ pub const Bpf = struct {
 pub const SigsetT = struct {
     _sigset_t: ?*c.__sigset_t = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *Self) void {
@@ -553,6 +630,7 @@ pub const SigsetT = struct {
 pub const MemRegionReg = struct {
     _io_uring_mem_region_reg: ?*c.io_uring_mem_region_reg = null,
 
+    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
     pub fn __del__(self: *Self) void {
@@ -694,6 +772,14 @@ pub const OpenHow = struct {
         self._open_how.resolve = value;
     }
 };
+
+/// Points the owned field `field` at `obj` (a new reference), dropping the old one.
+pub fn setOwned(field: *?*Object, obj: *Object) void {
+    if (field.* == obj) return;
+    const old = field.*;
+    field.* = keep(obj);
+    py.decref(old);
+}
 
 /// A new reference to `obj`, for an owned (`?*Object`) field.
 pub fn keep(obj: *Object) *Object {

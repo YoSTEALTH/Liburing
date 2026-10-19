@@ -61,8 +61,8 @@ pub const FileIndex = struct {
         return self._fds.?[self._index];
     }
 
-    pub fn __getitem__(self: *const Self, index: usize) py.Error!i32 {
-        if (index < self._len) return self._fds.?[index];
+    pub fn __getitem__(self: *const Self, index: isize) py.Error!i32 {
+        if (index >= 0 and index < self._len) return self._fds.?[@intCast(index)]; // cast: checked
         return py.raiseIndexError("`FileIndex` - index out of range", .{});
     }
 
@@ -120,6 +120,10 @@ pub fn probe() py.Error!*Object {
 ///    >>> io_uring_prep_timeout(sqe, ts, ...)
 ///
 pub fn timespec(second: f64) py.Error!*Object {
+    if (!std.math.isFinite(second) or second < 0) {
+        return py.raiseValueError("`timespec(second)` must be a finite number >= 0, got {d}", .{second});
+    }
+    if (second >= 0x1p63) return py.raiseOverflowError("`timespec(second)` = {d} is out of range", .{second});
     var ts = std.heap.c_allocator.create(c.__kernel_timespec) catch {
         return e.raiseMemoryError("`timespec()` - Out of Memory!");
     };
@@ -165,8 +169,9 @@ pub fn timespec(second: f64) py.Error!*Object {
 ///Note
 ///    - Returns `False` if queue is full. Will need to `io_uring_submit()` and try again.
 ///    - Returns `False` if `entries` < `len(sqe)`
-pub fn put_sqe(ring: *Ring, sqe: *Sqe) bool {
-    const io_uring = &ring._io_uring;
+pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
+    const io_uring = try ring.checkedPtr();
+    if (sqe._keep) |list| try keepAll(&ring._keep, list); // paths its entries point to, until submit
     //note:
     //    - its ok to submit `0` sqe thus `True`
     //    - this also accounts for `ptr` gotten from `io_uring_get_sqe`
@@ -198,6 +203,31 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) bool {
 /// Note
 ///     - `str` arguments (and `pathlib` paths, which cache their `str`) live as long as the
 ///       caller's object; `deinit` drops only the reference this took.
+/// Keeps `obj` (a path `str`, ...) alive until the kernel has read the entry `sqe`: on its `Ring`
+/// until a submit consumes it, or on its `Sqe` until `put_sqe` hands it to a ring. io_uring reads
+/// paths at submit time, so a temporary (`dir / "name"`) would otherwise be freed before that.
+pub fn keepUntilSubmit(sqe: *class.SQE, obj: *Object) py.Error!void {
+    const self = class.SQEType.object(sqe);
+    if (sqe._owner) |owner| {
+        if (class.RingType.check(owner)) return keepIn(&class.RingType.data(owner)._keep, obj);
+        if (class.SqeType.check(owner)) return keepIn(&class.SqeType.data(owner)._keep, obj);
+    }
+    if (class.SqeType.check(self)) return keepIn(&class.SqeType.data(self)._keep, obj);
+}
+
+/// Appends `obj` to the owned `list` field `field` (created on first use).
+fn keepIn(field: *?*Object, obj: *Object) py.Error!void {
+    if (field.* == null) field.* = sc.PyList_New(0) orelse return error.PythonError;
+    if (sc.PyList_Append(field.*.?, obj) < 0) return error.PythonError;
+}
+
+/// Appends every item of the `list` `items` to the owned `list` field `field`.
+fn keepAll(field: *?*Object, items: *Object) py.Error!void {
+    const count = sc.PyList_Size(items);
+    var i: sc.ssize = 0;
+    while (i < count) : (i += 1) try keepIn(field, sc.PyList_GetItem(items, i).?);
+}
+
 pub const Path = struct {
     obj: *Object,
     path: [:0]const u8,

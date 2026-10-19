@@ -180,15 +180,15 @@ fn scopeId(text: []const u8) py.Error!u32 {
 ///    - remember to hold on to `val` reference till `sqe` has been submitted.
 ///    - min length of `val` must be `4`.
 ///    - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
-pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.Buffer) void {
+pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.Buffer) py.Error!void {
     c.io_uring_prep_cmd_sock(
-        sqe._sqe.?,
+        try sqe.sqePtr(),
         c.SOCKET_URING_OP_SETSOCKOPT,
         sockfd,
         level,
         optname,
         @constCast(optval.data.ptr),
-        @intCast(optval.data.len), // cast: a buffer the size of a socket option
+        try py.narrow(c_int, optval.data.len, "`setsockopt(optval)` length"), // cast: a buffer the size of a socket option
     );
 }
 
@@ -206,15 +206,15 @@ pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.B
 ///    - `cqe.res` will return `len()` of populating data(`buf`).
 ///    - min length of `buf` must be `4`.
 ///    - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
-pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.WritableBuffer) void {
+pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.WritableBuffer) py.Error!void {
     c.io_uring_prep_cmd_sock(
-        sqe._sqe.?,
+        try sqe.sqePtr(),
         c.SOCKET_URING_OP_GETSOCKOPT,
         sockfd,
         level,
         optname,
         optval.data.ptr,
-        @intCast(optval.data.len), // cast: a buffer the size of a socket option
+        try py.narrow(c_int, optval.data.len, "`getsockopt(optval)` length"), // cast: a buffer the size of a socket option
     );
 }
 
@@ -225,9 +225,9 @@ pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.W
 ///
 ///Note
 ///    - This function is an alias of `io_uring_prep_cmd_getsockname`
-pub fn getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) void {
+pub fn getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) py.Error!void {
     c.io_uring_prep_cmd_getsockname(
-        sqe._sqe.?,
+        try sqe.sqePtr(),
         fd,
         sockaddr.addrPtr(),
         &sockaddr._socklen,
