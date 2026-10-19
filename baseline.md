@@ -16,6 +16,12 @@ Each test id ran in its own process, so a crash could not hide later results. Ru
 `test_rwf_nowait_flag` writes into the current directory and fails with `EOPNOTSUPP` (errno 95) if that is
 tmpfs, by design of the test.
 
+## Update 2026-10-19
+
+The uncommitted `const_test.py` changes were later discarded, which removes `test_enum` (a skipped test):
+the suite is now 61 tests. On those, PyOZ (3.14) and the Setu port (3.15, 3.15t) both give **51 passed,
+10 skipped**, identical per test.
+
 ## Summary
 
 62 collected: **51 passed, 11 skipped**, 0 failed, 0 crashed.
