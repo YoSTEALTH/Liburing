@@ -1,12 +1,18 @@
 //! Build script for Liburing (Zig 0.17)
 //!
-//!   zig build          the `liburing` extension (and C liburing, `liburing-ffi.a`) for `-Dtarget`
-//!   zig build develop  the extension into src/liburing/, to import it from the source tree
+//!   zig build          the `liburing` extension and its stubs (`liburing.pyi`) into zig-out/lib/
+//!   zig build develop  also copy both into src/liburing/ (for `pytest` from a checkout)
+//!   zig build stubs    write the type stubs to src/liburing/liburing.pyi
 //!
 //! Options:
 //!   -Dfree-threaded=false   build for the regular (GIL) 3.15 instead of 3.15t
+//!   -Drelease               ReleaseFast (wheels use it); `-Doptimize=...` picks any mode
+//!   -Dstrip                 drop debug info from the extension (wheels use it)
 //!   -Dext-suffix=...        Python extension suffix (default: CPython's `EXT_SUFFIX` for the target and ABI)
+//!
+//! Wheels are built by `tools/setu_build.py` (the PEP 517 backend), not by a step here.
 const std = @import("std");
+const zon = @import("build.zig.zon");
 
 /// C liburing sources compiled into the library (`liburing_srcs` + `ffi.c` in lib/liburing/src/Makefile).
 const liburing_srcs: []const []const u8 = &.{ "setup.c", "queue.c", "register.c", "syscall.c", "version.c", "ffi.c" };
@@ -26,7 +32,7 @@ const liburing_flags: []const []const u8 = &.{
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
     const strip = b.option(bool, "strip", "Strip debug symbols from the binary") orelse false;
     const free_threaded = b.option(bool, "free-threaded", "Build for free-threaded 3.15t (default: true)") orelse
         true;
@@ -55,31 +61,13 @@ pub fn build(b: *std.Build) !void {
         .flags = liburing_flags,
     });
     liburing_c.root_module.addIncludePath(b.path("lib/liburing/src/include"));
-    b.installArtifact(liburing_c);
 
-    // The C headers as a Zig module (`@import("c")`); `@cImport` no longer exists in Zig 0.17.
-    const translate_c = b.addTranslateC(.{
-        .root_source_file = b.path("src/liburing/c.h"),
-        .target = target,
-        .optimize = optimize,
-    });
-    translate_c.addIncludePath(b.path("lib/liburing/src/include"));
-    // Bodies translate-c can not translate (liburing's atomics) become `extern`s from `ffi.c`.
-    const c_externs = b.addRunArtifact(b.addExecutable(.{
-        .name = "c_externs",
-        .root_module = b.createModule(.{ .root_source_file = b.path("tools/c_externs.zig"), .target = b.graph.host }),
-    }));
-    c_externs.addFileArg(translate_c.getOutput());
-    const c_mod = b.createModule(.{
-        .root_source_file = c_externs.addOutputFileArg("c.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
+    const c_mod = cModule(b, target, optimize);
 
     const setu_dep = b.dependency("setu", .{});
     const options = b.addOptions();
     options.addOption(bool, "free_threaded", free_threaded);
+    options.addOption([:0]const u8, "version", zon.version);
 
     // The `liburing` extension module.
     const ext = b.addLibrary(.{
@@ -102,8 +90,51 @@ pub fn build(b: *std.Build) !void {
     ext.linker_allow_shlib_undefined = true; // the CPython C API comes from the interpreter
     const ext_name = b.fmt("liburing{s}", .{ext_suffix});
     b.getInstallStep().dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .lib, ext_name).step);
-    const develop = b.step("develop", "Build the extension into src/liburing/");
+
+    // Type stubs, generated on the build machine (`src/liburing/stubgen.zig`).
+    const stubgen = b.addExecutable(.{
+        .name = "stubgen",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/liburing/stubgen.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+            .imports = &.{
+                .{ .name = "setu", .module = setu_dep.module("setu") },
+                .{ .name = "c", .module = cModule(b, b.graph.host, .Debug) },
+            },
+        }),
+    });
+    const pyi = b.addRunArtifact(stubgen).captureStdOut(.{ .basename = "liburing.pyi" });
+    b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "liburing.pyi").step);
+    const pyi_copy = b.addInstallFileWithDir(pyi, .{ .custom = "../src/liburing" }, "liburing.pyi");
+    b.step("stubs", "Write the type stubs to src/liburing/liburing.pyi").dependOn(&pyi_copy.step);
+
+    const develop = b.step("develop", "Copy the extension and its stubs into src/liburing/");
     develop.dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .{ .custom = "../src/liburing" }, ext_name).step);
+    develop.dependOn(&pyi_copy.step);
+}
+
+/// The C headers (`src/liburing/c.h`) as a Zig module for `target` (`@import("c")`); `@cImport`
+/// no longer exists in Zig 0.17.
+fn cModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
+    const translate_c = b.addTranslateC(.{
+        .root_source_file = b.path("src/liburing/c.h"),
+        .target = target,
+        .optimize = optimize,
+    });
+    translate_c.addIncludePath(b.path("lib/liburing/src/include"));
+    // Bodies translate-c can not translate (liburing's atomics) become `extern`s from `ffi.c`.
+    const c_externs = b.addRunArtifact(b.addExecutable(.{
+        .name = "c_externs",
+        .root_module = b.createModule(.{ .root_source_file = b.path("tools/c_externs.zig"), .target = b.graph.host }),
+    }));
+    c_externs.addFileArg(translate_c.getOutput());
+    return b.createModule(.{
+        .root_source_file = c_externs.addOutputFileArg("c.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
 }
 
 /// Runs `./configure --use-libc` in lib/liburing unless its generated headers already exist.

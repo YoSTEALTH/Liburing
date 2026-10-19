@@ -7,40 +7,17 @@ const sc = setu.c;
 const py = setu.py;
 const Object = sc.Object;
 
-const class = @import("class.zig");
-const @"const" = @import("const.zig");
-const @"enum" = @import("enum.zig");
-const @"error" = @import("error.zig");
-const helper = @import("helper.zig");
-const uring = @import("uring.zig");
-const statx = @import("statx.zig");
-const futex = @import("futex.zig");
-const socket = @import("socket.zig");
+const api = @import("api.zig");
 
 /// Setu settings, read by `setu.Class` from the root file.
-pub const setu_options: setu.Options = .{ .module = "liburing" };
+pub const setu_options = api.setu_options;
 
-/// Every class, in creation order (a base before its subclasses).
-const classes = .{
-    class.IovecType,         class.TimespecType,      class.RingType,         class.CQEType,
-    class.CqeType,           class.CqeIterType,       class.SQEType,          class.SqeType,
-    class.ProbeType,         class.ParamType,         class.RegWaitType,      class.RestrictionType,
-    class.BufRegType,        class.SyncCancelRegType, class.NapiType,         class.ZcrxIfqRegType,
-    class.ClockRegisterType, class.BpfType,           class.SigsetTType,      class.MemRegionRegType,
-    class.BufRingType,       class.CmsghdrType,       class.MsghdrType,       class.EpollEventType,
-    class.RecvmsgOutType,    class.OpenHowType,       helper.FileIndexType,   statx.StatxType,
-    futex.FUTEXType,         futex.FutexType,         socket.SockaddrType,
+/// The module functions, from every file in `api.files`.
+const module_methods = blk: {
+    var defs: []const sc.MethodDef = &.{};
+    for (api.files) |f| defs = defs ++ py.exportFns(f.M, f.source);
+    break :blk defs[0..].* ++ [_]sc.MethodDef{py.method_end};
 };
-
-/// The files whose UPPER_CASE `pub const` ints are module constants.
-const constant_files = .{ @"const", statx, futex, socket };
-
-/// The files whose `pub fn`s are module functions.
-const module_methods = py.exportFns(@"error", @embedFile("error.zig")) ++
-    py.exportFns(helper, @embedFile("helper.zig")) ++
-    py.exportFns(uring, @embedFile("uring.zig")) ++
-    py.exportFns(socket, @embedFile("socket.zig")) ++
-    [_]sc.MethodDef{py.method_end};
 
 /// `Py_mod_exec`: creates the classes, constants and enums.
 fn exec(module: *Object) callconv(.c) c_int {
@@ -49,11 +26,11 @@ fn exec(module: *Object) callconv(.c) c_int {
 }
 
 fn initModule(module: *Object) py.Error!void {
-    inline for (classes) |C| try C.create(module);
-    inline for (constant_files) |F| try py.addConstants(module, F);
+    inline for (api.classes) |C| try C.create(module);
+    inline for (api.constant_files) |F| try py.addConstants(module, F);
     if (sc.PyModule_AddStringConstant(module, "LIBURING_HAVE_DATA64", "") < 0) return error.PythonError;
-    try addIntEnum(module, @"enum".io_uring_op);
-    try addIntEnum(module, @"enum".io_uring_socket_op);
+    if (sc.PyModule_AddStringConstant(module, "__version__", build_options.version) < 0) return error.PythonError;
+    inline for (api.enums) |E| try addIntEnum(module, E);
 }
 
 /// Adds the Zig enum `E` to `module` as an `enum.IntEnum` of the same name.

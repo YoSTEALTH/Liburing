@@ -1,26 +1,20 @@
-[build-system]
-requires = ["pyoz"]
-build-backend = "pyoz.backend"
-
 [project]
 name = "liburing"
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 license = "CC0-1.0"
-version = "2026.3.30"
+dynamic = ["version"]  # from `build.zig.zon` (tools/setu_build.py)
 authors = [{name="YoSTEALTH"}]
-keywords = ["python", "socket", "async", "cython", "file", "python3", "io", "syscall", "futex", "statx",
+keywords = ["python", "socket", "async", "file", "python3", "io", "syscall", "futex", "statx",
             "io-uring", "uring", "liburing"]
-requires-python = ">=3.10"
+requires-python = ">=3.15"
 license-files = ["LICENSE.txt"]
+dependencies = []
 description = "Liburing is Python + Zig wrapper around C Liburing, which is a helper to setup and tear-down io_uring instances."
 classifiers = ["Topic :: Software Development",
                "Intended Audience :: Developers",
                "Operating System :: POSIX :: Linux",
-               "Programming Language :: Python :: 3.10",
-               "Programming Language :: Python :: 3.11",
-               "Programming Language :: Python :: 3.12",
-               "Programming Language :: Python :: 3.13",
-               "Programming Language :: Python :: 3.14",
+               "Programming Language :: Python :: 3.15",
+               "Programming Language :: Python :: Free Threading :: 1 - Unstable",  # 3.15t wheel, but the GIL stays on
                "Development Status :: 2 - Pre-Alpha"]
                # 1 - Planning
                # 2 - Pre-Alpha
@@ -40,29 +34,16 @@ test = ["pytest"]
 [tool.ruff]
 line-length = 120
 
-[tool.pyoz]
-abi3 = true
+[build-system]
+requires = []  # `zig` 0.17.0 on PATH (or $ZIG); see tools/setu_build.py
+build-backend = "setu_build"
+backend-path = ["tools"]
 
-# Path to your Zig source file
-module-path = "src/liburing/root.zig"
+[tool.setu_build]
+# `--all`: cp315 / cp315t wheels for glibc 2.28+ on x86_64 and aarch64 (plan.md decision 7).
+abis = ["cp315t", "cp315"]
+targets = ["x86_64-linux-gnu.2.28", "aarch64-linux-gnu.2.28"]
 
-# Native module name (underscore prefix for package layout)
-module-name = "liburing"
-
-# Python package directory to include in the wheel
-py-packages = ["liburing"]
-
-# Optimization level for release builds: "Debug", "ReleaseSafe", "ReleaseFast", "ReleaseSmall"
-optimize = "ReleaseSafe"
-
-# Strip debug symbols in release builds
-# strip = true
-
-# File extensions to include from py-packages (default: .py only)
-# Use ["*"] to include all files
-include-ext = ["py", "zig"]
-
-# Linux platform tag for wheel builds (default: "linux_x86_64" or "linux_aarch64")
-# Use manylinux tags only if building in a manylinux container
-linux-platform-tag = "manylinux_2_17_x86_64"
-
+[tool.pytest.ini_options]
+pythonpath = ["src"]  # after `zig build develop`, tests run straight from the checkout
+testpaths = ["test"]
