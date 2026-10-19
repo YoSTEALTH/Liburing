@@ -298,3 +298,59 @@ def test_buf_ring_init_cq_advance(ring):
 def test_setup_buf_ring_error(ring):
     with pytest.raises(OSError):  # entries must be a power of two
         L.io_uring_setup_buf_ring(ring, 3, 1, 0)
+
+
+# sizes, shifts and low-level helpers
+
+
+def test_cqe_nr_and_shift(ring, cqe):
+    nop(ring, 1)
+    L.io_uring_wait_cqe(ring, cqe)
+    assert L.io_uring_cqe_nr(cqe[0]) == 1
+    L.io_uring_cqe_seen(ring, cqe[0])
+    assert L.io_uring_cqe_shift(ring) == 0
+    assert L.io_uring_cqe_shift_from_flags(0) == 0
+    assert L.io_uring_cqe_shift_from_flags(L.IORING_SETUP_CQE32) == 1
+
+
+def test_memory_and_mlock_size():
+    assert L.io_uring_memory_size(8, 0) > 0
+    assert L.io_uring_memory_size(4096, 0) > L.io_uring_memory_size(8, 0)
+    assert L.io_uring_mlock_size(8, 0) >= 0  # 0 on kernels that no longer count rings against RLIMIT_MEMLOCK
+    p = L.Param()
+    assert L.io_uring_memory_size_params(8, p) > 0
+    assert L.io_uring_mlock_size_params(8, p) >= 0
+    with pytest.raises(OSError):  # 0 entries
+        L.io_uring_memory_size(0, 0)
+
+
+def test_prep_rw():
+    sqe = L.Sqe()
+    L.io_uring_prep_rw(sqe, L.io_uring_op.IORING_OP_NOP, 5, None, 7, 9)
+    assert sqe.opcode == L.io_uring_op.IORING_OP_NOP
+    assert (sqe.fd, sqe.len) == (5, 7)
+
+
+def test_prep_rw_runs(ring, cqe):
+    sqe = L.io_uring_get_sqe(ring)
+    L.io_uring_prep_rw(sqe, L.io_uring_op.IORING_OP_NOP, 0, None, 0, 0)
+    sqe.user_data = 3
+    assert L.io_uring_submit(ring) == 1
+    assert L.io_uring_wait_cqe(ring, cqe) == 0
+    assert (cqe[0].user_data, cqe[0].res) == (3, 0)
+    L.io_uring_cqe_seen(ring, cqe[0])
+
+
+def test_iowq_aff(ring):
+    assert L.io_uring_register_iowq_aff(ring, bytes([1])) == 0  # cpu 0
+    assert L.io_uring_unregister_iowq_aff(ring) == 0
+    assert L.io_uring_register_iowq_aff(ring, bytes([3])) == 0  # cpus 0 and 1
+    assert L.io_uring_unregister_iowq_aff(ring) == 0
+
+
+def test_iowq_max_workers(ring):
+    old = L.io_uring_register_iowq_max_workers(ring, 0, 0)  # read the limits
+    assert len(old) == 2 and old[0] > 0 and old[1] > 0
+    assert L.io_uring_register_iowq_max_workers(ring, 2, 3) == old
+    assert L.io_uring_register_iowq_max_workers(ring, 0, 0) == (2, 3)
+    assert L.io_uring_register_iowq_max_workers(ring, *old) == (2, 3)
