@@ -1,7 +1,9 @@
 //! Liburing - Statx related class, ...
 const c = @import("c.zig").c;
-const oz = @import("PyOZ");
+const setu = @import("setu");
 const std = @import("std");
+
+pub const StatxType = setu.Class(Statx, @embedFile("statx.zig"));
 
 ///Statx - Structures for the extended file attribute retrieval system call `statx()`.
 ///
@@ -20,160 +22,134 @@ const std = @import("std");
 ///        https://man7.org/linux/man-pages/man2/statx.2.html
 ///        https://man7.org/linux/man-pages/man7/inode.7.html
 pub const Statx = struct {
-    _statx: ?*c.struct_statx,
+    _statx: c.struct_statx = std.mem.zeroes(c.struct_statx), // lives inside the Python object
 
     const Self = @This();
 
-    pub fn __new__() ?Self {
-        const statx = std.heap.c_allocator.create(c.struct_statx) catch {
-            return oz.raiseMemoryError("`statx()` - Out of Memory!");
-        };
-        statx.* = std.mem.zeroes(c.struct_statx); // set default value to `0`
-        return .{ ._statx = statx };
-    }
-
-    pub fn __del__(self: *Self) void {
-        if (self._statx) |ptr| std.heap.c_allocator.destroy(ptr);
-    }
-
     pub fn get_mask(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_mask else 0;
+        return self._statx.stx_mask;
     }
 
     pub fn get_blksize(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_blksize else 0;
+        return self._statx.stx_blksize;
     }
 
     pub fn get_attributes(self: *const Self) u64 {
-        return if (self._statx) |x| x.stx_attributes else 0;
+        return self._statx.stx_attributes;
     }
 
     pub fn get_nlink(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_nlink else 0;
+        return self._statx.stx_nlink;
     }
 
     pub fn get_uid(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_uid else 0;
+        return self._statx.stx_uid;
     }
 
     pub fn get_gid(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_gid else 0;
+        return self._statx.stx_gid;
     }
 
     pub fn get_mode(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_mode else 0;
+        return self._statx.stx_mode;
     }
 
     pub fn get_ino(self: *const Self) u64 {
-        return if (self._statx) |x| x.stx_ino else 0;
+        return self._statx.stx_ino;
     }
 
     pub fn get_size(self: *const Self) u64 {
-        return if (self._statx) |x| x.stx_size else 0;
+        return self._statx.stx_size;
     }
 
     pub fn get_blocks(self: *const Self) u64 {
-        return if (self._statx) |x| x.stx_blocks else 0;
+        return self._statx.stx_blocks;
     }
 
     pub fn get_attributes_mask(self: *const Self) u64 {
-        return if (self._statx) |x| x.stx_attributes_mask else 0;
+        return self._statx.stx_attributes_mask;
     }
 
     pub fn get_rdev_major(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_rdev_major else 0;
+        return self._statx.stx_rdev_major;
     }
 
     pub fn get_rdev_minor(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_rdev_minor else 0;
+        return self._statx.stx_rdev_minor;
     }
 
     pub fn get_dev_major(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_dev_major else 0;
+        return self._statx.stx_dev_major;
     }
 
     pub fn get_dev_minor(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_dev_minor else 0;
+        return self._statx.stx_dev_minor;
     }
 
     pub fn get_mnt_id(self: *const Self) u64 {
-        return if (self._statx) |x| x.stx_mnt_id else 0;
+        return self._statx.stx_mnt_id;
     }
 
     pub fn get_dio_mem_align(self: *const Self) u32 {
-        return if (self._statx) |x| x.stx_dio_mem_align else 0;
+        return self._statx.stx_dio_mem_align;
     }
 
     // Timestamps
     // ----------
+    fn timestamp(t: c.struct_statx_timestamp) f64 {
+        const sec: f64 = @floatFromInt(t.tv_sec);
+        const nsec: f64 = @floatFromInt(t.tv_nsec);
+        return sec + nsec * 0.000_000_001;
+    }
+
     pub fn get_atime(self: *const Self) f64 {
-        if (self._statx) |x| {
-            const sec: f64 = @floatFromInt(x.stx_atime.tv_sec);
-            const nsec: f64 = @floatFromInt(x.stx_atime.tv_nsec);
-            return sec + nsec * 0.000_000_001;
-        }
-        return 0.0;
+        return timestamp(self._statx.stx_atime);
     }
 
     pub fn get_btime(self: *const Self) f64 {
-        if (self._statx) |x| {
-            const sec: f64 = @floatFromInt(x.stx_btime.tv_sec);
-            const nsec: f64 = @floatFromInt(x.stx_btime.tv_nsec);
-            return sec + nsec * 0.000_000_001;
-        }
-        return 0.0;
+        return timestamp(self._statx.stx_btime);
     }
 
     pub fn get_ctime(self: *const Self) f64 {
-        if (self._statx) |x| {
-            const sec: f64 = @floatFromInt(x.stx_ctime.tv_sec);
-            const nsec: f64 = @floatFromInt(x.stx_ctime.tv_nsec);
-            return sec + nsec * 0.000_000_001;
-        }
-        return 0.0;
+        return timestamp(self._statx.stx_ctime);
     }
 
     pub fn get_mtime(self: *const Self) f64 {
-        if (self._statx) |x| {
-            const sec: f64 = @floatFromInt(x.stx_mtime.tv_sec);
-            const nsec: f64 = @floatFromInt(x.stx_mtime.tv_nsec);
-            return sec + nsec * 0.000_000_001;
-        }
-        return 0.0;
+        return timestamp(self._statx.stx_mtime);
     }
 
     // Inode
     // -----
     pub fn get_islink(self: *const Self) bool {
-        return if (self._statx) |x| (x.stx_mode & c.S_IFMT) == c.S_IFLNK else false;
+        return (self._statx.stx_mode & c.S_IFMT) == c.S_IFLNK;
     }
 
     pub fn get_isfile(self: *const Self) bool {
-        return if (self._statx) |x| (x.stx_mode & c.S_IFMT) == c.S_IFREG else false;
+        return (self._statx.stx_mode & c.S_IFMT) == c.S_IFREG;
     }
 
     pub fn get_isreg(self: *const Self) bool {
-        return if (self._statx) |x| (x.stx_mode & c.S_IFMT) == c.S_IFREG else false;
+        return (self._statx.stx_mode & c.S_IFMT) == c.S_IFREG;
     }
 
     pub fn get_isdir(self: *const Self) bool {
-        return if (self._statx) |x| (x.stx_mode & c.S_IFMT) == c.S_IFDIR else false;
+        return (self._statx.stx_mode & c.S_IFMT) == c.S_IFDIR;
     }
 
     pub fn get_ischr(self: *const Self) bool {
-        return if (self._statx) |x| (x.stx_mode & c.S_IFMT) == c.S_IFCHR else false;
+        return (self._statx.stx_mode & c.S_IFMT) == c.S_IFCHR;
     }
 
     pub fn get_isblk(self: *const Self) bool {
-        return if (self._statx) |x| (x.stx_mode & c.S_IFMT) == c.S_IFBLK else false;
+        return (self._statx.stx_mode & c.S_IFMT) == c.S_IFBLK;
     }
 
     pub fn get_isfifo(self: *const Self) bool {
-        return if (self._statx) |x| (x.stx_mode & c.S_IFMT) == c.S_IFIFO else false;
+        return (self._statx.stx_mode & c.S_IFMT) == c.S_IFIFO;
     }
 
     pub fn get_issock(self: *const Self) bool {
-        return if (self._statx) |x| (x.stx_mode & c.S_IFMT) == c.S_IFSOCK else false;
+        return (self._statx.stx_mode & c.S_IFMT) == c.S_IFSOCK;
     }
 };
 

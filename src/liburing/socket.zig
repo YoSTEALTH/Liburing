@@ -1,15 +1,25 @@
 //! Liburing - Extra socket related class, functions, ...
 const c = @import("c.zig").c;
-const oz = @import("PyOZ");
+const h = @import("helper.zig");
+const setu = @import("setu");
 const std = @import("std");
 const SQE = @import("class.zig").SQE;
+
+const py = setu.py;
+const Object = setu.c.Object;
+const net = std.Io.net;
+
+pub const SockaddrType = setu.Class(Sockaddr, @embedFile("socket.zig"));
+
+/// libc: an interface name (`eth0`) to its index, `0` if unknown.
+extern fn if_nametoindex(name: [*:0]const u8) c_uint;
 
 ///Generic Socket Address.
 ///
 ///Example
-///    >>> addr = Sockaddr(AF_UNIX, b'./path')
-///    >>> addr = Sockaddr(AF_INET, b'0.0.0.0', 12345)
-///    >>> addr = Sockaddr(AF_INET6, b'::1', 12345)
+///    >>> addr = Sockaddr(AF_UNIX, './path')
+///    >>> addr = Sockaddr(AF_INET, '0.0.0.0', 12345)
+///    >>> addr = Sockaddr(AF_INET6, '::1', 12345)
 ///    >>> bind(sockfd, addr)
 ///
 ///Note
@@ -17,190 +27,141 @@ const SQE = @import("class.zig").SQE;
 ///    - `Sockaddr()` is low level setup, letting you serve/connect directly using path/ip.
 ///    If you need higher level features you can use `getaddrinfo()` this lets you connect
 ///    using domain names, ...
-pub const Sockaddr = extern struct {
-    _family: c.sa_family_t,
-    _socklen: c.socklen_t,
-    _sockaddr: usize, // ptr
+pub const Sockaddr = struct {
+    _family: c.sa_family_t = AF_UNSPEC,
+    _socklen: c.socklen_t = @sizeOf(c.sockaddr_storage),
+    _storage: c.sockaddr_storage = std.mem.zeroes(c.sockaddr_storage), // any family's address fits
 
     const Self = @This();
 
-    pub fn __new__(family: ?c.sa_family_t, addr: ?oz.Path, port: ?usize) ?Self {
-        const _family: c.sa_family_t = family orelse 0;
+    pub fn __new__(self: *Self, family: ?c.sa_family_t, addr: ?*Object, port: ?usize) py.Error!void {
+        const _family: c.sa_family_t = family orelse AF_UNSPEC;
         var _port: u16 = 0;
         if (port) |p| {
-            if (p > 65_535) return oz.raiseOverflowError("`Sockaddr` - `port` out of range, max `65_535`");
-            _port = @intCast(p);
+            if (p > 65_535) return py.raiseOverflowError("`Sockaddr` - `port` out of range, max `65_535`", .{});
+            _port = @intCast(p); // cast: checked above
         }
-
-        var socklen: c.socklen_t = undefined;
-        var sockaddr: usize = undefined;
 
         switch (_family) {
             AF_UNIX => {
-                const _addr = addr orelse return oz.raiseValueError("`Sockaddr` - `addr` not provided.");
-                if (_addr.path.len > 108) return oz.raiseValueError("`Sockaddr` - length of `addr` can not be `> 108`");
-                if (_addr.path.len == 0) return oz.raiseValueError("`Sockaddr` - `addr` can not be empty.");
+                const _addr = try h.toPath(addr orelse return py.raiseValueError("`Sockaddr` - `addr` not provided.", .{}));
+                defer _addr.deinit();
+                if (_addr.path.len > 108) return py.raiseValueError("`Sockaddr` - length of `addr` can not be `> 108`", .{});
+                if (_addr.path.len == 0) return py.raiseValueError("`Sockaddr` - `addr` can not be empty.", .{});
 
-                socklen = @sizeOf(c.sockaddr_un);
-                const _sock: *c.sockaddr_un = std.heap.c_allocator.create(c.sockaddr_un) catch {
-                    return oz.raiseMemoryError("`Sockaddr` - Out of Memory!");
-                };
-                _sock.sun_family = _family;
-                @memset(&_sock.sun_path, 0);
-                @memcpy(_sock.sun_path[0.._addr.path.len], _addr.path);
-                sockaddr = @intFromPtr(_sock);
+                const sock = self.as(c.sockaddr_un);
+                sock.sun_family = _family;
+                @memcpy(sock.sun_path[0.._addr.path.len], _addr.path);
+                self._socklen = @sizeOf(c.sockaddr_un);
             },
             AF_INET => {
-                const _addr = addr orelse return oz.raiseValueError("`Sockaddr` - `addr` not provided.");
-                if (_addr.path.len == 0) return oz.raiseValueError("`Sockaddr` - `addr` can not be empty.");
-
-                socklen = @sizeOf(c.sockaddr_in);
-                const _sock: *c.sockaddr_in = std.heap.c_allocator.create(c.sockaddr_in) catch {
-                    return oz.raiseMemoryError("`Sockaddr` - Out of Memory!");
+                const _addr = try ipText(addr);
+                const ip = net.Ip4Address.parse(_addr, _port) catch {
+                    return py.raiseValueError("`Sockaddr` - `addr` or `port` not valid IPv4", .{});
                 };
-                const _result = std.net.Ip4Address.parse(_addr.path, _port) catch {
-                    return oz.raiseValueError("`Sockaddr` - `addr` or `port` not valid IPv4");
-                };
-                _sock.sin_family = _family;
-                _sock.sin_port = _result.sa.port;
-                _sock.sin_addr.s_addr = _result.sa.addr;
-                sockaddr = @intFromPtr(_sock);
+                const sock = self.as(c.sockaddr_in);
+                sock.sin_family = _family;
+                sock.sin_port = std.mem.nativeToBig(u16, ip.port);
+                sock.sin_addr.s_addr = @bitCast(ip.bytes); // network order, as stored
+                self._socklen = @sizeOf(c.sockaddr_in);
             },
             AF_INET6 => {
-                const _addr = addr orelse return oz.raiseValueError("`Sockaddr` - `addr` not provided.");
-                if (_addr.path.len == 0) return oz.raiseValueError("`Sockaddr` - `addr` can not be empty.");
-
-                socklen = @sizeOf(c.sockaddr_in6);
-                const _sock: *c.sockaddr_in6 = std.heap.c_allocator.create(c.sockaddr_in6) catch {
-                    return oz.raiseMemoryError("`Sockaddr` - Out of Memory!");
+                const _addr = try ipText(addr);
+                // `std.Io.net` leaves a `%scope` unresolved, so it is read here: a number or an interface name.
+                const pct = std.mem.indexOfScalar(u8, _addr, '%');
+                const ip = net.Ip6Address.parse(_addr[0 .. pct orelse _addr.len], _port) catch {
+                    return py.raiseValueError("`Sockaddr` - `addr` or `port` not valid IPv6", .{});
                 };
-                const _result = std.net.Ip6Address.parse(_addr.path, _port) catch {
-                    return oz.raiseValueError("`Sockaddr` - `addr` or `port` not valid IPv6");
-                };
-                _sock.sin6_family = _family;
-                _sock.sin6_port = _result.sa.port;
-                _sock.sin6_addr.__in6_u.__u6_addr8 = _result.sa.addr;
-                _sock.sin6_scope_id = _result.sa.scope_id;
-                _sock.sin6_flowinfo = _result.sa.flowinfo;
-                sockaddr = @intFromPtr(_sock);
+                const scope_id: u32 = if (pct) |i| try scopeId(_addr[i + 1 ..]) else 0;
+                const sock = self.as(c.sockaddr_in6);
+                sock.sin6_family = _family;
+                sock.sin6_port = std.mem.nativeToBig(u16, ip.port);
+                sock.sin6_addr.__in6_u.__u6_addr8 = ip.bytes;
+                sock.sin6_scope_id = scope_id;
+                sock.sin6_flowinfo = ip.flow;
+                self._socklen = @sizeOf(c.sockaddr_in6);
             },
-            AF_UNSPEC => {
-                socklen = @sizeOf(c.sockaddr_storage);
-                const _sock: *c.sockaddr_storage = std.heap.c_allocator.create(c.sockaddr_storage) catch {
-                    return oz.raiseMemoryError("`Sockaddr` - Out of Memory!");
-                };
-                _sock.* = std.mem.zeroes(c.sockaddr_storage); // set default value to `0`
-                sockaddr = @intFromPtr(_sock);
-            },
-            else => return oz.raiseNotImplementedError(oz.fmt("`Sockaddr` - `family={d}` not supported!", .{_family})),
+            AF_UNSPEC => {},
+            else => return py.raiseNotImplementedError("`Sockaddr` - `family={d}` not supported!", .{_family}),
         }
-        return .{ ._sockaddr = sockaddr, ._socklen = socklen, ._family = _family };
+        self._family = _family;
     }
 
-    pub fn __del__(self: *Self) void {
-        switch (self._family) {
-            AF_UNIX => {
-                const ptr: *c.sockaddr_un = @ptrFromInt(self._sockaddr);
-                std.heap.c_allocator.destroy(ptr);
-            },
-            AF_INET => {
-                const ptr: *c.sockaddr_in = @ptrFromInt(self._sockaddr);
-                std.heap.c_allocator.destroy(ptr);
-            },
-            AF_INET6 => {
-                const ptr: *c.sockaddr_in6 = @ptrFromInt(self._sockaddr);
-                std.heap.c_allocator.destroy(ptr);
-            },
-            AF_UNSPEC => {
-                const ptr: *c.sockaddr_storage = @ptrFromInt(self._sockaddr);
-                std.heap.c_allocator.destroy(ptr);
-            },
-            else => {},
-        }
+    /// The address as `*T` (`sockaddr_un`, `sockaddr_in`, ...), inside `_storage`.
+    fn as(self: *Self, comptime T: type) *T {
+        return @ptrCast(&self._storage);
+    }
+
+    /// The `sockaddr *` to hand to C (Zig side).
+    pub fn addrPtr(self: *Self) *c.sockaddr {
+        return @ptrCast(&self._storage);
+    }
+
+    /// The family: the one given, or for `Sockaddr()` the one the kernel filled in.
+    fn currentFamily(self: *const Self) c.sa_family_t {
+        return if (self._family == AF_UNSPEC) self._storage.ss_family else self._family;
     }
 
     ///>>> sock.path
     ///"./path"
-    pub fn get_path(self: *const Self) ?[*:0]const u8 {
-        var _family: c.sa_family_t = undefined;
-
-        if (self._family == AF_UNSPEC) {
-            const ptr: *c.sockaddr_storage = @ptrFromInt(self._sockaddr);
-            _family = ptr.ss_family;
-        } else {
-            _family = self._family;
-        }
-
-        if (_family == AF_UNIX) {
-            const ptr: *c.sockaddr_un = @ptrFromInt(self._sockaddr);
-            return @ptrCast(ptr.sun_path[0..]);
-        }
-        return oz.raiseNotImplementedError(oz.fmt("`Sockaddr` - `path` is not implemented for {}", .{_family}));
+    pub fn get_path(self: *Self) py.Error![]const u8 {
+        const _family = self.currentFamily();
+        if (_family == AF_UNIX) return std.mem.sliceTo(&self.as(c.sockaddr_un).sun_path, 0);
+        return py.raiseNotImplementedError("`Sockaddr` - `path` is not implemented for {}", .{_family});
     }
 
     ///>>> sock.ip
     ///"1.2.3.4"
-    pub fn get_ip(self: *const Self) ?[*:0]const u8 {
-        var _family: c.sa_family_t = undefined;
-
-        if (self._family == AF_UNSPEC) {
-            const ptr: *c.sockaddr_storage = @ptrFromInt(self._sockaddr);
-            _family = ptr.ss_family;
-        } else {
-            _family = self._family;
-        }
-
+    pub fn get_ip(self: *Self) py.Error!*Object {
+        const _family = self.currentFamily();
         switch (_family) {
             AF_INET => {
-                const ptr: *c.sockaddr_in = @ptrFromInt(self._sockaddr);
-                const bytes: *const [4]u8 = @ptrCast(&ptr.sin_addr.s_addr);
-                return oz.fmt("{d}.{d}.{d}.{d}", .{ bytes[0], bytes[1], bytes[2], bytes[3] });
+                const bytes: *const [4]u8 = @ptrCast(&self.as(c.sockaddr_in).sin_addr.s_addr);
+                var buf: [16]u8 = undefined;
+                const text = std.fmt.bufPrint(&buf, "{d}.{d}.{d}.{d}", .{ bytes[0], bytes[1], bytes[2], bytes[3] }) catch unreachable; // fits
+                return py.new(text);
             },
-            // TODO:
-            // AF_INET6 => {
-            //     const ptr: *c.sockaddr_in6 = @ptrFromInt(self._sockaddr);
-            //     // const addr: [16]u8 = ptr.sin6_addr.__in6_u.__u6_addr8;
-            // },
-            else => return oz.raiseNotImplementedError(oz.fmt("`Sockaddr` - `ip` is not implemented for {}", .{_family})),
+            // TODO: AF_INET6
+            else => return py.raiseNotImplementedError("`Sockaddr` - `ip` is not implemented for {}", .{_family}),
         }
     }
 
     ///>>> sock.port
     ///1234
-    pub fn get_port(self: *const Self) ?u16 {
-        var _family: c.sa_family_t = undefined;
-
-        if (self._family == AF_UNSPEC) {
-            const ptr: *c.sockaddr_storage = @ptrFromInt(self._sockaddr);
-            _family = ptr.ss_family;
-        } else {
-            _family = self._family;
-        }
-
+    pub fn get_port(self: *Self) py.Error!u16 {
+        const _family = self.currentFamily();
         switch (_family) {
-            AF_INET => {
-                const ptr: *c.sockaddr_in = @ptrFromInt(self._sockaddr);
-                return std.mem.bigToNative(u16, ptr.sin_port);
-            },
-            AF_INET6 => {
-                const ptr: *c.sockaddr_in6 = @ptrFromInt(self._sockaddr);
-                return std.mem.bigToNative(u16, ptr.sin6_port);
-            },
-            else => return oz.raiseNotImplementedError(
-                oz.fmt("`Sockaddr` - `port` does not support family: {}", .{_family}),
-            ),
+            AF_INET => return std.mem.bigToNative(u16, self.as(c.sockaddr_in).sin_port),
+            AF_INET6 => return std.mem.bigToNative(u16, self.as(c.sockaddr_in6).sin6_port),
+            else => return py.raiseNotImplementedError("`Sockaddr` - `port` does not support family: {}", .{_family}),
         }
     }
 
     ///>>> sock.family
     ///1
     pub fn get_family(self: *const Self) i32 {
-        if (self._family == AF_UNSPEC) {
-            const ptr: *c.sockaddr_storage = @ptrFromInt(self._sockaddr);
-            return ptr.ss_family;
-        } else return self._family;
+        return self.currentFamily();
     }
 };
+
+/// The text of an IP `addr` argument (a `str`, borrowed from it): `ValueError` if missing or empty.
+fn ipText(addr: ?*Object) py.Error![]const u8 {
+    const a = addr orelse return py.raiseValueError("`Sockaddr` - `addr` not provided.", .{});
+    const text = try py.fromPython([]const u8, a);
+    if (text.len == 0) return py.raiseValueError("`Sockaddr` - `addr` can not be empty.", .{});
+    return text;
+}
+
+/// An IPv6 `%scope`: an interface index, or an interface name.
+fn scopeId(text: []const u8) py.Error!u32 {
+    if (std.fmt.parseInt(u32, text, 10)) |n| return n else |_| {}
+    var name: [16:0]u8 = @splat(0); // IF_NAMESIZE
+    if (text.len == 0 or text.len >= name.len) return py.raiseValueError("`Sockaddr` - invalid IPv6 scope `{s}`", .{text});
+    @memcpy(name[0..text.len], text);
+    const index = if_nametoindex(&name);
+    if (index == 0) return py.raiseValueError("`Sockaddr` - unknown IPv6 scope `{s}`", .{text});
+    return index;
+}
 
 ///Example
 ///    >>> val = (1).to_bytes(4, "big")
@@ -219,15 +180,15 @@ pub const Sockaddr = extern struct {
 ///    - remember to hold on to `val` reference till `sqe` has been submitted.
 ///    - min length of `val` must be `4`.
 ///    - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
-pub inline fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: oz.Bytes) void {
+pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.Buffer) void {
     c.io_uring_prep_cmd_sock(
-        sqe._sqe,
+        sqe._sqe.?,
         c.SOCKET_URING_OP_SETSOCKOPT,
         sockfd,
         level,
         optname,
         @constCast(optval.data.ptr),
-        @intCast(optval.data.len),
+        @intCast(optval.data.len), // cast: a buffer the size of a socket option
     );
 }
 
@@ -245,15 +206,15 @@ pub inline fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optva
 ///    - `cqe.res` will return `len()` of populating data(`buf`).
 ///    - min length of `buf` must be `4`.
 ///    - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
-pub inline fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: oz.ByteArray) void {
+pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.WritableBuffer) void {
     c.io_uring_prep_cmd_sock(
-        sqe._sqe,
+        sqe._sqe.?,
         c.SOCKET_URING_OP_GETSOCKOPT,
         sockfd,
         level,
         optname,
         optval.data.ptr,
-        @intCast(optval.data.len),
+        @intCast(optval.data.len), // cast: a buffer the size of a socket option
     );
 }
 
@@ -264,11 +225,11 @@ pub inline fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optva
 ///
 ///Note
 ///    - This function is an alias of `io_uring_prep_cmd_getsockname`
-pub inline fn getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) void {
+pub fn getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) void {
     c.io_uring_prep_cmd_getsockname(
-        sqe._sqe,
+        sqe._sqe.?,
         fd,
-        @ptrFromInt(sockaddr._sockaddr),
+        sockaddr.addrPtr(),
         &sockaddr._socklen,
         peer orelse 0,
     );

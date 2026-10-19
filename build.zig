@@ -1,9 +1,11 @@
 //! Build script for Liburing (Zig 0.17)
 //!
-//!   zig build          C liburing (`liburing-ffi.a`), compiled by Zig for `-Dtarget`
-//!   zig build spike    phase 2 spike: a one-function Setu extension into spike/
+//!   zig build          the `liburing` extension (and C liburing, `liburing-ffi.a`) for `-Dtarget`
+//!   zig build develop  the extension into src/liburing/, to import it from the source tree
 //!
-//! The Python extension itself (`src/liburing`) is ported to Setu in phase 4 of plan.md.
+//! Options:
+//!   -Dfree-threaded=false   build for the regular (GIL) 3.15 instead of 3.15t
+//!   -Dext-suffix=...        Python extension suffix (default: CPython's `EXT_SUFFIX` for the target and ABI)
 const std = @import("std");
 
 /// C liburing sources compiled into the library (`liburing_srcs` + `ffi.c` in lib/liburing/src/Makefile).
@@ -62,17 +64,29 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     translate_c.addIncludePath(b.path("lib/liburing/src/include"));
-    const c_mod = translate_c.createModule();
+    // Bodies translate-c can not translate (liburing's atomics) become `extern`s from `ffi.c`.
+    const c_externs = b.addRunArtifact(b.addExecutable(.{
+        .name = "c_externs",
+        .root_module = b.createModule(.{ .root_source_file = b.path("tools/c_externs.zig"), .target = b.graph.host }),
+    }));
+    c_externs.addFileArg(translate_c.getOutput());
+    const c_mod = b.createModule(.{
+        .root_source_file = c_externs.addOutputFileArg("c.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
 
-    // Phase 2 spike: a one-function Setu module calling `io_uring_queue_init` / `io_uring_queue_exit`.
     const setu_dep = b.dependency("setu", .{});
     const options = b.addOptions();
     options.addOption(bool, "free_threaded", free_threaded);
-    const spike = b.addLibrary(.{
-        .name = "liburing_spike",
+
+    // The `liburing` extension module.
+    const ext = b.addLibrary(.{
+        .name = "liburing",
         .linkage = .dynamic,
         .root_module = b.createModule(.{
-            .root_source_file = b.path("spike/spike.zig"),
+            .root_source_file = b.path("src/liburing/root.zig"),
             .target = target,
             .optimize = optimize,
             .strip = strip,
@@ -84,14 +98,12 @@ pub fn build(b: *std.Build) !void {
             },
         }),
     });
-    spike.root_module.linkLibrary(liburing_c);
-    spike.linker_allow_shlib_undefined = true; // the CPython C API comes from the interpreter
-    const spike_step = b.step("spike", "Build the phase 2 spike extension into spike/");
-    spike_step.dependOn(&b.addInstallFileWithDir(
-        spike.getEmittedBin(),
-        .{ .custom = "../spike" },
-        b.fmt("liburing_spike{s}", .{ext_suffix}),
-    ).step);
+    ext.root_module.linkLibrary(liburing_c);
+    ext.linker_allow_shlib_undefined = true; // the CPython C API comes from the interpreter
+    const ext_name = b.fmt("liburing{s}", .{ext_suffix});
+    b.getInstallStep().dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .lib, ext_name).step);
+    const develop = b.step("develop", "Build the extension into src/liburing/");
+    develop.dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .{ .custom = "../src/liburing" }, ext_name).step);
 }
 
 /// Runs `./configure --use-libc` in lib/liburing unless its generated headers already exist.

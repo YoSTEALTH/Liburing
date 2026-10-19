@@ -1,9 +1,38 @@
 //! Liburing - io_uring related classes
 const c = @import("c.zig").c;
 const e = @import("error.zig");
-const oz = @import("PyOZ");
+const setu = @import("setu");
 const std = @import("std");
-const consts = @import("const.zig");
+
+const py = setu.py;
+const Object = setu.c.Object;
+
+pub const IovecType = setu.Class(Iovec, @embedFile("class.zig"));
+pub const TimespecType = setu.Class(Timespec, @embedFile("class.zig"));
+pub const RingType = setu.Class(Ring, @embedFile("class.zig"));
+pub const CQEType = setu.Class(CQE, @embedFile("class.zig"));
+pub const CqeType = setu.Class(Cqe, @embedFile("class.zig"));
+pub const CqeIterType = setu.Class(CqeIter, @embedFile("class.zig"));
+pub const SQEType = setu.Class(SQE, @embedFile("class.zig"));
+pub const SqeType = setu.Class(Sqe, @embedFile("class.zig"));
+pub const ProbeType = setu.Class(Probe, @embedFile("class.zig"));
+pub const ParamType = setu.Class(Param, @embedFile("class.zig"));
+pub const RegWaitType = setu.Class(RegWait, @embedFile("class.zig"));
+pub const RestrictionType = setu.Class(Restriction, @embedFile("class.zig"));
+pub const BufRegType = setu.Class(BufReg, @embedFile("class.zig"));
+pub const SyncCancelRegType = setu.Class(SyncCancelReg, @embedFile("class.zig"));
+pub const NapiType = setu.Class(Napi, @embedFile("class.zig"));
+pub const ZcrxIfqRegType = setu.Class(ZcrxIfqReg, @embedFile("class.zig"));
+pub const ClockRegisterType = setu.Class(ClockRegister, @embedFile("class.zig"));
+pub const BpfType = setu.Class(Bpf, @embedFile("class.zig"));
+pub const SigsetTType = setu.Class(SigsetT, @embedFile("class.zig"));
+pub const MemRegionRegType = setu.Class(MemRegionReg, @embedFile("class.zig"));
+pub const BufRingType = setu.Class(BufRing, @embedFile("class.zig"));
+pub const CmsghdrType = setu.Class(Cmsghdr, @embedFile("class.zig"));
+pub const MsghdrType = setu.Class(Msghdr, @embedFile("class.zig"));
+pub const EpollEventType = setu.Class(EpollEvent, @embedFile("class.zig"));
+pub const RecvmsgOutType = setu.Class(RecvmsgOut, @embedFile("class.zig"));
+pub const OpenHowType = setu.Class(OpenHow, @embedFile("class.zig"));
 
 ///Vector I/O data structure
 ///
@@ -23,31 +52,29 @@ const consts = @import("const.zig");
 ///Note
 ///    - Make sure to hold on to variable you are passing into `Iovec` so it does not get
 ///    garbage collected before you get the chance to use it!
-pub const Iovec = extern struct {
+pub const Iovec = struct {
     _len: usize = 0,
-    _iovec: [*]c.iovec,
+    _iovec: ?[*]c.iovec = null,
 
     const Self = @This();
 
-    pub fn __new__(list: oz.ListView(oz.BytesLike)) ?Self {
-        const _len = list.len();
-        if (_len == 0) return oz.raiseValueError("`Iovec(list)` - received `0` length sequence!");
+    pub fn __new__(self: *Self, list: py.Sequence(py.Buffer)) py.Error!void {
+        const _len = list.items.len;
+        if (_len == 0) return py.raiseValueError("`Iovec(list)` - received `0` length sequence!", .{});
         if (_len > std.posix.IOV_MAX) {
-            return oz.raiseValueError(oz.fmt(
+            return py.raiseValueError(
                 "`Iovec(data)` - length of {d} exceeds `IOV_MAX` limit set by OS of {d}",
                 .{ _len, std.posix.IOV_MAX },
-            ));
+            );
         }
 
-        if (std.heap.c_allocator.alloc(c.iovec, _len)) |iovec| {
-            for (0.._len) |i| {
-                if (list.get(i)) |item| {
-                    iovec[i].iov_base = @ptrCast(@constCast(item.data));
-                    iovec[i].iov_len = item.data.len;
-                } else return oz.raiseTypeError("`Iovec` - type not supported!");
-            }
-            return .{ ._len = _len, ._iovec = iovec.ptr };
-        } else |_| return oz.raiseMemoryError("Out of Memory!");
+        const iovec = std.heap.c_allocator.alloc(c.iovec, _len) catch return e.raiseMemoryError("Out of Memory!");
+        for (list.items, iovec) |item, *iov| {
+            iov.iov_base = @ptrCast(@constCast(item.data.ptr));
+            iov.iov_len = item.data.len;
+        }
+        self._len = _len;
+        self._iovec = iovec.ptr;
     }
 
     pub fn __len__(self: *const Self) usize {
@@ -59,7 +86,7 @@ pub const Iovec = extern struct {
     }
 
     pub fn __del__(self: *const Self) void {
-        std.heap.c_allocator.free(self._iovec[0..self._len]);
+        if (self._iovec) |iovec| std.heap.c_allocator.free(iovec[0..self._len]);
     }
 };
 
@@ -73,7 +100,7 @@ pub const Iovec = extern struct {
 ///    0
 ///    >>> ts.sec = 1           # second
 ///    >>> ts.nsec = 500000000  # nanosecond
-pub const Timespec = extern struct {
+pub const Timespec = struct {
     _timespec: ?*c.__kernel_timespec = null,
 
     const Self = @This();
@@ -84,32 +111,32 @@ pub const Timespec = extern struct {
 
     // Get
 
-    pub fn get_sec(self: *const Self) ?i64 {
+    pub fn get_sec(self: *const Self) py.Error!i64 {
         if (self._timespec) |ts| return ts.tv_sec;
-        return oz.raiseMemoryError("`kernel_timespec()` - Memory not set!");
+        return e.raiseMemoryError("`kernel_timespec()` - Memory not set!");
     }
 
-    pub fn get_nsec(self: *const Self) ?i64 {
+    pub fn get_nsec(self: *const Self) py.Error!i64 {
         if (self._timespec) |ts| return ts.tv_nsec;
-        return oz.raiseMemoryError("`kernel_timespec()` - Memory not set!");
+        return e.raiseMemoryError("`kernel_timespec()` - Memory not set!");
     }
 
     // Set
 
-    pub fn set_sec(self: *const Self, value: i64) ?void {
+    pub fn set_sec(self: *const Self, value: i64) py.Error!void {
         if (self._timespec) |ts| {
             ts.tv_sec = value;
             return;
         }
-        return oz.raiseMemoryError("`kernel_timespec()` - Memory not set!");
+        return e.raiseMemoryError("`kernel_timespec()` - Memory not set!");
     }
 
-    pub fn set_nsec(self: *const Self, value: i64) ?void {
+    pub fn set_nsec(self: *const Self, value: i64) py.Error!void {
         if (self._timespec) |ts| {
             ts.tv_nsec = value;
             return;
         }
-        return oz.raiseMemoryError("`kernel_timespec()` - Memory not set!");
+        return e.raiseMemoryError("`kernel_timespec()` - Memory not set!");
     }
 };
 
@@ -119,18 +146,8 @@ pub const Timespec = extern struct {
 ///    >>> ring = Ring()
 ///    >>> io_uring_queue_init(8, ring)
 ///    >>> io_uring_queue_exit(ring)
-pub const Ring = extern struct {
-    _io_uring: *c.io_uring,
-
-    pub fn __new__() !Ring {
-        const io_uring: *c.io_uring = try std.heap.c_allocator.create(c.io_uring);
-        io_uring.* = std.mem.zeroes(c.io_uring); // set default value to `0`
-        return .{ ._io_uring = io_uring };
-    }
-
-    pub fn __del__(self: *const Ring) void {
-        std.heap.c_allocator.destroy(self._io_uring);
-    }
+pub const Ring = struct {
+    _io_uring: c.io_uring = std.mem.zeroes(c.io_uring), // lives inside the Python object
 
     pub fn get_flags(self: *const Ring) u32 {
         return self._io_uring.flags;
@@ -154,27 +171,29 @@ pub const Ring = extern struct {
 };
 
 /// Completion Queue Entry (CQE)
-pub const CQE = extern struct {
-    _cqe: *c.io_uring_cqe,
+pub const CQE = struct {
+    _cqe: ?*c.io_uring_cqe = null,
+
+    pub const instantiable = false;
 
     const Self = @This();
 
     // GET
 
     pub fn get_user_data(self: *const Self) u64 {
-        return self._cqe.user_data;
+        return self._cqe.?.user_data;
     }
 
-    pub fn get_res(self: *const Self) ?i32 {
-        return e.trap_error(self._cqe.res);
+    pub fn get_res(self: *const Self) py.Error!i32 {
+        return e.trap_error(self._cqe.?.res);
     }
 
     pub fn get_flags(self: *const Self) u32 {
-        return self._cqe.flags;
+        return self._cqe.?.flags;
     }
 
-    pub fn get_big_cqe(_: *const Self) ?void {
-        return oz.raiseRuntimeError("`.big_cqe` not implemented!");
+    pub fn get_big_cqe(_: *const Self) py.Error!void {
+        return py.raiseRuntimeError("`.big_cqe` not implemented!", .{});
         // TODO: big_cqe: [16]u8, // when `IORING_SETUP_CQE32` is enabled.
     }
 };
@@ -195,26 +214,23 @@ pub const CQE = extern struct {
 ///Note
 ///    - `cqe` items e.g: `cqe[0], cqe[1], ...` are not cached (should be called/used only once) and
 ///    is very dynamic, so make copy if you want to keep data alive for longer use.
-pub const Cqe = extern struct {
+pub const Cqe = struct {
     // TODO:
     // _array: ?[*]CQE = null, // custom memory for batch cqe
-    _io_uring_cqe: ?[*]c.io_uring_cqe, // Note: Memory is managed by `io_uring`
+    _io_uring_cqe: ?[*]c.io_uring_cqe = null, // Note: Memory is managed by `io_uring`
 
-    pub fn __new__(no: ?u32) ?Cqe {
+    pub fn __new__(_: *Cqe, no: ?u32) py.Error!void {
         // TODO: `no` is need to get `io_uring_peek_batch_cqe` working
-        if (no) |_| return oz.raiseNotImplementedError("`Cqe(no)` - Custom memory allocation not coded yet!");
-        return .{ ._io_uring_cqe = null };
+        if (no) |_| return py.raiseNotImplementedError("`Cqe(no)` - Custom memory allocation not coded yet!", .{});
     }
 
     pub fn __bool__(self: *const Cqe) bool {
         return if (self._io_uring_cqe) |_| true else false;
     }
 
-    pub fn __getitem__(self: *const Cqe, index: usize) ?CQE {
-        if (self._io_uring_cqe) |cqe| {
-            return .{ ._cqe = &cqe[index] };
-        }
-        return oz.raiseIndexError("`Cqe` - out of completed entries");
+    pub fn __getitem__(self: *const Cqe, index: usize) py.Error!*Object {
+        if (self._io_uring_cqe) |cqe| return CQEType.new(.{ ._cqe = &cqe[index] });
+        return py.raiseIndexError("`Cqe` - out of completed entries", .{});
     }
 };
 
@@ -224,24 +240,24 @@ pub const Cqe = extern struct {
 ///
 ///Note
 ///    - Only `cqe[0]` gets updated with new completed entry value.
-pub const CqeIter = extern struct {
-    _io_uring_cqe_iter: c.io_uring_cqe_iter,
+pub const CqeIter = struct {
+    _io_uring_cqe_iter: c.io_uring_cqe_iter = std.mem.zeroes(c.io_uring_cqe_iter),
     _index: usize = 0,
-    _cqe: ?*Cqe = null,
+    _cqe: ?*Object = null, // the `Cqe` filled by `__next__` (owned)
+    _ring: ?*Object = null, // the `Ring` the iterator reads (owned)
 
     const Self = @This();
 
-    pub fn __new__(ring: *Ring, cqe: *Cqe, index: ?usize) Self {
-        const _index = index orelse 0;
-        return .{ ._io_uring_cqe_iter = c.io_uring_cqe_iter_init(ring._io_uring), ._index = _index, ._cqe = cqe };
-    }
-
-    pub fn __iter__(self: *Self) *Self {
-        return self;
+    pub fn __new__(self: *Self, ring: *Ring, cqe: *Cqe, index: ?usize) void {
+        self._io_uring_cqe_iter = c.io_uring_cqe_iter_init(&ring._io_uring);
+        self._index = index orelse 0;
+        self._cqe = keep(CqeType.object(cqe));
+        self._ring = keep(RingType.object(ring));
     }
 
     pub fn __next__(self: *Self) ?usize {
-        if (self._cqe) |_cqe| {
+        if (self._cqe) |o| {
+            const _cqe = CqeType.data(o);
             if (c.io_uring_cqe_iter_next(&self._io_uring_cqe_iter, &_cqe._io_uring_cqe)) {
                 defer self._index += 1;
                 return self._index;
@@ -252,49 +268,53 @@ pub const CqeIter = extern struct {
 };
 
 /// Submission Queue Entry (SQE)
-pub const SQE = extern struct {
-    _sqe: *c.io_uring_sqe,
+pub const SQE = struct {
+    _sqe: ?*c.io_uring_sqe = null,
+    _owner: ?*Object = null, // keeps the memory `_sqe` points into alive (`Sqe` or `Ring`)
+
+    pub const instantiable = false;
+    pub const basetype = true; // `Sqe` / `Futex` subclass it
 
     const Self = @This();
 
     // GET
 
     pub fn get_opcode(self: *const Self) u8 {
-        return self._sqe.opcode;
+        return self._sqe.?.opcode;
     }
 
     pub fn get_flags(self: *const Self) u8 {
-        return self._sqe.flags;
+        return self._sqe.?.flags;
     }
 
     pub fn get_ioprio(self: *const Self) u16 {
-        return self._sqe.ioprio;
+        return self._sqe.?.ioprio;
     }
 
     pub fn get_fd(self: *const Self) i32 {
-        return self._sqe.fd;
+        return self._sqe.?.fd;
     }
 
     pub fn get_len(self: *const Self) u32 {
-        return self._sqe.len;
+        return self._sqe.?.len;
     }
 
     pub fn get_user_data(self: *const Self) u64 {
-        return self._sqe.user_data;
+        return self._sqe.?.user_data;
     }
 
     pub fn get_personality(self: *const Self) u16 {
-        return self._sqe.personality;
+        return self._sqe.?.personality;
     }
 
     // SET
 
     pub fn set_flags(self: *Self, flags: u8) void {
-        self._sqe.flags = flags;
+        self._sqe.?.flags = flags;
     }
 
     pub fn set_user_data(self: *Self, data: u64) void {
-        self._sqe.user_data = data;
+        self._sqe.?.user_data = data;
     }
 };
 
@@ -324,38 +344,27 @@ pub const SQE = extern struct {
 ///        you are going to "put" pre-made sqe(s) into the ring later. Refer to
 ///        `help(put_sqe)` to see more detail.
 ///    - `Sqe(no)` is limited to max `0-255` items.
-pub const Sqe = extern struct {
-    _parent: SQE,
+pub const Sqe = struct {
     _len: usize = 0,
-    _index: usize = 0,
-    _array: ?[*]SQE = null, // alloc memory reference to `SQE` class stored here.
-    _io_uring_sqe: ?[*]c.io_uring_sqe = null,
+    _io_uring_sqe: ?[*]c.io_uring_sqe = null, // allocated here, `_len` entries
+
+    pub const base = SQEType;
 
     const Self = @This();
 
-    pub const __base__ = oz.base(SQE);
-
-    pub fn __new__(no: ?usize) ?Self {
-        const _no = if (no) |n| n else 1; // no = null/None/1 == 1
-        if (_no > 0) {
-            if (std.heap.c_allocator.alloc(c.io_uring_sqe, _no)) |sqes| {
-                if (std.heap.c_allocator.alloc(SQE, _no)) |class| {
-                    for (0.., sqes) |i, *sqe| {
-                        sqe.* = std.mem.zeroes(c.io_uring_sqe);
-                        class[i] = .{ ._sqe = sqe };
-                    }
-                    return .{ ._parent = class[0], ._len = _no, ._array = class.ptr, ._io_uring_sqe = sqes.ptr };
-                } else |_| return oz.raiseMemoryError("out of memory!");
-            } else |_| return oz.raiseMemoryError("out of memory!");
-        }
-        return oz.raiseRuntimeError("New `Sqe()` class not created.");
+    pub fn __new__(self: *Object, no: ?usize) py.Error!void {
+        const _no = no orelse 1; // no = null/None/1 == 1
+        if (_no == 0) return py.raiseRuntimeError("New `Sqe()` class not created.", .{});
+        const sqes = std.heap.c_allocator.alloc(c.io_uring_sqe, _no) catch return e.raiseMemoryError("out of memory!");
+        @memset(sqes, std.mem.zeroes(c.io_uring_sqe));
+        const d = SqeType.data(self);
+        d._len = _no;
+        d._io_uring_sqe = sqes.ptr;
+        SQEType.data(self)._sqe = &sqes[0]; // `sqe.user_data` is `sqe[0].user_data`
     }
 
     pub fn __del__(self: *Self) void {
-        if (self._array) |list| { // clean up locally allocated memory
-            if (self._io_uring_sqe) |items| std.heap.c_allocator.free(items[0..self._len]);
-            std.heap.c_allocator.free(list[0..self._len]);
-        }
+        if (self._io_uring_sqe) |items| std.heap.c_allocator.free(items[0..self._len]);
     }
 
     pub fn __len__(self: *const Self) usize {
@@ -366,99 +375,82 @@ pub const Sqe = extern struct {
         return (self._len > 0);
     }
 
-    pub fn __getitem__(self: *const Self, index: u32) ?SQE {
-        if (self._array) |array| {
-            if (index < self._len) return array[index];
-        } else if (index == 0) {
-            if (self._io_uring_sqe) |sqe| return .{ ._sqe = &sqe[0] };
-            return oz.raiseMemoryError("`io_uring_sqe()` is `null`!");
+    pub fn __getitem__(self: *Object, index: usize) py.Error!*Object {
+        const d = SqeType.data(self);
+        if (d._io_uring_sqe) |array| {
+            if (index < d._len) return SQEType.new(.{ ._sqe = &array[index], ._owner = keep(self) });
         }
-        return oz.raiseIndexError("Index out of range");
+        return py.raiseIndexError("Index out of range", .{});
     }
 };
 
-pub const Probe = extern struct {
-    // _len: usize = 0,
+pub const Probe = struct {
     _io_uring_probe: ?*c.io_uring_probe = null,
 
     const Self = @This();
 
-    pub fn __new__() ?Self {
-        return oz.raiseNotImplementedError("`Probe()`");
-        // if (no) |_no| {
-        //     if (_no > 0) {
-        //         if (std.heap.c_allocator.alloc(c.io_uring_probe, _no)) |probe| {
-        //             return .{ ._len = _no, ._io_uring_probe = @ptrCast(probe) };
-        //         } else |_| return oz.raiseMemoryError("out of memory!");
-        //     }
-        // }
-        // return oz.raiseRuntimeError("New `Probe()` class not created.");
-
-        // const p = std.heap.c_allocator.create(c.io_uring_probe) catch {
-        //     return oz.raiseMemoryError("`io_uring_probe()` - Out of Memory!");
-        // };
-        // p.* = std.mem.zeroes(c.io_uring_probe); // set default value to `0`
-        // return .{ ._io_uring_probe = p };
+    pub fn __new__(_: *Self) py.Error!void {
+        return py.raiseNotImplementedError("`Probe()`", .{});
     }
 
     pub fn __del__(self: *Self) void {
         if (self._io_uring_probe) |p| c.io_uring_free_probe(p); // clean up in case user forgot to do so!
     }
 
-    pub fn get_last_op(self: *const Self) ?u8 {
+    pub fn get_last_op(self: *const Self) py.Error!u8 {
         if (self._io_uring_probe) |p| return p.last_op;
-        return oz.raiseMemoryError("`Probe()` is null!");
+        return e.raiseMemoryError("`Probe()` is null!");
     }
 
-    pub fn get_ops_len(self: *const Self) ?u8 {
+    pub fn get_ops_len(self: *const Self) py.Error!u8 {
         if (self._io_uring_probe) |p| return p.ops_len;
-        return oz.raiseMemoryError("`Probe()` is null!");
+        return e.raiseMemoryError("`Probe()` is null!");
     }
 };
 
-pub const Param = extern struct {
-    _io_uring_params: ?*c.io_uring_params,
+pub const Param = struct {
+    _io_uring_params: ?*c.io_uring_params = null,
 
     const Self = @This();
 
-    pub fn get_sq_entries(self: *const Self) ?u32 {
+    pub fn get_sq_entries(self: *const Self) py.Error!u32 {
         if (self._io_uring_params) |p| return p.sq_entries;
-        return oz.raiseRuntimeError("`Param()` not initialized properly!");
+        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
     }
 
-    pub fn get_cq_entries(self: *const Self) ?u32 {
+    pub fn get_cq_entries(self: *const Self) py.Error!u32 {
         if (self._io_uring_params) |p| return p.cq_entries;
-        return oz.raiseRuntimeError("`Param()` not initialized properly!");
+        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
     }
 
-    pub fn get_flags(self: *const Self) ?u32 {
+    pub fn get_flags(self: *const Self) py.Error!u32 {
         if (self._io_uring_params) |p| return p.flags;
-        return oz.raiseRuntimeError("`Param()` not initialized properly!");
+        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
     }
 
-    pub fn get_sq_thread_cpu(self: *const Self) ?u32 {
+    pub fn get_sq_thread_cpu(self: *const Self) py.Error!u32 {
         if (self._io_uring_params) |p| return p.sq_thread_cpu;
-        return oz.raiseRuntimeError("`Param()` not initialized properly!");
+        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
     }
 
-    pub fn get_sq_thread_idle(self: *const Self) ?u32 {
+    pub fn get_sq_thread_idle(self: *const Self) py.Error!u32 {
         if (self._io_uring_params) |p| return p.sq_thread_idle;
-        return oz.raiseRuntimeError("`Param()` not initialized properly!");
+        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
     }
 
-    pub fn get_features(self: *const Self) ?u32 {
+    pub fn get_features(self: *const Self) py.Error!u32 {
         if (self._io_uring_params) |p| return p.features;
-        return oz.raiseRuntimeError("`Param()` not initialized properly!");
+        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
     }
 
-    pub fn get_wq_fd(self: *const Self) ?u32 {
+    pub fn get_wq_fd(self: *const Self) py.Error!u32 {
         if (self._io_uring_params) |p| return p.wq_fd;
-        return oz.raiseRuntimeError("`Param()` not initialized properly!");
+        return py.raiseRuntimeError("`Param()` not initialized properly!", .{});
     }
 };
 
 ///RegWait
-pub const RegWait = extern struct {
+pub const RegWait = struct {
     _io_uring_reg_wait: ?*c.io_uring_reg_wait = null,
 
     const Self = @This();
@@ -469,7 +461,7 @@ pub const RegWait = extern struct {
 };
 
 ///Restriction
-pub const Restriction = extern struct {
+pub const Restriction = struct {
     _len: usize = 0,
     _io_uring_restriction: ?[*]c.io_uring_restriction = null,
 
@@ -481,7 +473,7 @@ pub const Restriction = extern struct {
 };
 
 ///BufReg
-pub const BufReg = extern struct {
+pub const BufReg = struct {
     _io_uring_buf_reg: ?*c.io_uring_buf_reg = null,
 
     const Self = @This();
@@ -492,7 +484,7 @@ pub const BufReg = extern struct {
 };
 
 ///SyncCancelReg
-pub const SyncCancelReg = extern struct {
+pub const SyncCancelReg = struct {
     _io_uring_sync_cancel_reg: ?*c.io_uring_sync_cancel_reg = null,
 
     const Self = @This();
@@ -503,7 +495,7 @@ pub const SyncCancelReg = extern struct {
 };
 
 ///Napi
-pub const Napi = extern struct {
+pub const Napi = struct {
     _io_uring_napi: ?*c.io_uring_napi = null,
 
     const Self = @This();
@@ -514,7 +506,7 @@ pub const Napi = extern struct {
 };
 
 ///ZcrxIfqReg
-pub const ZcrxIfqReg = extern struct {
+pub const ZcrxIfqReg = struct {
     _io_uring_zcrx_ifq_reg: ?*c.io_uring_zcrx_ifq_reg = null,
 
     const Self = @This();
@@ -525,7 +517,7 @@ pub const ZcrxIfqReg = extern struct {
 };
 
 ///ClockRegister
-pub const ClockRegister = extern struct {
+pub const ClockRegister = struct {
     _io_uring_clock_register: ?*c.io_uring_clock_register = null,
 
     const Self = @This();
@@ -536,7 +528,7 @@ pub const ClockRegister = extern struct {
 };
 
 ///Bpf
-pub const Bpf = extern struct {
+pub const Bpf = struct {
     _io_uring_bpf: ?*c.io_uring_bpf = null,
 
     const Self = @This();
@@ -547,7 +539,7 @@ pub const Bpf = extern struct {
 };
 
 ///SigsetT
-pub const SigsetT = extern struct {
+pub const SigsetT = struct {
     _sigset_t: ?*c.__sigset_t = null,
 
     const Self = @This();
@@ -558,7 +550,7 @@ pub const SigsetT = extern struct {
 };
 
 ///MemRegionReg
-pub const MemRegionReg = extern struct {
+pub const MemRegionReg = struct {
     _io_uring_mem_region_reg: ?*c.io_uring_mem_region_reg = null,
 
     const Self = @This();
@@ -569,32 +561,30 @@ pub const MemRegionReg = extern struct {
 };
 
 ///BufRing
-pub const BufRing = extern struct {
-    _io_uring_buf_ring: [*]c.io_uring_buf_ring,
+pub const BufRing = struct {
+    _io_uring_buf_ring: ?[*]c.io_uring_buf_ring = null,
     // note: `io_uring_free_buf_ring()` should be called manually to free the memory.
+
+    pub const instantiable = false;
 };
 
 ///Cmsghdr
-pub const Cmsghdr = extern struct {
-    _cmsghdr: *c.cmsghdr,
+pub const Cmsghdr = struct {
+    _cmsghdr: ?*c.cmsghdr = null,
 
-    // const Self = @This();
+    pub const instantiable = false;
 
     // TODO: create fields
     // cmsg_len: usize align(8)    // Length of data in `cmsg_data` plus length of `cmsghdr` structure.
     // cmsg_level: c_int           // Originating protocol.
     // cmsg_type: c_int            // Protocol specific type.
-
-    // pub fn __del__(self: *Self) void {
-    //     if (self._cmsghdr) |ptr| std.heap.c_allocator.destroy(ptr);
-    // }
 };
 
 ///Msghdr
-pub const Msghdr = extern struct {
-    _msghdr: *c.msghdr,
+pub const Msghdr = struct {
+    _msghdr: ?*c.msghdr = null,
 
-    // const Self = @This();
+    pub const instantiable = false;
 
     // TODO: create fields
     // msg_name: ?*anyopaque,      // Address to send to/receive from.
@@ -604,26 +594,20 @@ pub const Msghdr = extern struct {
     // msg_control: ?*anyopaque,   // Ancillary data (eg BSD filedesc passing).
     // msg_controllen: usize,      // Ancillary data buffer length.
     // msg_flags: c_int,           // Flags on received message.
-
-    // pub fn __del__(self: *Self) void {
-    //     if (self._msghdr) |ptr| std.heap.c_allocator.destroy(ptr);
-    // }
 };
 
 ///EpollEvent
-pub const EpollEvent = extern struct {
-    _epoll_event: *c.epoll_event,
+pub const EpollEvent = struct {
+    _epoll_event: ?*c.epoll_event = null,
+
+    pub const instantiable = false;
 };
 
 ///RecvmsgOut
-pub const RecvmsgOut = extern struct {
-    _recvmsg_out: *c.io_uring_recvmsg_out,
+pub const RecvmsgOut = struct {
+    _recvmsg_out: ?*c.io_uring_recvmsg_out = null,
 
-    // const Self = @This();
-
-    // pub fn __del__(self: *Self) void {
-    //     if (self._recvmsg_out) |ptr| std.heap.c_allocator.destroy(ptr);
-    // }
+    pub const instantiable = false;
 };
 
 ///How to Open a Path
@@ -659,33 +643,29 @@ pub const RecvmsgOut = extern struct {
 ///Note
 ///    - `mode` is only to set when creating new or temp file.
 ///    - You can use same `OpenHow()` reference if opening multiple files with same settings.
-pub const OpenHow = extern struct {
-    _open_how: *c.open_how,
+pub const OpenHow = struct {
+    _open_how: c.open_how = std.mem.zeroes(c.open_how), // lives inside the Python object
 
     const Self = @This();
 
-    pub fn __new__(flags: ?u64, mode: ?u64, resolve: ?u64) !Self {
-        const how: *c.open_how = try std.heap.c_allocator.create(c.open_how);
-        how.flags = flags orelse 0;
-        how.mode = mode orelse 0;
-        how.resolve = resolve orelse 0;
-        return .{ ._open_how = how };
+    pub fn __new__(self: *Self, flags: ?u64, mode: ?u64, resolve: ?u64) void {
+        self._open_how.flags = flags orelse 0;
+        self._open_how.mode = mode orelse 0;
+        self._open_how.resolve = resolve orelse 0;
+    }
+
+    pub fn __repr__(self: *const Self) py.Error!*Object {
+        var buf: [96]u8 = undefined;
+        const text = std.fmt.bufPrint(&buf, "OpenHow(flags={d}, mode={d}, resolve={d})", .{
+            self._open_how.flags,
+            self._open_how.mode,
+            self._open_how.resolve,
+        }) catch unreachable; // three u64s fit
+        return py.new(text);
     }
 
     // Get
     // ---
-
-    pub fn __del__(self: *Self) void {
-        std.heap.c_allocator.destroy(self._open_how);
-    }
-
-    pub fn __repr__(self: *const Self) [*:0]const u8 {
-        return oz.fmt("OpenHow(flags={}, mode={}, resolve={})", .{
-            self._open_how.flags,
-            self._open_how.mode,
-            self._open_how.resolve,
-        });
-    }
 
     pub fn get_flags(self: *const Self) u64 {
         return self._open_how.flags;
@@ -714,3 +694,9 @@ pub const OpenHow = extern struct {
         self._open_how.resolve = value;
     }
 };
+
+/// A new reference to `obj`, for an owned (`?*Object`) field.
+pub fn keep(obj: *Object) *Object {
+    py.incref(obj);
+    return obj;
+}
