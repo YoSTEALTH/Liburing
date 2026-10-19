@@ -3,7 +3,11 @@
     .version = "2026.3.30",
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
-        .setu = .{ .path = "../../../Setu/Zig/Setu" }, // local, until Setu has a tag (plan.md decision 2)
+        .setu = .{
+            .url = "https://github.com/YoSTEALTH/Setu/archive/refs/tags/v2026.10.19.tar.gz",
+            .hash = "setu-2026.10.19-f1cYJ4jqAgDxfHRmnwPzU2vPd2MhelIp2ASdUPI1vW2Q",
+        },
+        // .setu = .{ .path = "../../../Setu/Zig/Setu" }, // local debug
     },
     .paths = .{
         "build.zig",

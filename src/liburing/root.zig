@@ -109,7 +109,7 @@ const module_slots = [_]sc.Slot{
     sc.Slot.static(sc.Py_mod_methods, &module_methods),
     sc.Slot.func(sc.Py_mod_exec, @ptrCast(&exec)),
     // A `Ring` is not safe to share across threads (plan.md decision 4).
-    sc.Slot.uint(sc.Py_mod_gil, 0), // `Py_MOD_GIL_USED`: not in Setu's `capi.zig` yet
+    sc.Slot.uint(sc.Py_mod_gil, sc.Py_MOD_GIL_USED),
     sc.Slot.uint(sc.Py_mod_multiple_interpreters, sc.Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED),
     sc.Slot.end,
 };
