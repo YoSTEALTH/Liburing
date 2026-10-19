@@ -1,0 +1,151 @@
+'''HTTP keep-alive echo server on Liburing's Python API: the same server, response and load as
+Shakti's `example/bench` (`liburing_bench.c` translated line by line).
+
+    python3.15t example/bench/liburing_bench.py [port=12345] [--peek]
+    load 12345 64 5 100     # Shakti's `tools/load.zig`: port, connections, seconds, requests/connection
+
+One thread, one ring, default flags. Each connection: recv, send the response, recv again. Closes
+the connection when recv or send returns 0 or an error.
+
+Completions are read in a batch, `cqe[i]` for every ready one, then `io_uring_cq_advance`. `--peek`
+reads them one at a time instead (`io_uring_peek_cqe`, `cqe[0]`, `io_uring_cqe_seen`): the only way
+that works on the old PyOZ build, whose `cqe[i]` reads past the end of the completion queue once it
+wraps around.
+'''
+
+import os
+import socket
+import sys
+from liburing import (
+    SOCK_CLOEXEC,
+    Cqe,
+    Ring,
+    io_uring_cq_advance,
+    io_uring_cq_ready,
+    io_uring_cqe_seen,
+    io_uring_get_sqe,
+    io_uring_peek_cqe,
+    io_uring_prep_accept,
+    io_uring_prep_recv,
+    io_uring_prep_send,
+    io_uring_queue_init,
+    io_uring_submit,
+    io_uring_submit_and_wait,
+)
+
+LISTEN = 1024
+ENTRIES = 4096
+BUFSIZE = 1024
+RESPONSE = b'HTTP/1.1 200 OK\r\n'
+RESPONSE += b'Content-Type: text/html\r\n'
+RESPONSE += b'Content-Length: 131\r\n'
+RESPONSE += b'Connection:close\r\n\r\n'
+RESPONSE += b'<!DOCTYPE html><html><head><title>Hello</title></head>'
+RESPONSE += b'<body style="background-color:#151515;color:#ccc;">'
+RESPONSE += b'Hello world!</body></html>'
+
+# user_data: connection id << 2 | operation
+OP_ACCEPT, OP_RECV, OP_SEND, OP_MASK = 0, 1, 2, 3
+
+
+class Conn:
+    '''One client: its fd, receive buffer and how much of the response has been sent.'''
+
+    __slots__ = ('fd', 'buf', 'sent', 'out')
+
+    def __init__(self, fd):
+        self.fd = fd
+        self.buf = bytearray(BUFSIZE)
+        self.sent = 0
+        self.out = None  # the unsent part of `RESPONSE`, alive until its send completes
+
+
+def main(port, peek=False):
+    ring, cqe = Ring(), Cqe()
+    conns = {}  # id -> Conn
+    next_id = 1
+
+    def get_sqe():
+        sqe = io_uring_get_sqe(ring)
+        if sqe is None:  # SQ full: flush and retry
+            io_uring_submit(ring)
+            sqe = io_uring_get_sqe(ring)
+        return sqe
+
+    def arm_accept():
+        sqe = get_sqe()
+        io_uring_prep_accept(sqe, listen.fileno(), None, SOCK_CLOEXEC)
+        sqe.user_data = OP_ACCEPT
+
+    def arm_recv(cid, c):
+        sqe = get_sqe()
+        io_uring_prep_recv(sqe, c.fd, c.buf)
+        sqe.user_data = cid << 2 | OP_RECV
+
+    def arm_send(cid, c):
+        c.out = RESPONSE[c.sent :] if c.sent else RESPONSE  # `bytes` (the PyOZ build takes no `memoryview`)
+        sqe = get_sqe()
+        io_uring_prep_send(sqe, c.fd, c.out)
+        sqe.user_data = cid << 2 | OP_SEND
+
+    def close_conn(cid):
+        os.close(conns.pop(cid).fd)
+
+    listen = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listen.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listen.bind(('127.0.0.1', port))
+    listen.listen(LISTEN)
+    io_uring_queue_init(ENTRIES, ring)
+    print(f'Starting Liburing server on 127.0.0.1:{port}', flush=True)
+    arm_accept()
+
+    while True:
+        io_uring_submit_and_wait(ring, 1)
+        io_uring_peek_cqe(ring, cqe)  # `cqe[0]` is the oldest completion
+        ready = io_uring_cq_ready(ring)
+        for i in range(ready):
+            if peek:
+                if i:
+                    io_uring_peek_cqe(ring, cqe)
+                entry = cqe[0]
+            else:
+                entry = cqe[i]
+            data = entry.user_data
+            op, cid = data & OP_MASK, data >> 2
+            try:
+                res = entry.res
+            except OSError:  # a failed operation
+                res = -1
+            if op == OP_ACCEPT:
+                if res >= 0:
+                    cid, next_id = next_id, next_id + 1
+                    conns[cid] = c = Conn(res)
+                    arm_recv(cid, c)
+                arm_accept()
+            elif op == OP_RECV:
+                if res <= 0:
+                    close_conn(cid)
+                else:
+                    c = conns[cid]
+                    c.sent = 0
+                    arm_send(cid, c)
+            else:  # OP_SEND
+                c = conns[cid]
+                if res <= 0:
+                    close_conn(cid)
+                else:
+                    c.sent += res
+                    if c.sent < len(RESPONSE):
+                        arm_send(cid, c)
+                    else:
+                        c.out = None
+                        arm_recv(cid, c)
+            if peek:
+                io_uring_cqe_seen(ring, entry)
+        if not peek:
+            io_uring_cq_advance(ring, ready)
+
+
+if __name__ == '__main__':
+    args = [a for a in sys.argv[1:] if a != '--peek']
+    main(int(args[0]) if args else 12345, '--peek' in sys.argv)
