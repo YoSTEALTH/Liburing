@@ -130,7 +130,7 @@ pub const Futex = struct {
             -1,
             0,
         );
-        if (linux.errno(futex) != .SUCCESS) return py.raiseErrno(@intFromEnum(linux.errno(futex)));
+        if (linux.errno(futex) != .SUCCESS) return py.raiseErrno(@backingInt(linux.errno(futex)));
         const states: [*]u32 = @ptrFromInt(futex);
         errdefer _ = linux.munmap(@ptrCast(states), size);
 

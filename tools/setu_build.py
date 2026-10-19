@@ -277,7 +277,9 @@ def main():
     parser = argparse.ArgumentParser(description=f'Build a {pyproject()["name"]} wheel with zig build.')
     parser.add_argument('--abi', choices=['cp315', 'cp315t'], help='default: this interpreter')
     parser.add_argument('--target', help='Zig target, like x86_64-linux-gnu.2.28 (default: native)')
-    parser.add_argument('--all', action='store_true', help='build every release wheel ([tool.setu_build] abis x targets)')
+    parser.add_argument(
+        '--all', action='store_true', help='build every release wheel ([tool.setu_build] abis x targets)'
+    )
     parser.add_argument('--debug', action='store_true', help='Debug build instead of ReleaseFast')
     parser.add_argument('-o', '--out', default=os.path.join(ROOT, 'dist'), help='output directory (default: dist/)')
     args = parser.parse_args()

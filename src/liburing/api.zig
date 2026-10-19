@@ -12,13 +12,13 @@ pub const setu_options: setu.Options = .{ .module = "liburing" };
 
 /// Every class, in creation order (a base before its subclasses).
 pub const classes = .{
-    class.IovecType,         class.TimespecType,      class.RingType,         class.CQEType,
-    class.CqeType,           class.CqeIterType,       class.SQEType,          class.SqeType,
-    class.ProbeType,         class.ParamType,         class.RegWaitType,      class.RestrictionType,
-    class.BufRegType,        class.SyncCancelRegType, class.NapiType,         class.ZcrxIfqRegType,
-    class.ClockRegisterType, class.BpfType,           class.SigsetTType,      class.MemRegionRegType,
-    class.BufRingType,       class.CmsghdrType,       class.MsghdrType,       class.EpollEventType,
-    class.RecvmsgOutType,    class.OpenHowType,       helper.FileIndexType,   statx.StatxType,
+    class.IovecType,         class.TimespecType,      class.RingType,       class.CQEType,
+    class.CqeType,           class.CqeIterType,       class.SQEType,        class.SqeType,
+    class.ProbeType,         class.ParamType,         class.RegWaitType,    class.RestrictionType,
+    class.BufRegType,        class.SyncCancelRegType, class.NapiType,       class.ZcrxIfqRegType,
+    class.ClockRegisterType, class.BpfType,           class.SigsetTType,    class.MemRegionRegType,
+    class.BufRingType,       class.CmsghdrType,       class.MsghdrType,     class.EpollEventType,
+    class.RecvmsgOutType,    class.OpenHowType,       helper.FileIndexType, statx.StatxType,
     futex.FUTEXType,         futex.FutexType,         socket.SockaddrType,
 };
 

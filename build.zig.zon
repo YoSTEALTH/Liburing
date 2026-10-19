@@ -4,8 +4,8 @@
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
         .setu = .{
-            .url = "https://github.com/YoSTEALTH/Setu/archive/refs/tags/v2026.10.19.tar.gz",
-            .hash = "setu-2026.10.19-f1cYJ4jqAgDxfHRmnwPzU2vPd2MhelIp2ASdUPI1vW2Q",
+            .url = "https://github.com/YoSTEALTH/Setu/archive/refs/tags/v2026.10.20.tar.gz",
+            .hash = "setu-2026.10.20-f1cYJxYkAwBffd5wvwosaR3ui2lW7zYkp-04Rj5zapZw",
         },
         // .setu = .{ .path = "../../../Setu/Zig/Setu" }, // local debug
     },
