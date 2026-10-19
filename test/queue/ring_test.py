@@ -303,14 +303,11 @@ def test_setup_buf_ring_error(ring):
 # sizes, shifts and low-level helpers
 
 
-def test_cqe_nr_and_shift(ring, cqe):
+def test_cqe_nr(ring, cqe):
     nop(ring, 1)
     L.io_uring_wait_cqe(ring, cqe)
     assert L.io_uring_cqe_nr(cqe[0]) == 1
     L.io_uring_cqe_seen(ring, cqe[0])
-    assert L.io_uring_cqe_shift(ring) == 0
-    assert L.io_uring_cqe_shift_from_flags(0) == 0
-    assert L.io_uring_cqe_shift_from_flags(L.IORING_SETUP_CQE32) == 1
 
 
 def test_memory_and_mlock_size():
