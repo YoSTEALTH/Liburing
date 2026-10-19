@@ -8,7 +8,8 @@
 //!
 //! Options:
 //!   -Dfree-threaded=false   build for the regular (GIL) 3.15 instead of 3.15t
-//!   -Drelease               ReleaseSafe (wheels use it, as PyOZ did); `-Doptimize=...` picks any mode
+//!   -Drelease               ReleaseSafe (wheels use it, as PyOZ did); without it, Debug. (A preferred release
+//!                           mode leaves no `-Doptimize`.)
 //!   -Dstrip                 drop debug info from the extension (wheels use it)
 //!   -Dext-suffix=...        Python extension suffix (default: CPython's `EXT_SUFFIX` for the target and ABI)
 //!
