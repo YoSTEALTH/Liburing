@@ -41,6 +41,8 @@ CASES = {
     "fsync": (lambda s: L.io_uring_prep_fsync(s, 7), OP.IORING_OP_FSYNC, 7),
     "poll_add": (lambda s: L.io_uring_prep_poll_add(s, 7, select.POLLIN), OP.IORING_OP_POLL_ADD, 7),
     "poll_multishot": (lambda s: L.io_uring_prep_poll_multishot(s, 7, select.POLLIN), OP.IORING_OP_POLL_ADD, 7),
+    "send_bundle": (lambda s: L.io_uring_prep_send_bundle(s, 7, 10), OP.IORING_OP_SEND, 7),
+    "waitid": (lambda s: L.io_uring_prep_waitid(s, 0, 0, L.SigsetT(), 0), OP.IORING_OP_WAITID, None),
     "poll_remove": (lambda s: L.io_uring_prep_poll_remove(s, 5), OP.IORING_OP_POLL_REMOVE, None),
     "poll_update": (lambda s: L.io_uring_prep_poll_update(s, 5, 6, select.POLLIN), OP.IORING_OP_POLL_REMOVE, None),
     "timeout": (lambda s: L.io_uring_prep_timeout(s, ts(), 0), OP.IORING_OP_TIMEOUT, None),

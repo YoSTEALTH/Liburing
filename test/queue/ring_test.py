@@ -354,3 +354,124 @@ def test_iowq_max_workers(ring):
     assert L.io_uring_register_iowq_max_workers(ring, 2, 3) == old
     assert L.io_uring_register_iowq_max_workers(ring, 0, 0) == (2, 3)
     assert L.io_uring_register_iowq_max_workers(ring, *old) == (2, 3)
+
+
+# the rest of the ring functions
+
+
+def test_buf_ring_head_and_unregister(ring):
+    br = L.io_uring_setup_buf_ring(ring, 8, 1, 0)
+    assert L.io_uring_buf_ring_head(ring, 1) == 0
+    with pytest.raises(FileNotFoundError):  # no ring for group 9
+        L.io_uring_buf_ring_head(ring, 9)
+    assert L.io_uring_unregister_buf_ring(ring, 1) == 0
+    with pytest.raises(FileNotFoundError):
+        L.io_uring_unregister_buf_ring(ring, 1)
+    del br
+
+
+def test_queue_init_mem():
+    ring = L.Ring()
+    size = L.io_uring_queue_init_mem(8, ring, L.Param(), 1 << 16)
+    try:
+        assert size > 0  # the bytes of the memory it used
+        assert ring.ring_fd > 0
+        with pytest.raises(RuntimeError):
+            L.io_uring_queue_init_mem(8, ring, L.Param(), 1 << 16)
+    finally:
+        L.io_uring_queue_exit(ring)
+
+
+def test_queue_mmap():
+    p, ring = L.Param(), L.Ring()
+    fd = L.io_uring_setup(8, p)
+    assert L.io_uring_queue_mmap(fd, ring, p) == 0
+    try:
+        assert ring.ring_fd == fd
+        assert L.io_uring_sq_space_left(ring) == 8
+    finally:
+        L.io_uring_queue_exit(ring)  # closes the fd
+
+
+def test_clone_buffers_offset(ring):
+    dst = L.Ring()
+    L.io_uring_queue_init(8, dst)
+    try:
+        assert L.io_uring_register_buffers(ring, L.Iovec([bytearray(4096)])) == 0
+        assert L.io_uring_clone_buffers_offset(dst, ring, 0, 0, 1) == 0
+        assert L.io_uring_unregister_buffers(dst) == 0
+        assert L.io_uring_unregister_buffers(ring) == 0
+    finally:
+        L.io_uring_queue_exit(dst)
+
+
+def test_register_files_update_tag(ring):
+    assert L.io_uring_register_files_sparse(ring, 4) == 0
+    assert L.io_uring_register_files_update_tag(ring, L.FileIndex([-1]), 0) == 1
+    assert L.io_uring_unregister_files(ring) == 0
+
+
+def test_enter2(ring, cqe):
+    nop(ring, 1)
+    assert L.io_uring_enter2(ring.ring_fd, 0, 1, L.IORING_ENTER_GETEVENTS, 0) == 0
+    assert L.io_uring_cq_ready(ring) == 1
+    L.io_uring_cq_advance(ring, 1)
+
+
+def test_register_raw(ring):
+    assert L.io_uring_register(ring.ring_fd, 9, 0, None) >= 0  # IORING_REGISTER_PERSONALITY
+    with pytest.raises(OSError):  # unknown opcode
+        L.io_uring_register(ring.ring_fd, 9999, 0, None)
+
+
+def test_get_sqe128():
+    ring = L.Ring()
+    L.io_uring_queue_init(8, ring, L.IORING_SETUP_SQE128)
+    try:
+        sqe = L.io_uring_get_sqe128(ring)
+        L.io_uring_prep_nop128(sqe)
+        assert sqe.opcode == L.io_uring_op.IORING_OP_NOP128
+    finally:
+        L.io_uring_queue_exit(ring)
+
+
+def test_get_sqe128_uninitialized_ring():
+    with pytest.raises(RuntimeError):
+        L.io_uring_get_sqe128(L.Ring())
+
+
+def test_register_sync_msg():
+    ring = L.Ring()
+    L.io_uring_queue_init(8, ring)
+    try:
+        sqe = L.Sqe()
+        L.io_uring_prep_msg_ring(sqe, ring.ring_fd, 5, 77)
+        assert L.io_uring_register_sync_msg(sqe) == 0
+        cqe = L.Cqe()
+        assert L.io_uring_wait_cqe_timeout(ring, cqe, L.timespec(1)) == 0
+        assert (cqe[0].user_data, cqe[0].res) == (77, 5)
+        L.io_uring_cqe_seen(ring, cqe[0])
+    finally:
+        L.io_uring_queue_exit(ring)
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda r: L.io_uring_register_buf_ring(r, L.BufReg()),
+        lambda r: L.io_uring_register_sync_cancel(r, L.SyncCancelReg()),
+        lambda r: L.io_uring_register_napi(r, L.Napi()),
+        lambda r: L.io_uring_unregister_napi(r, L.Napi()),
+        lambda r: L.io_uring_register_clock(r, L.ClockRegister()),
+        lambda r: L.io_uring_register_restrictions(r, L.Restriction()),
+        lambda r: L.io_uring_register_wait_reg(r, L.RegWait(), 1),
+        lambda r: L.io_uring_register_region(r, L.MemRegionReg()),
+        lambda r: L.io_uring_register_ifq(r, L.ZcrxIfqReg()),
+        lambda r: L.io_uring_register_bpf_filter(r, L.Bpf()),
+        lambda r: L.io_uring_register_bpf_filter_task(L.Bpf()),
+    ],
+)
+def test_register_structs_not_filled_yet(ring, call):
+    # these register structs can not be filled from Python yet: a clear error, never a NULL for C
+    with pytest.raises(NotImplementedError):
+        call(ring)
