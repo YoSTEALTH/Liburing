@@ -1669,9 +1669,9 @@ pub fn io_uring_mlock_size_params(entries: u32, p: *Param) py.Error!isize {
 ///     >>> io_uring_prep_rw(sqe, IORING_OP_NOP, 0, 0, 0, 0)
 ///
 /// Note
-///     - Function arguments position has changed for C origin: `sqe` is first. `addr` is an address (int).
-pub fn io_uring_prep_rw(sqe: *SQE, op: u8, fd: i32, addr: ?usize, len: u32, offset: u64) py.Error!void {
-    c.io_uring_prep_rw(op, try sqe.sqePtr(), fd, if (addr) |a| @ptrFromInt(a) else null, len, offset);
+///     - Function arguments position has changed for C origin: `sqe` is first. `addr` is an address (int, `0` for NULL).
+pub fn io_uring_prep_rw(sqe: *SQE, op: u8, fd: i32, addr: usize, len: u32, offset: u64) py.Error!void {
+    c.io_uring_prep_rw(op, try sqe.sqePtr(), fd, if (addr == 0) null else @ptrFromInt(addr), len, offset);
 }
 
 /// Limits the cpus the ring's async workers (`io-wq`) may run on to those set in `mask` (`bytes` / `bytearray`
