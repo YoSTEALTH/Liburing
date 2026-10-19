@@ -31,7 +31,7 @@ const liburing_flags: []const []const u8 = &.{
     "-fno-stack-protector",
 };
 
-pub fn build(b: *std.Build) !void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
     const strip = b.option(bool, "strip", "Strip debug symbols from the binary") orelse false;
@@ -41,8 +41,12 @@ pub fn build(b: *std.Build) !void {
         defaultSuffix(b, target.result, free_threaded);
 
     // `./configure` generates `compat.h` and `io_uring_version.h` (feature checks, not CPU specific),
-    // so it runs once on the build machine for every target.
-    try configure(b);
+    // so it runs on the build machine for every target. It runs on every build (0.4 s): the build
+    // script itself is cached, and the headers must follow the `lib/liburing` checkout.
+    const configure = b.addSystemCommand(&.{ "./configure", "--use-libc" });
+    configure.setCwd(b.path("lib/liburing"));
+    configure.has_side_effects = true; // writes the headers into lib/liburing (git-ignored there)
+    _ = configure.captureStdOut(.{});
 
     // C liburing, compiled by Zig for the target instead of `make library`.
     const liburing_c = b.addLibrary(.{
@@ -62,8 +66,9 @@ pub fn build(b: *std.Build) !void {
         .flags = liburing_flags,
     });
     liburing_c.root_module.addIncludePath(b.path("lib/liburing/src/include"));
+    liburing_c.step.dependOn(&configure.step);
 
-    const c_mod = cModule(b, target, optimize);
+    const c_mod = cModule(b, target, optimize, &configure.step);
 
     const setu_dep = b.dependency("setu", .{});
     const options = b.addOptions();
@@ -101,7 +106,7 @@ pub fn build(b: *std.Build) !void {
             .optimize = .Debug,
             .imports = &.{
                 .{ .name = "setu", .module = setu_dep.module("setu") },
-                .{ .name = "c", .module = cModule(b, b.graph.host, .Debug) },
+                .{ .name = "c", .module = cModule(b, b.graph.host, .Debug, &configure.step) },
             },
         }),
     });
@@ -123,12 +128,18 @@ pub fn build(b: *std.Build) !void {
 
 /// The C headers (`src/liburing/c.h`) as a Zig module for `target` (`@import("c")`); `@cImport`
 /// no longer exists in Zig 0.17.
-fn cModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Module {
+fn cModule(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    configure: *std.Build.Step,
+) *std.Build.Module {
     const translate_c = b.addTranslateC(.{
         .root_source_file = b.path("src/liburing/c.h"),
         .target = target,
         .optimize = optimize,
     });
+    translate_c.step.dependOn(configure);
     translate_c.addIncludePath(b.path("lib/liburing/src/include"));
     // Bodies translate-c can not translate (liburing's atomics) become `extern`s from `ffi.c`.
     const c_externs = b.addRunArtifact(b.addExecutable(.{
@@ -142,27 +153,6 @@ fn cModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builti
         .optimize = optimize,
         .link_libc = true,
     });
-}
-
-/// Runs `./configure --use-libc` in lib/liburing unless its generated headers already exist.
-fn configure(b: *std.Build) !void {
-    const io = b.graph.io;
-    const dir = try b.root.joinString(b.allocator, "lib/liburing");
-    const compat_h = b.pathJoin(&.{ dir, "src/include/liburing/compat.h" });
-    std.Io.Dir.cwd().access(io, compat_h, .{}) catch |e| switch (e) {
-        error.FileNotFound => try runCmd(b, &.{ "./configure", "--use-libc" }, dir),
-        else => return e,
-    };
-}
-
-fn runCmd(b: *std.Build, argv: []const []const u8, cwd: []const u8) !void {
-    const result = try std.process.run(b.allocator, b.graph.io, .{ .argv = argv, .cwd = .{ .path = cwd } });
-    defer b.allocator.free(result.stderr);
-    defer b.allocator.free(result.stdout);
-    if (!result.term.success()) {
-        std.log.err("{s} failed in {s}:\n{s}", .{ argv[0], cwd, result.stderr });
-        return error.CommandFailed;
-    }
 }
 
 /// CPython's `EXT_SUFFIX` for `target`, like `.cpython-315t-x86_64-linux-gnu.so`.
