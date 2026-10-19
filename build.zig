@@ -1,7 +1,7 @@
 //! Build script for Liburing (Zig 0.17)
 //!
-//!   zig build          the `liburing` extension and its stubs (`liburing.pyi`) into zig-out/lib/
-//!   zig build develop  also copy both into src/liburing/ (for `pytest` from a checkout)
+//!   zig build          the `liburing` extension, its stubs (`liburing.pyi`) and `py.typed` into zig-out/lib/
+//!   zig build develop  also copy the extension and stubs into src/liburing/ (for `pytest` from a checkout)
 //!   zig build stubs    write the type stubs to src/liburing/liburing.pyi
 //!   zig build setu-build-sync    copy the pinned Setu's tools/setu_build.py into tools/ (never edit it)
 //!   zig build setu-build-check   check that tools/setu_build.py is the pinned Setu's copy
@@ -115,6 +115,10 @@ pub fn build(b: *std.Build) void {
     });
     const pyi = b.addRunArtifact(stubgen).captureStdOut(.{ .basename = "liburing.pyi" });
     b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "liburing.pyi").step);
+    // PEP 561 marker: type checkers read `liburing.pyi` only next to it. Installed with the stubs (not
+    // copied by `develop`: `tools/setu_build.py` also packs src/liburing/, which would ship it twice).
+    const py_typed = b.addWriteFiles().add("py.typed", "");
+    b.getInstallStep().dependOn(&b.addInstallFileWithDir(py_typed, .lib, "py.typed").step);
     const pyi_copy = b.addInstallFileWithDir(pyi, .{ .custom = "../src/liburing" }, "liburing.pyi");
     b.step("stubs", "Write the type stubs to src/liburing/liburing.pyi").dependOn(&pyi_copy.step);
 
