@@ -75,7 +75,7 @@ pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
 
 ///Warning
 ///    - Coded but not tested!!!
-pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?usize, buf_size: usize) py.Error!i32 {
+pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf_size: usize, buf: ?usize) py.Error!i32 {
     return e.trap_error(c.io_uring_queue_init_mem(entries, &ring._io_uring, p._io_uring_params, if (buf) |b| @ptrFromInt(b) else null, buf_size));
 }
 
@@ -129,7 +129,8 @@ pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
 ///
 ///Warning
 ///    - Don't use this function, till this warning is removed or else its most likely segfault!!!
-pub fn io_uring_peek_batch_cqe(_: *Ring, _: *Cqe, _: u32) py.Error!void {
+pub fn io_uring_peek_batch_cqe(ring: *Ring, cqe: *Cqe, count: u32) py.Error!void {
+    _ = .{ ring, cqe, count };
     return py.raiseNotImplementedError("`io_uring_peek_batch_cqe`", .{});
     // TODO:
     // fn peekBatchCqe(ring: *Ring, cqe: *Cqe, count: u32) py.Error!void {
@@ -347,7 +348,8 @@ pub fn io_uring_unregister_eventfd(ring: *Ring) py.Error!i32 {
     return e.trap_error(c.io_uring_unregister_eventfd(&ring._io_uring));
 }
 
-pub fn io_uring_register_probe(_: *Ring, _: *Probe, _: u32) py.Error!i32 {
+pub fn io_uring_register_probe(ring: *Ring, probe: *Probe, nr: u32) py.Error!i32 {
+    _ = .{ ring, probe, nr };
     return py.raiseNotImplementedError("`io_uring_register_probe` - caught the zig bug!", .{});
     // return e.trap_error(c.io_uring_register_probe(&ring._io_uring, probe._io_uring_probe, nr));
 }
@@ -450,7 +452,7 @@ pub fn io_uring_enter(fd: u32, to_submit: u32, min_complete: u32, flags: u32, si
     return e.trap_error(c.io_uring_enter(fd, to_submit, min_complete, flags, sig._sigset_t));
 }
 
-pub fn io_uring_enter2(fd: u32, to_submit: u32, min_complete: u32, flags: u32, arg: ?usize, sz: usize) py.Error!i32 {
+pub fn io_uring_enter2(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sz: usize, arg: ?usize) py.Error!i32 {
     return e.trap_error(c.io_uring_enter2(fd, to_submit, min_complete, flags, if (arg) |a| @ptrFromInt(a) else null, sz));
 }
 
@@ -458,7 +460,7 @@ pub fn io_uring_setup(entries: u32, p: *Param) py.Error!i32 {
     return e.trap_error(c.io_uring_setup(entries, p._io_uring_params));
 }
 
-pub fn io_uring_register(fd: u32, opcode: u32, arg: ?usize, nr_args: u32) py.Error!i32 {
+pub fn io_uring_register(fd: u32, opcode: u32, nr_args: u32, arg: ?usize) py.Error!i32 {
     return e.trap_error(c.io_uring_register(fd, opcode, if (arg) |a| @ptrFromInt(a) else null, nr_args));
 }
 
