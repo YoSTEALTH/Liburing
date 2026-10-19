@@ -1,7 +1,7 @@
 '''HTTP keep-alive echo server on Liburing's Python API: the same server, response and load as
 Shakti's `example/bench` (`liburing_bench.c` translated line by line).
 
-    python3.15t example/bench/liburing_bench.py [port=12345] [--peek]
+    python3.15t example/bench/liburing_bench.py [port=12345] [--peek | --at]
     load 12345 64 5 100     # Shakti's `tools/load.zig`: port, connections, seconds, requests/connection
 
 One thread, one ring, default flags. Each connection: recv, send the response, recv again. Closes
@@ -10,7 +10,7 @@ the connection when recv or send returns 0 or an error.
 Completions are read in a batch, `cqe[i]` for every ready one, then `io_uring_cq_advance`. `--peek`
 reads them one at a time instead (`io_uring_peek_cqe`, `cqe[0]`, `io_uring_cqe_seen`): the only way
 that works on the old PyOZ build, whose `cqe[i]` reads past the end of the completion queue once it
-wraps around.
+wraps around. `--at` reads them with `cqe.user_data_at(i)` / `cqe.res_at(i)`: no entry objects.
 '''
 
 import os
@@ -60,7 +60,7 @@ class Conn:
         self.out = None  # the unsent part of `RESPONSE`, alive until its send completes
 
 
-def main(port, peek=False):
+def main(port, peek=False, at=False):
     ring, cqe = Ring(), Cqe()
     conns = {}  # id -> Conn
     next_id = 1
@@ -104,16 +104,19 @@ def main(port, peek=False):
         io_uring_peek_cqe(ring, cqe)  # `cqe[0]` is the oldest completion
         ready = io_uring_cq_ready(ring)
         for i in range(ready):
-            if peek:
-                if i:
-                    io_uring_peek_cqe(ring, cqe)
-                entry = cqe[0]
+            if at:
+                data = cqe.user_data_at(i)
             else:
-                entry = cqe[i]
-            data = entry.user_data
+                if peek:
+                    if i:
+                        io_uring_peek_cqe(ring, cqe)
+                    entry = cqe[0]
+                else:
+                    entry = cqe[i]
+                data = entry.user_data
             op, cid = data & OP_MASK, data >> 2
             try:
-                res = entry.res
+                res = cqe.res_at(i) if at else entry.res
             except OSError:  # a failed operation
                 res = -1
             if op == OP_ACCEPT:
@@ -147,5 +150,5 @@ def main(port, peek=False):
 
 
 if __name__ == '__main__':
-    args = [a for a in sys.argv[1:] if a != '--peek']
-    main(int(args[0]) if args else 12345, '--peek' in sys.argv)
+    args = [a for a in sys.argv[1:] if a not in ('--peek', '--at')]
+    main(int(args[0]) if args else 12345, '--peek' in sys.argv, '--at' in sys.argv)

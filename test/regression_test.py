@@ -170,3 +170,55 @@ def test_cqe_entries_held_are_not_reused():
         liburing.io_uring_cq_advance(ring, 6)
     finally:
         liburing.io_uring_queue_exit(ring)
+
+
+# 7. `user_data_at(i)` / `res_at(i)` read `cqe[i]` without an entry object.
+
+
+def test_cqe_user_data_at_res_at():
+    ring, cqe = liburing.Ring(), liburing.Cqe()
+    liburing.io_uring_queue_init(4, ring)  # 8 CQ entries: the batches wrap around the queue
+    try:
+        for start, n in ((100, 4), (200, 3), (300, 4)):
+            for i in range(n):
+                sqe = liburing.io_uring_get_sqe(ring)
+                liburing.io_uring_prep_nop(sqe)
+                sqe.user_data = start + i
+            liburing.io_uring_submit(ring)
+            liburing.io_uring_wait_cqe_nr(ring, cqe, n)
+            assert [cqe.user_data_at(i) for i in range(n)] == list(range(start, start + n))
+            assert [cqe.res_at(i) for i in range(n)] == [cqe[i].res for i in range(n)]
+            liburing.io_uring_cq_advance(ring, n)
+    finally:
+        liburing.io_uring_queue_exit(ring)
+
+
+def test_cqe_at_errors(ring, cqe):
+    with pytest.raises(IndexError):
+        cqe.user_data_at(0)  # nothing completed yet
+    sqe = liburing.io_uring_get_sqe(ring)
+    liburing.io_uring_prep_read(sqe, -1, bytearray(1), 0)  # bad fd: res = -EBADF
+    liburing.io_uring_submit(ring)
+    liburing.io_uring_wait_cqe(ring, cqe)
+    with pytest.raises(OSError):
+        cqe.res_at(0)
+    for bad in (10**7, -1):
+        with pytest.raises(IndexError):
+            cqe.user_data_at(bad)
+        with pytest.raises(IndexError):
+            cqe.res_at(bad)
+    liburing.io_uring_cqe_seen(ring, cqe[0])
+
+
+def test_cqe_at_after_exit():
+    ring, cqe = liburing.Ring(), liburing.Cqe()
+    liburing.io_uring_queue_init(8, ring)
+    sqe = liburing.io_uring_get_sqe(ring)
+    liburing.io_uring_prep_nop(sqe)
+    liburing.io_uring_submit(ring)
+    liburing.io_uring_wait_cqe(ring, cqe)
+    liburing.io_uring_queue_exit(ring)
+    with pytest.raises(RuntimeError):
+        cqe.user_data_at(0)
+    with pytest.raises(RuntimeError):
+        cqe.res_at(0)

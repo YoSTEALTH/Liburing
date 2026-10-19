@@ -68,6 +68,21 @@ def nop_batch_read(ring, cqe, n):
         io_uring_cq_advance(ring, BATCH)
 
 
+def nop_batch_read_at(ring, cqe, n):
+    '''`nop_batch_read` with `cqe.user_data_at(i)` / `cqe.res_at(i)` (no entry object; not in the PyOZ build)'''
+    for _ in range(n // BATCH):
+        for i in range(BATCH):
+            sqe = io_uring_get_sqe(ring)
+            io_uring_prep_nop(sqe)
+            sqe.user_data = i
+        io_uring_submit(ring)
+        io_uring_wait_cqe_nr(ring, cqe, BATCH)
+        for i in range(BATCH):
+            cqe.user_data_at(i)
+            cqe.res_at(i)
+        io_uring_cq_advance(ring, BATCH)
+
+
 def put_batch(ring, cqe, n):
     '''`BATCH` NOPs prepared once in an `Sqe(BATCH)` and copied in with `put_sqe` per submit'''
     sqes = Sqe(BATCH)
@@ -84,6 +99,7 @@ CASES = [
     ('nop serial', 100_000, nop_serial),
     (f'nop batch x{BATCH}', 1_024_000, nop_batch),
     (f'nop batch x{BATCH} + read', 1_024_000, nop_batch_read),
+    *([(f'nop batch x{BATCH} + read_at', 1_024_000, nop_batch_read_at)] if hasattr(Cqe, 'user_data_at') else []),
     (f'put_sqe batch x{BATCH}', 1_024_000, put_batch),
 ]
 
