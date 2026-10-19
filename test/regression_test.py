@@ -146,3 +146,27 @@ def test_negative_index():
         liburing.Sqe()[-1]
     with pytest.raises(IndexError):
         liburing.FileIndex([1, 2])[-1]
+
+
+# 6. `cqe[i]` reuses an entry object only when nothing else holds it.
+
+
+def test_cqe_entries_held_are_not_reused():
+    ring, cqe = liburing.Ring(), liburing.Cqe()
+    liburing.io_uring_queue_init(8, ring)
+    try:
+        for i in range(6):
+            sqe = liburing.io_uring_get_sqe(ring)
+            liburing.io_uring_prep_nop(sqe)
+            sqe.user_data = 10 + i
+        liburing.io_uring_submit(ring)
+        liburing.io_uring_wait_cqe_nr(ring, cqe, 6)
+        held = [cqe[i] for i in range(6)]  # more than the reuse slots: all must stay distinct
+        assert [e.user_data for e in held] == list(range(10, 16))
+        assert len({id(e) for e in held}) == 6
+        del held
+        for i in range(6):  # nothing held: values still follow the index
+            assert cqe[i].user_data == 10 + i
+        liburing.io_uring_cq_advance(ring, 6)
+    finally:
+        liburing.io_uring_queue_exit(ring)

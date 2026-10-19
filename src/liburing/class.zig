@@ -6,7 +6,6 @@ const std = @import("std");
 
 const py = setu.py;
 const Object = setu.c.Object;
-
 pub const IovecType = setu.Class(Iovec, @embedFile("class.zig"));
 pub const TimespecType = setu.Class(Timespec, @embedFile("class.zig"));
 pub const RingType = setu.Class(Ring, @embedFile("class.zig"));
@@ -158,11 +157,22 @@ pub const Ring = struct {
     /// The `io_uring` for C, or `RuntimeError` if the ring is not initialised (or already exited):
     /// liburing would read unmapped memory.
     pub fn checkedPtr(self: *Ring) py.Error!*c.io_uring {
-        if (self._io_uring.ring_fd <= 0) return py.raiseRuntimeError(
+        return checkRing(&self._io_uring);
+    }
+
+    /// `ring` (inside a `Ring`), or `RuntimeError` as `checkedPtr` does: for entries, which keep
+    /// the pointer next to their owner to skip the `Ring` lookup.
+    pub inline fn checkRing(ring: *c.io_uring) py.Error!*c.io_uring {
+        if (ring.ring_fd <= 0) return raiseNotInitialized();
+        return ring;
+    }
+
+    /// Out of line: keeps its message formatting off the hot paths that inline `checkRing`.
+    noinline fn raiseNotInitialized() py.Error {
+        return py.raiseRuntimeError(
             "`Ring` is not initialized (`io_uring_queue_init`) or already exited (`io_uring_queue_exit`)",
             .{},
         );
-        return &self._io_uring;
     }
 
     /// After a submit: drops `_keep` once the kernel has consumed every SQE (it read their paths then).
@@ -199,6 +209,7 @@ pub const Ring = struct {
 pub const CQE = struct {
     _cqe: ?*c.io_uring_cqe = null,
     _owner: ?*Object = null, // the `Ring` whose completion queue `_cqe` points into
+    _ring: ?*c.io_uring = null, // inside `_owner`
 
     pub const instantiable = false;
 
@@ -207,8 +218,8 @@ pub const CQE = struct {
     // GET
 
     /// The entry for C, or `RuntimeError` once its ring has exited (its memory is unmapped).
-    pub fn cqePtr(self: *const Self) py.Error!*c.io_uring_cqe {
-        if (self._owner) |o| _ = try RingType.data(o).checkedPtr();
+    pub inline fn cqePtr(self: *const Self) py.Error!*c.io_uring_cqe {
+        if (self._ring) |r| _ = try Ring.checkRing(r);
         return self._cqe.?;
     }
 
@@ -217,7 +228,9 @@ pub const CQE = struct {
     }
 
     pub fn get_res(self: *const Self) py.Error!i32 {
-        return py.checkErrno((try self.cqePtr()).res);
+        const res = (try self.cqePtr()).res;
+        if (res >= 0) return res; // inline fast path: `checkErrno` is a call
+        return py.checkErrno(res);
     }
 
     pub fn get_flags(self: *const Self) py.Error!u32 {
@@ -251,6 +264,11 @@ pub const Cqe = struct {
     // _array: ?[*]CQE = null, // custom memory for batch cqe
     _io_uring_cqe: ?[*]c.io_uring_cqe = null, // Note: Memory is managed by `io_uring`
     _ring: ?*Object = null, // the `Ring` `_io_uring_cqe` points into (set with it)
+    /// `CQE`s handed out by `cqe[i]`, reused once nothing else holds them (see `__getitem__`).
+    _reuse: [reuse_len]?*Object = @splat(null),
+
+    /// `entry = cqe[i]` in a loop still holds the previous entry while asking for the next one.
+    const reuse_len = 4;
 
     pub fn __new__(_: *Cqe, no: ?u32) py.Error!void {
         // TODO: `no` is need to get `io_uring_peek_batch_cqe` working
@@ -274,7 +292,7 @@ pub const Cqe = struct {
     ///
     /// Type
     ///     return: CQE
-    pub fn __getitem__(self: *const Cqe, index: isize) py.Error!*Object {
+    pub fn __getitem__(self: *Cqe, index: isize) py.Error!*Object {
         const first = self._io_uring_cqe orelse return py.raiseIndexError("`Cqe` - out of completed entries", .{});
         const ring_obj = self._ring.?;
         const ring = try RingType.data(ring_obj).checkedPtr();
@@ -287,7 +305,27 @@ pub const Cqe = struct {
         const shift: u5 = @intCast(c.io_uring_cqe_shift(ring)); // cast: 0 or 1 (`IORING_SETUP_CQE32`)
         const slot = (@intFromPtr(first) - @intFromPtr(cqes)) / @sizeOf(c.io_uring_cqe);
         const pos = (((slot >> shift) + @as(usize, @intCast(index))) & cq.ring_mask) << shift; // cast: 0 <= index
-        return CQEType.new(.{ ._cqe = &cqes[pos], ._owner = keep(ring_obj) });
+        return self.entry(&cqes[pos], ring_obj, ring);
+    }
+
+    /// A `CQE` for `cqe` (a new reference): a reused one that only `_reuse` holds (no one can see
+    /// it change), else a new one, kept in `_reuse` if there is room.
+    fn entry(self: *Cqe, cqe: *c.io_uring_cqe, ring_obj: *Object, ring: *c.io_uring) py.Error!*Object {
+        for (&self._reuse) |*slot| {
+            const o = slot.* orelse {
+                const new = try CQEType.new(.{ ._cqe = cqe, ._owner = keep(ring_obj), ._ring = ring });
+                slot.* = keep(new);
+                return new;
+            };
+            if (PyUnstable_Object_IsUniquelyReferenced(o) != 0) {
+                const d = CQEType.data(o);
+                d._cqe = cqe;
+                setOwned(&d._owner, ring_obj);
+                d._ring = ring;
+                return keep(o);
+            }
+        }
+        return CQEType.new(.{ ._cqe = cqe, ._owner = keep(ring_obj), ._ring = ring });
     }
 };
 
@@ -785,6 +823,9 @@ pub fn setOwned(field: *?*Object, obj: *Object) void {
     field.* = keep(obj);
     py.decref(old);
 }
+
+/// Is `obj` referenced only by the caller (on 3.15t too, unlike reading its refcount)?
+extern fn PyUnstable_Object_IsUniquelyReferenced(obj: *Object) c_int;
 
 /// A new reference to `obj`, for an owned (`?*Object`) field.
 pub fn keep(obj: *Object) *Object {
