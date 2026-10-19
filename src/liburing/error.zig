@@ -2,26 +2,26 @@ const setu = @import("setu");
 
 const py = setu.py;
 
-///Trap Error
+/// Trap Error
 ///
-///Type
-///    errno  int
-///    return int
+/// Type
+///     errno  int
+///     return int
 ///
-///Example
-///    >>> trap_error(1)
-///    1
+/// Example
+///     >>> trap_error(1)
+///     1
 ///
-///    >>> trap_error(-11)
-///    BlockingIOError: [Errno 11] Resource temporarily unavailable
+///     >>> trap_error(-11)
+///     BlockingIOError: [Errno 11] Resource temporarily unavailable
 ///
-///    >>> trap_error(-1)
-///    # dynamic error based on `errno`
+///     >>> trap_error(-1)
+///     # dynamic error based on `errno`
 ///
-///Note
-///    - any `no >= 0` is considered safe.
-///    - if `no=-1` it will check with `errno` first to see if proper error is set,
-///      and raise that as exception
+/// Note
+///     - any `no >= 0` is considered safe.
+///     - if `no=-1` it will check with `errno` first to see if proper error is set,
+///       and raise that as exception
 pub fn trap_error(errno: i32) py.Error!i32 {
     return py.checkErrno(errno);
 }

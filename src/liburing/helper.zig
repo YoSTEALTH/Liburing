@@ -16,23 +16,23 @@ const Timespec = class.Timespec;
 
 pub const FileIndexType = setu.Class(FileIndex, @embedFile("helper.zig"));
 
-///File Index
+/// File Index
 ///
-///Example
-///    >>> ids = FileIndex([-1, -1, 3])
-///    >>> ids[1]
-///    -1
-///    >>> ids.update([4, 5, 6])
-///    >>> ids[1]
-///    5
-///    >>> list(ids)
-///    [4, 5, 6]
-///    >>> for id in ids:
-///    ...     # do something e.g.`if id != -1: os.close(id)`
+/// Example
+///     >>> ids = FileIndex([-1, -1, 3])
+///     >>> ids[1]
+///     -1
+///     >>> ids.update([4, 5, 6])
+///     >>> ids[1]
+///     5
+///     >>> list(ids)
+///     [4, 5, 6]
+///     >>> for id in ids:
+///     ...     # do something e.g.`if id != -1: os.close(id)`
 ///
-///Note
-///    - Makes copy of the list provided & shares it with `io_uring`,
-///    so modifying python list will not effect `FileIndex` already submitting.
+/// Note
+///     - Makes copy of the list provided & shares it with `io_uring`,
+///     so modifying python list will not effect `FileIndex` already submitting.
 pub const FileIndex = struct {
     _fds: ?[*]i32 = null,
     _len: usize = 0,
@@ -50,6 +50,8 @@ pub const FileIndex = struct {
         if (self._fds) |fds| std.heap.c_allocator.free(fds[0..self._len]);
     }
 
+    /// Type
+    ///     return: Self
     pub fn __iter__(self: *Object) *Object {
         FileIndexType.data(self)._index = 0;
         return class.keep(self);
@@ -80,18 +82,21 @@ pub const FileIndex = struct {
     }
 };
 
-///Probe your system to find out which `io_uring` operations are available.
+/// Probe your system to find out which `io_uring` operations are available.
 ///
-///Example
-///    >>> probe()
-///    {'IORING_OP_NOP': True, ...}
+/// Example
+///     >>> probe()
+///     {'IORING_OP_NOP': True, ...}
 ///
-///    # or
+///     # or
 ///
-///    >>> for op, supported in probe().items():
-///    ...     op, supported
-///    IORING_OP_NOP True
+///     >>> for op, supported in probe().items():
+///     ...     op, supported
+///     IORING_OP_NOP True
 ///
+///
+/// Type
+///     return: dict[str, bool]
 pub fn probe() py.Error!*Object {
     const last: usize = @backingInt(n.io_uring_op.IORING_OP_LAST);
     const items = @typeInfo(n.io_uring_op).@"enum".field_names;
@@ -112,13 +117,16 @@ pub fn probe() py.Error!*Object {
     return dict;
 }
 
-///Kernel Timespec
+/// Kernel Timespec
 ///
-///Example
-///    >>> ts = timespec(1)        # int
-///    >>> ts = timespec(1.5)      # float
-///    >>> io_uring_prep_timeout(sqe, ts, ...)
+/// Example
+///     >>> ts = timespec(1)        # int
+///     >>> ts = timespec(1.5)      # float
+///     >>> io_uring_prep_timeout(sqe, ts, ...)
 ///
+///
+/// Type
+///     return: Timespec
 pub fn timespec(second: f64) py.Error!*Object {
     if (!std.math.isFinite(second) or second < 0) {
         return py.raiseValueError("`timespec(second)` must be a finite number >= 0, got {d}", .{second});
@@ -139,36 +147,36 @@ pub fn timespec(second: f64) py.Error!*Object {
     return class.TimespecType.new(.{ ._timespec = ts });
 }
 
-///Put `io_uring_sqe` into `io_uring` ring's memory.
+/// Put `io_uring_sqe` into `io_uring` ring's memory.
 ///
-///Type
-///    ring:   Ring
-///    sqe:    Sqe
-///    return: bool
+/// Type
+///     ring:   Ring
+///     sqe:    Sqe
+///     return: bool
 ///
-///Example
-///    # single
-///    >>> sqe = Sqe()
-///    >>> io_uring_prep_read(sqe, ...)
+/// Example
+///     # single
+///     >>> sqe = Sqe()
+///     >>> io_uring_prep_read(sqe, ...)
 ///
-///    # multiple
-///    >>> sqe = Sqe(2)
-///    >>> io_uring_prep_read(sqe[0], ...)
-///    >>> io_uring_prep_write(sqe[1], ...)
+///     # multiple
+///     >>> sqe = Sqe(2)
+///     >>> io_uring_prep_read(sqe[0], ...)
+///     >>> io_uring_prep_write(sqe[1], ...)
 ///
-///    # back-end single | multiple
-///    >>> if put_sqe(self.ring, sqe):
-///    ...     # do stuff
+///     # back-end single | multiple
+///     >>> if put_sqe(self.ring, sqe):
+///     ...     # do stuff
 ///
-///    # failed: `ring` was full, submit and try to again.
-///    >>> if put_sqe(self.ring, sqe):
-///    ...     io_uring_submit(self.ring)
-///    ...     if put_sqe(self.ring, sqe):
-///    ...         # do stuff
+///     # failed: `ring` was full, submit and try to again.
+///     >>> if put_sqe(self.ring, sqe):
+///     ...     io_uring_submit(self.ring)
+///     ...     if put_sqe(self.ring, sqe):
+///     ...         # do stuff
 ///
-///Note
-///    - Returns `False` if queue is full. Will need to `io_uring_submit()` and try again.
-///    - Returns `False` if `entries` < `len(sqe)`
+/// Note
+///     - Returns `False` if queue is full. Will need to `io_uring_submit()` and try again.
+///     - Returns `False` if `entries` < `len(sqe)`
 pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
     const io_uring = try ring.checkedPtr();
     if (sqe._keep) |list| try keepAll(&ring._keep, list); // paths its entries point to, until submit
@@ -201,8 +209,8 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
 /// io_uring reads it at submit time, not when the `sqe` is prepared.
 ///
 /// Note
-///     - `str` arguments (and `pathlib` paths, which cache their `str`) live as long as the
-///       caller's object; `deinit` drops only the reference this took.
+///      - `str` arguments (and `pathlib` paths, which cache their `str`) live as long as the
+///        caller's object; `deinit` drops only the reference this took.
 /// Keeps `obj` (a path `str`, ...) alive until the kernel has read the entry `sqe`: on its `Ring`
 /// until a submit consumes it, or on its `Sqe` until `put_sqe` hands it to a ring. io_uring reads
 /// paths at submit time, so a temporary (`dir / "name"`) would otherwise be freed before that.

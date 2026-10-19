@@ -5,22 +5,22 @@ const std = @import("std");
 
 pub const StatxType = setu.Class(Statx, @embedFile("statx.zig"));
 
-///Statx - Structures for the extended file attribute retrieval system call `statx()`.
+/// Statx - Structures for the extended file attribute retrieval system call `statx()`.
 ///
-///Example
-///    >>> stat = Statx()
-///    >>> if sqe := io_uring_get_sqe(ring)
-///    ...     io_uring_prep_statx(sqe, stat, __file__)
-///    ... ...
-///    >>> stat.isfile
-///    True
-///    >>> stat.size
-///    123
+/// Example
+///     >>> stat = Statx()
+///     >>> if sqe := io_uring_get_sqe(ring)
+///     ...     io_uring_prep_statx(sqe, stat, __file__)
+///     ... ...
+///     >>> stat.isfile
+///     True
+///     >>> stat.size
+///     123
 ///
-///Note
-///    - For more information visit:
-///        https://man7.org/linux/man-pages/man2/statx.2.html
-///        https://man7.org/linux/man-pages/man7/inode.7.html
+/// Note
+///     - For more information visit:
+///         https://man7.org/linux/man-pages/man2/statx.2.html
+///         https://man7.org/linux/man-pages/man7/inode.7.html
 pub const Statx = struct {
     _statx: c.struct_statx = std.mem.zeroes(c.struct_statx), // lives inside the Python object
 
