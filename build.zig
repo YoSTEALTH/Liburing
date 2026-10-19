@@ -7,7 +7,7 @@
 //!
 //! Options:
 //!   -Dfree-threaded=false   build for the regular (GIL) 3.15 instead of 3.15t
-//!   -Drelease               ReleaseFast (wheels use it); `-Doptimize=...` picks any mode
+//!   -Drelease               ReleaseSafe (wheels use it, as PyOZ did); `-Doptimize=...` picks any mode
 //!   -Dstrip                 drop debug info from the extension (wheels use it)
 //!   -Dext-suffix=...        Python extension suffix (default: CPython's `EXT_SUFFIX` for the target and ABI)
 //!
@@ -33,7 +33,9 @@ const liburing_flags: []const []const u8 = &.{
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
+    // `-Drelease` (what `tools/setu_build.py` passes) is ReleaseSafe: a bug hit from Python stops the
+    // process instead of corrupting memory.
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
     const strip = b.option(bool, "strip", "Strip debug symbols from the binary") orelse false;
     const free_threaded = b.option(bool, "free-threaded", "Build for free-threaded 3.15t (default: true)") orelse
         true;
