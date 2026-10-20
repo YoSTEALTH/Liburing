@@ -1,13 +1,12 @@
 //! Liburing: the `liburing` extension module (PEP 793 export, Setu).
 const std = @import("std");
+const api = @import("api.zig");
 const setu = @import("setu");
 const build_options = @import("build_options");
 
 const sc = setu.c;
 const py = setu.py;
 const Object = sc.Object;
-
-const api = @import("api.zig");
 
 /// Setu settings, read by `setu.Class` from the root file.
 pub const setu_options = api.setu_options;

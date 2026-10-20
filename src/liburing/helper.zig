@@ -9,7 +9,6 @@ const class = @import("class.zig");
 const py = setu.py;
 const sc = setu.c;
 const Object = sc.Object;
-
 const Ring = class.Ring;
 const Sqe = class.Sqe;
 const Timespec = class.Timespec;

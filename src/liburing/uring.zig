@@ -3,16 +3,15 @@ const c = @import("c.zig").c;
 const h = @import("helper.zig");
 const setu = @import("setu");
 const std = @import("std");
-
-const py = setu.py;
-const Object = setu.c.Object;
-const FileIndex = @import("helper.zig").FileIndex;
 const class = @import("class.zig");
 const Statx = @import("statx.zig").Statx;
 const Futex = @import("futex.zig").Futex;
 const AT_FDCWD = @import("const.zig").AT_FDCWD;
 const Sockaddr = @import("socket.zig").Sockaddr;
+const FileIndex = @import("helper.zig").FileIndex;
 
+const py = setu.py;
+const Object = setu.c.Object;
 const SyncCancelReg = class.SyncCancelReg;
 const ClockRegister = class.ClockRegister;
 const MemRegionReg = class.MemRegionReg;
