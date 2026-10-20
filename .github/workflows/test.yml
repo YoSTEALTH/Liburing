@@ -84,7 +84,7 @@ jobs:
             abi=$("$py" -c 'import sysconfig; print("cp315t" if sysconfig.get_config_var("Py_GIL_DISABLED") else "cp315")')
             "$py" -m venv "$RUNNER_TEMP/venv-$abi"
             "$RUNNER_TEMP/venv-$abi/bin/pip" install pytest dist/liburing-*-"$abi"-manylinux_2_28_x86_64.whl
-            (cd "$RUNNER_TEMP/wheeltest" && "$RUNNER_TEMP/venv-$abi/bin/python" -m pytest test -p no:cacheprovider)
+            (cd "$RUNNER_TEMP/wheeltest" && "$RUNNER_TEMP/venv-$abi/bin/python" -m pytest test -rs -p no:cacheprovider)
           done
 
       - uses: actions/upload-artifact@v6
