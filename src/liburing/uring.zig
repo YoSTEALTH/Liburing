@@ -1621,10 +1621,6 @@ fn pipeFds(fds: py.WritableBuffer) py.Error![*]c_int {
     return @ptrCast(@alignCast(fds.data.ptr));
 }
 
-pub fn io_uring_load_sq_head(ring: *Ring) py.Error!u32 {
-    return c.io_uring_load_sq_head(try ring.checkedPtr());
-}
-
 pub fn io_uring_sq_ready(ring: *Ring) py.Error!u32 {
     return c.io_uring_sq_ready(try ring.checkedPtr());
 }
@@ -1697,14 +1693,6 @@ pub fn io_uring_register_iowq_max_workers(ring: *Ring, bounded: u32, unbounded: 
     var values = [2]c_uint{ bounded, unbounded };
     _ = try py.checkErrno(c.io_uring_register_iowq_max_workers(try ring.checkedPtr(), &values));
     return .{ values[0], values[1] };
-}
-
-pub fn io_uring_sqe_shift_from_flags(flags: u32) u32 {
-    return c.io_uring_sqe_shift_from_flags(flags);
-}
-
-pub fn io_uring_sqe_shift(ring: *Ring) py.Error!u32 {
-    return c.io_uring_sqe_shift(try ring.checkedPtr());
 }
 
 pub fn io_uring_sqring_wait(ring: *Ring) py.Error!i32 {

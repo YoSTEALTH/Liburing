@@ -37,15 +37,11 @@ def test_cqe_get_data(ring, cqe):
 # queue state
 
 
-def test_sq_space_and_shift(ring):
+def test_sq_space_left(ring):
     left = L.io_uring_sq_space_left(ring)
     assert left == 1024
     L.io_uring_get_sqe(ring)
     assert L.io_uring_sq_space_left(ring) == left - 1
-    assert L.io_uring_sqe_shift(ring) == 0
-    assert L.io_uring_sqe_shift_from_flags(0) == 0
-    assert L.io_uring_sqe_shift_from_flags(L.IORING_SETUP_SQE128) == 1
-    assert L.io_uring_load_sq_head(ring) == 0
 
 
 def test_cq_overflow_events(ring, cqe):
