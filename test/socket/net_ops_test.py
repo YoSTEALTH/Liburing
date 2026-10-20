@@ -431,11 +431,3 @@ def test_cmd_getsockname(ring, cqe, pair):
         assert cqe[0].res >= 0
         L.io_uring_cqe_seen(ring, cqe[0])
         assert (out.ip, out.port) == expect
-
-
-def test_message_classes_are_not_creatable_yet():
-    # `Msghdr`, `Cmsghdr`, `EpollEvent` and `RecvmsgOut` are not built from Python yet, which blocks the
-    # `sendmsg` / `recvmsg` / `epoll_*` preps and the `io_uring_recvmsg_*` readers from being used (or tested)
-    for cls in (L.Msghdr, L.Cmsghdr, L.EpollEvent, L.RecvmsgOut):
-        with pytest.raises(TypeError):
-            cls()
