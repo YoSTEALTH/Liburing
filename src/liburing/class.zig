@@ -37,24 +37,27 @@ pub const OpenHowType = setu.Class(OpenHow, @embedFile("class.zig"));
 /// Vector I/O data structure
 ///
 /// Example
-////   # Read
+///     # Read
 ///     # ----
-///     >>> buffer = [bytearray(1), bytearray(2), bytearray(3)]
-///     >>> iov_read = Iovec(buffer)
-///     >>> io_uring_prep_readv(sqe, fd, iov_read, ...)
+///     >>> iov = Iovec([bytearray(1), bytearray(2), bytearray(3)])
+///     >>> io_uring_prep_readv(sqe, fd, iov, ...)
+///     ...
+///     >>> iov.buffers
+///     (bytearray(b"a"), bytearray(b"bc"), bytearray(b"def"))
 ///
 ///     # Write
 ///     # -----
-///     >>> buffer = [b'1', b'22', b'333']
-///     >>> iov_write = Iovec(buffer)
-///     >>> io_uring_prep_writev(sqe, fd, iov_write, ...)
+///     >>> iov = Iovec([b"1", b"22", b"333"])
+///     >>> io_uring_prep_writev(sqe, fd, iov, ...)
 ///
 /// Note
-///     - Make sure to hold on to variable you are passing into `Iovec` so it does not get
-///     garbage collected before you get the chance to use it!
+///     - `Iovec` holds on to the buffers it is given, so there is no need for a separate variable;
+///     `iov.buffers` / `iov[i]` give them back (e.g. to read what `io_uring_prep_readv` filled).
+///     - Hold on to the `Iovec` itself until the request has completed.
 pub const Iovec = struct {
     _len: usize = 0,
     _iovec: ?[*]c.iovec = null,
+    _buffers: ?*Object = null, // the tuple of buffers the `iovec` points into (owned)
 
     const Self = @This();
 
@@ -75,6 +78,7 @@ pub const Iovec = struct {
         }
         self._len = _len;
         self._iovec = iovec.ptr;
+        self._buffers = keep(list.tuple);
     }
 
     pub fn __len__(self: *const Self) usize {
@@ -83,6 +87,22 @@ pub const Iovec = struct {
 
     pub fn __bool__(self: *const Self) bool {
         return (self._len > 0);
+    }
+
+    /// The buffers, as given (a `tuple`).
+    ///
+    /// Type
+    ///     return: tuple[Buffer, ...]
+    pub fn get_buffers(self: *const Self) py.Error!*Object {
+        return keep(self._buffers orelse return py.raiseRuntimeError("`Iovec` not initialized!", .{}));
+    }
+
+    /// Type
+    ///     return: Buffer
+    pub fn __getitem__(self: *const Self, index: isize) py.Error!*Object {
+        const tuple = self._buffers orelse return py.raiseRuntimeError("`Iovec` not initialized!", .{});
+        if (index >= 0 and index < self._len) return keep(setu.c.PyTuple_GetItem(tuple, index).?);
+        return py.raiseIndexError("Index out of range", .{});
     }
 
     pub fn __del__(self: *const Self) void {

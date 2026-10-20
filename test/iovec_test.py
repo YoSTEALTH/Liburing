@@ -30,3 +30,27 @@ def test_iovec():
     msg = re.escape(f"`Iovec(data)` - length of {iov_max} exceeds `IOV_MAX` limit set by OS of {IOV_MAX}")
     with pytest.raises(ValueError, match=msg):
         Iovec(data)
+
+
+def test_iovec_holds_buffers():
+    import gc
+    import sys
+
+    iov = Iovec([bytearray(2), bytearray(3)])  # no other reference to the list or the buffers
+    gc.collect()
+    assert len(iov.buffers) == 2
+    assert [len(b) for b in iov.buffers] == [2, 3]
+    assert len(iov[1]) == 3
+    iov[0][:] = b"hi"  # the same object the kernel would write into
+    assert iov.buffers[0] == bytearray(b"hi")
+    with pytest.raises(IndexError):
+        iov[2]
+    with pytest.raises(IndexError):
+        iov[-1]
+
+    buf = bytearray(4)
+    before = sys.getrefcount(buf)
+    iov = Iovec([buf])
+    assert sys.getrefcount(buf) == before + 1
+    del iov
+    assert sys.getrefcount(buf) == before
