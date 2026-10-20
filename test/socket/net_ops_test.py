@@ -333,7 +333,11 @@ def test_prep_pipe_direct(ring, cqe):
     fds = array.array("i", [-1, -1])
     assert L.io_uring_register_files_sparse(ring, 4) == 0
     assert one(ring, cqe, L.io_uring_prep_pipe_direct, fds, 0, 0) == 0
-    assert tuple(fds) == (0, 1)  # the slots used in the file table
+    if L.linux_version_check(7.0):
+        # kernel bug fixed in 7.0 (stable backports vary): `io_pipe_fixed()` reported `(0, 0)`
+        assert fds[0] == 0
+    else:
+        assert tuple(fds) == (0, 1)  # the slots used in the file table
     assert one(ring, cqe, L.io_uring_prep_close_direct, 0) == 0
     assert one(ring, cqe, L.io_uring_prep_close_direct, 1) == 0
     assert L.io_uring_unregister_files(ring) == 0
