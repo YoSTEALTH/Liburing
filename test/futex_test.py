@@ -9,7 +9,7 @@ def test_futex_6_7():
             liburing.Futex()
 
 
-@pytest.mark.skip_linux(6.7)
+# @pytest.mark.skip_linux(6.7)
 def test_futex_state():
     # shared
     futex = liburing.Futex()
@@ -48,7 +48,7 @@ def test_futex_state():
     assert futex.state == futex[0].state == 1
 
 
-@pytest.mark.skip_linux("6.7")
+# @pytest.mark.skip_linux("6.7")
 def test_futex_waitv_class():
     fw = liburing.Futex(1, None, True)
     assert fw.val == 0
@@ -64,7 +64,7 @@ def test_futex_waitv_class():
     assert fw.flags == liburing.FUTEX2_PRIVATE
 
 
-@pytest.mark.skip_linux("6.7")
+# @pytest.mark.skip_linux("6.7")
 def test_multi_wake(ring, cqe):
     val = 0
     mask = liburing.FUTEX_BITSET_MATCH_ANY
@@ -104,7 +104,7 @@ def test_multi_wake(ring, cqe):
         pass
 
 
-@pytest.mark.skip_linux(6.7)
+# @pytest.mark.skip_linux(6.7)
 def test_futex_wake_zero(ring, cqe):
     val = 0
     mask = liburing.FUTEX_BITSET_MATCH_ANY
@@ -134,7 +134,7 @@ def test_futex_wake_zero(ring, cqe):
         pass
 
 
-@pytest.mark.skip_linux(6.7)
+# @pytest.mark.skip_linux(6.7)
 def test_multi_wake_waitv(ring, cqe):
     # Submit two futex waits
     flag = liburing.FUTEX2_SIZE_U32
