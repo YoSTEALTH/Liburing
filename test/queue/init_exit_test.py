@@ -1,3 +1,4 @@
+import mmap
 import pytest
 import liburing
 
@@ -83,3 +84,24 @@ def test_io_uring_submit_and_wait(ring, cqe):
     assert liburing.io_uring_sq_ready(ring) == 0
     liburing.io_uring_peek_cqe(ring, cqe)
     assert cqe[0].user_data == 123
+
+
+def test_io_uring_init_mem():
+    ring = liburing.Ring()
+    param = liburing.Param()
+    buf = mmap.mmap(-1, 2 * 1024 * 1024)  # page-aligned & zeroed; keep alive until exit
+    used = liburing.io_uring_queue_init_mem(8, ring, param, buf)
+
+    try:
+        assert used > 0
+
+        sqe = liburing.io_uring_get_sqe(ring)
+        liburing.io_uring_prep_nop(sqe)
+        sqe.user_data = 7
+        assert liburing.io_uring_submit(ring) == 1
+        cqe = liburing.Cqe()
+        liburing.io_uring_wait_cqe(ring, cqe)
+        assert cqe[0].user_data == 7
+        liburing.io_uring_cqe_seen(ring, cqe[0])
+    finally:
+        liburing.io_uring_queue_exit(ring)

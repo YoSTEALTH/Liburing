@@ -78,9 +78,32 @@ pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
     return (c.io_uring_opcode_supported(probe._io_uring_probe, op) == 1);
 }
 
-pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf_size: usize, buf: ?usize) py.Error!i32 {
+/// Setup `Ring` in memory you supply (`IORING_SETUP_NO_MMAP`). Returns the bytes of `buf` it used.
+///
+/// Example
+///     >>> import mmap
+///     >>> ring = Ring()
+///     >>> buf = mmap.mmap(-1, 2 * 1024 * 1024)  # page aligned and zeroed
+///     >>> try:
+///     ...     io_uring_queue_init_mem(8, ring, Param(), buf)
+///     ...     # do stuff ...
+///     >>> finally:
+///     ...     io_uring_queue_exit(ring)
+///
+/// Note
+///     - `buf` must be page aligned and zeroed: `mmap.mmap(-1, size)` is both, a `bytearray` is not
+///     (`OSError: EINVAL`). `buf=None` lets liburing allocate the memory.
+///     - `ring` holds on to `buf` until `io_uring_queue_exit`: it can not be closed or resized
+///     (`BufferError`) while the kernel uses it.
+pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.WritableBuffer) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_mem(ring)` already initialized!", .{});
-    return py.checkErrno(c.io_uring_queue_init_mem(entries, &ring._io_uring, &p._io_uring_params, if (buf) |b| @ptrFromInt(b) else null, buf_size));
+    // Own view: the argument's is released after the call, this one at `io_uring_queue_exit`.
+    const mem: ?py.WritableBuffer = if (buf) |b| try py.WritableBuffer.from(b.view.obj.?) else null;
+    errdefer if (mem) |m| m.deinit();
+    const ptr: ?*anyopaque = if (mem) |m| m.data.ptr else null;
+    const used = try py.checkErrno(c.io_uring_queue_init_mem(entries, &ring._io_uring, &p._io_uring_params, ptr, if (mem) |m| m.data.len else 0));
+    ring._mem = mem;
+    return used;
 }
 
 pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.Error!i32 {
@@ -121,6 +144,8 @@ pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
         const kept = ring._keep;
         ring._keep = null;
         py.decref(kept);
+        if (ring._mem) |m| m.deinit(); // the kernel is done with it
+        ring._mem = null;
     } else return py.raiseRuntimeError("`io_uring_queue_exit(ring)` not initialized or already exited!", .{});
 }
 

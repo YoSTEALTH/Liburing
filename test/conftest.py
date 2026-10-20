@@ -5,6 +5,7 @@ import pathlib
 import getpass
 import tempfile
 import liburing
+import mmap
 
 
 @pytest.fixture
@@ -34,11 +35,24 @@ def tmp_dir():
 
 
 # liburing start >>>
-@pytest.fixture
-def ring():
+@pytest.fixture(params=['queue_init', 'queue_init_mem'])
+def ring(request):
+    '''
+    =======================
+    params:
+        queue_init:
+            Init queue using `io_uring_queue_init`
+        queue_init_mem:
+            Init queue using `io_uring_queue_init_mem`
+    '''
     ring = liburing.Ring()
     try:
-        liburing.io_uring_queue_init(1024, ring)
+        if request.param == 'queue_init':
+            liburing.io_uring_queue_init(1024, ring)
+        else:
+            buf = mmap.mmap(-1, 8 * 1024 * 1024)
+            param = liburing.Param()
+            liburing.io_uring_queue_init_mem(1024, ring, param, buf)
         yield ring
     finally:
         liburing.io_uring_queue_exit(ring)

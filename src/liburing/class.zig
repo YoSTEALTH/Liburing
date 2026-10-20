@@ -152,6 +152,8 @@ pub const Ring = struct {
     /// Objects the kernel still has to read (path strings, ...): a `list`, dropped once a submit has
     /// handed every SQE to the kernel (`releaseSubmitted`). See `keepUntilSubmit`.
     _keep: ?*Object = null,
+    /// The `buf` of `io_uring_queue_init_mem`, locked until `io_uring_queue_exit`.
+    _mem: ?py.WritableBuffer = null,
 
     pub fn __new__(_: *Ring) void {}
 
