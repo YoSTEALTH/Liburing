@@ -21,6 +21,9 @@ const header =
     \\__version__: str
     \\LIBURING_HAVE_DATA64: str
     \\
+    \\class UnsupportedError(OSError):
+    \\    """The running kernel does not support this `io_uring` feature (`errno` is the kernel's: `EINVAL`, ...)."""
+    \\
 ;
 
 /// `class Name(IntEnum):` with its members, for an enum `api.enums` exports.

@@ -9,6 +9,7 @@ const Futex = @import("futex.zig").Futex;
 const AT_FDCWD = @import("const.zig").AT_FDCWD;
 const Sockaddr = @import("socket.zig").Sockaddr;
 const FileIndex = @import("helper.zig").FileIndex;
+const support = @import("support.zig");
 
 const py = setu.py;
 const Object = setu.c.Object;
@@ -102,14 +103,14 @@ pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.Wr
     const mem: ?py.WritableBuffer = if (buf) |b| try py.WritableBuffer.from(b.view.obj.?) else null;
     errdefer if (mem) |m| m.deinit();
     const ptr: ?*anyopaque = if (mem) |m| m.data.ptr else null;
-    const used = try py.checkErrno(c.io_uring_queue_init_mem(entries, &ring._io_uring, &p._io_uring_params, ptr, if (mem) |m| m.data.len else 0));
+    const used = try support.setup(c.io_uring_queue_init_mem(entries, &ring._io_uring, &p._io_uring_params, ptr, if (mem) |m| m.data.len else 0), p._io_uring_params.flags);
     ring._mem = mem;
     return used;
 }
 
 pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_params(ring)` already initialized!", .{});
-    return py.checkErrno(c.io_uring_queue_init_params(entries, &ring._io_uring, &param._io_uring_params));
+    return support.setup(c.io_uring_queue_init_params(entries, &ring._io_uring, &param._io_uring_params), param._io_uring_params.flags);
 }
 
 /// Setup `Ring` Submission & Completion Queues
@@ -123,7 +124,7 @@ pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.E
 ///     ...     io_uring_queue_exit(ring)
 pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init(ring)` already initialized!", .{});
-    return py.checkErrno(c.io_uring_queue_init(entries, &ring._io_uring, flags orelse 0));
+    return support.setup(c.io_uring_queue_init(entries, &ring._io_uring, flags orelse 0), flags orelse 0);
 }
 
 /// >>> io_uring_queue_mmap(fd, param, ring)
@@ -253,7 +254,7 @@ pub fn io_uring_register_wait_reg(ring: *Ring, reg: *RegWait, nr: i32) py.Error!
 }
 
 pub fn io_uring_resize_rings(ring: *Ring, p: *Param) py.Error!i32 {
-    return py.checkErrno(c.io_uring_resize_rings(try ring.checkedPtr(), &p._io_uring_params));
+    return support.register("IORING_REGISTER_RESIZE_RINGS", c.io_uring_resize_rings(try ring.checkedPtr(), &p._io_uring_params));
 }
 
 pub fn io_uring_clone_buffers_offset(
@@ -265,7 +266,7 @@ pub fn io_uring_clone_buffers_offset(
     flags: ?c_uint,
 ) py.Error!i32 {
     const _flags = flags orelse 0;
-    return py.checkErrno(c.io_uring_clone_buffers_offset(
+    return support.register("IORING_REGISTER_CLONE_BUFFERS", c.io_uring_clone_buffers_offset(
         try dst_ring.checkedPtr(),
         try src_ring.checkedPtr(),
         dst_off,
@@ -276,7 +277,7 @@ pub fn io_uring_clone_buffers_offset(
 }
 
 pub fn io_uring_clone_buffers(dst_ring: *Ring, src_ring: *Ring, flags: ?u32) py.Error!i32 {
-    return py.checkErrno(c.__io_uring_clone_buffers(try dst_ring.checkedPtr(), try src_ring.checkedPtr(), flags orelse 0));
+    return support.register("IORING_REGISTER_CLONE_BUFFERS", c.__io_uring_clone_buffers(try dst_ring.checkedPtr(), try src_ring.checkedPtr(), flags orelse 0));
 }
 
 /// Example
@@ -290,7 +291,7 @@ pub fn io_uring_clone_buffers(dst_ring: *Ring, src_ring: *Ring, flags: ?u32) py.
 pub fn io_uring_register_buffers(ring: *Ring, iovecs: *const Iovec, tags: ?py.Sequence(u64)) py.Error!i32 {
     const ptr = try ring.checkedPtr();
     const _tags = try tagsPtr(tags, iovecs._len, "io_uring_register_buffers");
-    return py.checkErrno(c.io_uring_register_buffers_tags(ptr, iovecs._iovec.?, _tags, @intCast(iovecs._len)));
+    return support.register("IORING_REGISTER_BUFFERS2", c.io_uring_register_buffers_tags(ptr, iovecs._iovec.?, _tags, @intCast(iovecs._len)));
 }
 
 /// The `__u64 *tags` for C: `null` for no tags, else the list, which must have one item for each of `count`.
@@ -304,7 +305,7 @@ fn tagsPtr(tags: ?py.Sequence(u64), count: usize, comptime name: []const u8) py.
 }
 
 pub fn io_uring_register_buffers_sparse(ring: *Ring, nr: u32) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_buffers_sparse(try ring.checkedPtr(), nr));
+    return support.register("IORING_REGISTER_BUFFERS2", c.io_uring_register_buffers_sparse(try ring.checkedPtr(), nr));
 }
 
 /// Note
@@ -312,7 +313,7 @@ pub fn io_uring_register_buffers_sparse(ring: *Ring, nr: u32) py.Error!i32 {
 pub fn io_uring_register_buffers_update_tag(ring: *Ring, iovecs: *const Iovec, tags: py.Sequence(u64), offset: ?u32) py.Error!i32 {
     const ptr = try ring.checkedPtr();
     const _tags = try tagsPtr(tags, iovecs._len, "io_uring_register_buffers_update_tag");
-    return py.checkErrno(c.io_uring_register_buffers_update_tag(
+    return support.register("IORING_REGISTER_BUFFERS_UPDATE", c.io_uring_register_buffers_update_tag(
         ptr,
         offset orelse 0,
         iovecs._iovec.?,
@@ -322,7 +323,7 @@ pub fn io_uring_register_buffers_update_tag(ring: *Ring, iovecs: *const Iovec, t
 }
 
 pub fn io_uring_unregister_buffers(ring: *Ring) py.Error!i32 {
-    return py.checkErrno(c.io_uring_unregister_buffers(try ring.checkedPtr()));
+    return support.register("IORING_UNREGISTER_BUFFERS", c.io_uring_unregister_buffers(try ring.checkedPtr()));
 }
 
 /// Register File Descriptor
@@ -343,7 +344,8 @@ pub fn io_uring_unregister_buffers(ring: *Ring) py.Error!i32 {
 ///     reduces the overhead of file reference management across requests that
 ///     operate on a file."
 pub fn io_uring_register_files(ring: *Ring, files: *const FileIndex) py.Error!i32 {
-    return py.checkErrno(
+    return support.register(
+        "IORING_REGISTER_FILES",
         c.io_uring_register_files(try ring.checkedPtr(), files.fdSlice().ptr, @intCast(files._len)),
     );
 }
@@ -356,13 +358,14 @@ pub fn io_uring_register_files(ring: *Ring, files: *const FileIndex) py.Error!i3
 pub fn io_uring_register_files_tags(ring: *Ring, files: *const FileIndex, tags: py.Sequence(u64)) py.Error!i32 {
     const ptr = try ring.checkedPtr();
     const _tags = try tagsPtr(tags, files._len, "io_uring_register_files_tags");
-    return py.checkErrno(
+    return support.register(
+        "IORING_REGISTER_FILES2",
         c.io_uring_register_files_tags(ptr, files.fdSlice().ptr, _tags, @intCast(files._len)),
     );
 }
 
 pub fn io_uring_register_files_sparse(ring: *Ring, nr: u32) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_files_sparse(try ring.checkedPtr(), nr));
+    return support.register("IORING_REGISTER_FILES2", c.io_uring_register_files_sparse(try ring.checkedPtr(), nr));
 }
 
 /// Note
@@ -371,35 +374,36 @@ pub fn io_uring_register_files_update_tag(ring: *Ring, files: *const FileIndex, 
     const ptr = try ring.checkedPtr();
     const _tags = try tagsPtr(tags, files._len, "io_uring_register_files_update_tag");
     const _offset = offset orelse 0;
-    return py.checkErrno(
+    return support.register(
+        "IORING_REGISTER_FILES_UPDATE2",
         c.io_uring_register_files_update_tag(ptr, _offset, files.fdSlice().ptr, _tags, @intCast(files._len)),
     );
 }
 
 /// >>> io_uring_unregister_files(ring)
 pub fn io_uring_unregister_files(ring: *Ring) py.Error!i32 {
-    return py.checkErrno(c.io_uring_unregister_files(try ring.checkedPtr()));
+    return support.register("IORING_UNREGISTER_FILES", c.io_uring_unregister_files(try ring.checkedPtr()));
 }
 
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 pub fn io_uring_register_files_update(ring: *Ring, fds: *const FileIndex, offset: ?u32) py.Error!i32 {
     const _offset = offset orelse 0;
-    return py.checkErrno(c.io_uring_register_files_update(try ring.checkedPtr(), _offset, fds.fdSlice().ptr, @intCast(fds._len)));
+    return support.register("IORING_REGISTER_FILES_UPDATE", c.io_uring_register_files_update(try ring.checkedPtr(), _offset, fds.fdSlice().ptr, @intCast(fds._len)));
 }
 
 /// >>> io_uring_register_eventfd(fd)
 pub fn io_uring_register_eventfd(ring: *Ring, fd: i32) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_eventfd(try ring.checkedPtr(), fd));
+    return support.register("IORING_REGISTER_EVENTFD", c.io_uring_register_eventfd(try ring.checkedPtr(), fd));
 }
 
 pub fn io_uring_register_eventfd_async(ring: *Ring, fd: i32) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_eventfd_async(try ring.checkedPtr(), fd));
+    return support.register("IORING_REGISTER_EVENTFD_ASYNC", c.io_uring_register_eventfd_async(try ring.checkedPtr(), fd));
 }
 
 /// >>> io_uring_unregister_eventfd(ring)
 pub fn io_uring_unregister_eventfd(ring: *Ring) py.Error!i32 {
-    return py.checkErrno(c.io_uring_unregister_eventfd(try ring.checkedPtr()));
+    return support.register("IORING_UNREGISTER_EVENTFD", c.io_uring_unregister_eventfd(try ring.checkedPtr()));
 }
 
 pub fn io_uring_register_probe(ring: *Ring, probe: *Probe, nr: u32) py.Error!i32 {
@@ -411,33 +415,34 @@ pub fn io_uring_register_probe(ring: *Ring, probe: *Probe, nr: u32) py.Error!i32
 /// >>> io_uring_register_personality(ring)
 /// 123  # id
 pub fn io_uring_register_personality(ring: *Ring) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_personality(try ring.checkedPtr()));
+    return support.register("IORING_REGISTER_PERSONALITY", c.io_uring_register_personality(try ring.checkedPtr()));
 }
 
 /// >>> io_uring_unregister_personality(ring, id)
 pub fn io_uring_unregister_personality(ring: *Ring, id: i32) py.Error!i32 {
-    return py.checkErrno(c.io_uring_unregister_personality(try ring.checkedPtr(), id));
+    return support.register("IORING_UNREGISTER_PERSONALITY", c.io_uring_unregister_personality(try ring.checkedPtr(), id));
 }
 
 pub fn io_uring_register_restrictions(ring: *Ring, res: *Restriction) py.Error!i32 {
-    return py.checkErrno(
+    return support.register(
+        "IORING_REGISTER_RESTRICTIONS",
         c.io_uring_register_restrictions(try ring.checkedPtr(), res._io_uring_restriction orelse return py.raiseValueError("`Restriction()` is empty: `add()` what is allowed", .{}), @intCast(res._len)),
     );
 }
 
 /// >>> io_uring_enable_rings(ring)
 pub fn io_uring_enable_rings(ring: *Ring) py.Error!i32 {
-    return py.checkErrno(c.io_uring_enable_rings(try ring.checkedPtr()));
+    return support.register("IORING_REGISTER_ENABLE_RINGS", c.io_uring_enable_rings(try ring.checkedPtr()));
 }
 
 /// >>> io_uring_register_ring_fd(ring)
 pub fn io_uring_register_ring_fd(ring: *Ring) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_ring_fd(try ring.checkedPtr()));
+    return support.register("IORING_REGISTER_RING_FDS", c.io_uring_register_ring_fd(try ring.checkedPtr()));
 }
 
 /// >>> io_uring_unregister_ring_fd(ring)
 pub fn io_uring_unregister_ring_fd(ring: *Ring) py.Error!i32 {
-    return py.checkErrno(c.io_uring_unregister_ring_fd(try ring.checkedPtr()));
+    return support.register("IORING_UNREGISTER_RING_FDS", c.io_uring_unregister_ring_fd(try ring.checkedPtr()));
 }
 
 /// >>> io_uring_close_ring_fd(ring)
@@ -447,11 +452,11 @@ pub fn io_uring_close_ring_fd(ring: *Ring) py.Error!i32 {
 
 pub fn io_uring_register_buf_ring(ring: *Ring, reg: *BufReg, flags: ?u32) py.Error!i32 {
     const _flags: u32 = if (flags) |f| f else 0;
-    return py.checkErrno(c.io_uring_register_buf_ring(try ring.checkedPtr(), &reg._io_uring_buf_reg, _flags));
+    return support.register("IORING_REGISTER_PBUF_RING", c.io_uring_register_buf_ring(try ring.checkedPtr(), &reg._io_uring_buf_reg, _flags));
 }
 
 pub fn io_uring_unregister_buf_ring(ring: *Ring, bgid: i32) py.Error!i32 {
-    return py.checkErrno(c.io_uring_unregister_buf_ring(try ring.checkedPtr(), bgid));
+    return support.register("IORING_UNREGISTER_PBUF_RING", c.io_uring_unregister_buf_ring(try ring.checkedPtr(), bgid));
 }
 
 /// The kernel's current head of the buffer ring `buf_group` (how many buffers it has used).
@@ -461,32 +466,32 @@ pub fn io_uring_unregister_buf_ring(ring: *Ring, bgid: i32) py.Error!i32 {
 ///     0
 pub fn io_uring_buf_ring_head(ring: *Ring, buf_group: i32) py.Error!u16 {
     var head: u16 = 0;
-    _ = try py.checkErrno(c.io_uring_buf_ring_head(try ring.checkedPtr(), buf_group, &head));
+    _ = try support.register("IORING_REGISTER_PBUF_STATUS", c.io_uring_buf_ring_head(try ring.checkedPtr(), buf_group, &head));
     return head;
 }
 
 pub fn io_uring_register_sync_cancel(ring: *Ring, reg: *SyncCancelReg) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_sync_cancel(try ring.checkedPtr(), &reg._io_uring_sync_cancel_reg));
+    return support.register("IORING_REGISTER_SYNC_CANCEL", c.io_uring_register_sync_cancel(try ring.checkedPtr(), &reg._io_uring_sync_cancel_reg));
 }
 
 pub fn io_uring_register_sync_msg(sqe: *Sqe) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_sync_msg(&sqe._io_uring_sqe.?[0]));
+    return support.register("IORING_REGISTER_SEND_MSG_RING", c.io_uring_register_sync_msg(&sqe._io_uring_sqe.?[0]));
 }
 
 pub fn io_uring_register_file_alloc_range(ring: *Ring, off: u32, len: u32) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_file_alloc_range(try ring.checkedPtr(), off, len));
+    return support.register("IORING_REGISTER_FILE_ALLOC_RANGE", c.io_uring_register_file_alloc_range(try ring.checkedPtr(), off, len));
 }
 
 pub fn io_uring_register_napi(ring: *Ring, napi: *Napi) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_napi(try ring.checkedPtr(), &napi._io_uring_napi));
+    return support.register("IORING_REGISTER_NAPI", c.io_uring_register_napi(try ring.checkedPtr(), &napi._io_uring_napi));
 }
 
 pub fn io_uring_unregister_napi(ring: *Ring, napi: *Napi) py.Error!i32 {
-    return py.checkErrno(c.io_uring_unregister_napi(try ring.checkedPtr(), &napi._io_uring_napi));
+    return support.register("IORING_UNREGISTER_NAPI", c.io_uring_unregister_napi(try ring.checkedPtr(), &napi._io_uring_napi));
 }
 
 pub fn io_uring_register_ifq(ring: *Ring, reg: *ZcrxIfqReg) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_ifq(try ring.checkedPtr(), ifqReg(reg)));
+    return support.register("IORING_REGISTER_ZCRX_IFQ", c.io_uring_register_ifq(try ring.checkedPtr(), ifqReg(reg)));
 }
 
 /// >>> io_uring_register_query(Query(IO_URING_QUERY_SCQ))
@@ -498,23 +503,23 @@ pub fn io_uring_register_query(query: *Query) py.Error!i32 {
     query._hdr.query_data = @intFromPtr(&query._data);
     query._hdr.size = @sizeOf(@TypeOf(query._data));
     query._hdr.next_entry = 0;
-    return py.checkErrno(c.io_uring_register_query(&query._hdr));
+    return support.register("IORING_REGISTER_QUERY", c.io_uring_register_query(&query._hdr));
 }
 
 pub fn io_uring_register_zcrx_ctrl(ring: *Ring, ctrl: *ZcrxCtrl) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_zcrx_ctrl(try ring.checkedPtr(), &ctrl._zcrx_ctrl));
+    return support.register("IORING_REGISTER_ZCRX_CTRL", c.io_uring_register_zcrx_ctrl(try ring.checkedPtr(), &ctrl._zcrx_ctrl));
 }
 
 pub fn io_uring_register_clock(ring: *Ring, arg: *ClockRegister) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_clock(try ring.checkedPtr(), &arg._io_uring_clock_register));
+    return support.register("IORING_REGISTER_CLOCK", c.io_uring_register_clock(try ring.checkedPtr(), &arg._io_uring_clock_register));
 }
 
 pub fn io_uring_register_bpf_filter(ring: *Ring, bpf: *Bpf) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_bpf_filter(try ring.checkedPtr(), &bpf._io_uring_bpf));
+    return support.register("IORING_REGISTER_BPF_FILTER", c.io_uring_register_bpf_filter(try ring.checkedPtr(), &bpf._io_uring_bpf));
 }
 
 pub fn io_uring_register_bpf_filter_task(bpf: *Bpf) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_bpf_filter_task(&bpf._io_uring_bpf));
+    return support.register("IORING_REGISTER_BPF_FILTER", c.io_uring_register_bpf_filter_task(&bpf._io_uring_bpf));
 }
 
 pub fn io_uring_get_events(ring: *Ring) py.Error!i32 {
@@ -535,11 +540,11 @@ pub fn io_uring_enter2(fd: u32, to_submit: u32, min_complete: u32, flags: u32, s
 }
 
 pub fn io_uring_setup(entries: u32, p: *Param) py.Error!i32 {
-    return py.checkErrno(c.io_uring_setup(entries, &p._io_uring_params));
+    return support.setup(c.io_uring_setup(entries, &p._io_uring_params), p._io_uring_params.flags);
 }
 
 pub fn io_uring_register(fd: u32, opcode: u32, nr_args: u32, arg: ?usize) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register(fd, opcode, if (arg) |a| @ptrFromInt(a) else null, nr_args));
+    return support.registerOp(opcode, c.io_uring_register(fd, opcode, if (arg) |a| @ptrFromInt(a) else null, nr_args));
 }
 
 /// `reg` with `region_uptr` pointing at its description (which lives in the same object).
@@ -556,7 +561,7 @@ fn ifqReg(reg: *class.ZcrxIfqReg) *c.io_uring_zcrx_ifq_reg {
 }
 
 pub fn io_uring_register_region(ring: *Ring, reg: *MemRegionReg) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_region(try ring.checkedPtr(), regionReg(reg)));
+    return support.register("IORING_REGISTER_MEM_REGION", c.io_uring_register_region(try ring.checkedPtr(), regionReg(reg)));
 }
 
 /// Note
@@ -1746,11 +1751,11 @@ pub fn io_uring_prep_rw(sqe: *SQE, op: u8, fd: i32, addr: usize, len: u32, offse
 /// Example
 ///     >>> io_uring_register_iowq_aff(ring, bytes([0b11]))  # cpus 0 and 1
 pub fn io_uring_register_iowq_aff(ring: *Ring, mask: py.Buffer) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_iowq_aff(try ring.checkedPtr(), mask.data.len, @ptrCast(@alignCast(mask.data.ptr))));
+    return support.register("IORING_REGISTER_IOWQ_AFF", c.io_uring_register_iowq_aff(try ring.checkedPtr(), mask.data.len, @ptrCast(@alignCast(mask.data.ptr))));
 }
 
 pub fn io_uring_unregister_iowq_aff(ring: *Ring) py.Error!i32 {
-    return py.checkErrno(c.io_uring_unregister_iowq_aff(try ring.checkedPtr()));
+    return support.register("IORING_UNREGISTER_IOWQ_AFF", c.io_uring_unregister_iowq_aff(try ring.checkedPtr()));
 }
 
 /// Sets the most `io-wq` workers the ring may run: `bounded` (regular files) and `unbounded` (sockets, ...);
@@ -1761,7 +1766,7 @@ pub fn io_uring_unregister_iowq_aff(ring: *Ring) py.Error!i32 {
 ///     (4, 8)
 pub fn io_uring_register_iowq_max_workers(ring: *Ring, bounded: u32, unbounded: u32) py.Error!struct { u32, u32 } {
     var values = [2]c_uint{ bounded, unbounded };
-    _ = try py.checkErrno(c.io_uring_register_iowq_max_workers(try ring.checkedPtr(), &values));
+    _ = try support.register("IORING_REGISTER_IOWQ_MAX_WORKERS", c.io_uring_register_iowq_max_workers(try ring.checkedPtr(), &values));
     return .{ values[0], values[1] };
 }
 
