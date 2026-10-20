@@ -125,7 +125,8 @@ def pytest_runtest_call(item):
     try:
         return (yield)
     except liburing.UnsupportedError as e:
-        pytest.skip(str(e))
+        # `_use_item_location`: `-rs` names the test, as for a skip marker, not this hook.
+        raise pytest.skip.Exception(e.strerror, _use_item_location=True) from None
 
 
 def pytest_configure(config):

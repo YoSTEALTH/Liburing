@@ -3,6 +3,7 @@
 
 import ctypes
 import mmap
+import struct
 import time
 import pytest
 import liburing as L
@@ -281,6 +282,21 @@ def test_bpf_fields_and_register(ring):
     with pytest.raises(OSError):  # not a valid program (or not allowed for this task): the kernel refuses
         L.io_uring_register_bpf_filter(ring, bpf)
 
+
+
+def test_register_bpf_filter_denies_nop(ring, cqe):
+    # Kernel 7.0+ (`IORING_REGISTER_BPF_FILTER`): older kernels skip it (`UnsupportedError`, conftest.py).
+    bpf = L.Bpf()
+    bpf.opcode = L.io_uring_op.IORING_OP_NOP
+    bpf.filter = struct.pack("HBBI", 0x06, 0, 0, 0)  # BPF_RET | BPF_K, 0: deny
+    assert L.io_uring_register_bpf_filter(ring, bpf) == 0  # this ring only
+    sqe = L.io_uring_get_sqe(ring)
+    L.io_uring_prep_nop(sqe)
+    L.io_uring_submit_and_wait(ring, 1)
+    L.io_uring_wait_cqe(ring, cqe)
+    with pytest.raises(PermissionError):  # EACCES: the filter denied it
+        cqe[0].res
+    L.io_uring_cqe_seen(ring, cqe[0])
 
 def test_register_bpf_filter_task_refuses_an_empty_filter():
     # only the refusal is tested: a valid filter would restrict this whole test process
