@@ -12,7 +12,7 @@ Liburing is Python + Zig wrapper around [C Liburing](https://github.com/axboe/Li
 Good(old) documentation [Lord of the io_uring](https://unixism.net/loti/)
 
 ## Requires
- - Linux 6.14+
+ - Linux 6.14+ (7.0+ recommended)
  - Python 3.15+ (regular or free-threaded 3.15t)
 
 Note: on Python 3.10 to 3.14, `pip install liburing` installs the last release that supports them.
@@ -166,9 +166,9 @@ if __name__ == "__main__":
  - This project has been moved to using Zig as back-end, thus leading to breaking changes from previous release.
  - Try using latest Linux if possible to enable all `io_uring` features.
 
+<!--
 ## Other Projects
-<!-- - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
-- [Setu](https://github.com/YoSTEALTH/Setu) (the Zig <-> CPython binding layer Liburing is built with)
+ - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
 
 ## License
 Free, Public Domain (CC0). [Read more](https://github.com/YoSTEALTH/Liburing/blob/dev/LICENSE.txt)
