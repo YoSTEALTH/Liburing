@@ -1,10 +1,8 @@
 import os
 import os.path
-import pytest
 import liburing
 
 
-# @pytest.mark.skip_linux(5.7)
 def test_clone_file_using_splice(tmp_dir, ring, cqe):
     flags = liburing.SPLICE_F_MOVE | liburing.SPLICE_F_MORE
     data = b"hi... bye!"

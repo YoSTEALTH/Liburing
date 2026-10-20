@@ -1,6 +1,7 @@
 """Network, poll, timeout and cancel operations run for real through the ring (loopback only)."""
 
 import array
+import errno
 import os
 import socket
 import select
@@ -422,7 +423,12 @@ def test_send_set_addr_udp(ring, cqe):
         tx.close()
 
 
-# @pytest.mark.skip_linux("6.19")
+# `SOCKET_URING_OP_GETSOCKNAME`: a socket command has no probe, the CQE says `EOPNOTSUPP`.
+NO_GETSOCKNAME = (
+    f"Kernel `{L.LINUX_VERSION_MAJOR}.{L.LINUX_VERSION_MINOR}` does not support `SOCKET_URING_OP_GETSOCKNAME`"
+)
+
+
 def test_cmd_getsockname(ring, cqe, pair):
     listener, client, _ = pair
     for peer, expect in ((0, client.getsockname()), (1, client.getpeername())):
@@ -432,6 +438,11 @@ def test_cmd_getsockname(ring, cqe, pair):
         sqe.user_data = 6
         assert L.io_uring_submit(ring) == 1
         assert L.io_uring_wait_cqe(ring, cqe) == 0
-        assert cqe[0].res >= 0
+        try:
+            assert cqe[0].res >= 0
+        except OSError as e:
+            if e.errno == errno.EOPNOTSUPP:
+                pytest.skip(NO_GETSOCKNAME)
+            raise
         L.io_uring_cqe_seen(ring, cqe[0])
         assert (out.ip, out.port) == expect

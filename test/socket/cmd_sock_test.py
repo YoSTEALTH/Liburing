@@ -1,9 +1,7 @@
 import socket
-import pytest
 import liburing
 
 
-# @pytest.mark.skip_linux("6.7")
 def test_setsockopt_getsockopt(ring, cqe):
     ts = liburing.timespec(3)
     # socket
@@ -56,7 +54,6 @@ def test_setsockopt_getsockopt(ring, cqe):
     liburing.io_uring_cqe_seen(ring, entry)
 
 
-# @pytest.mark.skip_linux("6.7")
 def test_cmd_sock(ring, cqe):
     ts = liburing.timespec(3)
     # socket

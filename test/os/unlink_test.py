@@ -4,7 +4,6 @@ import pytest
 import liburing
 
 
-# @pytest.mark.skip_linux(5.11)
 def test_unlink(tmp_dir, ring, cqe):
     file_path = tmp_dir / "file-1.txt"
     file_path.write_text("file-1")
@@ -36,7 +35,6 @@ def test_unlink(tmp_dir, ring, cqe):
     assert not os.path.exists(dir_path)  # dir should not exist
 
 
-# @pytest.mark.skip_linux(5.11)
 def test_unlinkat_error(tmp_dir, ring, cqe):
     file_path = tmp_dir / "file-2.txt"
     file_path.write_text("file-2")

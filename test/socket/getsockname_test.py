@@ -1,8 +1,15 @@
+import errno
 import pytest
 import liburing
 
 
-# @pytest.mark.skip_linux("6.19")
+# `SOCKET_URING_OP_GETSOCKNAME`: a socket command has no probe, the CQE says `EOPNOTSUPP`.
+NO_GETSOCKNAME = (
+    f"Kernel `{liburing.LINUX_VERSION_MAJOR}.{liburing.LINUX_VERSION_MINOR}` "
+    "does not support `SOCKET_URING_OP_GETSOCKNAME`"
+)
+
+
 def test_getsockname(ring, cqe):
     with pytest.raises(TypeError):
         addr = liburing.Sockaddr(liburing.AF_UNIX, "./path")
@@ -42,7 +49,13 @@ def test_getsockname(ring, cqe):
         sqe.user_data = i + 2
         assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
         entry = cqe[0]
-        assert entry.res == 0
+        try:
+            res = entry.res
+        except OSError as e:
+            if e.errno == errno.EOPNOTSUPP:
+                pytest.skip(NO_GETSOCKNAME)
+            raise
+        assert res == 0
         assert entry.user_data == i + 2
         liburing.io_uring_cqe_seen(ring, entry)
 
