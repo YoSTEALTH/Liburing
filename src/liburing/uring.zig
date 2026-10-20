@@ -78,8 +78,6 @@ pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
     return (c.io_uring_opcode_supported(probe._io_uring_probe, op) == 1);
 }
 
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf_size: usize, buf: ?usize) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_mem(ring)` already initialized!", .{});
     return py.checkErrno(c.io_uring_queue_init_mem(entries, &ring._io_uring, &p._io_uring_params, if (buf) |b| @ptrFromInt(b) else null, buf_size));
@@ -105,9 +103,6 @@ pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) py.Error!i32 
 }
 
 /// >>> io_uring_queue_mmap(fd, param, ring)
-///
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_queue_mmap(fd: i32, ring: *Ring, param: *Param) py.Error!i32 {
     return py.checkErrno(c.io_uring_queue_mmap(fd, &param._io_uring_params, &ring._io_uring));
 }
@@ -226,14 +221,9 @@ pub fn io_uring_submit_and_wait_reg(ring: *Ring, cqe: *Cqe, wait_nr: u32, reg_in
     return py.checkErrno(c.io_uring_submit_and_wait_reg(try ring.checkedPtr(), cqe.outFor(ring), wait_nr, reg_index));
 }
 
-/// `ptr` of a register struct, or `NotImplementedError`: those classes can not be filled from Python yet,
-/// and C liburing (or the kernel) would read a NULL.
-fn unset(ptr: anytype, comptime name: []const u8) py.Error!@typeInfo(@TypeOf(ptr)).optional.child {
-    return ptr orelse py.raiseNotImplementedError("`" ++ name ++ "()` can not be filled from Python yet", .{});
-}
-
 pub fn io_uring_register_wait_reg(ring: *Ring, reg: *RegWait, nr: i32) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_wait_reg(try ring.checkedPtr(), try unset(reg._io_uring_reg_wait, "RegWait"), nr));
+    if (nr != 1) return py.raiseValueError("`io_uring_register_wait_reg(nr)` - only one `RegWait` can be registered from Python for now", .{});
+    return py.checkErrno(c.io_uring_register_wait_reg(try ring.checkedPtr(), &reg._io_uring_reg_wait, nr));
 }
 
 pub fn io_uring_resize_rings(ring: *Ring, p: *Param) py.Error!i32 {
@@ -377,7 +367,7 @@ pub fn io_uring_unregister_personality(ring: *Ring, id: i32) py.Error!i32 {
 
 pub fn io_uring_register_restrictions(ring: *Ring, res: *Restriction) py.Error!i32 {
     return py.checkErrno(
-        c.io_uring_register_restrictions(try ring.checkedPtr(), try unset(res._io_uring_restriction, "Restriction"), @intCast(res._len)),
+        c.io_uring_register_restrictions(try ring.checkedPtr(), res._io_uring_restriction orelse return py.raiseValueError("`Restriction()` is empty: `add()` what is allowed", .{}), @intCast(res._len)),
     );
 }
 
@@ -403,7 +393,7 @@ pub fn io_uring_close_ring_fd(ring: *Ring) py.Error!i32 {
 
 pub fn io_uring_register_buf_ring(ring: *Ring, reg: *BufReg, flags: ?u32) py.Error!i32 {
     const _flags: u32 = if (flags) |f| f else 0;
-    return py.checkErrno(c.io_uring_register_buf_ring(try ring.checkedPtr(), try unset(reg._io_uring_buf_reg, "BufReg"), _flags));
+    return py.checkErrno(c.io_uring_register_buf_ring(try ring.checkedPtr(), &reg._io_uring_buf_reg, _flags));
 }
 
 pub fn io_uring_unregister_buf_ring(ring: *Ring, bgid: i32) py.Error!i32 {
@@ -422,7 +412,7 @@ pub fn io_uring_buf_ring_head(ring: *Ring, buf_group: i32) py.Error!u16 {
 }
 
 pub fn io_uring_register_sync_cancel(ring: *Ring, reg: *SyncCancelReg) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_sync_cancel(try ring.checkedPtr(), try unset(reg._io_uring_sync_cancel_reg, "SyncCancelReg")));
+    return py.checkErrno(c.io_uring_register_sync_cancel(try ring.checkedPtr(), &reg._io_uring_sync_cancel_reg));
 }
 
 pub fn io_uring_register_sync_msg(sqe: *Sqe) py.Error!i32 {
@@ -434,27 +424,27 @@ pub fn io_uring_register_file_alloc_range(ring: *Ring, off: u32, len: u32) py.Er
 }
 
 pub fn io_uring_register_napi(ring: *Ring, napi: *Napi) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_napi(try ring.checkedPtr(), try unset(napi._io_uring_napi, "Napi")));
+    return py.checkErrno(c.io_uring_register_napi(try ring.checkedPtr(), &napi._io_uring_napi));
 }
 
 pub fn io_uring_unregister_napi(ring: *Ring, napi: *Napi) py.Error!i32 {
-    return py.checkErrno(c.io_uring_unregister_napi(try ring.checkedPtr(), try unset(napi._io_uring_napi, "Napi")));
+    return py.checkErrno(c.io_uring_unregister_napi(try ring.checkedPtr(), &napi._io_uring_napi));
 }
 
 pub fn io_uring_register_ifq(ring: *Ring, reg: *ZcrxIfqReg) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_ifq(try ring.checkedPtr(), try unset(reg._io_uring_zcrx_ifq_reg, "ZcrxIfqReg")));
+    return py.checkErrno(c.io_uring_register_ifq(try ring.checkedPtr(), ifqReg(reg)));
 }
 
 pub fn io_uring_register_clock(ring: *Ring, arg: *ClockRegister) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_clock(try ring.checkedPtr(), try unset(arg._io_uring_clock_register, "ClockRegister")));
+    return py.checkErrno(c.io_uring_register_clock(try ring.checkedPtr(), &arg._io_uring_clock_register));
 }
 
 pub fn io_uring_register_bpf_filter(ring: *Ring, bpf: *Bpf) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_bpf_filter(try ring.checkedPtr(), try unset(bpf._io_uring_bpf, "Bpf")));
+    return py.checkErrno(c.io_uring_register_bpf_filter(try ring.checkedPtr(), &bpf._io_uring_bpf));
 }
 
 pub fn io_uring_register_bpf_filter_task(bpf: *Bpf) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_bpf_filter_task(try unset(bpf._io_uring_bpf, "Bpf")));
+    return py.checkErrno(c.io_uring_register_bpf_filter_task(&bpf._io_uring_bpf));
 }
 
 pub fn io_uring_get_events(ring: *Ring) py.Error!i32 {
@@ -482,8 +472,21 @@ pub fn io_uring_register(fd: u32, opcode: u32, nr_args: u32, arg: ?usize) py.Err
     return py.checkErrno(c.io_uring_register(fd, opcode, if (arg) |a| @ptrFromInt(a) else null, nr_args));
 }
 
+/// `reg` with `region_uptr` pointing at its description (which lives in the same object).
+fn regionReg(reg: *MemRegionReg) *c.io_uring_mem_region_reg {
+    reg._io_uring_mem_region_reg.region_uptr = @intFromPtr(&reg._desc);
+    return &reg._io_uring_mem_region_reg;
+}
+
+/// `reg` with `area_ptr` and `region_ptr` pointing at their descriptions (in the same object).
+fn ifqReg(reg: *class.ZcrxIfqReg) *c.io_uring_zcrx_ifq_reg {
+    reg._io_uring_zcrx_ifq_reg.area_ptr = @intFromPtr(&reg._area);
+    reg._io_uring_zcrx_ifq_reg.region_ptr = @intFromPtr(&reg._region);
+    return &reg._io_uring_zcrx_ifq_reg;
+}
+
 pub fn io_uring_register_region(ring: *Ring, reg: *MemRegionReg) py.Error!i32 {
-    return py.checkErrno(c.io_uring_register_region(try ring.checkedPtr(), try unset(reg._io_uring_mem_region_reg, "MemRegionReg")));
+    return py.checkErrno(c.io_uring_register_region(try ring.checkedPtr(), regionReg(reg)));
 }
 
 /// Note
@@ -711,25 +714,22 @@ pub fn io_uring_prep_writev_fixed(
     c.io_uring_prep_writev_fixed(try sqe.sqePtr(), fd, iovec._iovec.?, @intCast(iovec._len), _offset, _flags, buf_index);
 }
 
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_prep_recvmsg(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.Error!void {
     const _flags = flags orelse 0;
-    c.io_uring_prep_recvmsg(try sqe.sqePtr(), fd, msg._msghdr.?, _flags);
+    c.io_uring_prep_recvmsg(try sqe.sqePtr(), fd, &msg._msghdr, _flags);
+    try h.keepUntilSubmit(sqe, class.MsghdrType.object(msg)); // read at submit; hold it until the completion
 }
 
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_prep_recvmsg_multishot(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.Error!void {
     const _flags = flags orelse 0;
-    c.io_uring_prep_recvmsg_multishot(try sqe.sqePtr(), fd, msg._msghdr.?, _flags);
+    c.io_uring_prep_recvmsg_multishot(try sqe.sqePtr(), fd, &msg._msghdr, _flags);
+    try h.keepUntilSubmit(sqe, class.MsghdrType.object(msg));
 }
 
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_prep_sendmsg(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.Error!void {
     const _flags = flags orelse 0;
-    c.io_uring_prep_sendmsg(try sqe.sqePtr(), fd, msg._msghdr.?, _flags);
+    c.io_uring_prep_sendmsg(try sqe.sqePtr(), fd, &msg._msghdr, _flags);
+    try h.keepUntilSubmit(sqe, class.MsghdrType.object(msg));
 }
 
 pub fn io_uring_prep_poll_add(sqe: *SQE, fd: i32, poll_mask: u32) py.Error!void {
@@ -869,10 +869,10 @@ pub fn io_uring_prep_listen(sqe: *SQE, fd: i32, backlog: i32) py.Error!void {
     c.io_uring_prep_listen(try sqe.sqePtr(), fd, backlog);
 }
 
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_prep_epoll_wait(sqe: *SQE, fd: i32, events: *EpollEvent, maxevents: i32, flags: ?u32) py.Error!void {
-    c.io_uring_prep_epoll_wait(try sqe.sqePtr(), fd, events._epoll_event.?, maxevents, flags orelse 0);
+    if (events._owner != null or maxevents < 1 or maxevents > events._len)
+        return py.raiseValueError("`maxevents` must be 1..{d}, the size of `EpollEvent(no=...)`", .{events._len});
+    c.io_uring_prep_epoll_wait(try sqe.sqePtr(), fd, @ptrCast(events._events.?), maxevents, flags orelse 0);
 }
 
 pub fn io_uring_prep_files_update(sqe: *SQE, fds: *FileIndex, offset: ?i32) py.Error!void {
@@ -1087,14 +1087,10 @@ pub fn io_uring_prep_send(sqe: *SQE, sockfd: i32, buf: py.Buffer, flags: ?i32) p
     c.io_uring_prep_send(try sqe.sqePtr(), sockfd, buf.data.ptr, buf.data.len, _flags);
 }
 
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_prep_send_bundle(sqe: *SQE, sockfd: i32, len: ?usize, flags: ?i32) py.Error!void {
     c.io_uring_prep_send_bundle(try sqe.sqePtr(), sockfd, len orelse 0, flags orelse 0);
 }
 
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_prep_send_set_addr(sqe: *SQE, dest_addr: *Sockaddr) py.Error!void {
     c.io_uring_prep_send_set_addr(try sqe.sqePtr(), dest_addr.addrPtr(), @intCast(dest_addr._socklen));
     try h.keepUntilSubmit(sqe, SockaddrType.object(dest_addr));
@@ -1140,10 +1136,9 @@ pub fn io_uring_prep_send_zc_fixed(
     );
 }
 
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_prep_sendmsg_zc(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.Error!void {
-    c.io_uring_prep_sendmsg_zc(try sqe.sqePtr(), fd, msg._msghdr.?, flags orelse 0);
+    c.io_uring_prep_sendmsg_zc(try sqe.sqePtr(), fd, &msg._msghdr, flags orelse 0);
+    try h.keepUntilSubmit(sqe, class.MsghdrType.object(msg));
 }
 
 /// Note
@@ -1152,7 +1147,8 @@ pub fn io_uring_prep_sendmsg_zc(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) p
 /// Warning
 ///     - Coded but not tested!!!
 pub fn io_uring_prep_sendmsg_zc_fixed(sqe: *SQE, fd: i32, msg: *Msghdr, buf_index: u32, flags: ?u32) py.Error!void {
-    c.io_uring_prep_sendmsg_zc_fixed(try sqe.sqePtr(), fd, msg._msghdr.?, flags orelse 0, buf_index);
+    c.io_uring_prep_sendmsg_zc_fixed(try sqe.sqePtr(), fd, &msg._msghdr, flags orelse 0, buf_index);
+    try h.keepUntilSubmit(sqe, class.MsghdrType.object(msg));
 }
 
 pub fn io_uring_prep_recv(sqe: *SQE, sockfd: i32, buf: ?py.WritableBuffer, flags: ?i32) py.Error!void {
@@ -1171,53 +1167,56 @@ pub fn io_uring_prep_recv_multishot(sqe: *SQE, sockfd: i32, buf: ?py.WritableBuf
     }
 }
 
-/// Warning
-///     - Coded but not tested!!!
+/// Checks that `buf` holds a message received by `io_uring_prep_recvmsg_multishot` (`ValueError` if it is too
+/// short for the `namelen` and `controllen` of `msgh`) and gives its parts.
 ///
 /// Type
 ///     return: RecvmsgOut
-pub fn io_uring_recvmsg_validate(buf: py.WritableBuffer, msgh: *Msghdr) py.Error!*Object {
-    return class.RecvmsgOutType.new(.{
-        ._recvmsg_out = c.io_uring_recvmsg_validate(buf.data.ptr, try py.narrow(c_int, buf.data.len, "`io_uring_recvmsg_validate(buf)` length"), msgh._msghdr.?),
-    });
+pub fn io_uring_recvmsg_validate(buf: *Object, msgh: *Msghdr) py.Error!*Object {
+    const view = try py.WritableBuffer.from(buf);
+    errdefer view.deinit();
+    const len = try py.narrow(c_int, view.data.len, "`io_uring_recvmsg_validate(buf)` length");
+    const out = c.io_uring_recvmsg_validate(view.data.ptr, len, &msgh._msghdr) orelse
+        return py.raiseValueError("`io_uring_recvmsg_validate(buf)` - `buf` is too short for the header, name and control data", .{});
+    // the view moves into the result, so the buffer stays locked (can not be resized) while it lives
+    return class.RecvmsgOutType.new(.{ ._recvmsg_out = out, ._len = view.data.len, ._view = .{ .data = view.data, .view = view.view } });
 }
 
-/// Warning
-///     - Coded but not tested!!!
-pub fn io_uring_recvmsg_name(o: *RecvmsgOut) ?usize {
-    return if (c.io_uring_recvmsg_name(o._recvmsg_out.?)) |p| @intFromPtr(p) else null;
+/// The socket address the message came from (`bytes`: the start of a `sockaddr`, `out.namelen` long).
+pub fn io_uring_recvmsg_name(o: *RecvmsgOut) py.Bytes {
+    const name: [*]const u8 = @ptrCast(c.io_uring_recvmsg_name(o._recvmsg_out.?));
+    const room = o._len - @sizeOf(c.io_uring_recvmsg_out);
+    return .{ .data = name[0..@min(o._recvmsg_out.?.namelen, room)] };
 }
 
-/// Warning
-///     - Coded but not tested!!!
+/// The first control message, or `None`.
 ///
 /// Type
-///     return: Cmsghdr
-pub fn io_uring_recvmsg_cmsg_firsthdr(o: *RecvmsgOut, msgh: *Msghdr) py.Error!*Object {
-    return class.CmsghdrType.new(.{ ._cmsghdr = c.io_uring_recvmsg_cmsg_firsthdr(o._recvmsg_out.?, msgh._msghdr.?) });
+///     return: Cmsghdr | None
+pub fn io_uring_recvmsg_cmsg_firsthdr(o: *RecvmsgOut, msgh: *Msghdr) py.Error!?*Object {
+    const hdr = c.io_uring_recvmsg_cmsg_firsthdr(o._recvmsg_out.?, &msgh._msghdr) orelse return null;
+    return try class.CmsghdrType.new(.{ ._cmsghdr = hdr, ._owner = class.keep(class.RecvmsgOutType.object(o)) });
 }
 
-/// Warning
-///     - Coded but not tested!!!
+/// The control message after `cmsg`, or `None`.
 ///
 /// Type
-///     return: Cmsghdr
-pub fn io_uring_recvmsg_cmsg_nexthdr(o: *RecvmsgOut, msgh: *Msghdr, cmsg: *Cmsghdr) py.Error!*Object {
-    return class.CmsghdrType.new(.{
-        ._cmsghdr = c.io_uring_recvmsg_cmsg_nexthdr(o._recvmsg_out.?, msgh._msghdr.?, cmsg._cmsghdr.?),
-    });
+///     return: Cmsghdr | None
+pub fn io_uring_recvmsg_cmsg_nexthdr(o: *RecvmsgOut, msgh: *Msghdr, cmsg: *Cmsghdr) py.Error!?*Object {
+    const hdr = c.io_uring_recvmsg_cmsg_nexthdr(o._recvmsg_out.?, &msgh._msghdr, cmsg._cmsghdr.?) orelse return null;
+    return try class.CmsghdrType.new(.{ ._cmsghdr = hdr, ._owner = class.keep(class.RecvmsgOutType.object(o)) });
 }
 
-/// Warning
-///     - Coded but not tested!!!
-pub fn io_uring_recvmsg_payload(o: *RecvmsgOut, msgh: *Msghdr) ?usize {
-    return if (c.io_uring_recvmsg_payload(o._recvmsg_out.?, msgh._msghdr.?)) |p| @intFromPtr(p) else null;
+/// The data of the message (`bytes`, `out.payloadlen` long, or less if the buffer ends first).
+pub fn io_uring_recvmsg_payload(o: *RecvmsgOut, msgh: *Msghdr) py.Bytes {
+    const start: [*]const u8 = @ptrCast(c.io_uring_recvmsg_payload(o._recvmsg_out.?, &msgh._msghdr));
+    const room: usize = @intCast(c.io_uring_recvmsg_payload_length(o._recvmsg_out.?, @intCast(o._len), &msgh._msghdr));
+    return .{ .data = start[0..@min(o._recvmsg_out.?.payloadlen, room)] };
 }
 
-/// Warning
-///     - Coded but not tested!!!
+/// How many bytes the payload may take in a buffer of `buf_len`.
 pub fn io_uring_recvmsg_payload_length(o: *RecvmsgOut, buf_len: i32, msgh: *Msghdr) u32 {
-    return c.io_uring_recvmsg_payload_length(o._recvmsg_out.?, buf_len, msgh._msghdr.?);
+    return c.io_uring_recvmsg_payload_length(o._recvmsg_out.?, buf_len, &msgh._msghdr);
 }
 
 /// Note
@@ -1248,10 +1247,9 @@ pub fn io_uring_prep_openat2_direct(sqe: *SQE, path: *Object, how: *OpenHow, fil
     c.io_uring_prep_openat2_direct(try sqe.sqePtr(), _dfd, path_.path, &how._open_how, _file_index);
 }
 
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_prep_epoll_ctl(sqe: *SQE, epfd: i32, fd: i32, op: i32, ev: *EpollEvent) py.Error!void {
-    c.io_uring_prep_epoll_ctl(try sqe.sqePtr(), epfd, fd, op, ev._epoll_event.?);
+    c.io_uring_prep_epoll_ctl(try sqe.sqePtr(), epfd, fd, op, @ptrCast(&ev._events.?[ev._index]));
+    try h.keepUntilSubmit(sqe, class.EpollEventType.object(ev)); // read at submit
 }
 
 /// Provides `nr` buffers of `len(addr) // nr` bytes each, laid out one after the other in `addr`.
@@ -1545,8 +1543,6 @@ pub fn io_uring_prep_cmd_getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, pe
     );
 }
 
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_prep_waitid(
     sqe: *SQE,
     idtype: c.idtype_t,

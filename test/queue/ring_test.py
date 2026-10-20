@@ -452,23 +452,3 @@ def test_register_sync_msg():
         L.io_uring_queue_exit(ring)
 
 
-@pytest.mark.parametrize(
-    "call",
-    [
-        lambda r: L.io_uring_register_buf_ring(r, L.BufReg()),
-        lambda r: L.io_uring_register_sync_cancel(r, L.SyncCancelReg()),
-        lambda r: L.io_uring_register_napi(r, L.Napi()),
-        lambda r: L.io_uring_unregister_napi(r, L.Napi()),
-        lambda r: L.io_uring_register_clock(r, L.ClockRegister()),
-        lambda r: L.io_uring_register_restrictions(r, L.Restriction()),
-        lambda r: L.io_uring_register_wait_reg(r, L.RegWait(), 1),
-        lambda r: L.io_uring_register_region(r, L.MemRegionReg()),
-        lambda r: L.io_uring_register_ifq(r, L.ZcrxIfqReg()),
-        lambda r: L.io_uring_register_bpf_filter(r, L.Bpf()),
-        lambda r: L.io_uring_register_bpf_filter_task(L.Bpf()),
-    ],
-)
-def test_register_structs_not_filled_yet(ring, call):
-    # these register structs can not be filled from Python yet: a clear error, never a NULL for C
-    with pytest.raises(NotImplementedError):
-        call(ring)
