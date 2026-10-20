@@ -3,7 +3,6 @@ import pytest
 import liburing
 
 
-# @pytest.mark.skip_linux("5.6")
 def test_io_uring_prep_statx(tmp_dir, ring, cqe):
     file_path = tmp_dir / "statx_test.txt"
     file_path.write_text("hi... bye!")
@@ -73,7 +72,6 @@ def test_io_uring_prep_statx(tmp_dir, ring, cqe):
     assert statx.mtime == os_stat.st_mtime
 
 
-# @pytest.mark.skip_linux("5.6")
 def test_statx_define():
     assert liburing.STATX_TYPE == 0x00000001
     assert liburing.STATX_MODE == 0x00000002
