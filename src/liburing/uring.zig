@@ -33,6 +33,8 @@ const Iovec = class.Iovec;
 const Probe = class.Probe;
 const Param = class.Param;
 const Napi = class.Napi;
+const Query = class.Query;
+const ZcrxCtrl = class.ZcrxCtrl;
 const Ring = class.Ring;
 const CQE = class.CQE;
 const Cqe = class.Cqe;
@@ -278,11 +280,28 @@ pub fn io_uring_clone_buffers(dst_ring: *Ring, src_ring: *Ring, flags: ?u32) py.
     return py.checkErrno(c.__io_uring_clone_buffers(try dst_ring.checkedPtr(), try src_ring.checkedPtr(), flags orelse 0));
 }
 
+/// Example
+///     >>> io_uring_register_buffers(ring, iovecs)
+///     # with a tag for each buffer
+///     >>> io_uring_register_buffers(ring, Iovec([bytearray(8), bytearray(8)]), [1, 2])
+///
 /// Note
 ///     - `io_uring_register_buffers` includes `io_uring_register_buffers_tags`
-pub fn io_uring_register_buffers(ring: *Ring, iovecs: *const Iovec, tags: ?u64) py.Error!i32 {
-    const _tags = tags orelse 0;
-    return py.checkErrno(c.io_uring_register_buffers_tags(try ring.checkedPtr(), iovecs._iovec.?, _tags, @intCast(iovecs._len)));
+///     - `tags` needs one item for each buffer in `iovecs`.
+pub fn io_uring_register_buffers(ring: *Ring, iovecs: *const Iovec, tags: ?py.Sequence(u64)) py.Error!i32 {
+    const ptr = try ring.checkedPtr();
+    const _tags = try tagsPtr(tags, iovecs._len, "io_uring_register_buffers");
+    return py.checkErrno(c.io_uring_register_buffers_tags(ptr, iovecs._iovec.?, _tags, @intCast(iovecs._len)));
+}
+
+/// The `__u64 *tags` for C: `null` for no tags, else the list, which must have one item for each of `count`.
+fn tagsPtr(tags: ?py.Sequence(u64), count: usize, comptime name: []const u8) py.Error!?[*]const u64 {
+    const list = tags orelse return null;
+    if (list.items.len != count) return py.raiseValueError(
+        "`" ++ name ++ "(..., tags)` - length of {d} does not match {d}",
+        .{ list.items.len, count },
+    );
+    return list.items.ptr;
 }
 
 pub fn io_uring_register_buffers_sparse(ring: *Ring, nr: u32) py.Error!i32 {
@@ -291,12 +310,14 @@ pub fn io_uring_register_buffers_sparse(ring: *Ring, nr: u32) py.Error!i32 {
 
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
-pub fn io_uring_register_buffers_update_tag(ring: *Ring, iovecs: *const Iovec, tags: usize, offset: ?u32) py.Error!i32 {
+pub fn io_uring_register_buffers_update_tag(ring: *Ring, iovecs: *const Iovec, tags: py.Sequence(u64), offset: ?u32) py.Error!i32 {
+    const ptr = try ring.checkedPtr();
+    const _tags = try tagsPtr(tags, iovecs._len, "io_uring_register_buffers_update_tag");
     return py.checkErrno(c.io_uring_register_buffers_update_tag(
-        try ring.checkedPtr(),
+        ptr,
         offset orelse 0,
         iovecs._iovec.?,
-        @ptrFromInt(tags),
+        _tags,
         @intCast(iovecs._len),
     ));
 }
@@ -328,9 +349,16 @@ pub fn io_uring_register_files(ring: *Ring, files: *const FileIndex) py.Error!i3
     );
 }
 
-pub fn io_uring_register_files_tags(ring: *Ring, files: *const FileIndex, tags: u64) py.Error!i32 {
+/// Example
+///     >>> io_uring_register_files_tags(ring, FileIndex([-1, -1]), [1, 2])
+///
+/// Note
+///     - `tags` needs one item for each file in `files`.
+pub fn io_uring_register_files_tags(ring: *Ring, files: *const FileIndex, tags: py.Sequence(u64)) py.Error!i32 {
+    const ptr = try ring.checkedPtr();
+    const _tags = try tagsPtr(tags, files._len, "io_uring_register_files_tags");
     return py.checkErrno(
-        c.io_uring_register_files_tags(try ring.checkedPtr(), files.fdSlice().ptr, tags, @intCast(files._len)),
+        c.io_uring_register_files_tags(ptr, files.fdSlice().ptr, _tags, @intCast(files._len)),
     );
 }
 
@@ -340,10 +368,12 @@ pub fn io_uring_register_files_sparse(ring: *Ring, nr: u32) py.Error!i32 {
 
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
-pub fn io_uring_register_files_update_tag(ring: *Ring, files: *const FileIndex, tags: usize, offset: ?u32) py.Error!i32 {
+pub fn io_uring_register_files_update_tag(ring: *Ring, files: *const FileIndex, tags: py.Sequence(u64), offset: ?u32) py.Error!i32 {
+    const ptr = try ring.checkedPtr();
+    const _tags = try tagsPtr(tags, files._len, "io_uring_register_files_update_tag");
     const _offset = offset orelse 0;
     return py.checkErrno(
-        c.io_uring_register_files_update_tag(try ring.checkedPtr(), _offset, files.fdSlice().ptr, @ptrFromInt(tags), @intCast(files._len)),
+        c.io_uring_register_files_update_tag(ptr, _offset, files.fdSlice().ptr, _tags, @intCast(files._len)),
     );
 }
 
@@ -458,6 +488,22 @@ pub fn io_uring_unregister_napi(ring: *Ring, napi: *Napi) py.Error!i32 {
 
 pub fn io_uring_register_ifq(ring: *Ring, reg: *ZcrxIfqReg) py.Error!i32 {
     return py.checkErrno(c.io_uring_register_ifq(try ring.checkedPtr(), ifqReg(reg)));
+}
+
+/// >>> io_uring_register_query(Query(IO_URING_QUERY_SCQ))
+///
+/// Note
+///     - Needs no ring. Refer to `help(Query)`.
+pub fn io_uring_register_query(query: *Query) py.Error!i32 {
+    // `query_data` is an address: set it at each call.
+    query._hdr.query_data = @intFromPtr(&query._data);
+    query._hdr.size = @sizeOf(@TypeOf(query._data));
+    query._hdr.next_entry = 0;
+    return py.checkErrno(c.io_uring_register_query(&query._hdr));
+}
+
+pub fn io_uring_register_zcrx_ctrl(ring: *Ring, ctrl: *ZcrxCtrl) py.Error!i32 {
+    return py.checkErrno(c.io_uring_register_zcrx_ctrl(try ring.checkedPtr(), &ctrl._zcrx_ctrl));
 }
 
 pub fn io_uring_register_clock(ring: *Ring, arg: *ClockRegister) py.Error!i32 {
