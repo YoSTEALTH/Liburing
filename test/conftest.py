@@ -115,6 +115,19 @@ def skip_by_opcode(request):
                 pytest.skip(f"Kernel `{LINUX_VERSION}` has no `{op}`")
 
 
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item):
+    """A test the kernel can't run skips (`UnsupportedError`) instead of failing: no `skip_linux` needed.
+
+    Example
+        test.py::test_Query SKIPPED (Kernel `6.12` does not support `IORING_REGISTER_QUERY`)
+    """
+    try:
+        return (yield)
+    except liburing.UnsupportedError as e:
+        pytest.skip(str(e))
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",

@@ -26,6 +26,7 @@ fn exec(module: *Object) callconv(.c) c_int {
 
 fn initModule(module: *Object) py.Error!void {
     inline for (api.classes) |C| try C.create(module);
+    try @import("support.zig").init(module);
     inline for (api.constant_files) |F| try py.addConstants(module, F);
     if (sc.PyModule_AddStringConstant(module, "LIBURING_HAVE_DATA64", "") < 0) return error.PythonError;
     if (sc.PyModule_AddStringConstant(module, "__version__", build_options.version) < 0) return error.PythonError;
