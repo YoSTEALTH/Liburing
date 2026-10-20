@@ -280,3 +280,9 @@ def test_bpf_fields_and_register(ring):
         bpf.filter = bytes(7)  # not whole instructions
     with pytest.raises(OSError):  # not a valid program (or not allowed for this task): the kernel refuses
         L.io_uring_register_bpf_filter(ring, bpf)
+
+
+def test_register_bpf_filter_task_refuses_an_empty_filter():
+    # only the refusal is tested: a valid filter would restrict this whole test process
+    with pytest.raises(OSError):
+        L.io_uring_register_bpf_filter_task(L.Bpf())
