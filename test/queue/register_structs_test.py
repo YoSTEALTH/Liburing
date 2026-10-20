@@ -288,6 +288,7 @@ def test_register_bpf_filter_task_refuses_an_empty_filter():
         L.io_uring_register_bpf_filter_task(L.Bpf())
 
 
+@pytest.mark.skip_linux("6.19")
 def test_Query():
     query = L.Query()
     assert query.op == L.IO_URING_QUERY_OPCODES
