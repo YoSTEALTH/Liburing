@@ -40,6 +40,7 @@ backend-path = ["tools"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]  # after `zig build develop`, tests run straight from the checkout
 testpaths = ["test"]
+addopts = "-rs"  # list each skip with its reason (`UnsupportedError`, `skip_linux`, ...)
 
 [tool.ruff]
 line-length = 120
