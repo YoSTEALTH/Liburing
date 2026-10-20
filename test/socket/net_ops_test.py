@@ -422,7 +422,7 @@ def test_send_set_addr_udp(ring, cqe):
         tx.close()
 
 
-@pytest.mark.skip_linux("6.19")
+# @pytest.mark.skip_linux("6.19")
 def test_cmd_getsockname(ring, cqe, pair):
     listener, client, _ = pair
     for peer, expect in ((0, client.getsockname()), (1, client.getpeername())):
