@@ -217,3 +217,24 @@ def test_epoll_ctl_wait(ring, cqe):
         ep.close()
         os.close(r)
         os.close(w)
+
+
+def test_sendmsg_zc_fixed(ring, cqe, udp):
+    rx, tx = udp
+    area = bytearray(b"fixed-zc")
+    assert L.io_uring_register_buffers(ring, L.Iovec([area])) == 0
+    try:
+        msg = L.Msghdr(L.Sockaddr(L.AF_INET, "127.0.0.1", rx.getsockname()[1]), L.Iovec([area]))
+        sqe = L.io_uring_get_sqe(ring)
+        L.io_uring_prep_sendmsg_zc_fixed(sqe, tx.fileno(), msg, 0)
+        assert L.io_uring_submit(ring) == 1
+        while True:
+            assert L.io_uring_wait_cqe_timeout(ring, cqe, L.timespec(2)) == 0
+            more = cqe[0].flags & L.IORING_CQE_F_MORE
+            res = cqe[0].res
+            L.io_uring_cqe_seen(ring, cqe[0])
+            if not more:
+                break
+        assert rx.recv(16) == b"fixed-zc"
+    finally:
+        L.io_uring_unregister_buffers(ring)
