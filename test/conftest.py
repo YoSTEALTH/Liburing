@@ -95,10 +95,34 @@ def skip_by_platform(request):
             pytest.skip(msg)
 
 
+@pytest.fixture(autouse=True)
+def skip_by_opcode(request):
+    """Skip when the running kernel does not support an io_uring opcode (asked from the kernel itself).
+
+    Prefer this over `skip_linux` for `IORING_OP_*`: it is right on backported / patched kernels too.
+    `skip_linux` stays for what the probe can't tell (register opcodes, flags, setup features).
+
+    Example
+        >>> @pytest.mark.requires_op("IORING_OP_FUTEX_WAIT", "IORING_OP_FUTEX_WAKE")
+        >>> def test_function():
+        ...
+        test.py::test_function SKIPPED (kernel has no `IORING_OP_FUTEX_WAIT`)
+    """
+    if r := request.node.get_closest_marker("requires_op"):
+        supported = liburing.probe()
+        for op in r.args:
+            if not supported.get(op, False):
+                pytest.skip(f"Kernel `{LINUX_VERSION}` has no `{op}`")
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "skip_linux(version:str|float|int, message:str): skipping linux version not supported.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_op(*names:str): skip unless the kernel's probe lists every `IORING_OP_*` name.",
     )
 
 
