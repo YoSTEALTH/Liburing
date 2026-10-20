@@ -1,6 +1,7 @@
 """Ring-level functions: parameters, waiting with timeouts, eventfd, registration, buffer rings, ..."""
 
 import os
+import mmap
 import pytest
 import liburing as L
 
@@ -365,14 +366,32 @@ def test_buf_ring_head_and_unregister(ring):
 
 def test_queue_init_mem():
     ring = L.Ring()
-    size = L.io_uring_queue_init_mem(8, ring, L.Param(), 1 << 16)
+    size = L.io_uring_queue_init_mem(8, ring, L.Param())  # liburing allocates the memory
     try:
         assert size > 0  # the bytes of the memory it used
         assert ring.ring_fd > 0
         with pytest.raises(RuntimeError):
-            L.io_uring_queue_init_mem(8, ring, L.Param(), 1 << 16)
+            L.io_uring_queue_init_mem(8, ring, L.Param())
     finally:
         L.io_uring_queue_exit(ring)
+
+
+def test_queue_init_mem_buffer():
+    ring, buf = L.Ring(), mmap.mmap(-1, 2 * 1024 * 1024)
+    size = L.io_uring_queue_init_mem(8, ring, L.Param(), buf)
+    try:
+        assert 0 < size <= len(buf)
+        with pytest.raises(BufferError):
+            buf.close()  # the ring holds it until `io_uring_queue_exit`
+    finally:
+        L.io_uring_queue_exit(ring)
+    buf.close()
+
+    with pytest.raises(TypeError):
+        L.io_uring_queue_init_mem(8, L.Ring(), L.Param(), b"read only")
+    with pytest.raises(OSError):  # too small for the rings: ENOMEM
+        L.io_uring_queue_init_mem(8, ring, L.Param(), mmap.mmap(-1, 4096))
+    assert ring.ring_fd <= 0
 
 
 def test_queue_mmap():
