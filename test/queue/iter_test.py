@@ -66,3 +66,30 @@ def _run_while_init_next(ring, cqe, seen):
             assert i == 0
         else:
             assert i == loop
+
+
+def test_iter_linked(ring, cqe):
+    sqe = liburing.io_uring_get_sqe(ring)
+    liburing.io_uring_prep_nop(sqe)
+    sqe.user_data = 1
+    assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1) == 1
+    assert [cqe[0].user_data for _ in liburing.CqeIter(ring, cqe, 1)] == [1]
+    assert cqe[0].res == 0
+    liburing.io_uring_cq_advance(ring, 1)
+
+    # linked nops complete in order
+    sqe = liburing.io_uring_get_sqe(ring)
+    liburing.io_uring_prep_nop(sqe)
+    sqe.user_data = 2
+    sqe.flags = liburing.IOSQE_IO_LINK
+    sqe = liburing.io_uring_get_sqe(ring)
+    liburing.io_uring_prep_nop(sqe)
+    sqe.user_data = 3
+    assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 2) == 2
+
+    seen = []
+    for _ in liburing.CqeIter(ring, cqe, 1):
+        assert cqe[0].res == 0
+        seen.append(cqe[0].user_data)
+    assert seen == [2, 3]
+    liburing.io_uring_cq_advance(ring, 2)

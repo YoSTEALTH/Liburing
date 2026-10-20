@@ -120,3 +120,10 @@ def test_socket_extra_define():
     assert liburing.NI_DGRAM == 16
     assert liburing.NI_IDN == 32
     # getaddrinfo/getnameinfo end <<<
+
+
+def test_sockaddr_family_mismatch():
+    with pytest.raises(ValueError):
+        liburing.Sockaddr(liburing.AF_INET, "::", 12345)
+    with pytest.raises(ValueError):
+        liburing.Sockaddr(liburing.AF_INET6, "0.0.0.0", 12345)
