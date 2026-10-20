@@ -144,8 +144,21 @@ def test_file_alloc_range_and_sparse(ring):
 def test_register_files_tags(ring):
     with pytest.raises(OSError):  # a table is already registered: EBUSY
         assert L.io_uring_register_files_sparse(ring, 2) == 0
-        L.io_uring_register_files_tags(ring, L.FileIndex([-1, -1]), 0)
+        L.io_uring_register_files_tags(ring, L.FileIndex([-1, -1]), [0, 0])
     assert L.io_uring_unregister_files(ring) == 0
+
+
+def test_register_files_tags_list(ring):
+    r, w = os.pipe()  # a tag needs a real file: `-1` (sparse) can only have tag `0`
+    try:
+        assert L.io_uring_register_files_tags(ring, L.FileIndex([r, w]), [7, 8]) == 0
+        assert L.io_uring_register_files_update_tag(ring, L.FileIndex([w]), [9], 1) == 1
+        with pytest.raises(ValueError):  # one tag for each file
+            L.io_uring_register_files_update_tag(ring, L.FileIndex([r, w]), [1])
+        assert L.io_uring_unregister_files(ring) == 0
+    finally:
+        os.close(r)
+        os.close(w)
 
 
 def test_register_buffers(ring):
@@ -154,8 +167,12 @@ def test_register_buffers(ring):
     assert L.io_uring_unregister_buffers(ring) == 0
     assert L.io_uring_register_buffers(ring, iov) == 0
     assert L.io_uring_unregister_buffers(ring) == 0
-    assert L.io_uring_register_buffers(ring, iov, 0) == 0  # with tags
-    assert L.io_uring_register_buffers_update_tag(ring, iov, 0) == 1
+    assert L.io_uring_register_buffers(ring, iov, [5]) == 0  # with tags
+    assert L.io_uring_register_buffers_update_tag(ring, iov, [6]) == 1
+    with pytest.raises(ValueError):  # one tag for each buffer
+        L.io_uring_register_buffers(ring, iov, [1, 2])
+    with pytest.raises(ValueError):
+        L.io_uring_register_buffers_update_tag(ring, iov, [])
     assert L.io_uring_unregister_buffers(ring) == 0
 
 
@@ -419,7 +436,7 @@ def test_clone_buffers_offset(ring):
 
 def test_register_files_update_tag(ring):
     assert L.io_uring_register_files_sparse(ring, 4) == 0
-    assert L.io_uring_register_files_update_tag(ring, L.FileIndex([-1]), 0) == 1
+    assert L.io_uring_register_files_update_tag(ring, L.FileIndex([-1]), [0]) == 1
     assert L.io_uring_unregister_files(ring) == 0
 
 
@@ -467,3 +484,16 @@ def test_register_sync_msg():
         L.io_uring_queue_exit(ring)
 
 
+
+
+def test_ring_collected_without_exit():
+    import gc
+    import os
+
+    before = len(os.listdir("/proc/self/fd"))
+    for _ in range(20):
+        ring = L.Ring()
+        L.io_uring_queue_init(8, ring)
+        del ring
+    gc.collect()
+    assert len(os.listdir("/proc/self/fd")) == before

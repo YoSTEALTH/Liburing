@@ -22,6 +22,8 @@ pub const RestrictionType = setu.Class(Restriction, @embedFile("class.zig"));
 pub const BufRegType = setu.Class(BufReg, @embedFile("class.zig"));
 pub const SyncCancelRegType = setu.Class(SyncCancelReg, @embedFile("class.zig"));
 pub const NapiType = setu.Class(Napi, @embedFile("class.zig"));
+pub const QueryType = setu.Class(Query, @embedFile("class.zig"));
+pub const ZcrxCtrlType = setu.Class(ZcrxCtrl, @embedFile("class.zig"));
 pub const ZcrxIfqRegType = setu.Class(ZcrxIfqReg, @embedFile("class.zig"));
 pub const ClockRegisterType = setu.Class(ClockRegister, @embedFile("class.zig"));
 pub const BpfType = setu.Class(Bpf, @embedFile("class.zig"));
@@ -176,6 +178,18 @@ pub const Ring = struct {
     _mem: ?py.WritableBuffer = null,
 
     pub fn __new__(_: *Ring) void {}
+
+    /// A `Ring` collected without `io_uring_queue_exit`: close it here, or its fd and mappings leak.
+    pub fn __del__(self: *Ring) void {
+        if (self._io_uring.ring_fd > 0) {
+            c.io_uring_queue_exit(&self._io_uring);
+            self._io_uring.ring_fd = 0;
+        }
+        py.decref(self._keep);
+        self._keep = null;
+        if (self._mem) |m| m.deinit();
+        self._mem = null;
+    }
 
     /// The `io_uring` for C, or `RuntimeError` if the ring is not initialised (or already exited):
     /// liburing would read unmapped memory.
@@ -889,6 +903,114 @@ pub const Napi = struct {
 
     pub fn set_prefer_busy_poll(self: *Self, value: bool) void {
         self._io_uring_napi.prefer_busy_poll = @intFromBool(value);
+    }
+};
+
+/// Asks the kernel what `io_uring` supports (`io_uring_register_query`; needs no ring).
+///
+/// Example
+///     >>> query = Query()                   # IO_URING_QUERY_OPCODES
+///     >>> io_uring_register_query(query)
+///     >>> query.data["nr_request_opcodes"]
+///     62
+///     >>> query = Query(IO_URING_QUERY_SCQ)
+///     >>> io_uring_register_query(query)
+///     >>> query.data
+///     {'hdr_size': 320, 'hdr_alignment': 64}
+///
+/// Note
+///     - `query.data` has the fields of the C struct for `op`:
+///     `IO_URING_QUERY_OPCODES` (`io_uring_query_opcode`), `IO_URING_QUERY_ZCRX` (`io_uring_query_zcrx`)
+///     or `IO_URING_QUERY_SCQ` (`io_uring_query_scq`); all `0` until it is registered.
+///     - `query.result` is the error the kernel put in the header (`0` on success).
+pub const Query = struct {
+    _hdr: c.io_uring_query_hdr = std.mem.zeroes(c.io_uring_query_hdr),
+    _data: extern union {
+        opcode: c.io_uring_query_opcode,
+        zcrx: c.io_uring_query_zcrx,
+        scq: c.io_uring_query_scq,
+    } = std.mem.zeroes(@FieldType(Query, "_data")),
+
+    const Self = @This();
+
+    pub fn __new__(self: *Self, op: ?u32) py.Error!void {
+        const _op = op orelse c.IO_URING_QUERY_OPCODES;
+        if (_op >= c.__IO_URING_QUERY_MAX) return py.raiseValueError("`Query(op)` - unknown query `{d}`", .{_op});
+        self._hdr.query_op = _op;
+    }
+
+    pub fn get_op(self: *const Self) u32 {
+        return self._hdr.query_op;
+    }
+
+    pub fn get_result(self: *const Self) i32 {
+        return self._hdr.result;
+    }
+
+    /// Type
+    ///     return: dict[str, int]
+    pub fn get_data(self: *const Self) py.Error!*Object {
+        return switch (self._hdr.query_op) {
+            c.IO_URING_QUERY_OPCODES => structDict(self._data.opcode, .{
+                "nr_request_opcodes", "nr_register_opcodes", "feature_flags",    "ring_setup_flags",
+                "enter_flags",        "sqe_flags",           "nr_query_opcodes",
+            }),
+            c.IO_URING_QUERY_ZCRX => structDict(self._data.zcrx, .{
+                "register_flags", "area_flags", "nr_ctrl_opcodes", "features", "rq_hdr_size", "rq_hdr_alignment",
+            }),
+            else => structDict(self._data.scq, .{ "hdr_size", "hdr_alignment" }),
+        };
+    }
+};
+
+/// A `dict` of the `names` fields of `value`.
+fn structDict(value: anytype, comptime names: anytype) py.Error!*Object {
+    const dict = setu.c.PyDict_New() orelse return error.PythonError;
+    errdefer py.decref(dict);
+    inline for (names) |name| {
+        const key = try py.new(name);
+        defer py.decref(key);
+        const item = try py.new(@as(u64, @field(value, name)));
+        defer py.decref(item);
+        if (setu.c.PyDict_SetItem(dict, key, item) < 0) return error.PythonError;
+    }
+    return dict;
+}
+
+/// Control of a zero-copy receive instance (`io_uring_register_zcrx_ctrl`).
+///
+/// Example
+///     >>> ctrl = ZcrxCtrl(zcrx_id, ZCRX_CTRL_FLUSH_RQ)
+///     >>> io_uring_register_zcrx_ctrl(ring, ctrl)
+///     # or export it to share with another ring
+///     >>> ctrl = ZcrxCtrl(zcrx_id, ZCRX_CTRL_EXPORT)
+///     >>> io_uring_register_zcrx_ctrl(ring, ctrl)
+///     >>> ctrl.zcrx_fd
+///
+/// Note
+///     - `zcrx_id` is the `ZcrxIfqReg.zcrx_id` of `io_uring_register_ifq`; needs a registered instance.
+pub const ZcrxCtrl = struct {
+    _zcrx_ctrl: c.zcrx_ctrl = std.mem.zeroes(c.zcrx_ctrl),
+
+    const Self = @This();
+
+    pub fn __new__(self: *Self, zcrx_id: u32, op: u32) py.Error!void {
+        if (op >= c.__ZCRX_CTRL_LAST) return py.raiseValueError("`ZcrxCtrl(zcrx_id, op)` - unknown op `{d}`", .{op});
+        self._zcrx_ctrl.zcrx_id = zcrx_id;
+        self._zcrx_ctrl.op = op;
+    }
+
+    pub fn get_zcrx_id(self: *const Self) u32 {
+        return self._zcrx_ctrl.zcrx_id;
+    }
+
+    pub fn get_op(self: *const Self) u32 {
+        return self._zcrx_ctrl.op;
+    }
+
+    /// The file descriptor `ZCRX_CTRL_EXPORT` wrote.
+    pub fn get_zcrx_fd(self: *const Self) u32 {
+        return self._zcrx_ctrl.unnamed_0.zc_export.zcrx_fd;
     }
 };
 

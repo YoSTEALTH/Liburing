@@ -286,3 +286,40 @@ def test_register_bpf_filter_task_refuses_an_empty_filter():
     # only the refusal is tested: a valid filter would restrict this whole test process
     with pytest.raises(OSError):
         L.io_uring_register_bpf_filter_task(L.Bpf())
+
+
+def test_Query():
+    query = L.Query()
+    assert query.op == L.IO_URING_QUERY_OPCODES
+    assert query.result == 0
+    assert set(query.data.values()) == {0}  # nothing registered yet
+    assert L.io_uring_register_query(query) == 0
+    assert query.result == 0
+    assert query.data["nr_request_opcodes"] > 0
+    assert query.data["nr_register_opcodes"] > 0
+    assert query.data["sqe_flags"] & L.IOSQE_IO_LINK
+
+    scq = L.Query(L.IO_URING_QUERY_SCQ)
+    assert L.io_uring_register_query(scq) == 0
+    assert scq.data["hdr_size"] > 0
+    assert scq.data["hdr_alignment"] > 0
+
+    zcrx = L.Query(L.IO_URING_QUERY_ZCRX)
+    assert zcrx.op == L.IO_URING_QUERY_ZCRX
+    assert "rq_hdr_size" in zcrx.data
+    assert L.io_uring_register_query(zcrx) == 0
+    assert zcrx.data["nr_ctrl_opcodes"] >= 0
+
+    with pytest.raises(ValueError):
+        L.Query(99)
+    with pytest.raises(TypeError):
+        L.Query(1, 2)
+
+
+def test_ZcrxCtrl(ring):
+    ctrl = L.ZcrxCtrl(3, L.ZCRX_CTRL_EXPORT)
+    assert (ctrl.zcrx_id, ctrl.op, ctrl.zcrx_fd) == (3, L.ZCRX_CTRL_EXPORT, 0)
+    with pytest.raises(ValueError):
+        L.ZcrxCtrl(0, 99)
+    with pytest.raises(OSError):  # no zcrx instance registered on this ring
+        L.io_uring_register_zcrx_ctrl(ring, ctrl)
