@@ -53,7 +53,7 @@ pub const FUTEX = struct {
     ///     - Overwrite `.flags` value.
     pub fn set_flags(self: *Self, value: u32) py.Error!void {
         if (self._vector) |v| {
-            v.val = value;
+            v.flags = value;
         } else return e.raiseMemoryError("Futex(vector) Memory not set!");
     }
 };

@@ -53,6 +53,9 @@ def test_futex_waitv_class():
     assert fw.flags == liburing.FUTEX2_SIZE_U32
     fw.val = 1
     assert fw.val == 1
+    fw.flags = liburing.FUTEX2_SIZE_U32 | liburing.FUTEX2_PRIVATE
+    assert fw.flags == liburing.FUTEX2_SIZE_U32 | liburing.FUTEX2_PRIVATE
+    assert fw.val == 1  # the flags setter used to write `.val`
 
     with pytest.raises(ValueError):
         liburing.Futex(liburing.FUTEX_WAITV_MAX + 1, None, True)
