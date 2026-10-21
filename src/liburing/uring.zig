@@ -38,6 +38,7 @@ const ZcrxCtrl = class.ZcrxCtrl;
 const Ring = class.Ring;
 const CQE = class.CQE;
 const Cqe = class.Cqe;
+const CqeBatch = class.CqeBatch;
 const SQE = class.SQE;
 const Sqe = class.Sqe;
 const Bpf = class.Bpf;
@@ -108,6 +109,27 @@ pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.Wr
     return used;
 }
 
+/// Setup `Ring` like `io_uring_queue_init` but with a `Param`, which lets the caller pass
+/// setup flags in and read back what the kernel actually gave.
+///
+/// Note
+///     - The kernel fills `param` in on success: `sq_entries`, `cq_entries` (defaults to `2x`
+///     `sq_entries`), `features` and `flags` (liburing may add its own, e.g. `IORING_SETUP_NO_SQARRAY`).
+///     - `entries` is rounded up to a power of `2` and must be `1-32768`, unless
+///     `IORING_SETUP_CLAMP` is set, which caps it instead of raising `OSError`.
+///     - `IORING_SETUP_DEFER_TASKRUN` requires `IORING_SETUP_SINGLE_ISSUER`.
+///
+/// Example
+///     >>> ring = Ring()
+///     >>> param = Param()
+///     >>> param.flags = IORING_SETUP_SINGLE_ISSUER
+///     >>> try:
+///     ...     io_uring_queue_init_params(1024, ring, param)
+///     ...     param.sq_entries
+///     1024
+///     ...     # do stuff ...
+///     >>> finally:
+///     ...     io_uring_queue_exit(ring)
 pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_params(ring)` already initialized!", .{});
     return support.setup(c.io_uring_queue_init_params(entries, &ring._io_uring, &param._io_uring_params), param._io_uring_params.flags);
@@ -132,12 +154,28 @@ pub fn io_uring_queue_mmap(fd: i32, ring: *Ring, param: *Param) py.Error!i32 {
     return py.checkErrno(c.io_uring_queue_mmap(fd, &param._io_uring_params, &ring._io_uring));
 }
 
+/// Apply `madvise(MADV_DONTFORK)` to `ring`'s SQE array, SQ ring and CQ ring, so they are
+/// not mapped into a child process after `fork()`.
+///
+/// By default the rings are `MAP_SHARED`, so a forked child shares them with the parent and both
+/// could submit/reap on the same queue. After this call the child simply has no such memory:
+/// touching `ring` in the child (e.g. `io_uring_get_sqe`) crashes it with `SIGSEGV`.
+/// The parent is not affected and keeps using `ring` as normal.
+///
+/// Note
+///     - `ring` must be initialized, else raises `RuntimeError`.
+///
 /// >>> io_uring_ring_dontfork(ring)
+/// 0
 pub fn io_uring_ring_dontfork(ring: *Ring) py.Error!i32 {
-    // note: currently there is no `test` or `man` page for `io_uring_ring_dontfork` so guessing how it should work!
     return py.checkErrno(c.io_uring_ring_dontfork(try ring.checkedPtr()));
 }
 
+/// Tear down `ring`: unmap its Submission & Completion Queues and close its `fd`.
+///
+/// Note
+///     - Raises `RuntimeError` if `ring` is not initialized or already exited.
+///
 /// >>> io_uring_queue_exit(ring)
 pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
     if (ring._io_uring.ring_fd > 0) {
@@ -151,22 +189,24 @@ pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
     } else return py.raiseRuntimeError("`io_uring_queue_exit(ring)` not initialized or already exited!", .{});
 }
 
-/// TODO
+/// Peek up to `count` (default: all of `batch`) ready completions without waiting.
+/// Returns how many were placed in `batch`, `0` if none are ready.
 ///
 /// Example
-///     >>> cqe = Cqe(1024) # custom memory
-///     ...
-///     >>> io_uring_peek_batch_cqe(ring, cqe, 1024)
-///     123
+///     >>> batch = CqeBatch(64)
+///     >>> n = io_uring_peek_batch_cqe(ring, batch)
+///     >>> for cqe in batch:
+///     ...     cqe.user_data  # do stuff
+///     >>> io_uring_cq_advance(ring, n)
 ///
-/// Warning
-///     - Don't use this function, till this warning is removed or else its most likely segfault!!!
-pub fn io_uring_peek_batch_cqe(ring: *Ring, cqe: *Cqe, count: u32) py.Error!void {
-    _ = .{ ring, cqe, count };
-    return py.raiseNotImplementedError("`io_uring_peek_batch_cqe`", .{});
-    // TODO:
-    // fn peekBatchCqe(ring: *Ring, cqe: *Cqe, count: u32) py.Error!void {
-    // if (cqe._array) |_| return c.io_uring_peek_batch_cqe(try ring.checkedPtr(), cqe.outFor(ring), count);
+/// Note
+///     - Does not consume them, call `io_uring_cq_advance(ring, n)` after reading.
+pub fn io_uring_peek_batch_cqe(ring: *Ring, batch: *CqeBatch, count: ?u32) py.Error!u32 {
+    const n = count orelse batch._len;
+    if (n > batch._len) return py.raiseValueError("`io_uring_peek_batch_cqe` - `count` larger than `CqeBatch`", .{});
+    batch._count = c.io_uring_peek_batch_cqe(try ring.checkedPtr(), batch._array.?, n);
+    class.setOwned(&batch._ring, class.RingType.object(ring));
+    return batch._count;
 }
 
 /// Example
@@ -174,15 +214,23 @@ pub fn io_uring_peek_batch_cqe(ring: *Ring, cqe: *Cqe, count: u32) py.Error!void
 ///     # or
 ///     >>> ts = timespec(1.5)  # timeout
 ///     >>>io_uring_wait_cqes(ring, cqe, 123, ts)
-pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec) py.Error!i32 {
-    const _sigmask = null; // TODO
+///
+/// Note
+///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
+///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
+pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, sigmask: ?*SigsetT) py.Error!i32 {
+    const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const _ts = if (ts) |t| t._timespec else null;
     return py.checkErrno(c.io_uring_wait_cqes(try ring.checkedPtr(), cqe.outFor(ring), wait_nr, _ts, _sigmask));
 }
 
 /// >>> io_uring_wait_cqes_min_timeout(ring)
-pub fn io_uring_wait_cqes_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_ts_usec: u32) py.Error!i32 {
-    const _sigmask = null; // TODO
+///
+/// Note
+///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
+///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
+pub fn io_uring_wait_cqes_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_ts_usec: u32, sigmask: ?*SigsetT) py.Error!i32 {
+    const _sigmask = if (sigmask) |s| s._sigset_t else null;
     return py.checkErrno(c.io_uring_wait_cqes_min_timeout(
         try ring.checkedPtr(),
         cqe.outFor(ring),
@@ -216,9 +264,13 @@ pub fn io_uring_submit_and_wait(ring: *Ring, wait_nr: u32) py.Error!i32 {
 /// # or
 /// >>> ts = timespec(0.5)
 /// >>> io_uring_submit_and_wait_timeout(ring, cqe, 1, ts)
-pub fn io_uring_submit_and_wait_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec) py.Error!i32 {
+///
+/// Note
+///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
+///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
+pub fn io_uring_submit_and_wait_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, sigmask: ?*SigsetT) py.Error!i32 {
     defer ring.releaseSubmitted(); // the kernel has read the prepared paths
-    const _sigmask = null; // TODO
+    const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const _ts = if (ts) |t| t._timespec else null;
     return py.checkErrno(c.io_uring_submit_and_wait_timeout(
         try ring.checkedPtr(),
@@ -229,9 +281,12 @@ pub fn io_uring_submit_and_wait_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts
     ));
 }
 
-pub fn io_uring_submit_and_wait_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_wait: u32) py.Error!i32 {
+/// Note
+///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
+///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
+pub fn io_uring_submit_and_wait_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_wait: u32, sigmask: ?*SigsetT) py.Error!i32 {
     defer ring.releaseSubmitted(); // the kernel has read the prepared paths
-    const _sigmask = null; // TODO
+    const _sigmask = if (sigmask) |s| s._sigset_t else null;
 
     return py.checkErrno(c.io_uring_submit_and_wait_min_timeout(
         try ring.checkedPtr(),
@@ -535,8 +590,8 @@ pub fn io_uring_submit_and_get_events(ring: *Ring) py.Error!i32 {
     return py.checkErrno(c.io_uring_submit_and_get_events(try ring.checkedPtr()));
 }
 
-pub fn io_uring_enter(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sig: *SigsetT) py.Error!i32 {
-    return py.checkErrno(c.io_uring_enter(fd, to_submit, min_complete, flags, sig._sigset_t));
+pub fn io_uring_enter(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sig: ?*SigsetT) py.Error!i32 {
+    return py.checkErrno(c.io_uring_enter(fd, to_submit, min_complete, flags, if (sig) |s| s._sigset_t else null));
 }
 
 pub fn io_uring_enter2(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sz: usize, arg: ?usize) py.Error!i32 {

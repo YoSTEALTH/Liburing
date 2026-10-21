@@ -12,6 +12,7 @@ pub const TimespecType = setu.Class(Timespec, @embedFile("class.zig"));
 pub const RingType = setu.Class(Ring, @embedFile("class.zig"));
 pub const CQEType = setu.Class(CQE, @embedFile("class.zig"));
 pub const CqeType = setu.Class(Cqe, @embedFile("class.zig"));
+pub const CqeBatchType = setu.Class(CqeBatch, @embedFile("class.zig"));
 pub const CqeIterType = setu.Class(CqeIter, @embedFile("class.zig"));
 pub const SQEType = setu.Class(SQE, @embedFile("class.zig"));
 pub const SqeType = setu.Class(Sqe, @embedFile("class.zig"));
@@ -395,6 +396,67 @@ pub const Cqe = struct {
             }
         }
         return CQEType.new(.{ ._cqe = cqe, ._owner = keep(ring_obj), ._ring = ring });
+    }
+};
+
+/// Caller owned array of CQE pointers, filled by `io_uring_peek_batch_cqe`.
+///
+/// Example
+///     >>> batch = CqeBatch(64)
+///     >>> n = io_uring_peek_batch_cqe(ring, batch)
+///     >>> for cqe in batch:
+///     ...     cqe.user_data, cqe.res
+///     >>> io_uring_cq_advance(ring, n)
+///
+/// Note
+///     - Entries point into the ring, only valid until `io_uring_cq_advance`.
+///     - Reusable: every peek overwrites previous entries.
+pub const CqeBatch = struct {
+    _array: ?[*]?*c.io_uring_cqe = null,
+    _len: u32 = 0, // allocated slots
+    _count: u32 = 0, // slots filled by last peek
+    _index: u32 = 0, // `__next__` position
+    _ring: ?*Object = null, // the `Ring` the entries point into (set by `io_uring_peek_batch_cqe`)
+
+    const Self = @This();
+
+    pub fn __new__(self: *Self, no: u32) py.Error!void {
+        if (no == 0) return py.raiseValueError("`CqeBatch(no)` - `no` must be > 0", .{});
+        const array = std.heap.c_allocator.alloc(?*c.io_uring_cqe, no) catch return e.raiseMemoryError("Out of Memory!");
+        self._array = array.ptr;
+        self._len = no;
+    }
+
+    pub fn __del__(self: *Self) void {
+        if (self._array) |array| std.heap.c_allocator.free(array[0..self._len]);
+    }
+
+    pub fn __len__(self: *const Self) usize {
+        return self._count;
+    }
+
+    /// Type
+    ///     return: CQE
+    pub fn __getitem__(self: *const Self, index: isize) py.Error!*Object {
+        if (index < 0 or index >= self._count) return py.raiseIndexError("`CqeBatch` - out of completed entries", .{});
+        const ring_obj = self._ring.?;
+        const ring = try RingType.data(ring_obj).checkedPtr();
+        return CQEType.new(.{ ._cqe = self._array.?[@intCast(index)].?, ._owner = keep(ring_obj), ._ring = ring }); // cast: checked
+    }
+
+    /// Type
+    ///     return: Self
+    pub fn __iter__(self: *Object) *Object {
+        CqeBatchType.data(self)._index = 0;
+        return keep(self);
+    }
+
+    /// Type
+    ///     return: CQE
+    pub fn __next__(self: *Self) py.Error!?*Object {
+        if (self._index >= self._count) return null; // StopIteration
+        defer self._index += 1;
+        return try self.__getitem__(self._index);
     }
 };
 
@@ -1243,12 +1305,27 @@ pub const Bpf = struct {
     }
 };
 
-/// SigsetT
+/// Signal set (`sigset_t`), e.g. for `sigmask` of wait functions.
+///
+/// Example
+///     >>> SigsetT([signal.SIGINT, signal.SIGTERM])
+///     >>> SigsetT()  # empty set
 pub const SigsetT = struct {
     _sigset_t: ?*c.__sigset_t = null,
 
-    pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
+
+    pub fn __new__(self: *Self, signals: ?py.Sequence(i32)) py.Error!void {
+        const set = std.heap.c_allocator.create(c.__sigset_t) catch return e.raiseMemoryError("Out of Memory!");
+        _ = c.sigemptyset(set);
+        if (signals) |list| for (list.items) |signum| {
+            if (c.sigaddset(set, signum) != 0) {
+                std.heap.c_allocator.destroy(set);
+                return py.raiseValueError("`SigsetT(signals)` - invalid signal {d}", .{signum});
+            }
+        };
+        self._sigset_t = set;
+    }
 
     pub fn __del__(self: *Self) void {
         if (self._sigset_t) |ptr| std.heap.c_allocator.destroy(ptr);
