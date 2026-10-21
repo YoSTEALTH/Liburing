@@ -163,27 +163,6 @@ if __name__ == "__main__":
 
 ```
 
-## HTTP server benchmark
-
-The same HTTP keep-alive server (one thread: accept, recv, send the response, recv again) written with C
-liburing (`example/bench/liburing_bench.c`), Liburing (`example/bench/liburing_bench.py`) and asyncio
-(`example/bench/asyncio_bench.py`), under the same load: 64 connections, 100 requests each, for 5 seconds
-(`tools/load.zig`). Requests per second, low - max of 5 runs (higher is better):
-
-| server                 | req/s             |
-|------------------------|------------------:|
-| C liburing             | 631,955 - 634,684 |
-| Liburing, Python 3.15  | 454,143 - 456,003 |
-| Liburing, Python 3.15t | 424,231 - 430,615 |
-| Liburing, Python 3.14  | 442,564 - 456,346 |
-| Liburing, Python 3.14t | 421,814 - 435,044 |
-| asyncio, Python 3.15   | 136,183 - 137,527 |
-| asyncio, Python 3.15t  | 128,586 - 129,694 |
-| asyncio, Python 3.14   | 131,884 - 135,416 |
-| asyncio, Python 3.14t  | 125,835 - 127,919 |
-
-Server on one core, load on other cores, Linux 7.2, Liburing built with `-Drelease`, C with `-O2`, 2026-10-21.
-
 ## Note
  - This project has been moved to using Zig as back-end, thus leading to breaking changes from previous release.
  - Try using latest Linux if possible to enable all `io_uring` features.
