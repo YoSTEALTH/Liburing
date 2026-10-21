@@ -30,5 +30,4 @@ env/
 src/liburing/liburing.pyi
 *.local.md
 
-# Local benchmark results
-example/bench/bench.html
+*.html
