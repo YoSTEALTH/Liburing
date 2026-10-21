@@ -989,6 +989,8 @@ fn structDict(value: anytype, comptime names: anytype) py.Error!*Object {
 ///
 /// Note
 ///     - `zcrx_id` is the `ZcrxIfqReg.zcrx_id` of `io_uring_register_ifq`; needs a registered instance.
+///     - Not tested with a real device (needs a NIC whose driver supports zero-copy receive, like `mlx5`, `bnxt`,
+///       `gve`): only the fields and the error without a device are.
 pub const ZcrxCtrl = struct {
     _zcrx_ctrl: c.zcrx_ctrl = std.mem.zeroes(c.zcrx_ctrl),
 
@@ -1025,6 +1027,10 @@ pub const ZcrxCtrl = struct {
 ///     >>> reg.region_user_addr, reg.region_size = address_of(rq), len(rq)
 ///     >>> io_uring_register_ifq(ring, reg)
 ///     >>> reg.zcrx_id
+///
+/// Note
+///     - Not tested with a real device (needs a NIC whose driver supports zero-copy receive, like `mlx5`, `bnxt`,
+///       `gve`): only the fields and the error without a device are.
 pub const ZcrxIfqReg = struct {
     _io_uring_zcrx_ifq_reg: c.io_uring_zcrx_ifq_reg = std.mem.zeroes(c.io_uring_zcrx_ifq_reg),
     _area: c.io_uring_zcrx_area_reg = std.mem.zeroes(c.io_uring_zcrx_area_reg), // what `area_ptr` points to

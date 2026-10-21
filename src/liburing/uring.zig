@@ -490,6 +490,8 @@ pub fn io_uring_unregister_napi(ring: *Ring, napi: *Napi) py.Error!i32 {
     return support.register("IORING_UNREGISTER_NAPI", c.io_uring_unregister_napi(try ring.checkedPtr(), &napi._io_uring_napi));
 }
 
+/// Note
+///     - Not tested with a real device. Refer to `help(ZcrxIfqReg)`.
 pub fn io_uring_register_ifq(ring: *Ring, reg: *ZcrxIfqReg) py.Error!i32 {
     return support.register("IORING_REGISTER_ZCRX_IFQ", c.io_uring_register_ifq(try ring.checkedPtr(), ifqReg(reg)));
 }
@@ -506,6 +508,8 @@ pub fn io_uring_register_query(query: *Query) py.Error!i32 {
     return support.register("IORING_REGISTER_QUERY", c.io_uring_register_query(&query._hdr));
 }
 
+/// Note
+///     - Not tested with a real device. Refer to `help(ZcrxCtrl)`.
 pub fn io_uring_register_zcrx_ctrl(ring: *Ring, ctrl: *ZcrxCtrl) py.Error!i32 {
     return support.register("IORING_REGISTER_ZCRX_CTRL", c.io_uring_register_zcrx_ctrl(try ring.checkedPtr(), &ctrl._zcrx_ctrl));
 }
