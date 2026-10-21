@@ -74,14 +74,12 @@ fn shortName(comptime full: []const u8) [:0]const u8 {
 }
 
 // The module: `PyModExport_liburing` (3.15+) and `PyInit_liburing` (3.14), one stable-ABI binary.
-// `gil`: a `Ring` is not safe to share across threads (plan.md decision 4), so the free-threaded
-// CPython enables the GIL on import.
+// Setu's default `gil` (`Py_MOD_GIL_NOT_USED`): the free-threaded CPython keeps the GIL off.
 comptime {
     py.exportModule(.{
         .name = "liburing",
         .doc = "Python + Zig wrapper around C liburing.",
         .methods = &module_methods,
         .exec = &exec,
-        .gil = true,
     });
 }
