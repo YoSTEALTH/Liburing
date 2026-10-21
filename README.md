@@ -12,7 +12,7 @@ Liburing is Python + Zig wrapper around [C Liburing](https://github.com/axboe/Li
 Good(old) documentation [Lord of the io_uring](https://unixism.net/loti/)
 
 ## Requires
- - Linux 6.14+ (7.0+ recommended)
+ - Linux 6.8+
  - Python 3.14+ (regular or free-threaded: 3.14, 3.14t, 3.15, 3.15t, ...)
  - pip: any for 3.14, 3.14t, 3.15, 3.15t; 26.2+ for 3.16t and later (`abi3t`)
 

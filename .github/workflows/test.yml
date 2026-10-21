@@ -94,9 +94,9 @@ jobs:
   wheel-test:
     # The glibc wheel of each arch, installed and tested on its own hardware (aarch64: GitHub's arm64 runners;
     # qemu-user has no io_uring), on the oldest and newest Ubuntu images GitHub offers, for their kernels:
-    # 22.04 is 6.8 (below README's 6.14: unsupported features must skip, not fail; unsupported from 2027-04-17,
-    # then use the next oldest), 26.04 is 7.0 (2026-10). One `cp314.cp315-abi3.abi3t.cp314t.cp315t` wheel per
-    # platform: any pip installs it on all four interpreters.
+    # 22.04 is 6.8 (README's minimum; GitHub drops it on 2027-04-17, then use the next oldest), 26.04 is 7.0
+    # (2026-10). One `cp314.cp315-abi3.abi3t.cp314t.cp315t` wheel per platform: any pip installs it on all four
+    # interpreters.
     needs: wheels
     strategy:
       fail-fast: false
