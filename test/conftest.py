@@ -35,7 +35,7 @@ def tmp_dir():
 
 
 # liburing start >>>
-@pytest.fixture(params=['queue_init', 'queue_init_mem'])
+@pytest.fixture(params=['queue_init', 'queue_init_mem', 'queue_init_params'])
 def ring(request):
     '''
     =======================
@@ -49,6 +49,9 @@ def ring(request):
     try:
         if request.param == 'queue_init':
             liburing.io_uring_queue_init(1024, ring)
+        elif request.param == 'queue_init_params':
+            param = liburing.Param()
+            liburing.io_uring_queue_init_params(1024, ring, param)
         else:
             buf = mmap.mmap(-1, 8 * 1024 * 1024)
             param = liburing.Param()
