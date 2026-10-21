@@ -170,25 +170,11 @@ C (`example/bench/liburing_bench.c`) and in Python (`example/bench/liburing_benc
 64 connections, 100 requests each, for 5 seconds (`tools/load.zig`). Requests per second, low - max of 5 runs
 (higher is better):
 
-| server                 | req/s             |
-|------------------------|------------------:|
-| C liburing             | 631,955 - 634,684 |
-| Liburing, Python 3.15  | 454,143 - 456,003 |
-| Liburing, Python 3.15t | 424,231 - 430,615 |
-| Liburing, Python 3.14  | 442,564 - 456,346 |
-| Liburing, Python 3.14t | 421,814 - 435,044 |
+|       | C liburing        | Liburing 3.15     | 3.15t             | 3.14              | 3.14t             |
+|-------|------------------:|------------------:|------------------:|------------------:|------------------:|
+| req/s | 631,955 - 634,684 | 454,143 - 456,003 | 424,231 - 430,615 | 442,564 - 456,346 | 421,814 - 435,044 |
 
-AMD Ryzen 9 9900X, server on one core (`taskset -c 2`), load on other cores of the same CCD, Linux 7.2,
-Liburing built with `-Drelease`, C with `-O2`, 2026-10-21. To run them:
-
-```bash
-zig build develop -Drelease
-zig build load
-PYTHONPATH=src taskset -c 2 python3.15 example/bench/liburing_bench.py 12345
-zig-out/bin/load 12345 64 5 100  # in another terminal: port, connections, seconds, requests/connection
-zig cc -O2 -D_GNU_SOURCE -Ilib/liburing/src/include -o zig-out/bin/liburing_bench_c example/bench/liburing_bench.c lib/liburing/src/{setup,queue,register,syscall,version}.c
-taskset -c 2 zig-out/bin/liburing_bench_c 12345
-```
+Server on one core, load on other cores, Linux 7.2, Liburing built with `-Drelease`, C with `-O2`, 2026-10-21.
 
 ## Note
  - This project has been moved to using Zig as back-end, thus leading to breaking changes from previous release.
