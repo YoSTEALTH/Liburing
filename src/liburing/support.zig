@@ -1,6 +1,6 @@
 //! `UnsupportedError`: tells "this kernel has no `IORING_REGISTER_X`" apart from a bad argument. The kernel
-//! says `EINVAL` for both, so only after a call failed (never on success) the kernel is asked, once, what
-//! it supports: `IORING_REGISTER_QUERY` when it has it, else the table of the kernel each opcode came in.
+//! says `EINVAL` for both, so after a call failed (never on success) the kernel's answer is looked at: what
+//! `IORING_REGISTER_QUERY` said at import when it has it, else the table of the kernel each opcode came in.
 const std = @import("std");
 const setu = @import("setu");
 const c = @import("c.zig").c;
@@ -38,6 +38,9 @@ pub fn init(module: *Object) py.Error!void {
         return error.PythonError;
     }
     unsupported_error = exc; // keeps the reference: the module is never unloaded
+    // Asked once here (module exec runs on one thread), then only read: no race between threads.
+    query = queryOpcodes();
+    kernel_version = unameVersion();
 }
 
 /// `res` when it is `>= 0`, else `UnsupportedError` when the kernel has no `name` (an `IORING_REGISTER_*`),
@@ -138,35 +141,34 @@ fn setupName(flags: u32) ?[]const u8 {
     return null;
 }
 
-var query_state: enum(u8) { unknown, yes, no } = .unknown;
-var query_data: c.io_uring_query_opcode = undefined;
+/// `IO_URING_QUERY_OPCODES` of the running kernel, `null` without `IORING_REGISTER_QUERY` (set by `init`).
+var query: ?c.io_uring_query_opcode = null;
 
-/// `IO_URING_QUERY_OPCODES` of the running kernel, or `null` when it has no `IORING_REGISTER_QUERY`.
 fn queried() ?*const c.io_uring_query_opcode {
-    if (query_state == .unknown) {
-        var data = std.mem.zeroes(c.io_uring_query_opcode);
-        var hdr = std.mem.zeroes(c.io_uring_query_hdr);
-        hdr.query_op = c.IO_URING_QUERY_OPCODES;
-        hdr.query_data = @intFromPtr(&data);
-        hdr.size = @sizeOf(c.io_uring_query_opcode);
-        const ok = c.io_uring_register_query(&hdr) >= 0 and hdr.result == 0;
-        if (ok) query_data = data;
-        query_state = if (ok) .yes else .no;
-    }
-    return if (query_state == .yes) &query_data else null;
+    return if (query) |*q| q else null;
 }
 
+fn queryOpcodes() ?c.io_uring_query_opcode {
+    var data = std.mem.zeroes(c.io_uring_query_opcode);
+    var hdr = std.mem.zeroes(c.io_uring_query_hdr);
+    hdr.query_op = c.IO_URING_QUERY_OPCODES;
+    hdr.query_data = @intFromPtr(&data);
+    hdr.size = @sizeOf(c.io_uring_query_opcode);
+    return if (c.io_uring_register_query(&hdr) >= 0 and hdr.result == 0) data else null;
+}
+
+/// The running kernel, `major << 8 | minor` (set by `init`).
 var kernel_version: u16 = 0;
 
-/// The running kernel, `major << 8 | minor` (`uname`).
 fn kernel() u16 {
-    if (kernel_version == 0) {
-        var uts: std.os.linux.utsname = undefined;
-        _ = std.os.linux.uname(&uts);
-        var it = std.mem.tokenizeAny(u8, std.mem.sliceTo(&uts.release, 0), ".-");
-        const major = std.fmt.parseInt(u8, it.next() orelse "0", 10) catch 0;
-        const minor = std.fmt.parseInt(u8, it.next() orelse "0", 10) catch 0;
-        kernel_version = v(major, minor);
-    }
     return kernel_version;
+}
+
+fn unameVersion() u16 {
+    var uts: std.os.linux.utsname = undefined;
+    _ = std.os.linux.uname(&uts);
+    var it = std.mem.tokenizeAny(u8, std.mem.sliceTo(&uts.release, 0), ".-");
+    const major = std.fmt.parseInt(u8, it.next() orelse "0", 10) catch 0;
+    const minor = std.fmt.parseInt(u8, it.next() orelse "0", 10) catch 0;
+    return v(major, minor);
 }

@@ -170,8 +170,16 @@ pub const Timespec = struct {
 ///     >>> ring = Ring()
 ///     >>> io_uring_queue_init(8, ring)
 ///     >>> io_uring_queue_exit(ring)
+///
+/// Note
+///     - One ring per thread: a `Ring` belongs to the thread that initialized it (`io_uring_queue_init*`),
+///     using it (or a `CQE` / `SQE` from it) from another thread raises `RuntimeError`. Threads talk to
+///     each other's rings with `io_uring_prep_msg_ring`. A `Cqe`, `CqeBatch` or `Sqe` is used by one thread.
+///     - The waits (`io_uring_wait_cqe*`, `io_uring_submit_and_wait*`) let other threads run while the
+///     kernel sleeps.
 pub const Ring = struct {
     _io_uring: c.io_uring = std.mem.zeroes(c.io_uring), // lives inside the Python object
+    _thread: usize = 0, // `pthread_self()` of the thread that initialized it: the only one that may use it
     /// Objects the kernel still has to read (path strings, ...): a `list`, dropped once a submit has
     /// handed every SQE to the kernel (`releaseSubmitted`). See `keepUntilSubmit`.
     _keep: ?*Object = null,
@@ -202,7 +210,26 @@ pub const Ring = struct {
     /// the pointer next to their owner to skip the `Ring` lookup.
     pub inline fn checkRing(ring: *c.io_uring) py.Error!*c.io_uring {
         if (ring.ring_fd <= 0) return raiseNotInitialized();
+        const self: *Ring = @fieldParentPtr("_io_uring", ring);
+        if (self._thread != pthread_self()) return raiseOtherThread();
         return ring;
+    }
+
+    /// Marks the calling thread as the owner, before an `io_uring_queue_init*`.
+    pub fn own(self: *Ring) void {
+        self._thread = pthread_self();
+    }
+
+    /// `RuntimeError` if the calling thread is not the owner (`ring` initialized).
+    pub fn checkThread(self: *const Ring) py.Error!void {
+        if (self._thread != pthread_self()) return raiseOtherThread();
+    }
+
+    noinline fn raiseOtherThread() py.Error {
+        return py.raiseRuntimeError(
+            "`Ring` belongs to the thread that initialized it (`io_uring_queue_init`): use one ring per thread",
+            .{},
+        );
     }
 
     /// Out of line: keeps its message formatting off the hot paths that inline `checkRing`.
@@ -481,10 +508,13 @@ pub const CqeIter = struct {
         self._ring = keep(RingType.object(ring));
     }
 
-    pub fn __next__(self: *Self) ?usize {
+    pub fn __next__(self: *Self) py.Error!?usize {
         if (self._cqe) |o| {
             const _cqe = CqeType.data(o);
-            if (self._ring) |r| setOwned(&_cqe._ring, r);
+            if (self._ring) |r| {
+                _ = try RingType.data(r).checkedPtr(); // the iterator reads its completion queue
+                setOwned(&_cqe._ring, r);
+            }
             if (c.io_uring_cqe_iter_next(&self._io_uring_cqe_iter, &_cqe._io_uring_cqe)) {
                 defer self._index += 1;
                 return self._index;
@@ -1760,6 +1790,9 @@ pub fn setOwned(field: *?*Object, obj: *Object) void {
 /// `obj`'s reference count; a function in the stable ABI (abi3t too), right on 3.15t, unlike reading
 /// `ob_refcnt`. (`PyUnstable_Object_IsUniquelyReferenced` is not in the stable ABI.)
 extern fn Py_REFCNT(obj: *Object) isize;
+
+/// The calling thread (libc; the same value in a child after `fork`).
+extern fn pthread_self() usize;
 
 /// A new reference to `obj`, for an owned (`?*Object`) field.
 pub fn keep(obj: *Object) *Object {

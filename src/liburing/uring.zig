@@ -100,6 +100,7 @@ pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
 ///     (`BufferError`) while the kernel uses it.
 pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.WritableBuffer) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_mem(ring)` already initialized!", .{});
+    ring.own();
     // Own view: the argument's is released after the call, this one at `io_uring_queue_exit`.
     const mem: ?py.WritableBuffer = if (buf) |b| try py.WritableBuffer.from(b.view.obj.?) else null;
     errdefer if (mem) |m| m.deinit();
@@ -132,6 +133,7 @@ pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.Wr
 ///     ...     io_uring_queue_exit(ring)
 pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_params(ring)` already initialized!", .{});
+    ring.own();
     return support.setup(c.io_uring_queue_init_params(entries, &ring._io_uring, &param._io_uring_params), param._io_uring_params.flags);
 }
 
@@ -146,11 +148,14 @@ pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.E
 ///     ...     io_uring_queue_exit(ring)
 pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init(ring)` already initialized!", .{});
+    ring.own();
     return support.setup(c.io_uring_queue_init(entries, &ring._io_uring, flags orelse 0), flags orelse 0);
 }
 
 /// >>> io_uring_queue_mmap(fd, param, ring)
 pub fn io_uring_queue_mmap(fd: i32, ring: *Ring, param: *Param) py.Error!i32 {
+    if (ring._io_uring.ring_fd > 0) try ring.checkThread();
+    ring.own();
     return py.checkErrno(c.io_uring_queue_mmap(fd, &param._io_uring_params, &ring._io_uring));
 }
 
@@ -179,6 +184,7 @@ pub fn io_uring_ring_dontfork(ring: *Ring) py.Error!i32 {
 /// >>> io_uring_queue_exit(ring)
 pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
     if (ring._io_uring.ring_fd > 0) {
+        try ring.checkThread(); // not under the owner while it waits in the kernel
         c.io_uring_queue_exit(&ring._io_uring);
         ring._io_uring.ring_fd = 0;
         const kept = ring._keep;
@@ -221,7 +227,8 @@ pub fn io_uring_peek_batch_cqe(ring: *Ring, batch: *CqeBatch, count: ?u32) py.Er
 pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, sigmask: ?*SigsetT) py.Error!i32 {
     const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const _ts = if (ts) |t| t._timespec else null;
-    return py.checkErrno(c.io_uring_wait_cqes(try ring.checkedPtr(), cqe.outFor(ring), wait_nr, _ts, _sigmask));
+    const r = try ring.checkedPtr();
+    return py.checkErrno(wait(r, wait_nr, c.io_uring_wait_cqes, .{ r, cqe.outFor(ring), wait_nr, _ts, _sigmask }));
 }
 
 /// >>> io_uring_wait_cqes_min_timeout(ring)
@@ -231,20 +238,22 @@ pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, 
 ///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
 pub fn io_uring_wait_cqes_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_ts_usec: u32, sigmask: ?*SigsetT) py.Error!i32 {
     const _sigmask = if (sigmask) |s| s._sigset_t else null;
-    return py.checkErrno(c.io_uring_wait_cqes_min_timeout(
-        try ring.checkedPtr(),
+    const r = try ring.checkedPtr();
+    return py.checkErrno(wait(r, wait_nr, c.io_uring_wait_cqes_min_timeout, .{
+        r,
         cqe.outFor(ring),
         wait_nr,
         ts._timespec,
         min_ts_usec,
         _sigmask,
-    ));
+    }));
 }
 
 /// >>> ts = timespec(1.5)  # timeout
 /// >>> io_uring_wait_cqe_timeout(ring, cqe, ts)
 pub fn io_uring_wait_cqe_timeout(ring: *Ring, cqe: *Cqe, ts: *Timespec) py.Error!i32 {
-    return py.checkErrno(c.io_uring_wait_cqe_timeout(try ring.checkedPtr(), cqe.outFor(ring), ts._timespec));
+    const r = try ring.checkedPtr();
+    return py.checkErrno(wait(r, 1, c.io_uring_wait_cqe_timeout, .{ r, cqe.outFor(ring), ts._timespec }));
 }
 
 /// >>> io_uring_submit(ring)
@@ -257,7 +266,8 @@ pub fn io_uring_submit(ring: *Ring) py.Error!i32 {
 /// >>> io_uring_submit_and_wait(ring, 123)
 pub fn io_uring_submit_and_wait(ring: *Ring, wait_nr: u32) py.Error!i32 {
     defer ring.releaseSubmitted(); // the kernel has read the prepared paths
-    return py.checkErrno(c.io_uring_submit_and_wait(try ring.checkedPtr(), wait_nr));
+    const r = try ring.checkedPtr();
+    return py.checkErrno(wait(r, wait_nr, c.io_uring_submit_and_wait, .{ r, wait_nr }));
 }
 
 /// >>> io_uring_submit_and_wait_timeout(ring, cqe, 1)
@@ -272,13 +282,14 @@ pub fn io_uring_submit_and_wait_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts
     defer ring.releaseSubmitted(); // the kernel has read the prepared paths
     const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const _ts = if (ts) |t| t._timespec else null;
-    return py.checkErrno(c.io_uring_submit_and_wait_timeout(
-        try ring.checkedPtr(),
+    const r = try ring.checkedPtr();
+    return py.checkErrno(wait(r, wait_nr, c.io_uring_submit_and_wait_timeout, .{
+        r,
         cqe.outFor(ring),
         wait_nr,
         _ts,
         _sigmask,
-    ));
+    }));
 }
 
 /// Note
@@ -287,20 +298,21 @@ pub fn io_uring_submit_and_wait_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts
 pub fn io_uring_submit_and_wait_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_wait: u32, sigmask: ?*SigsetT) py.Error!i32 {
     defer ring.releaseSubmitted(); // the kernel has read the prepared paths
     const _sigmask = if (sigmask) |s| s._sigset_t else null;
-
-    return py.checkErrno(c.io_uring_submit_and_wait_min_timeout(
-        try ring.checkedPtr(),
+    const r = try ring.checkedPtr();
+    return py.checkErrno(wait(r, wait_nr, c.io_uring_submit_and_wait_min_timeout, .{
+        r,
         cqe.outFor(ring),
         wait_nr,
         ts._timespec,
         min_wait,
         _sigmask,
-    ));
+    }));
 }
 
 pub fn io_uring_submit_and_wait_reg(ring: *Ring, cqe: *Cqe, wait_nr: u32, reg_index: i32) py.Error!i32 {
     defer ring.releaseSubmitted(); // the kernel has read the prepared paths
-    return py.checkErrno(c.io_uring_submit_and_wait_reg(try ring.checkedPtr(), cqe.outFor(ring), wait_nr, reg_index));
+    const r = try ring.checkedPtr();
+    return py.checkErrno(wait(r, wait_nr, c.io_uring_submit_and_wait_reg, .{ r, cqe.outFor(ring), wait_nr, reg_index }));
 }
 
 pub fn io_uring_register_wait_reg(ring: *Ring, reg: *RegWait, nr: i32) py.Error!i32 {
@@ -526,7 +538,8 @@ pub fn io_uring_buf_ring_head(ring: *Ring, buf_group: i32) py.Error!u16 {
 }
 
 pub fn io_uring_register_sync_cancel(ring: *Ring, reg: *SyncCancelReg) py.Error!i32 {
-    return support.register("IORING_REGISTER_SYNC_CANCEL", c.io_uring_register_sync_cancel(try ring.checkedPtr(), &reg._io_uring_sync_cancel_reg));
+    const res = released(c.io_uring_register_sync_cancel, .{ try ring.checkedPtr(), &reg._io_uring_sync_cancel_reg }); // waits up to `reg.timeout`
+    return support.register("IORING_REGISTER_SYNC_CANCEL", res);
 }
 
 pub fn io_uring_register_sync_msg(sqe: *Sqe) py.Error!i32 {
@@ -591,11 +604,15 @@ pub fn io_uring_submit_and_get_events(ring: *Ring) py.Error!i32 {
 }
 
 pub fn io_uring_enter(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sig: ?*SigsetT) py.Error!i32 {
-    return py.checkErrno(c.io_uring_enter(fd, to_submit, min_complete, flags, if (sig) |s| s._sigset_t else null));
+    const args = .{ fd, to_submit, min_complete, flags, if (sig) |s| s._sigset_t else null };
+    if (min_complete == 0) return py.checkErrno(@call(.auto, c.io_uring_enter, args));
+    return py.checkErrno(released(c.io_uring_enter, args));
 }
 
 pub fn io_uring_enter2(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sz: usize, arg: ?usize) py.Error!i32 {
-    return py.checkErrno(c.io_uring_enter2(fd, to_submit, min_complete, flags, if (arg) |a| @ptrFromInt(a) else null, sz));
+    const args = .{ fd, to_submit, min_complete, flags, if (arg) |a| @as(?*anyopaque, @ptrFromInt(a)) else null, sz };
+    if (min_complete == 0) return py.checkErrno(@call(.auto, c.io_uring_enter2, args));
+    return py.checkErrno(released(c.io_uring_enter2, args));
 }
 
 pub fn io_uring_setup(entries: u32, p: *Param) py.Error!i32 {
@@ -1830,7 +1847,7 @@ pub fn io_uring_register_iowq_max_workers(ring: *Ring, bounded: u32, unbounded: 
 }
 
 pub fn io_uring_sqring_wait(ring: *Ring) py.Error!i32 {
-    return c.io_uring_sqring_wait(try ring.checkedPtr());
+    return released(c.io_uring_sqring_wait, .{try ring.checkedPtr()}); // `SQPOLL`: until the SQ has room
 }
 
 pub fn io_uring_cq_ready(ring: *Ring) py.Error!u32 {
@@ -1850,7 +1867,8 @@ pub fn io_uring_cq_eventfd_toggle(ring: *Ring, enabled: bool) py.Error!i32 {
 }
 
 pub fn io_uring_wait_cqe_nr(ring: *Ring, cqe: *Cqe, wait_nr: u32) py.Error!i32 {
-    return py.checkErrno(c.io_uring_wait_cqe_nr(try ring.checkedPtr(), cqe.outFor(ring), wait_nr));
+    const r = try ring.checkedPtr();
+    return py.checkErrno(wait(r, wait_nr, c.io_uring_wait_cqe_nr, .{ r, cqe.outFor(ring), wait_nr }));
 }
 
 /// >>> io_uring_peek_cqe(ring, cqe)
@@ -1859,7 +1877,28 @@ pub fn io_uring_peek_cqe(ring: *Ring, cqe_ptr: *Cqe) py.Error!i32 {
 }
 
 pub fn io_uring_wait_cqe(ring: *Ring, cqe: *Cqe) py.Error!i32 {
-    return py.checkErrno(c.io_uring_wait_cqe(try ring.checkedPtr(), cqe.outFor(ring)));
+    const r = try ring.checkedPtr();
+    return py.checkErrno(wait(r, 1, c.io_uring_wait_cqe, .{ r, cqe.outFor(ring) }));
+}
+
+/// Calls the liburing function `f(args)` for `wait_nr` completions: straight away when they are ready
+/// (the kernel does not sleep), else with the thread state released (`released`).
+inline fn wait(ring: *c.io_uring, wait_nr: u32, comptime f: anytype, args: anytype) Return(f) {
+    if (c.io_uring_cq_ready(ring) >= wait_nr) return @call(.auto, f, args);
+    return released(f, args);
+}
+
+/// Calls `f(args)`, which may sleep in the kernel, with the thread state released (`PyEval_SaveThread`,
+/// as `os.read` does): other threads run, and on the free-threaded build the GC does not wait for it.
+/// `args` are no Python objects; the ring is the caller's thread's alone (`Ring.checkRing`).
+fn released(comptime f: anytype, args: anytype) Return(f) {
+    const state = setu.c.PyEval_SaveThread();
+    defer setu.c.PyEval_RestoreThread(state);
+    return @call(.auto, f, args);
+}
+
+fn Return(comptime f: anytype) type {
+    return @typeInfo(@TypeOf(f)).@"fn".return_type.?;
 }
 
 pub fn io_uring_buf_ring_mask(ring_entries: u32) i32 {
