@@ -6,6 +6,7 @@
 # SETU=... (default: the `setu` path in build.zig.zon); extra pytest arguments after `--`.
 set -euo pipefail
 
+[[ -n ${SETU:-} ]] && SETU=$(realpath -m -- "$SETU") # relative to the caller's cwd, not the repo root
 cd "$(dirname "$0")/.."
 PY_FT=${PY_FT:-/opt/python/3.15t/bin/python3}
 PY_GIL=${PY_GIL:-/opt/python/3.15/bin/python3}
