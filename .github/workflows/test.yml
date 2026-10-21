@@ -92,14 +92,16 @@ jobs:
           path: dist/*.whl
 
   wheel-test:
-    # The glibc wheel of each arch, installed and tested on its own hardware (aarch64: GitHub's arm64 runner;
-    # qemu-user has no io_uring). One `cp314.cp315-abi3.abi3t.cp314t.cp315t` wheel per platform: any pip installs
-    # it on all four interpreters.
+    # The glibc wheel of each arch, installed and tested on its own hardware (aarch64: GitHub's arm64 runners;
+    # qemu-user has no io_uring), on the oldest and newest Ubuntu images GitHub offers, for their kernels:
+    # 22.04 is 6.8 (below README's 6.14: unsupported features must skip, not fail; unsupported from 2027-04-17,
+    # then use the next oldest), 26.04 is 7.0 (2026-10). One `cp314.cp315-abi3.abi3t.cp314t.cp315t` wheel per
+    # platform: any pip installs it on all four interpreters.
     needs: wheels
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        runner: [ubuntu-22.04, ubuntu-26.04, ubuntu-22.04-arm, ubuntu-26.04-arm]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7  # test/ only: no submodules, no zig
@@ -137,6 +139,7 @@ jobs:
 
       - name: Test the installed wheel
         run: |
+          uname -r  # the kernel under test
           wheel=$(ls dist/liburing-*-manylinux_2_28_"$(uname -m)".whl)
           mkdir -p "$RUNNER_TEMP/wheeltest" && cp -r test "$RUNNER_TEMP/wheeltest/"
           for py in "${{ steps.py_ft.outputs.python-path }}" "${{ steps.py_gil.outputs.python-path }}" \
