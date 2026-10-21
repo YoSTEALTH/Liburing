@@ -3,10 +3,10 @@
     .version = "2026.10.19",
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
-        // Setu v2026.10.20.2 (commit d7c3c13).
+        // Setu v2026.10.20.3 (commit 1c9a81a).
         .setu = .{
-            .url = "git+https://github.com/YoSTEALTH/Setu?ref=v2026.10.20.2#d7c3c13e626b3ffeaa9183daa589aa8104464956",
-            .hash = "setu-2026.10.20-f1cYJytmAwBMVcevuu4ZCbURIsUO_6m9LayryAtEzuh9",
+            .url = "git+https://github.com/YoSTEALTH/Setu?ref=v2026.10.20.3#1c9a81ab254e8dd0992ebfb4954a0e35097e1caf",
+            .hash = "setu-2026.10.20-f1cYJyxoAwCA_ll9j7bH7Tu4D0FpyNwpreNJHcRHyaXl",
         },
         // .setu = .{ .path = "../../../Setu/Setu/Code" }, // local debug
     },

@@ -4,7 +4,7 @@ Kept in Setu (`tools/setu_build.py`) and copied unchanged into each project that
 Shakti): the package name (`[project].name`, with its sources in `src/<name>/`) and the release
 matrix (`[tool.setu_build]`) come from `pyproject.toml`.
 
-Only wheels are built (no sdist is published), one per Linux target: tagged `cp314-abi3.abi3t`,
+Only wheels are built (no sdist is published), one per Linux target: tagged `cp314.cp315-abi3.abi3t.cp314t.cp315t`,
 its one extension (`<name>.so`) loads on CPython 3.14, 3.14t, 3.15, 3.15t and later (see Setu's
 `src/capi.zig`). `pip install .` / `pip install git+...` call `build_wheel`, which needs `zig`
 0.17.0 on `PATH` (or `$ZIG`). Release wheels are built from the command line, for any target:
@@ -33,8 +33,9 @@ Note
       this machine's CPU and tagged `linux_<arch>` (fine locally, not for PyPI).
     - The extension links nothing from libpython (symbols resolve at import), so one build
       needs no Python headers or libraries: any interpreter can build every wheel.
-    - The project's `requires-python` should be `>=3.14`; pip 26.2 installs `cp314-abi3.abi3t`
-      wheels on all four builds (older pips may not know `abi3t`).
+    - The project's `requires-python` should be `>=3.14`. Any pip installs the wheel on 3.14, 3.14t,
+      3.15 and 3.15t: `cp314-abi3` for the GIL builds, `cp314-cp314t` / `cp315-cp315t` for pips that
+      do not know `abi3t` (before 26.2). 3.16t and later need pip 26.2+ (`abi3t`).
     - Metadata comes from `pyproject.toml`; the version from `build.zig.zon`.
     - `zig build` also writes `<name>.pyi` (type stubs); the wheel ships it with `py.typed`.
     - A file in `src/<name>/` that `zig build` also installs (`py.typed`, ...) is shipped once, the
@@ -59,7 +60,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # `zig build develop` copies there (the extension and `<name>.pyi` come from the build).
 SKIP = re.compile(r'.*\.(zig|h|so|pyi|py[cod])$|__pycache__')
 # The wheel's Python and ABI tags: CPython 3.14+ with and without the GIL, from one extension.
-TAG = 'cp314-abi3.abi3t'
+# `abi3t` (PEP 803) covers 3.15t and later for pip 26.2+; `cp314t` / `cp315t` are for older pips.
+TAG = 'cp314.cp315-abi3.abi3t.cp314t.cp315t'
 # `--all`: what a release ships, one wheel per target (unless `[tool.setu_build]` says otherwise).
 RELEASE_TARGETS = ('x86_64-linux-gnu.2.28', 'aarch64-linux-gnu.2.28', 'x86_64-linux-musl', 'aarch64-linux-musl')
 # Zip entries get this date unless `SOURCE_DATE_EPOCH` is set (reproducible wheels).
@@ -260,8 +262,10 @@ def build(wheel_directory, target=None, debug=False):
                 data = musl_needed(data, target.split('-')[0])
             wheel.add(f'{name}/{os.path.basename(file)}', data, 0o755 if file.endswith('.so') else 0o644)
         wheel.add(f'{dist_info}/METADATA', metadata(project, ver).encode())
-        python, abis, plat = tag.split('-')
-        tags = ''.join(f'Tag: {python}-{abi}-{plat}\n' for abi in abis.split('.'))  # the expanded tag set
+        pythons, abis, plat = tag.split('-')
+        tags = ''.join(  # the expanded tag set: every python x abi
+            f'Tag: {python}-{abi}-{plat}\n' for python in pythons.split('.') for abi in abis.split('.')
+        )
         wheel.add(
             f'{dist_info}/WHEEL',
             f'Wheel-Version: 1.0\nGenerator: setu_build\nRoot-Is-Purelib: false\n{tags}'.encode(),

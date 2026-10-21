@@ -14,7 +14,7 @@ Good(old) documentation [Lord of the io_uring](https://unixism.net/loti/)
 ## Requires
  - Linux 6.14+ (7.0+ recommended)
  - Python 3.14+ (regular or free-threaded: 3.14, 3.14t, 3.15, 3.15t, ...)
- - pip 26.2+ (older pips may not install its `cp314-abi3.abi3t` wheels)
+ - pip: any for 3.14, 3.14t, 3.15, 3.15t; 26.2+ for 3.16t and later (`abi3t`)
 
 One binary, built on CPython's stable ABI, loads on every supported version. On Python 3.10 to 3.13,
 `pip install liburing` installs the last release that supports them.
@@ -56,7 +56,7 @@ zig build develop                       # `liburing.so` + `liburing.pyi` into sr
 python3.15t -m pytest                   # tests run from the checkout (`pythonpath = ["src"]`)
 tools/check.sh                          # every check: zig fmt, 3.15t / 3.15 / 3.14t / 3.14, mypy --strict, stubtest
 
-python3.15t tools/setu_build.py --all   # release wheels into dist/: cp314-abi3.abi3t, x86_64 + aarch64
+python3.15t tools/setu_build.py --all   # release wheels into dist/ (x86_64 + aarch64)
 ```
 
 ## To find out all the class, functions and definitions

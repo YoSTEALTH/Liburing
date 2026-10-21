@@ -105,7 +105,7 @@ jobs:
       - name: Build wheels
         run: '"${{ steps.py_ft.outputs.python-path }}" tools/setu_build.py --all -o dist'
 
-      # One `cp314-abi3.abi3t` wheel per platform; pip >= 26.2 installs it on all four interpreters.
+      # One `cp314.cp315-abi3.abi3t.cp314t.cp315t` wheel per platform; any pip installs it on all four interpreters.
       - name: Test the installed x86_64 wheel
         run: |
           mkdir -p "$RUNNER_TEMP/wheeltest" && cp -r test "$RUNNER_TEMP/wheeltest/"
@@ -114,7 +114,7 @@ jobs:
             venv="$RUNNER_TEMP/venv-$("$py" -c 'import sys; print(sys.implementation.cache_tag + sys.abiflags)')"
             "$py" -m venv "$venv"
             "$venv/bin/pip" install -U pip
-            "$venv/bin/pip" install pytest dist/liburing-*-cp314-abi3.abi3t-manylinux_2_28_x86_64.whl
+            "$venv/bin/pip" install pytest dist/liburing-*-manylinux_2_28_x86_64.whl
             (cd "$RUNNER_TEMP/wheeltest" && "$venv/bin/python" -m pytest test -rs -p no:cacheprovider)
           done
 

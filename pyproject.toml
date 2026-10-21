@@ -47,6 +47,6 @@ addopts = "-rs"  # list each skip with its reason (`UnsupportedError`, `skip_lin
 line-length = 120
 
 [tool.setu_build]
-# `--all`: one `cp314-abi3.abi3t` wheel (3.14, 3.14t, 3.15, 3.15t and later) for glibc 2.28+ on x86_64 and
-# aarch64 (plan.md decision 7).
+# `--all`: one `cp314.cp315-abi3.abi3t.cp314t.cp315t` wheel (3.14, 3.14t, 3.15, 3.15t and later) for glibc 2.28+
+# on x86_64 and aarch64 (plan.md decision 7).
 targets = ["x86_64-linux-gnu.2.28", "aarch64-linux-gnu.2.28"]
