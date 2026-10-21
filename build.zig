@@ -3,6 +3,7 @@
 //!   zig build          the `liburing` extension, its stubs (`liburing.pyi`) and `py.typed` into zig-out/lib/
 //!   zig build develop  also copy the extension and stubs into src/liburing/ (for `pytest` from a checkout)
 //!   zig build stubs    write the type stubs to src/liburing/liburing.pyi
+//!   zig build load     the HTTP load generator for example/bench/liburing_bench.{py,c} into zig-out/bin/
 //!   zig build setu-build-sync    copy the pinned Setu's tools/setu_build.py into tools/ (never edit it)
 //!   zig build setu-build-check   check that tools/setu_build.py is the pinned Setu's copy
 //!
@@ -126,6 +127,17 @@ pub fn build(b: *std.Build) void {
     const develop = b.step("develop", "Copy the extension and its stubs into src/liburing/");
     develop.dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .{ .custom = "../src/liburing" }, ext_name).step);
     develop.dependOn(&pyi_copy.step);
+
+    // HTTP load generator for `example/bench/` (`zig build load`).
+    const load = b.addExecutable(.{
+        .name = "load",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/load.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+        }),
+    });
+    b.step("load", "Build the HTTP load generator into zig-out/bin/").dependOn(&b.addInstallArtifact(load, .{}).step);
 }
 
 /// The C headers (`src/liburing/c.h`) as a Zig module for `target` (`@import("c")`); `@cImport`

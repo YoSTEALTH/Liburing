@@ -1,8 +1,8 @@
 '''HTTP keep-alive echo server on Liburing's Python API: the same server, response and load as
-Shakti's `example/bench` (`liburing_bench.c` translated line by line).
+`liburing_bench.c` (translated line by line; both from Shakti's `example/bench`).
 
     python3.15t example/bench/liburing_bench.py [port=12345] [--peek | --at]
-    load 12345 64 5 100     # Shakti's `tools/load.zig`: port, connections, seconds, requests/connection
+    zig-out/bin/load 12345 64 5 100     # `zig build load`: port, connections, seconds, requests/connection
 
 One thread, one ring, default flags. Each connection: recv, send the response, recv again. Closes
 the connection when recv or send returns 0 or an error.

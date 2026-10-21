@@ -163,28 +163,30 @@ if __name__ == "__main__":
 
 ```
 
-## Speed: C liburing vs Liburing
+## HTTP server benchmark
 
-The same NOP loops written with the same calls, in C (`example/bench/loop_bench.c`) and in Python
-(`example/bench/loop_bench.py`), ns per operation (lower is better), best of 5:
+The same HTTP keep-alive server (one thread, one ring: accept, recv, send the response, recv again) written in
+C (`example/bench/liburing_bench.c`) and in Python (`example/bench/liburing_bench.py`), under the same load:
+64 connections, 100 requests each, for 5 seconds (`tools/load.zig`). Server CPU time per request (user +
+kernel, lower is better), best of 3:
 
-| case                                    | C liburing | Liburing 3.15 | 3.15t | 3.14 | 3.14t |
-|-----------------------------------------|-----------:|--------------:|------:|-----:|------:|
-| nop serial (submit + wait each)         |         84 |           256 |   263 |  242 |   249 |
-| nop batch x1024                         |         22 |            91 |    90 |   84 |    89 |
-| nop batch x1024 + read `user_data, res` |         24 |           127 |   127 |  127 |   139 |
-| ... + read with `cqe.res_at(i)`         |          - |           122 |   121 |  120 |   121 |
-| `put_sqe` batch x1024                   |         22 |            23 |    23 |   23 |    23 |
+| server                                 | C liburing | Liburing 3.15 | 3.15t |  3.14 | 3.14t |
+|----------------------------------------|-----------:|--------------:|------:|------:|------:|
+| µs/req, `cqe[i]`                       |       1.70 |          2.28 |  2.40 |  2.28 |  2.35 |
+| µs/req, `cqe.user_data_at(i)` (`--at`) |          - |          2.24 |  2.31 |  2.22 |  2.33 |
+| k req/s, `cqe[i]`                      |        288 |           250 |   241 |   249 |   246 |
 
-`put_sqe` copies entries prepared once (`Sqe(1024)`) into the ring: no Python call per operation, the same
-speed as C. AMD Ryzen 9 9900X (one core, `taskset -c 2`), Linux 7.2, Liburing built with `-Drelease`,
-C with `-O2`, 2026-10-20. To run them:
+At this load the client, not the server, is the limit (the C server sits at about 40% of its core), so req/s
+are close; µs/req is the server's own cost. AMD Ryzen 9 9900X, server on one core (`taskset -c 2`), load on
+the others, Linux 7.2, Liburing built with `-Drelease`, C with `-O2`, 2026-10-21. To run them:
 
 ```bash
 zig build develop -Drelease
-PYTHONPATH=src python3.15 example/bench/loop_bench.py
-zig cc -O2 -D_GNU_SOURCE -Ilib/liburing/src/include -o zig-out/bin/loop_bench_c example/bench/loop_bench.c lib/liburing/src/{setup,queue,register,syscall,version}.c
-zig-out/bin/loop_bench_c
+zig build load
+PYTHONPATH=src taskset -c 2 python3.15 example/bench/liburing_bench.py 12345  # or --at
+zig-out/bin/load 12345 64 5 100  # in another terminal: port, connections, seconds, requests/connection
+zig cc -O2 -D_GNU_SOURCE -Ilib/liburing/src/include -o zig-out/bin/liburing_bench_c example/bench/liburing_bench.c lib/liburing/src/{setup,queue,register,syscall,version}.c
+taskset -c 2 zig-out/bin/liburing_bench_c 12345
 ```
 
 ## Note
