@@ -247,9 +247,10 @@ def test_temporary_timespec_survives_until_submit(ring, cqe):
 
 def test_temporary_timespec_link_timeout_and_update(ring, cqe):
     r, w = os.pipe()
+    buf = bytearray(1)  # held: the kernel writes into it after the submit (only paths / timespecs are kept)
     try:
         sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_read(sqe, r, bytearray(1))
+        liburing.io_uring_prep_read(sqe, r, buf)
         sqe.flags = liburing.IOSQE_IO_LINK
         sqe.user_data = 1
         sqe = liburing.io_uring_get_sqe(ring)
@@ -265,6 +266,7 @@ def test_temporary_timespec_link_timeout_and_update(ring, cqe):
         os.write(w, b"x")
         liburing.io_uring_wait_cqe_nr(ring, cqe, 2)
         liburing.io_uring_cq_advance(ring, 2)
+        assert buf == b"x"
     finally:
         os.close(r)
         os.close(w)
