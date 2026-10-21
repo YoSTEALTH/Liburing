@@ -1,5 +1,6 @@
 import faulthandler
 import os
+import resource
 import signal
 import pytest
 import liburing
@@ -15,6 +16,7 @@ def _child_touches_ring(ring):
     pid = os.fork()
     if pid == 0:
         faulthandler.disable()  # expected crash, no traceback noise
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))  # and no core dump
         liburing.io_uring_get_sqe(ring)  # SIGSEGV if ring memory is not in the child.
         os._exit(0)
     return os.waitpid(pid, 0)[1]

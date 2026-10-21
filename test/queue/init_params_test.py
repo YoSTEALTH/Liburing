@@ -52,5 +52,3 @@ def test_setup_clamp():
         assert param.cq_entries == 65536
     finally:
         liburing.io_uring_queue_exit(ring)
-
-
