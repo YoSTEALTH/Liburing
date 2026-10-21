@@ -386,7 +386,7 @@ pub const Cqe = struct {
                 slot.* = keep(new);
                 return new;
             };
-            if (PyUnstable_Object_IsUniquelyReferenced(o) != 0) {
+            if (Py_REFCNT(o) == 1) {
                 const d = CQEType.data(o);
                 d._cqe = cqe;
                 setOwned(&d._owner, ring_obj);
@@ -1674,8 +1674,9 @@ pub fn setOwned(field: *?*Object, obj: *Object) void {
     py.decref(old);
 }
 
-/// Is `obj` referenced only by the caller (on 3.15t too, unlike reading its refcount)?
-extern fn PyUnstable_Object_IsUniquelyReferenced(obj: *Object) c_int;
+/// `obj`'s reference count; a function in the stable ABI (abi3t too), right on 3.15t, unlike reading
+/// `ob_refcnt`. (`PyUnstable_Object_IsUniquelyReferenced` is not in the stable ABI.)
+extern fn Py_REFCNT(obj: *Object) isize;
 
 /// A new reference to `obj`, for an owned (`?*Object`) field.
 pub fn keep(obj: *Object) *Object {

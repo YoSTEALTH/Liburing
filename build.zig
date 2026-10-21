@@ -7,11 +7,10 @@
 //!   zig build setu-build-check   check that tools/setu_build.py is the pinned Setu's copy
 //!
 //! Options:
-//!   -Dfree-threaded=false   build for the regular (GIL) 3.15 instead of 3.15t
 //!   -Drelease               ReleaseSafe (wheels use it, as PyOZ did); without it, Debug. (A preferred release
 //!                           mode leaves no `-Doptimize`.)
 //!   -Dstrip                 drop debug info from the extension (wheels use it)
-//!   -Dext-suffix=...        Python extension suffix (default: CPython's `EXT_SUFFIX` for the target and ABI)
+//!   -Dext-suffix=...        Python extension suffix (default: Setu's `.so`: one stable-ABI binary for 3.14+)
 //!
 //! Wheels are built by `tools/setu_build.py` (the PEP 517 backend), not by a step here.
 const std = @import("std");
@@ -39,10 +38,8 @@ pub fn build(b: *std.Build) void {
     // process instead of corrupting memory.
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
     const strip = b.option(bool, "strip", "Strip debug symbols from the binary") orelse false;
-    const free_threaded = b.option(bool, "free-threaded", "Build for free-threaded 3.15t (default: true)") orelse
-        true;
     const ext_suffix = b.option([]const u8, "ext-suffix", "Python extension module suffix") orelse
-        defaultSuffix(b, target.result, free_threaded);
+        @import("setu").ext_suffix;
 
     // `./configure` generates `compat.h` and `io_uring_version.h` (feature checks, not CPU specific),
     // so it runs on the build machine for every target. It runs on every build (0.4 s): the build
@@ -76,7 +73,6 @@ pub fn build(b: *std.Build) void {
 
     const setu_dep = b.dependency("setu", .{});
     const options = b.addOptions();
-    options.addOption(bool, "free_threaded", free_threaded);
     options.addOption([:0]const u8, "version", zon.version);
 
     // The `liburing` extension module.
@@ -158,15 +154,5 @@ fn cModule(
         .target = target,
         .optimize = optimize,
         .link_libc = true,
-    });
-}
-
-/// CPython's `EXT_SUFFIX` for `target`, like `.cpython-315t-x86_64-linux-gnu.so`.
-fn defaultSuffix(b: *std.Build, target: std.Target, free_threaded: bool) []const u8 {
-    const libc = if (target.abi.isMusl()) "musl" else "gnu";
-    return b.fmt(".cpython-315{s}-{s}-linux-{s}.so", .{
-        if (free_threaded) "t" else "",
-        @tagName(target.cpu.arch),
-        libc,
     });
 }

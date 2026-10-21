@@ -36,15 +36,31 @@ jobs:
           python-version: "3.15"
           allow-prereleases: true
 
+      - name: Python 3.14t (free-threaded)
+        id: py314_ft
+        uses: actions/setup-python@v7
+        with:
+          python-version: 3.14t
+
+      - name: Python 3.14 (GIL)
+        id: py314_gil
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
       - name: Install tools
         run: |
           "${{ steps.py_ft.outputs.python-path }}" -m pip install pytest mypy
           "${{ steps.py_gil.outputs.python-path }}" -m pip install pytest
+          "${{ steps.py314_ft.outputs.python-path }}" -m pip install pytest
+          "${{ steps.py314_gil.outputs.python-path }}" -m pip install pytest
 
       - name: tools/check.sh
         env:
           PY_FT: ${{ steps.py_ft.outputs.python-path }}
           PY_GIL: ${{ steps.py_gil.outputs.python-path }}
+          PY314_FT: ${{ steps.py314_ft.outputs.python-path }}
+          PY314_GIL: ${{ steps.py314_gil.outputs.python-path }}
         run: tools/check.sh
 
   wheels:
@@ -74,17 +90,32 @@ jobs:
           python-version: "3.15"
           allow-prereleases: true
 
+      - name: Python 3.14t (free-threaded)
+        id: py314_ft
+        uses: actions/setup-python@v7
+        with:
+          python-version: 3.14t
+
+      - name: Python 3.14 (GIL)
+        id: py314_gil
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
       - name: Build wheels
         run: '"${{ steps.py_ft.outputs.python-path }}" tools/setu_build.py --all -o dist'
 
-      - name: Test the installed x86_64 wheels
+      # One `cp314-abi3.abi3t` wheel per platform; pip >= 26.2 installs it on all four interpreters.
+      - name: Test the installed x86_64 wheel
         run: |
           mkdir -p "$RUNNER_TEMP/wheeltest" && cp -r test "$RUNNER_TEMP/wheeltest/"
-          for py in "${{ steps.py_ft.outputs.python-path }}" "${{ steps.py_gil.outputs.python-path }}"; do
-            abi=$("$py" -c 'import sysconfig; print("cp315t" if sysconfig.get_config_var("Py_GIL_DISABLED") else "cp315")')
-            "$py" -m venv "$RUNNER_TEMP/venv-$abi"
-            "$RUNNER_TEMP/venv-$abi/bin/pip" install pytest dist/liburing-*-"$abi"-manylinux_2_28_x86_64.whl
-            (cd "$RUNNER_TEMP/wheeltest" && "$RUNNER_TEMP/venv-$abi/bin/python" -m pytest test -rs -p no:cacheprovider)
+          for py in "${{ steps.py_ft.outputs.python-path }}" "${{ steps.py_gil.outputs.python-path }}" \
+                    "${{ steps.py314_ft.outputs.python-path }}" "${{ steps.py314_gil.outputs.python-path }}"; do
+            venv="$RUNNER_TEMP/venv-$("$py" -c 'import sys; print(sys.implementation.cache_tag + sys.abiflags)')"
+            "$py" -m venv "$venv"
+            "$venv/bin/pip" install -U pip
+            "$venv/bin/pip" install pytest dist/liburing-*-cp314-abi3.abi3t-manylinux_2_28_x86_64.whl
+            (cd "$RUNNER_TEMP/wheeltest" && "$venv/bin/python" -m pytest test -rs -p no:cacheprovider)
           done
 
       - uses: actions/upload-artifact@v6

@@ -16,7 +16,9 @@ const header =
     \\import os
     \\from collections.abc import Buffer, Generator, Sequence
     \\from enum import IntEnum
-    \\from typing import Any, ClassVar, Self, disjoint_base, final
+    \\from typing import Any, ClassVar, Self, final
+    \\
+    \\from typing_extensions import disjoint_base  # `typing` has it from 3.15 (PEP 800); stubs cover 3.14 too
     \\
     \\__version__: str
     \\LIBURING_HAVE_DATA64: str

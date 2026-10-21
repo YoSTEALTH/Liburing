@@ -2,7 +2,7 @@
 name = "liburing"
 description = "Liburing is Python + Zig wrapper around C Liburing, which is a helper to setup and tear-down io_uring instances."
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.15"
+requires-python = ">=3.14"
 license = "CC0-1.0"
 license-files = ["LICENSE.txt"]
 authors = [{ name = "YoSTEALTH" }]
@@ -11,8 +11,9 @@ classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3.15",
-  "Programming Language :: Python :: Free Threading :: 1 - Unstable",  # 3.15t wheel, but the GIL stays on
+  "Programming Language :: Python :: Free Threading :: 1 - Unstable",  # loads on 3.14t / 3.15t, but the GIL stays on
   "Topic :: Software Development"
 ]
 dependencies = []
@@ -46,6 +47,6 @@ addopts = "-rs"  # list each skip with its reason (`UnsupportedError`, `skip_lin
 line-length = 120
 
 [tool.setu_build]
-# `--all`: cp315 / cp315t wheels for glibc 2.28+ on x86_64 and aarch64 (plan.md decision 7).
-abis = ["cp315t", "cp315"]
+# `--all`: one `cp314-abi3.abi3t` wheel (3.14, 3.14t, 3.15, 3.15t and later) for glibc 2.28+ on x86_64 and
+# aarch64 (plan.md decision 7).
 targets = ["x86_64-linux-gnu.2.28", "aarch64-linux-gnu.2.28"]

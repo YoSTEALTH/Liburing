@@ -3,11 +3,8 @@
     .version = "2026.10.19",
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
-        .setu = .{
-            .url = "https://github.com/YoSTEALTH/Setu/archive/refs/tags/v2026.10.19.2.tar.gz",
-            .hash = "setu-2026.10.19-f1cYJ5M0AwDKJtS21wDwpYGZ0ugLcxHXfCnPUhbiCS22",
-        },
-        // .setu = .{ .path = "../../../Setu/Zig/Setu" }, // local debug
+        // Back to `.url` + `.hash` once Setu tags its stable-ABI release (v2026.10.19.2 predates it).
+        .setu = .{ .path = "../../../Setu/Setu/Code" },
     },
     .paths = .{
         "build.zig",

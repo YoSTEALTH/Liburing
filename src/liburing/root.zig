@@ -1,4 +1,4 @@
-//! Liburing: the `liburing` extension module (PEP 793 export, Setu).
+//! Liburing: the `liburing` extension module (Setu's `py.exportModule`).
 const std = @import("std");
 const api = @import("api.zig");
 const setu = @import("setu");
@@ -73,25 +73,15 @@ fn shortName(comptime full: []const u8) [:0]const u8 {
     return (s ++ "\x00")[0..s.len :0];
 }
 
-const abi_info: sc.ABIInfo = .{
-    .flags = if (build_options.free_threaded) sc.PyABIInfo_FREETHREADED else sc.PyABIInfo_GIL,
-    .build_version = sc.version_3_15,
-    .abi_version = sc.version_3_15,
-};
-
-const module_slots = [_]sc.Slot{
-    sc.Slot.data(sc.Py_mod_abi, &abi_info),
-    sc.Slot.data(sc.Py_mod_name, "liburing"),
-    sc.Slot.data(sc.Py_mod_doc, "Python + Zig wrapper around C liburing."),
-    sc.Slot.static(sc.Py_mod_methods, &module_methods),
-    sc.Slot.func(sc.Py_mod_exec, @ptrCast(&exec)),
-    // A `Ring` is not safe to share across threads (plan.md decision 4).
-    sc.Slot.uint(sc.Py_mod_gil, sc.Py_MOD_GIL_USED),
-    sc.Slot.uint(sc.Py_mod_multiple_interpreters, sc.Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED),
-    sc.Slot.end,
-};
-
-/// PEP 793 entry point: CPython 3.15 looks up `PyModExport_<name>`.
-export fn PyModExport_liburing() callconv(.c) [*]const sc.Slot {
-    return &module_slots;
+// The module: `PyModExport_liburing` (3.15+) and `PyInit_liburing` (3.14), one stable-ABI binary.
+// `gil`: a `Ring` is not safe to share across threads (plan.md decision 4), so the free-threaded
+// CPython enables the GIL on import.
+comptime {
+    py.exportModule(.{
+        .name = "liburing",
+        .doc = "Python + Zig wrapper around C liburing.",
+        .methods = &module_methods,
+        .exec = &exec,
+        .gil = true,
+    });
 }

@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Runs every Liburing check: zig fmt, `tools/setu_build.py` against the pinned Setu, then for both
-# 3.15 builds `zig build develop` and pytest, then `mypy --strict` + `stubtest` on `liburing.pyi`.
-# Interpreters: PY_FT=... / PY_GIL=...; compiler: ZIG=...; extra pytest arguments after `--`.
+# Runs every Liburing check: zig fmt, `tools/setu_build.py` against the pinned Setu, `zig build develop` (the one
+# stable-ABI `liburing.so`), then with each interpreter (3.15t, 3.15, 3.14t, 3.14) Setu's `check_symbols.py` and
+# pytest, then `mypy --strict` (as 3.14 and 3.15) + `stubtest` on `liburing.pyi`.
+# Interpreters: PY_FT=... / PY_GIL=... (3.15), PY314_FT=... / PY314_GIL=...; compiler: ZIG=...; Setu checkout:
+# SETU=... (default: the `setu` path in build.zig.zon); extra pytest arguments after `--`.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 PY_FT=${PY_FT:-/opt/python/3.15t/bin/python3}
 PY_GIL=${PY_GIL:-/opt/python/3.15/bin/python3}
+PY314_FT=${PY314_FT:-/opt/python/3.14t/bin/python3}
+PY314_GIL=${PY314_GIL:-/opt/python/3.14/bin/python3}
+SETU=${SETU:-../../../Setu/Setu/Code}
 ZIG=${ZIG:-zig}
 [[ ${1:-} == -- ]] && shift
 PYTEST_ARGS=("$@")
@@ -19,20 +24,22 @@ step "zig fmt"
 step "tools/setu_build.py is the pinned Setu's copy"
 "$ZIG" build setu-build-check
 
-for py in "$PY_FT" "$PY_GIL"; do
-    if [[ $("$py" -c 'import sysconfig; print(sysconfig.get_config_var("Py_GIL_DISABLED") or 0)') == 1 ]]; then
-        flag=-Dfree-threaded=true
+step "zig build develop"
+"$ZIG" build develop # src/liburing/liburing.so: one binary for every interpreter below
+
+for py in "$PY_FT" "$PY_GIL" "$PY314_FT" "$PY314_GIL"; do
+    step "$py"
+    if [[ -f $SETU/tools/check_symbols.py ]]; then
+        "$py" "$SETU/tools/check_symbols.py" src/liburing/liburing.so # exported by $py, and in abi3t (3.15+)
     else
-        flag=-Dfree-threaded=false
+        echo "skipped check_symbols.py: no Setu checkout at $SETU"
     fi
-    step "$py ($flag)"
-    "$ZIG" build develop "$flag"
     "$py" -m pytest "${PYTEST_ARGS[@]}"
 done
 
 step "mypy --strict + stubtest ($PY_FT)"
 if "$PY_FT" -c 'import mypy' 2>/dev/null; then
-    "$ZIG" build develop -Dfree-threaded=true
+    (cd src && "$PY_FT" -m mypy --strict --python-version 3.14 liburing/liburing.pyi)
     (cd src && "$PY_FT" -m mypy --strict liburing/liburing.pyi)
     (cd src && PYTHONPATH=. "$PY_FT" -m mypy.stubtest liburing.liburing)
 else

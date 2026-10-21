@@ -4,14 +4,14 @@ Kept in Setu (`tools/setu_build.py`) and copied unchanged into each project that
 Shakti): the package name (`[project].name`, with its sources in `src/<name>/`) and the release
 matrix (`[tool.setu_build]`) come from `pyproject.toml`.
 
-Only wheels are built (no sdist is published). `pip install .` / `pip install git+...` call
-`build_wheel` for the running interpreter, which needs `zig` 0.17.0 on `PATH` (or `$ZIG`).
-Release wheels are built from the command line, for either ABI and any Linux target:
+Only wheels are built (no sdist is published), one per Linux target: tagged `cp314-abi3.abi3t`,
+its one extension (`<name>.so`) loads on CPython 3.14, 3.14t, 3.15, 3.15t and later (see Setu's
+`src/capi.zig`). `pip install .` / `pip install git+...` call `build_wheel`, which needs `zig`
+0.17.0 on `PATH` (or `$ZIG`). Release wheels are built from the command line, for any target:
 
-    python3.15t tools/setu_build.py                                   # this interpreter, native CPU
-    python3.15t tools/setu_build.py --abi cp315 --target x86_64-linux-gnu.2.28
-    python3.15t tools/setu_build.py --abi cp315t --target aarch64-linux-musl -o dist
-    python3.15t tools/setu_build.py --all                             # every release wheel -> dist/
+    python3 tools/setu_build.py                                   # native CPU
+    python3 tools/setu_build.py --target aarch64-linux-musl -o dist
+    python3 tools/setu_build.py --all                             # every release wheel -> dist/
 
 A project keeps this file unchanged (Setu tests it, and its tag notes say when it changed). Its
 `build.zig` gets two steps for that (`setu` in its `build.zig.zon`):
@@ -24,7 +24,6 @@ A project keeps this file unchanged (Setu tests it, and its tag notes say when i
 Settings (`[tool.setu_build]` in `pyproject.toml`; anything project-specific goes there, never in this
 file):
 
-    abis     the ABIs `--all` builds (default `RELEASE_ABIS`: ["cp315t", "cp315"])
     targets  the Zig targets `--all` builds (default `RELEASE_TARGETS`: glibc 2.28 and musl, x86_64
              and aarch64)
 
@@ -33,9 +32,13 @@ Note
       wheel, `<arch>-linux-musl` a `musllinux_1_2` one. Without it the wheel is built for
       this machine's CPU and tagged `linux_<arch>` (fine locally, not for PyPI).
     - The extension links nothing from libpython (symbols resolve at import), so one build
-      needs no Python headers or libraries: one interpreter can build every wheel.
+      needs no Python headers or libraries: any interpreter can build every wheel.
+    - The project's `requires-python` should be `>=3.14`; pip 26.2 installs `cp314-abi3.abi3t`
+      wheels on all four builds (older pips may not know `abi3t`).
     - Metadata comes from `pyproject.toml`; the version from `build.zig.zon`.
     - `zig build` also writes `<name>.pyi` (type stubs); the wheel ships it with `py.typed`.
+    - A file in `src/<name>/` that `zig build` also installs (`py.typed`, ...) is shipped once, the
+      built copy; the wheel never holds a name twice.
 '''
 
 import argparse
@@ -46,7 +49,6 @@ import platform
 import re
 import struct
 import subprocess
-import sysconfig
 import tempfile
 import time
 import tomllib
@@ -56,8 +58,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Files in `src/<name>/` that are not shipped as they are: sources, caches, and what
 # `zig build develop` copies there (the extension and `<name>.pyi` come from the build).
 SKIP = re.compile(r'.*\.(zig|h|so|pyi|py[cod])$|__pycache__')
-# `--all`: what a release ships, every ABI x every target (unless `[tool.setu_build]` says otherwise).
-RELEASE_ABIS = ('cp315t', 'cp315')
+# The wheel's Python and ABI tags: CPython 3.14+ with and without the GIL, from one extension.
+TAG = 'cp314-abi3.abi3t'
+# `--all`: what a release ships, one wheel per target (unless `[tool.setu_build]` says otherwise).
 RELEASE_TARGETS = ('x86_64-linux-gnu.2.28', 'aarch64-linux-gnu.2.28', 'x86_64-linux-musl', 'aarch64-linux-musl')
 # Zip entries get this date unless `SOURCE_DATE_EPOCH` is set (reproducible wheels).
 EPOCH = (1980, 1, 1, 0, 0, 0)
@@ -74,11 +77,13 @@ def pyproject():
         return tomllib.load(f)['project']
 
 
-def release_matrix():
-    '''`(abis, targets)` for `--all`: `[tool.setu_build]` in `pyproject.toml`, else the defaults.'''
+def release_targets():
+    '''The targets for `--all`: `[tool.setu_build]` in `pyproject.toml`, else the defaults.'''
     with open(os.path.join(ROOT, 'pyproject.toml'), 'rb') as f:
         settings = tomllib.load(f).get('tool', {}).get('setu_build', {})
-    return tuple(settings.get('abis', RELEASE_ABIS)), tuple(settings.get('targets', RELEASE_TARGETS))
+    if 'abis' in settings:
+        raise SystemExit(f'[tool.setu_build] abis: gone, every wheel is {TAG} (one per target); remove it')
+    return tuple(settings.get('targets', RELEASE_TARGETS))
 
 
 def metadata(project, ver):
@@ -121,10 +126,10 @@ def platform_tag(target):
     return f'manylinux_{major}_{minor}_{arch}'
 
 
-def zig_build(abi, target, debug, prefix):
+def zig_build(target, debug, prefix):
     '''Runs `zig build` into `prefix`; returns the built files (the extension, `<name>.pyi`).'''
     zig = os.environ.get('ZIG', 'zig')
-    cmd = [zig, 'build', f'-Dfree-threaded={str(abi.endswith("t")).lower()}', '--prefix', prefix]
+    cmd = [zig, 'build', '--prefix', prefix]
     if not debug:
         cmd += ['-Drelease', '-Dstrip']  # build.zig: ReleaseFast, no debug info
     if target is not None:
@@ -132,8 +137,8 @@ def zig_build(abi, target, debug, prefix):
     subprocess.run(cmd, cwd=ROOT, check=True)
     names = sorted(os.listdir(os.path.join(prefix, 'lib')))
     (extension,) = [n for n in names if n.endswith('.so')]
-    if target is None and abi == this_abi() and not extension.endswith(sysconfig.get_config_var('EXT_SUFFIX')):
-        raise SystemExit(f'built {extension}, but this interpreter wants {sysconfig.get_config_var("EXT_SUFFIX")}')
+    if extension.count('.') != 1:  # `.abi3.so` / `.abi3t.so` / `.cpython-*.so` load on some versions only
+        raise SystemExit(f'built {extension}: want <name>.so (Setu\'s `ext_suffix`), which every CPython 3.14+ loads')
     return [os.path.join(prefix, 'lib', n) for n in names]
 
 
@@ -205,11 +210,6 @@ def musl_needed(data, arch):
     return bytes(data)
 
 
-def this_abi():
-    '''`cp315t` or `cp315` for the running interpreter.'''
-    return 'cp315t' if sysconfig.get_config_var('Py_GIL_DISABLED') else 'cp315'
-
-
 class Wheel:
     '''Writes a wheel zip and its `RECORD`.'''
 
@@ -220,6 +220,8 @@ class Wheel:
         self.date = EPOCH if epoch is None else time.gmtime(int(epoch))[:6]
 
     def add(self, name, data, mode=0o644):
+        if any(r.startswith(f'{name},') for r in self.record):
+            raise SystemExit(f'setu_build: {name} is in the wheel twice')
         info = zipfile.ZipInfo(name, self.date)
         info.external_attr = (0o100000 | mode) << 16
         info.compress_type = zipfile.ZIP_DEFLATED
@@ -233,22 +235,22 @@ class Wheel:
         self.zip.close()
 
 
-def build(wheel_directory, abi=None, target=None, debug=False):
+def build(wheel_directory, target=None, debug=False):
     '''Builds one wheel into `wheel_directory`; returns its file name.'''
-    abi = abi or this_abi()
     project, ver = pyproject(), version()
     name = project['name']
-    tag = f'cp315-{abi}-{platform_tag(target)}'
+    tag = f'{TAG}-{platform_tag(target)}'
     filename = f'{name}-{ver}-{tag}.whl'
     dist_info = f'{name}-{ver}.dist-info'
     os.makedirs(wheel_directory, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as prefix:
-        built = zig_build(abi, target, debug, prefix)
+        built = zig_build(target, debug, prefix)
         wheel = Wheel(os.path.join(wheel_directory, filename))
         package = os.path.join(ROOT, 'src', name)
+        made = {os.path.basename(file) for file in built}  # what the build makes wins (`py.typed`, ...)
         for file in sorted(os.listdir(package)):
-            if not SKIP.match(file) and os.path.isfile(os.path.join(package, file)):
+            if not SKIP.match(file) and file not in made and os.path.isfile(os.path.join(package, file)):
                 with open(os.path.join(package, file), 'rb') as f:
                     wheel.add(f'{name}/{file}', f.read())
         for file in built:
@@ -258,9 +260,11 @@ def build(wheel_directory, abi=None, target=None, debug=False):
                 data = musl_needed(data, target.split('-')[0])
             wheel.add(f'{name}/{os.path.basename(file)}', data, 0o755 if file.endswith('.so') else 0o644)
         wheel.add(f'{dist_info}/METADATA', metadata(project, ver).encode())
+        python, abis, plat = tag.split('-')
+        tags = ''.join(f'Tag: {python}-{abi}-{plat}\n' for abi in abis.split('.'))  # the expanded tag set
         wheel.add(
             f'{dist_info}/WHEEL',
-            f'Wheel-Version: 1.0\nGenerator: setu_build\nRoot-Is-Purelib: false\nTag: {tag}\n'.encode(),
+            f'Wheel-Version: 1.0\nGenerator: setu_build\nRoot-Is-Purelib: false\n{tags}'.encode(),
         )
         for license_file in project.get('license-files', []):
             with open(os.path.join(ROOT, license_file), 'rb') as f:
@@ -278,9 +282,9 @@ def get_requires_for_build_wheel(config_settings=None):
 
 
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
-    '''Wheel for this interpreter. `pip ... -C target=<zig target>` / `-C debug=1` pass options.'''
+    '''The wheel (for every CPython 3.14+). `pip ... -C target=<zig target>` / `-C debug=1` pass options.'''
     settings = config_settings or {}
-    return build(wheel_directory, settings.get('abi'), settings.get('target'), bool(settings.get('debug')))
+    return build(wheel_directory, settings.get('target'), bool(settings.get('debug')))
 
 
 # --- command line -----------------------------------------------------------------------
@@ -288,20 +292,17 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
 
 def main():
     parser = argparse.ArgumentParser(description=f'Build a {pyproject()["name"]} wheel with zig build.')
-    parser.add_argument('--abi', choices=['cp315', 'cp315t'], help='default: this interpreter')
     parser.add_argument('--target', help='Zig target, like x86_64-linux-gnu.2.28 (default: native)')
     parser.add_argument(
-        '--all', action='store_true', help='build every release wheel ([tool.setu_build] abis x targets)'
+        '--all', action='store_true', help='build every release wheel (one per [tool.setu_build] target)'
     )
     parser.add_argument('--debug', action='store_true', help='Debug build instead of ReleaseFast')
     parser.add_argument('-o', '--out', default=os.path.join(ROOT, 'dist'), help='output directory (default: dist/)')
     args = parser.parse_args()
-    if args.all and (args.abi or args.target):
-        parser.error('--all builds every --abi and --target; give neither')
-    abis, targets = release_matrix()
-    jobs = [(a, t) for a in abis for t in targets] if args.all else [(args.abi, args.target)]
-    for abi, target in jobs:
-        print(os.path.join(args.out, build(args.out, abi, target, args.debug)))
+    if args.all and args.target:
+        parser.error('--all builds every target; give no --target')
+    for target in release_targets() if args.all else [args.target]:
+        print(os.path.join(args.out, build(args.out, target, args.debug)))
 
 
 if __name__ == '__main__':

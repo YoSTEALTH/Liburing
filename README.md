@@ -1,5 +1,5 @@
 # Liburing
-[![Python](https://img.shields.io/badge/python-3.15%20%7C%203.15t-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.14%20%7C%203.14t%20%7C%203.15%20%7C%203.15t-blue)](https://www.python.org/)
 [![Zig](https://img.shields.io/badge/zig-0.17.0-orange)](https://ziglang.org/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/liburing)
 [![Test status](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml) 
@@ -13,9 +13,11 @@ Good(old) documentation [Lord of the io_uring](https://unixism.net/loti/)
 
 ## Requires
  - Linux 6.14+ (7.0+ recommended)
- - Python 3.15+ (regular or free-threaded 3.15t)
+ - Python 3.14+ (regular or free-threaded: 3.14, 3.14t, 3.15, 3.15t, ...)
+ - pip 26.2+ (older pips may not install its `cp314-abi3.abi3t` wheels)
 
-Note: on Python 3.10 to 3.14, `pip install liburing` installs the last release that supports them.
+One binary, built on CPython's stable ABI, loads on every supported version. On Python 3.10 to 3.13,
+`pip install liburing` installs the last release that supports them.
 
 ## Includes (battery)
  - C liburing 2.15+
@@ -41,21 +43,20 @@ cd /tmp
 git clone --recurse-submodules https://github.com/YoSTEALTH/Liburing
 cd Liburing
 
-python3.15 -m pip install .     # builds the wheel with `zig build` (tools/setu_build.py), no other dependencies
+python3 -m pip install .        # builds the wheel with `zig build` (tools/setu_build.py), no other dependencies
 
 # uninstall
-python3.15 -m pip uninstall liburing
+python3 -m pip uninstall liburing
 ```
 
 ## Development
 
 ```bash
-zig build develop                       # extension + `liburing.pyi` into src/liburing/ (for Python 3.15t)
-zig build develop -Dfree-threaded=false # the same, for Python 3.15
+zig build develop                       # `liburing.so` + `liburing.pyi` into src/liburing/ (one binary, 3.14+)
 python3.15t -m pytest                   # tests run from the checkout (`pythonpath = ["src"]`)
-tools/check.sh                          # every check: zig fmt, both interpreters, mypy --strict, stubtest
+tools/check.sh                          # every check: zig fmt, 3.15t / 3.15 / 3.14t / 3.14, mypy --strict, stubtest
 
-python3.15t tools/setu_build.py --all   # release wheels into dist/: cp315 + cp315t, x86_64 + aarch64
+python3.15t tools/setu_build.py --all   # release wheels into dist/: cp314-abi3.abi3t, x86_64 + aarch64
 ```
 
 ## To find out all the class, functions and definitions
