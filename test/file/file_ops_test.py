@@ -3,19 +3,22 @@
 import os
 import pytest
 import liburing as L
+import kernel
 
 
 def run(ring, cqe, prep, *args, **kwargs):
-    """Prepares one operation, waits for it and gives its `res` (`OSError` if it failed)."""
+    """Prepares one operation, waits for it and gives its `res` (`OSError` if it failed, `UnsupportedError`
+    when the kernel has no such operation)."""
     sqe = L.io_uring_get_sqe(ring)
     prep(sqe, *args, **kwargs)
+    op = sqe.opcode
     sqe.user_data = 42
     assert L.io_uring_submit(ring) == 1
     assert L.io_uring_wait_cqe(ring, cqe) == 0
     entry = cqe[0]
     try:
         assert entry.user_data == 42
-        return entry.res
+        return kernel.res(entry, op)
     finally:
         L.io_uring_cqe_seen(ring, entry)
 

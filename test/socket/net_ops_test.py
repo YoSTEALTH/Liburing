@@ -7,19 +7,22 @@ import socket
 import select
 import pytest
 import liburing as L
+import kernel
 
 
 def one(ring, cqe, prep, *args, **kwargs):
-    """Prepares one operation and gives its `res` (`OSError` for a failed one)."""
+    """Prepares one operation and gives its `res` (`OSError` for a failed one, `UnsupportedError` for
+    one the kernel doesn't have)."""
     sqe = L.io_uring_get_sqe(ring)
     prep(sqe, *args, **kwargs)
+    op = sqe.opcode
     sqe.user_data = 9
     assert L.io_uring_submit(ring) == 1
     assert L.io_uring_wait_cqe(ring, cqe) == 0
     entry = cqe[0]
     try:
         assert entry.user_data == 9
-        return entry.res
+        return kernel.res(entry, op)
     finally:
         L.io_uring_cqe_seen(ring, entry)
 

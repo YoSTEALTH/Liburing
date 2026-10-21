@@ -1,6 +1,7 @@
 //! `UnsupportedError`: tells "this kernel has no `IORING_REGISTER_X`" apart from a bad argument. The kernel
 //! says `EINVAL` for both, so after a call failed (never on success) the kernel's answer is looked at: what
 //! `IORING_REGISTER_QUERY` said at import when it has it, else the table of the kernel each opcode came in.
+//! For a call that needs an `IORING_FEAT_*`, the ring's `features` (what the kernel said at setup) tell.
 const std = @import("std");
 const setu = @import("setu");
 const c = @import("c.zig").c;
@@ -25,8 +26,10 @@ const doc =
     \\
     \\Note
     \\    - `errno` is the kernel's (`EINVAL`, or `EBADF` for a call without a ring on kernels before 6.13).
-    \\    - Raised by the `io_uring_register_*` functions and by `io_uring_queue_init*` (setup flags, on kernels
-    \\    that have `IORING_REGISTER_QUERY`). An unsupported `IORING_OP_*` fails in its CQE: `probe()` tells.
+    \\    - Raised by the `io_uring_register_*` functions, by `io_uring_queue_init*` (setup flags, on kernels
+    \\    that have `IORING_REGISTER_QUERY`) and by calls that need an `IORING_FEAT_*` the ring lacks
+    \\    (`io_uring_set_iowait`, the `*_min_timeout` waits). An unsupported `IORING_OP_*` fails in its CQE:
+    \\    `probe()` tells.
 ;
 
 /// Creates `UnsupportedError` (`OSError` subclass) and adds it to `module`.
@@ -86,6 +89,23 @@ fn setupFailed(res: c_int, flags: u32) py.Error {
             return unsupported(name, res);
         }
     };
+    _ = try py.checkErrno(res);
+    unreachable;
+}
+
+/// `res` when it is `>= 0`, else `UnsupportedError` when the ring's `features` lack `name` (an
+/// `IORING_FEAT_*` the call needs: liburing fails it before the kernel is asked), else `OSError`.
+///
+/// Example
+///     >>> return support.feature("IORING_FEAT_NO_IOWAIT", ring.features, c.io_uring_set_iowait(ring, enable));
+pub inline fn feature(comptime name: [:0]const u8, features: u32, res: c_int) py.Error!c_int {
+    if (res >= 0) return res;
+    return featureFailed(name, features & @field(c, name) != 0, res);
+}
+
+fn featureFailed(name: []const u8, has: bool, res: c_int) py.Error {
+    @branchHint(.cold);
+    if (!has) return unsupported(name, res);
     _ = try py.checkErrno(res);
     unreachable;
 }

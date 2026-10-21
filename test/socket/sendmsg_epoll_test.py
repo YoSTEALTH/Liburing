@@ -7,20 +7,23 @@ import socket
 import struct
 import pytest
 import liburing as L
+import kernel
 
 EPOLL_CTL_ADD = 1
+FIXED_ZC = "`IORING_OP_SENDMSG_ZC` with `IORING_RECVSEND_FIXED_BUF`"
 
 
 def one(ring, cqe, prep, *args, **kwargs):
     sqe = L.io_uring_get_sqe(ring)
     prep(sqe, *args, **kwargs)
+    op = sqe.opcode
     sqe.user_data = 9
     assert L.io_uring_submit(ring) == 1
     assert L.io_uring_wait_cqe_timeout(ring, cqe, L.timespec(2)) == 0
     entry = cqe[0]
     try:
         assert entry.user_data == 9
-        return entry.res
+        return kernel.res(entry, op)
     finally:
         L.io_uring_cqe_seen(ring, entry)
 
@@ -231,8 +234,10 @@ def test_sendmsg_zc_fixed(ring, cqe, udp):
         while True:
             assert L.io_uring_wait_cqe_timeout(ring, cqe, L.timespec(2)) == 0
             more = cqe[0].flags & L.IORING_CQE_F_MORE
-            res = cqe[0].res
-            L.io_uring_cqe_seen(ring, cqe[0])
+            try:  # registered buffers for vectored ops came with `IORING_OP_READV_FIXED` (6.15)
+                kernel.res(cqe[0], "IORING_OP_READV_FIXED", name=FIXED_ZC)
+            finally:
+                L.io_uring_cqe_seen(ring, cqe[0])
             if not more:
                 break
         assert rx.recv(16) == b"fixed-zc"

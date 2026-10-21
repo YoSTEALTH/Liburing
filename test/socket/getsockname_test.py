@@ -1,6 +1,7 @@
 import errno
 import pytest
 import liburing
+import kernel
 
 
 # `SOCKET_URING_OP_GETSOCKNAME`: a socket command has no probe, the CQE says `EOPNOTSUPP`.
@@ -38,7 +39,7 @@ def test_getsockname(ring, cqe):
         sqe.user_data = i + 1
         assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
         entry = cqe[0]
-        assert entry.res == 0
+        assert kernel.res(entry, "IORING_OP_BIND") == 0
         assert entry.user_data == i + 1
         liburing.io_uring_cqe_seen(ring, entry)
 

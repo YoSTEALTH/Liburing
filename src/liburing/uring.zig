@@ -239,7 +239,7 @@ pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, 
 pub fn io_uring_wait_cqes_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_ts_usec: u32, sigmask: ?*SigsetT) py.Error!i32 {
     const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const r = try ring.checkedPtr();
-    return py.checkErrno(wait(r, wait_nr, c.io_uring_wait_cqes_min_timeout, .{
+    return support.feature("IORING_FEAT_MIN_TIMEOUT", r.features, wait(r, wait_nr, c.io_uring_wait_cqes_min_timeout, .{
         r,
         cqe.outFor(ring),
         wait_nr,
@@ -299,7 +299,7 @@ pub fn io_uring_submit_and_wait_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32
     defer ring.releaseSubmitted(); // the kernel has read the prepared paths
     const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const r = try ring.checkedPtr();
-    return py.checkErrno(wait(r, wait_nr, c.io_uring_submit_and_wait_min_timeout, .{
+    return support.feature("IORING_FEAT_MIN_TIMEOUT", r.features, wait(r, wait_nr, c.io_uring_submit_and_wait_min_timeout, .{
         r,
         cqe.outFor(ring),
         wait_nr,
@@ -659,7 +659,8 @@ pub fn io_uring_free_buf_ring(ring: *Ring, br: *BufRing, nentries: u32, bgid: i3
 }
 
 pub fn io_uring_set_iowait(ring: *Ring, enable_iowait: bool) py.Error!i32 {
-    return py.checkErrno(c.io_uring_set_iowait(try ring.checkedPtr(), enable_iowait));
+    const r = try ring.checkedPtr();
+    return support.feature("IORING_FEAT_NO_IOWAIT", r.features, c.io_uring_set_iowait(r, enable_iowait));
 }
 
 /// Example
