@@ -64,7 +64,7 @@ jobs:
         run: tools/check.sh
 
   wheels:
-    # Every release wheel ([tool.setu_build] in pyproject.toml); the x86_64 ones are tested installed.
+    # Every release wheel ([tool.setu_build] in pyproject.toml); `wheel-test` installs and tests them.
     needs: check
     runs-on: ubuntu-24.04
     steps:
@@ -75,6 +75,39 @@ jobs:
       - uses: mlugg/setup-zig@v2
         with:
           version: 0.17.0
+
+      - name: Python 3.15t (free-threaded)
+        id: py_ft
+        uses: actions/setup-python@v7
+        with:
+          python-version: 3.15t
+          allow-prereleases: true
+
+      - name: Build wheels
+        run: '"${{ steps.py_ft.outputs.python-path }}" tools/setu_build.py --all -o dist'
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels
+          path: dist/*.whl
+
+  wheel-test:
+    # The glibc wheel of each arch, installed and tested on its own hardware (aarch64: GitHub's arm64 runner;
+    # qemu-user has no io_uring). One `cp314.cp315-abi3.abi3t.cp314t.cp315t` wheel per platform: any pip installs
+    # it on all four interpreters.
+    needs: wheels
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7  # test/ only: no submodules, no zig
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: wheels
+          path: dist
 
       - name: Python 3.15t (free-threaded)
         id: py_ft
@@ -102,23 +135,15 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Build wheels
-        run: '"${{ steps.py_ft.outputs.python-path }}" tools/setu_build.py --all -o dist'
-
-      # One `cp314.cp315-abi3.abi3t.cp314t.cp315t` wheel per platform; any pip installs it on all four interpreters.
-      - name: Test the installed x86_64 wheel
+      - name: Test the installed wheel
         run: |
+          wheel=$(ls dist/liburing-*-manylinux_2_28_"$(uname -m)".whl)
           mkdir -p "$RUNNER_TEMP/wheeltest" && cp -r test "$RUNNER_TEMP/wheeltest/"
           for py in "${{ steps.py_ft.outputs.python-path }}" "${{ steps.py_gil.outputs.python-path }}" \
                     "${{ steps.py314_ft.outputs.python-path }}" "${{ steps.py314_gil.outputs.python-path }}"; do
             venv="$RUNNER_TEMP/venv-$("$py" -c 'import sys; print(sys.implementation.cache_tag + sys.abiflags)')"
             "$py" -m venv "$venv"
             "$venv/bin/pip" install -U pip
-            "$venv/bin/pip" install pytest dist/liburing-*-manylinux_2_28_x86_64.whl
+            "$venv/bin/pip" install pytest "$wheel"
             (cd "$RUNNER_TEMP/wheeltest" && "$venv/bin/python" -m pytest test -rs -p no:cacheprovider)
           done
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: wheels
-          path: dist/*.whl
