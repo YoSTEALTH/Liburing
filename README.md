@@ -163,6 +163,30 @@ if __name__ == "__main__":
 
 ```
 
+## Speed: C liburing vs Liburing
+
+The same NOP loops written with the same calls, in C (`example/bench/loop_bench.c`) and in Python
+(`example/bench/loop_bench.py`), ns per operation (lower is better), best of 5:
+
+| case                                    | C liburing | Liburing 3.15 | 3.15t | 3.14 | 3.14t |
+|-----------------------------------------|-----------:|--------------:|------:|-----:|------:|
+| nop serial (submit + wait each)         |         84 |           256 |   263 |  242 |   249 |
+| nop batch x1024                         |         22 |            91 |    90 |   84 |    89 |
+| nop batch x1024 + read `user_data, res` |         24 |           127 |   127 |  127 |   139 |
+| ... + read with `cqe.res_at(i)`         |          - |           122 |   121 |  120 |   121 |
+| `put_sqe` batch x1024                   |         22 |            23 |    23 |   23 |    23 |
+
+`put_sqe` copies entries prepared once (`Sqe(1024)`) into the ring: no Python call per operation, the same
+speed as C. AMD Ryzen 9 9900X (one core, `taskset -c 2`), Linux 7.2, Liburing built with `-Drelease`,
+C with `-O2`, 2026-10-20. To run them:
+
+```bash
+zig build develop -Drelease
+PYTHONPATH=src python3.15 example/bench/loop_bench.py
+zig cc -O2 -D_GNU_SOURCE -Ilib/liburing/src/include -o zig-out/bin/loop_bench_c example/bench/loop_bench.c lib/liburing/src/{setup,queue,register,syscall,version}.c
+zig-out/bin/loop_bench_c
+```
+
 ## Note
  - This project has been moved to using Zig as back-end, thus leading to breaking changes from previous release.
  - Try using latest Linux if possible to enable all `io_uring` features.
