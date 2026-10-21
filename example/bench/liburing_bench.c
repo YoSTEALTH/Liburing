@@ -2,10 +2,11 @@
 // `liburing_bench.py` (from Shakti's `example/bench`).
 //
 //   zig cc -O2 -D_GNU_SOURCE -Ilib/liburing/src/include -o zig-out/bin/liburing_bench_c example/bench/liburing_bench.c lib/liburing/src/{setup,queue,register,syscall,version}.c
-//   zig-out/bin/liburing_bench_c 12345
+//   zig-out/bin/liburing_bench_c 12345 [--defer]
 //
 // One thread, one ring, default flags. Each connection: recv, send the response, recv again.
-// Closes the connection when recv or send returns 0 or an error.
+// Closes the connection when recv or send returns 0 or an error. `--defer` sets the ring up with
+// `IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN` (default: no flags).
 
 #include <arpa/inet.h>
 #include <liburing.h>
@@ -113,7 +114,14 @@ static void handle(struct io_uring_cqe *cqe) {
 }
 
 int main(int argc, char **argv) {
-    int port = argc > 1 ? atoi(argv[1]) : 12345;
+    int port = 12345;
+    unsigned flags = 0;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--defer") == 0)
+            flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN;
+        else
+            port = atoi(argv[i]);
+    }
 
     signal(SIGPIPE, SIG_IGN);
 
@@ -130,7 +138,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (io_uring_queue_init(ENTRIES, &ring, 0) < 0) {
+    if (io_uring_queue_init(ENTRIES, &ring, flags) < 0) {
         perror("io_uring_queue_init");
         return 1;
     }

@@ -1,7 +1,7 @@
 '''HTTP keep-alive echo server on Liburing's Python API: the same server, response and load as
 `liburing_bench.c` (translated line by line; both from Shakti's `example/bench`).
 
-    python3.15t example/bench/liburing_bench.py [port=12345] [--peek | --at]
+    python3.15t example/bench/liburing_bench.py [port=12345] [--peek | --at] [--defer]
     zig-out/bin/load 12345 64 5 100     # `zig build load`: port, connections, seconds, requests/connection
 
 One thread, one ring, default flags. Each connection: recv, send the response, recv again. Closes
@@ -11,12 +11,15 @@ Completions are read in a batch, `cqe[i]` for every ready one, then `io_uring_cq
 reads them one at a time instead (`io_uring_peek_cqe`, `cqe[0]`, `io_uring_cqe_seen`): the only way
 that works on the old PyOZ build, whose `cqe[i]` reads past the end of the completion queue once it
 wraps around. `--at` reads them with `cqe.user_data_at(i)` / `cqe.res_at(i)`: no entry objects.
+`--defer` sets the ring up with `IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN` (default: no flags).
 '''
 
 import os
 import socket
 import sys
 from liburing import (
+    IORING_SETUP_DEFER_TASKRUN,
+    IORING_SETUP_SINGLE_ISSUER,
     SOCK_CLOEXEC,
     Cqe,
     Ring,
@@ -60,7 +63,7 @@ class Conn:
         self.out = None  # the unsent part of `RESPONSE`, alive until its send completes
 
 
-def main(port, peek=False, at=False):
+def main(port, peek=False, at=False, defer=False):
     ring, cqe = Ring(), Cqe()
     conns = {}  # id -> Conn
     next_id = 1
@@ -95,7 +98,7 @@ def main(port, peek=False, at=False):
     listen.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listen.bind(('127.0.0.1', port))
     listen.listen(LISTEN)
-    io_uring_queue_init(ENTRIES, ring)
+    io_uring_queue_init(ENTRIES, ring, IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN if defer else 0)
     print(f'Starting Liburing server on 127.0.0.1:{port}', flush=True)
     arm_accept()
 
@@ -150,5 +153,5 @@ def main(port, peek=False, at=False):
 
 
 if __name__ == '__main__':
-    args = [a for a in sys.argv[1:] if a not in ('--peek', '--at')]
-    main(int(args[0]) if args else 12345, '--peek' in sys.argv, '--at' in sys.argv)
+    args = [a for a in sys.argv[1:] if a not in ('--peek', '--at', '--defer')]
+    main(int(args[0]) if args else 12345, '--peek' in sys.argv, '--at' in sys.argv, '--defer' in sys.argv)
