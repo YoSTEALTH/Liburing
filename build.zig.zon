@@ -3,10 +3,10 @@
     .version = "2026.10.19",
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
-        // Setu's stable-ABI commit (ef25c0a, not tagged yet: v2026.10.20 points at an older commit).
+        // Setu v2026.10.20.2 (commit d7c3c13).
         .setu = .{
-            .url = "https://github.com/YoSTEALTH/Setu/archive/ef25c0a5082bf535510446a731aaf8a3465db6d2.tar.gz",
-            .hash = "setu-2026.10.19-f1cYJytmAwCfvmAookQ51UK7md8FU0GvJ1ay8aGk3yZa",
+            .url = "git+https://github.com/YoSTEALTH/Setu?ref=v2026.10.20.2#d7c3c13e626b3ffeaa9183daa589aa8104464956",
+            .hash = "setu-2026.10.20-f1cYJytmAwBMVcevuu4ZCbURIsUO_6m9LayryAtEzuh9",
         },
         // .setu = .{ .path = "../../../Setu/Setu/Code" }, // local debug
     },
