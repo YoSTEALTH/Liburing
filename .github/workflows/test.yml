@@ -141,7 +141,7 @@ jobs:
         run: |
           uname -r  # the kernel under test
           wheel=$(ls dist/liburing-*-manylinux_2_28_"$(uname -m)".whl)
-          mkdir -p "$RUNNER_TEMP/wheeltest" && cp -r test "$RUNNER_TEMP/wheeltest/"
+          mkdir -p "$RUNNER_TEMP/wheeltest" && cp -r test example "$RUNNER_TEMP/wheeltest/"
           for py in "${{ steps.py_ft.outputs.python-path }}" "${{ steps.py_gil.outputs.python-path }}" \
                     "${{ steps.py314_ft.outputs.python-path }}" "${{ steps.py314_gil.outputs.python-path }}"; do
             venv="$RUNNER_TEMP/venv-$("$py" -c 'import sys; print(sys.implementation.cache_tag + sys.abiflags)')"

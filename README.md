@@ -11,6 +11,8 @@ Liburing is Python + Zig wrapper around [C Liburing](https://github.com/axboe/Li
 
 Good(old) documentation [Lord of the io_uring](https://unixism.net/loti/)
 
+Benchmarks: [example/bench/bench.md](example/bench/bench.md) (HTTP server: Liburing vs `select.epoll`, asyncio and C)
+
 ## Requires
  - Linux 6.17+
  - Python 3.14+ (regular or free-threaded: 3.14, 3.14t, 3.15, 3.15t, ...)
