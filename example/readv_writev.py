@@ -5,7 +5,6 @@ from liburing import (
     O_RDWR,
     Ring,
     Cqe,
-    Iovec,
     io_uring_get_sqe,
     io_uring_prep_open,
     io_uring_prep_writev,
@@ -38,14 +37,13 @@ def main():
     try:
         fd = run(ring, cqe, io_uring_prep_open, path, O_CREAT | O_RDWR)
 
-        # `Iovec` holds on to the buffers it is given: no separate variable needed to keep them alive.
-        iov_write = Iovec([b"hello ", b"vector ", b"world"])
-        print("written:", run(ring, cqe, io_uring_prep_writev, fd, iov_write, 0))
+        # a list of buffers: the request holds them (locked) until its completion
+        print("written:", run(ring, cqe, io_uring_prep_writev, fd, [b"hello ", b"vector ", b"world"], 0))
 
-        iov_read = Iovec([bytearray(6), bytearray(7), bytearray(5)])
-        print("read:", run(ring, cqe, io_uring_prep_readv, fd, iov_read, 0))
-        print(iov_read.buffers)  # (bytearray(b'hello '), bytearray(b'vector '), bytearray(b'world'))
-        print(bytes(iov_read[1]))  # b'vector '
+        bufs = [bytearray(6), bytearray(7), bytearray(5)]
+        print("read:", run(ring, cqe, io_uring_prep_readv, fd, bufs, 0))
+        print(bufs)  # [bytearray(b'hello '), bytearray(b'vector '), bytearray(b'world')]
+        print(bytes(bufs[1]))  # b'vector '
 
         run(ring, cqe, io_uring_prep_close, fd)
     finally:

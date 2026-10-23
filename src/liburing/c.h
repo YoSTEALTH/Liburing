@@ -4,4 +4,5 @@
 #include <liburing.h>
 #include <sys/un.h>      /* sockaddr_un */
 #include <netinet/in.h>  /* sockaddr_in, sockaddr_in6, ... */
+#include <arpa/inet.h>   /* inet_ntop */
 #include <linux/futex.h>

@@ -24,7 +24,7 @@ pub fn main(init: std.process.Init) !void {
             while (lines.next()) |body| {
                 try out.appendSlice(arena, body);
                 try out.append(arena, '\n');
-                if (std.mem.indexOf(u8, body, "@compileError") != null) failed = true;
+                if (std.mem.find(u8, body, "@compileError") != null) failed = true;
                 if (std.mem.eql(u8, body, "}")) break;
             }
             if (failed) {

@@ -1,31 +1,32 @@
 """sendmsg / recvmsg (`Msghdr`), the multishot receive helpers (`RecvmsgOut`, `Cmsghdr`) and epoll (`EpollEvent`)."""
 
-import array
 import os
 import select
 import socket
 import struct
-import pytest
-import liburing as L
+
 import kernel
+import pytest
+
+import liburing as u
 
 EPOLL_CTL_ADD = 1
 FIXED_ZC = "`IORING_OP_SENDMSG_ZC` with `IORING_RECVSEND_FIXED_BUF`"
 
 
 def one(ring, cqe, prep, *args, **kwargs):
-    sqe = L.io_uring_get_sqe(ring)
+    sqe = u.io_uring_get_sqe(ring)
     prep(sqe, *args, **kwargs)
     op = sqe.opcode
     sqe.user_data = 9
-    assert L.io_uring_submit(ring) == 1
-    assert L.io_uring_wait_cqe_timeout(ring, cqe, L.timespec(2)) == 0
+    assert u.io_uring_submit(ring) == 1
+    assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
     entry = cqe[0]
     try:
         assert entry.user_data == 9
         return kernel.res(entry, op)
     finally:
-        L.io_uring_cqe_seen(ring, entry)
+        u.io_uring_cqe_seen(ring, entry)
 
 
 @pytest.fixture
@@ -40,14 +41,14 @@ def udp():
 
 
 def test_msghdr_fields():
-    msg = L.Msghdr()
+    msg = u.Msghdr()
     assert (msg.flags, msg.namelen, msg.controllen, msg.iovlen) == (0, 0, 0, 0)
     msg.flags = 3
     msg.namelen = 16
     assert (msg.flags, msg.namelen) == (3, 16)
     control = bytearray(32)
     iov_src = [bytearray(4), bytearray(4)]
-    full = L.Msghdr(L.Sockaddr(L.AF_INET, "127.0.0.1", 9), L.Iovec(iov_src), control)
+    full = u.Msghdr(u.Sockaddr(u.AF_INET, "127.0.0.1", 9), iov_src, control)
     assert full.namelen == 16  # sockaddr_in
     assert full.iovlen == 2
     assert full.controllen == 32
@@ -56,26 +57,26 @@ def test_msghdr_fields():
     with pytest.raises(ValueError):
         full.controllen = 64  # longer than `control`
     with pytest.raises(ValueError):
-        L.Msghdr(control=control, controllen=64)
+        u.Msghdr(control=control, controllen=64)
     with pytest.raises(TypeError):
-        L.Msghdr(name=object())
+        u.Msghdr(name=object())
     with pytest.raises(TypeError):
-        L.Msghdr(iov=[b"x"])
+        u.Msghdr(iov=[object()])  # no buffer protocol
 
 
 def test_sendmsg_recvmsg(ring, cqe, udp):
     rx, tx = udp
-    dest = L.Sockaddr(L.AF_INET, "127.0.0.1", rx.getsockname()[1])
+    dest = u.Sockaddr(u.AF_INET, "127.0.0.1", rx.getsockname()[1])
     parts = [bytearray(b"hel"), bytearray(b"lo")]
-    iov = L.Iovec(parts)
-    msg = L.Msghdr(dest, iov)
-    assert one(ring, cqe, L.io_uring_prep_sendmsg, tx.fileno(), msg) == 5
+    iov = parts
+    msg = u.Msghdr(dest, iov)
+    assert one(ring, cqe, u.io_uring_prep_sendmsg, tx.fileno(), msg) == 5
 
-    came_from = L.Sockaddr()
+    came_from = u.Sockaddr()
     got = [bytearray(16)]
-    into = L.Iovec(got)
-    rmsg = L.Msghdr(came_from, into)
-    assert one(ring, cqe, L.io_uring_prep_recvmsg, rx.fileno(), rmsg) == 5
+    into = got
+    rmsg = u.Msghdr(came_from, into)
+    assert one(ring, cqe, u.io_uring_prep_recvmsg, rx.fileno(), rmsg) == 5
     assert bytes(got[0][:5]) == b"hello"
     assert (came_from.ip, came_from.port) == ("127.0.0.1", tx.getsockname()[1])
     assert rmsg.namelen == 16
@@ -84,110 +85,114 @@ def test_sendmsg_recvmsg(ring, cqe, udp):
 def test_sendmsg_temporary_objects_survive(ring, cqe, udp):
     rx, tx = udp
     keep = [bytearray(b"temp")]
-    sqe = L.io_uring_get_sqe(ring)
-    L.io_uring_prep_sendmsg(sqe, tx.fileno(), L.Msghdr(L.Sockaddr(L.AF_INET, "127.0.0.1", rx.getsockname()[1]), L.Iovec(keep)))
-    junk = [L.Msghdr() for _ in range(100)]  # reuses the freed memory
+    sqe = u.io_uring_get_sqe(ring)
+    u.io_uring_prep_sendmsg(sqe, tx.fileno(), u.Msghdr(u.Sockaddr(u.AF_INET, "127.0.0.1", rx.getsockname()[1]), keep))
+    junk = [u.Msghdr() for _ in range(100)]  # reuses the freed memory
     del junk
     sqe.user_data = 1
-    assert L.io_uring_submit(ring) == 1
-    assert L.io_uring_wait_cqe_timeout(ring, cqe, L.timespec(2)) == 0
+    assert u.io_uring_submit(ring) == 1
+    assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
     assert cqe[0].res == 4
-    L.io_uring_cqe_seen(ring, cqe[0])
+    u.io_uring_cqe_seen(ring, cqe[0])
     assert rx.recv(8) == b"temp"
 
 
 def test_sendmsg_zc(ring, cqe, udp):
     rx, tx = udp
     src = [bytearray(b"zc!")]
-    msg = L.Msghdr(L.Sockaddr(L.AF_INET, "127.0.0.1", rx.getsockname()[1]), L.Iovec(src))
-    sqe = L.io_uring_get_sqe(ring)
-    L.io_uring_prep_sendmsg_zc(sqe, tx.fileno(), msg)
-    assert L.io_uring_submit(ring) == 1
+    msg = u.Msghdr(u.Sockaddr(u.AF_INET, "127.0.0.1", rx.getsockname()[1]), src)
+    sqe = u.io_uring_get_sqe(ring)
+    u.io_uring_prep_sendmsg_zc(sqe, tx.fileno(), msg)
+    assert u.io_uring_submit(ring) == 1
     while True:  # the result, then the notification that the buffer is free
-        assert L.io_uring_wait_cqe_timeout(ring, cqe, L.timespec(2)) == 0
-        more = cqe[0].flags & L.IORING_CQE_F_MORE
-        L.io_uring_cqe_seen(ring, cqe[0])
+        assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
+        more = cqe[0].flags & u.IORING_CQE_F_MORE
+        try:
+            _ = cqe[0].res  # raises if the send failed (`ENOMEM`: no pages to account), instead of `recv` hanging
+        finally:
+            u.io_uring_cqe_seen(ring, cqe[0])
         if not more:
             break
+    rx.settimeout(2)  # only now: a timeout makes the socket non-blocking
     assert rx.recv(8) == b"zc!"
 
 
 def test_recvmsg_multishot_with_helpers(ring, cqe, udp):
     rx, tx = udp
     area = bytearray(2 * 256)
-    sqe = L.io_uring_get_sqe(ring)
-    L.io_uring_prep_provide_buffers(sqe, area, 2, 1, 0)  # 2 buffers of 256
-    L.io_uring_submit(ring)
-    L.io_uring_wait_cqe(ring, cqe)
+    sqe = u.io_uring_get_sqe(ring)
+    u.io_uring_prep_provide_buffers(sqe, area, 2, 1, 0)  # 2 buffers of 256
+    u.io_uring_submit(ring)
+    u.io_uring_wait_cqe(ring, cqe)
     assert cqe[0].res == 0
-    L.io_uring_cqe_seen(ring, cqe[0])
+    u.io_uring_cqe_seen(ring, cqe[0])
 
-    msg = L.Msghdr(namelen=16, controllen=0)  # the layout: [header][name 16][control 0][payload]
-    sqe = L.io_uring_get_sqe(ring)
-    L.io_uring_prep_recvmsg_multishot(sqe, rx.fileno(), msg)
-    sqe.flags = L.IOSQE_BUFFER_SELECT
-    L.io_uring_sqe_set_buf_group(sqe, 1)
+    msg = u.Msghdr(namelen=16, controllen=0)  # the layout: [header][name 16][control 0][payload]
+    sqe = u.io_uring_get_sqe(ring)
+    u.io_uring_prep_recvmsg_multishot(sqe, rx.fileno(), msg)
+    sqe.flags = u.IOSQE_BUFFER_SELECT
+    u.io_uring_sqe_set_buf_group(sqe, 1)
     sqe.user_data = 7
-    assert L.io_uring_submit(ring) == 1
+    assert u.io_uring_submit(ring) == 1
     tx.sendto(b"multishot!", rx.getsockname())
-    assert L.io_uring_wait_cqe_timeout(ring, cqe, L.timespec(2)) == 0
-    res, flags = cqe[0].res, cqe[0].flags
-    L.io_uring_cqe_seen(ring, cqe[0])
-    assert flags & L.IORING_CQE_F_BUFFER
-    bid = flags >> L.IORING_CQE_BUFFER_SHIFT
+    assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
+    _, flags = cqe[0].res, cqe[0].flags
+    u.io_uring_cqe_seen(ring, cqe[0])
+    assert flags & u.IORING_CQE_F_BUFFER
+    bid = flags >> u.IORING_CQE_BUFFER_SHIFT
     buf = memoryview(area)[bid * 256 : (bid + 1) * 256]
 
-    out = L.io_uring_recvmsg_validate(buf, msg)
+    out = u.io_uring_recvmsg_validate(buf, msg)
     assert out.namelen == 16
     assert out.controllen == 0
     assert out.payloadlen == len(b"multishot!")
-    assert L.io_uring_recvmsg_payload(out, msg) == b"multishot!"
-    assert L.io_uring_recvmsg_payload_length(out, 256, msg) == 256 - 16 - 16
-    name = L.io_uring_recvmsg_name(out)
+    assert u.io_uring_recvmsg_payload(out, msg) == b"multishot!"
+    assert u.io_uring_recvmsg_payload_length(out, 256, msg) == 256 - 16 - 16
+    name = u.io_uring_recvmsg_name(out)
     assert len(name) == 16
     family, port = struct.unpack_from("=HH", name)
-    assert family == L.AF_INET
+    assert family == u.AF_INET
     assert socket.ntohs(port) == tx.getsockname()[1]
-    assert L.io_uring_recvmsg_cmsg_firsthdr(out, msg) is None  # no control data
+    assert u.io_uring_recvmsg_cmsg_firsthdr(out, msg) is None  # no control data
 
-    assert one(ring, cqe, L.io_uring_prep_cancel, 7) == 0
-    L.io_uring_wait_cqe_timeout(ring, cqe, L.timespec(1))
-    L.io_uring_cq_advance(ring, L.io_uring_cq_ready(ring))
+    assert one(ring, cqe, u.io_uring_prep_cancel, 7) == 0
+    u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(1))
+    u.io_uring_cq_advance(ring, u.io_uring_cq_ready(ring))
 
 
 def test_recvmsg_validate_too_short():
-    msg = L.Msghdr(namelen=16, controllen=0)
+    msg = u.Msghdr(namelen=16, controllen=0)
     with pytest.raises(ValueError):
-        L.io_uring_recvmsg_validate(bytearray(8), msg)  # not even the header
+        u.io_uring_recvmsg_validate(bytearray(8), msg)  # not even the header
     with pytest.raises(ValueError):
-        L.io_uring_recvmsg_validate(bytearray(20), msg)  # header (16) + name (16) do not fit
+        u.io_uring_recvmsg_validate(bytearray(20), msg)  # header (16) + name (16) do not fit
 
 
 def test_cmsg_walk_over_a_built_buffer():
     # [header][name][cmsg: SCM_RIGHTS with one int][payload]: what the kernel puts into a provided buffer
     name = bytes(16)
-    cmsg = struct.pack("=QII", struct.calcsize("=QII") + 4, L.SOL_SOCKET, 1) + struct.pack("=i", 7) + bytes(4)
+    cmsg = struct.pack("=QII", struct.calcsize("=QII") + 4, u.SOL_SOCKET, 1) + struct.pack("=i", 7) + bytes(4)
     header = struct.pack("=IIII", len(name), len(cmsg), 3, 0)
     buf = bytearray(header + name + cmsg + b"abc")
-    msg = L.Msghdr(namelen=len(name), controllen=len(cmsg))
-    out = L.io_uring_recvmsg_validate(buf, msg)
-    first = L.io_uring_recvmsg_cmsg_firsthdr(out, msg)
+    msg = u.Msghdr(namelen=len(name), controllen=len(cmsg))
+    out = u.io_uring_recvmsg_validate(buf, msg)
+    first = u.io_uring_recvmsg_cmsg_firsthdr(out, msg)
     assert first
-    assert (first.level, first.type) == (L.SOL_SOCKET, 1)
+    assert (first.level, first.type) == (u.SOL_SOCKET, 1)
     assert first.len == struct.calcsize("=QII") + 4
     assert first.data == struct.pack("=i", 7)
-    assert L.io_uring_recvmsg_cmsg_nexthdr(out, msg, first) is None
-    assert L.io_uring_recvmsg_payload(out, msg) == b"abc"
+    assert u.io_uring_recvmsg_cmsg_nexthdr(out, msg, first) is None
+    assert u.io_uring_recvmsg_payload(out, msg) == b"abc"
 
 
 def test_epoll_event_fields():
-    ev = L.EpollEvent(events=select.EPOLLIN, data=123)
+    ev = u.EpollEvent(events=select.EPOLLIN, data=123)
     assert (ev.events, ev.data) == (select.EPOLLIN, 123)
     ev.events = select.EPOLLOUT
     ev.data = 5
     assert (ev.events, ev.data) == (select.EPOLLOUT, 5)
     assert len(ev) == 1
-    many = L.EpollEvent(no=4)
+    many = u.EpollEvent(no=4)
     assert len(many) == 4
     many[2].data = 77
     assert many[2].data == 77 and many[0].data == 0
@@ -196,26 +201,26 @@ def test_epoll_event_fields():
     with pytest.raises(IndexError):
         many[2][0]
     with pytest.raises(ValueError):
-        L.EpollEvent(no=0)
+        u.EpollEvent(no=0)
     with pytest.raises(ValueError):
-        L.EpollEvent(no=2, data=1)
+        u.EpollEvent(no=2, data=1)
 
 
 def test_epoll_ctl_wait(ring, cqe):
     ep = select.epoll()
     r, w = os.pipe()
     try:
-        ev = L.EpollEvent(events=select.EPOLLIN, data=r)
-        assert one(ring, cqe, L.io_uring_prep_epoll_ctl, ep.fileno(), r, EPOLL_CTL_ADD, ev) == 0
+        ev = u.EpollEvent(events=select.EPOLLIN, data=r)
+        assert one(ring, cqe, u.io_uring_prep_epoll_ctl, ep.fileno(), r, EPOLL_CTL_ADD, ev) == 0
         assert ep.poll(0) == []
         os.write(w, b"x")
-        ready = L.EpollEvent(no=4)
-        assert one(ring, cqe, L.io_uring_prep_epoll_wait, ep.fileno(), ready, 4) == 1
+        ready = u.EpollEvent(no=4)
+        assert one(ring, cqe, u.io_uring_prep_epoll_wait, ep.fileno(), ready, 4) == 1
         assert (ready[0].events & select.EPOLLIN, ready[0].data) == (select.EPOLLIN, r)
         with pytest.raises(ValueError):  # more than the array holds
-            L.io_uring_prep_epoll_wait(L.Sqe(), ep.fileno(), ready, 5)
+            u.io_uring_prep_epoll_wait(u.Sqe(), ep.fileno(), ready, 5)
         with pytest.raises(ValueError):
-            L.io_uring_prep_epoll_wait(L.Sqe(), ep.fileno(), ready[0], 1)
+            u.io_uring_prep_epoll_wait(u.Sqe(), ep.fileno(), ready[0], 1)
     finally:
         ep.close()
         os.close(r)
@@ -225,21 +230,21 @@ def test_epoll_ctl_wait(ring, cqe):
 def test_sendmsg_zc_fixed(ring, cqe, udp):
     rx, tx = udp
     area = bytearray(b"fixed-zc")
-    assert L.io_uring_register_buffers(ring, L.Iovec([area])) == 0
+    assert u.io_uring_register_buffers(ring, [area]) == 0
     try:
-        msg = L.Msghdr(L.Sockaddr(L.AF_INET, "127.0.0.1", rx.getsockname()[1]), L.Iovec([area]))
-        sqe = L.io_uring_get_sqe(ring)
-        L.io_uring_prep_sendmsg_zc_fixed(sqe, tx.fileno(), msg, 0)
-        assert L.io_uring_submit(ring) == 1
+        msg = u.Msghdr(u.Sockaddr(u.AF_INET, "127.0.0.1", rx.getsockname()[1]), [area])
+        sqe = u.io_uring_get_sqe(ring)
+        u.io_uring_prep_sendmsg_zc_fixed(sqe, tx.fileno(), msg, 0)
+        assert u.io_uring_submit(ring) == 1
         while True:
-            assert L.io_uring_wait_cqe_timeout(ring, cqe, L.timespec(2)) == 0
-            more = cqe[0].flags & L.IORING_CQE_F_MORE
+            assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
+            more = cqe[0].flags & u.IORING_CQE_F_MORE
             try:  # registered buffers for vectored ops came with `IORING_OP_READV_FIXED` (6.15)
                 kernel.res(cqe[0], "IORING_OP_READV_FIXED", name=FIXED_ZC)
             finally:
-                L.io_uring_cqe_seen(ring, cqe[0])
+                u.io_uring_cqe_seen(ring, cqe[0])
             if not more:
                 break
         assert rx.recv(16) == b"fixed-zc"
     finally:
-        L.io_uring_unregister_buffers(ring)
+        u.io_uring_unregister_buffers(ring)

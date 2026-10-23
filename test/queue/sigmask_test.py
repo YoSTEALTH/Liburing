@@ -1,6 +1,8 @@
 import signal
 import threading
+
 import pytest
+
 import liburing
 
 
@@ -16,13 +18,13 @@ def test_sigmask(ring, cqe):
     handler = signal.signal(signal.SIGUSR1, lambda *_: None)
     mask = signal.pthread_sigmask(signal.SIG_BLOCK, [signal.SIGUSR1])
     try:
-        tid = threading.get_ident()
-        kill = lambda: signal.pthread_kill(tid, signal.SIGUSR1)
+        # raised before the wait (no timing): blocked, so it stays pending until a wait lets it in.
+        signal.pthread_kill(threading.get_ident(), signal.SIGUSR1)
+        assert signal.SIGUSR1 in signal.sigpending()
 
         # without `sigmask`: signal stays pending, wait runs into its timeout.
-        threading.Timer(0.05, kill).start()
         with pytest.raises(OSError) as err:
-            liburing.io_uring_wait_cqes(ring, cqe, 1, liburing.timespec(0.3))
+            liburing.io_uring_wait_cqes(ring, cqe, 1, liburing.timespec(0.05))
         assert not isinstance(err.value, InterruptedError)
         assert signal.SIGUSR1 in signal.sigpending()
 

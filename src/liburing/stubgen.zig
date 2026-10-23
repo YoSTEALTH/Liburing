@@ -31,7 +31,7 @@ const header =
 /// `class Name(IntEnum):` with its members, for an enum `api.enums` exports.
 fn intEnum(comptime E: type) []const u8 {
     const full = @typeName(E);
-    const name = full[(std.mem.lastIndexOfScalar(u8, full, '.') orelse return full) + 1 ..];
+    const name = full[(std.mem.findScalarLast(u8, full, '.') orelse return full) + 1 ..];
     var out: []const u8 = "\nclass " ++ name ++ "(IntEnum):\n";
     for (@typeInfo(E).@"enum".field_names) |f| out = out ++ "    " ++ f ++ " = " ++
         std.fmt.comptimePrint("{d}", .{@backingInt(@field(E, f))}) ++ "\n";

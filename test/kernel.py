@@ -6,12 +6,13 @@ The kernel fails an `IORING_OP_*` it doesn't know in its CQE, with `EINVAL`, as 
 
 import errno
 import functools
-import liburing as L
+
+import liburing as u
 
 
 @functools.cache
 def _ops() -> tuple[tuple[str, bool], ...]:
-    return tuple(L.probe().items())  # in opcode order
+    return tuple(u.probe().items())  # in opcode order
 
 
 def supported(op: int | str) -> tuple[str, bool]:
@@ -22,7 +23,7 @@ def supported(op: int | str) -> tuple[str, bool]:
     return ops[op] if op < len(ops) else (f"opcode {op}", False)
 
 
-def res(entry: L.CQE, *ops: int | str, name: str | None = None) -> int:
+def res(entry: u.CQE, *ops: int | str, name: str | None = None) -> int:
     """`entry.res`, `UnsupportedError` (not `OSError`) when it failed and the kernel has no one of `ops`.
 
     Example
@@ -38,6 +39,6 @@ def res(entry: L.CQE, *ops: int | str, name: str | None = None) -> int:
             for op in ops:
                 op_name, ok = supported(op)
                 if not ok:
-                    msg = f"Kernel `{L.LINUX_VERSION_MAJOR}.{L.LINUX_VERSION_MINOR}` does not support "
-                    raise L.UnsupportedError(e.errno, msg + (name or f"`{op_name}`")) from None
+                    msg = f"Kernel `{u.LINUX_VERSION_MAJOR}.{u.LINUX_VERSION_MINOR}` does not support "
+                    raise u.UnsupportedError(e.errno, msg + (name or f"`{op_name}`")) from None
         raise

@@ -1,4 +1,5 @@
 import pytest
+
 import liburing
 
 
@@ -153,4 +154,4 @@ def test_close_error(ring, cqe):
     assert liburing.io_uring_wait_cqe(ring, cqe) == 0
     assert cqe[0].user_data == 123
     with pytest.raises(OSError, match="Bad file descriptor"):
-        cqe[0].res
+        _ = cqe[0].res

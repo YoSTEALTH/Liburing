@@ -1,8 +1,9 @@
 import errno
-import pytest
-import liburing
-import kernel
 
+import kernel
+import pytest
+
+import liburing
 
 # `SOCKET_URING_OP_GETSOCKNAME`: a socket command has no probe, the CQE says `EOPNOTSUPP`.
 NO_GETSOCKNAME = (
@@ -61,8 +62,7 @@ def test_getsockname(ring, cqe):
         liburing.io_uring_cqe_seen(ring, entry)
 
         if i:
-            pass
-            #     # assert sockaddr.ip == "::1" # TODO
+            assert sockaddr.ip == "::1"  # filled in by the kernel
             assert sockaddr.port >= 1000
         else:
             assert sockaddr.ip == "127.0.0.1"

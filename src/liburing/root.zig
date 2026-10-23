@@ -68,7 +68,7 @@ fn addIntEnum(module: *Object, comptime E: type) py.Error!void {
 
 /// `io_uring_op` for `enum.io_uring_op`.
 fn shortName(comptime full: []const u8) [:0]const u8 {
-    const i = std.mem.lastIndexOfScalar(u8, full, '.') orelse return full ++ "";
+    const i = std.mem.findScalarLast(u8, full, '.') orelse return full ++ "";
     const s = full[i + 1 ..];
     return (s ++ "\x00")[0..s.len :0];
 }

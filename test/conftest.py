@@ -1,11 +1,13 @@
+import getpass
+import mmap
 import os
 import os.path
-import pytest
 import pathlib
-import getpass
 import tempfile
+
+import pytest
+
 import liburing
-import mmap
 
 
 @pytest.fixture
@@ -92,10 +94,9 @@ def skip_by_platform(request):
         ...
         test.py::test_function SKIPPED
     """
-    if r := request.node.get_closest_marker("skip_linux"):
-        if liburing.linux_version_check(version := r.args[0]):
-            msg = r.args[1] if len(r.args) > 1 else f"Kernel `{LINUX_VERSION} < {version}`"
-            pytest.skip(msg)
+    if (r := request.node.get_closest_marker("skip_linux")) and liburing.linux_version_check(version := r.args[0]):
+        msg = r.args[1] if len(r.args) > 1 else f"Kernel `{LINUX_VERSION} < {version}`"
+        pytest.skip(msg)
 
 
 @pytest.fixture(autouse=True)

@@ -1,5 +1,5 @@
 import os
-import pytest
+
 import liburing
 
 
@@ -182,6 +182,9 @@ def test_io_uring_defines():
 
     assert liburing.IORING_MEM_REGION_TYPE_USER == 1
     assert liburing.IORING_MEM_REGION_REG_WAIT_ARG == 1
+
+    assert liburing.IOU_PBUF_RING_MMAP == 1
+    assert liburing.IOU_PBUF_RING_INC == 2
 
     assert liburing.IORING_RSRC_REGISTER_SPARSE == 1 << 0
 

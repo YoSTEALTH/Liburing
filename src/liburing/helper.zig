@@ -1,19 +1,24 @@
 //! Liburing - Helper functions
-const c = @import("c.zig").c;
+const c = @import("c");
 const e = @import("error.zig");
 const n = @import("enum.zig");
 const setu = @import("setu");
 const std = @import("std");
 const class = @import("class.zig");
+const Ring = @import("ring.zig").Ring;
+const RingType = @import("ring.zig").RingType;
+const Sqe = @import("sqe.zig").Sqe;
+const SQE = @import("sqe.zig").SQE;
+const SQEType = @import("sqe.zig").SQEType;
+const SqeType = @import("sqe.zig").SqeType;
 
 const py = setu.py;
 const sc = setu.c;
 const Object = sc.Object;
-const Ring = class.Ring;
-const Sqe = class.Sqe;
 const Timespec = class.Timespec;
 
 pub const FileIndexType = setu.Class(FileIndex, @embedFile("helper.zig"));
+pub const FileIndexIterType = setu.Class(FileIndexIter, @embedFile("helper.zig"));
 
 /// File Index
 ///
@@ -35,7 +40,6 @@ pub const FileIndexType = setu.Class(FileIndex, @embedFile("helper.zig"));
 pub const FileIndex = struct {
     _fds: ?[*]i32 = null,
     _len: usize = 0,
-    _index: usize = 0,
 
     const Self = @This();
 
@@ -49,17 +53,12 @@ pub const FileIndex = struct {
         if (self._fds) |fds| std.heap.c_allocator.free(fds[0..self._len]);
     }
 
+    /// A new iterator for each loop, so two loops (or two threads) over one `FileIndex` don't interfere.
+    ///
     /// Type
-    ///     return: Self
-    pub fn __iter__(self: *Object) *Object {
-        FileIndexType.data(self)._index = 0;
-        return class.keep(self);
-    }
-
-    pub fn __next__(self: *Self) ?i32 {
-        if (self._index >= self._len) return null; // StopIteration
-        defer self._index += 1;
-        return self._fds.?[self._index];
+    ///     return: FileIndexIter
+    pub fn __iter__(self: *Object) py.Error!*Object {
+        return FileIndexIterType.new(.{ ._ids = class.keep(self) });
     }
 
     pub fn __getitem__(self: *const Self, index: isize) py.Error!i32 {
@@ -78,6 +77,24 @@ pub const FileIndex = struct {
     /// The registered file descriptors (Zig side).
     pub fn fdSlice(self: *const Self) []i32 {
         return if (self._fds) |fds| fds[0..self._len] else &.{};
+    }
+};
+
+/// Iterator over a `FileIndex`, from `iter(ids)` (a `for` loop): its own position, so loops over one `FileIndex`
+/// don't interfere.
+pub const FileIndexIter = struct {
+    _ids: ?*Object = null, // the `FileIndex` iterated (owned)
+    _index: usize = 0, // the next entry
+
+    pub const instantiable = false;
+
+    const Self = @This();
+
+    pub fn __next__(self: *Self) ?i32 {
+        const ids = FileIndexType.data(self._ids.?);
+        if (self._index >= ids._len) return null; // StopIteration
+        defer self._index += 1;
+        return ids._fds.?[self._index];
     }
 };
 
@@ -122,6 +139,7 @@ pub fn probe() py.Error!*Object {
 ///     >>> ts = timespec(1)        # int
 ///     >>> ts = timespec(1.5)      # float
 ///     >>> io_uring_prep_timeout(sqe, ts, ...)
+///     True
 ///
 ///
 /// Type
@@ -137,9 +155,9 @@ pub fn timespec(second: f64) py.Error!*Object {
     errdefer std.heap.c_allocator.destroy(ts);
     // split float to second & nano second
     if (second != 0.0) {
-        ts.tv_sec = @intFromFloat(second);
+        ts.tv_sec = @trunc(second);
         const x: f64 = @floatFromInt(ts.tv_sec);
-        ts.tv_nsec = @intFromFloat((second - x) * 1_000_000_000);
+        ts.tv_nsec = @trunc((second - x) * 1_000_000_000);
     } else {
         ts.* = std.mem.zeroes(c.__kernel_timespec); // set default value to `0`
     }
@@ -157,11 +175,14 @@ pub fn timespec(second: f64) py.Error!*Object {
 ///     # single
 ///     >>> sqe = Sqe()
 ///     >>> io_uring_prep_read(sqe, ...)
+///     True
 ///
 ///     # multiple
 ///     >>> sqe = Sqe(2)
 ///     >>> io_uring_prep_read(sqe[0], ...)
+///     True
 ///     >>> io_uring_prep_write(sqe[1], ...)
+///     True
 ///
 ///     # back-end single | multiple
 ///     >>> if put_sqe(self.ring, sqe):
@@ -174,11 +195,16 @@ pub fn timespec(second: f64) py.Error!*Object {
 ///     ...         # do stuff
 ///
 /// Note
-///     - Returns `False` if queue is full. Will need to `io_uring_submit()` and try again.
+///     - Returns `False` if queue is full. Will need to `io_uring_submit()` and try again
+///     (`Ring(auto_submit=True)` does that for you, unless the last queued request links on).
 ///     - Returns `False` if `entries` < `len(sqe)`
+///     - Not for an `Sqe(ring)` (`TypeError`): its preps already wrote into the ring.
 pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
     const io_uring = try ring.checkedPtr();
-    if (sqe._keep) |list| try keepAll(&ring._keep, list); // paths its entries point to, until submit
+    if (SQEType.data(SqeType.object(sqe))._bound) return py.raiseTypeError(
+        "`put_sqe(ring, sqe)`: an `Sqe(ring)` is already in its ring (its preps wrote there)",
+        .{},
+    );
     //note:
     //    - its ok to submit `0` sqe thus `True`
     //    - this also accounts for `ptr` gotten from `io_uring_get_sqe`
@@ -186,15 +212,24 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
     if (sqe._len == 0) return true;
 
     if (sqe._io_uring_sqe) |_sqe| {
+        try sqe.ownThread(ring._thread); // `checkedPtr`: the calling thread owns `ring`
+        const holds = sqe._holds.?[0..sqe._len];
+        for (holds) |*hold_| {
+            if (!hold_.isEmpty()) break try ring.ensurePending(); // before any copy: no error after one
+        }
         if (sqe._len == 1) { // single
-            if (c.io_uring_get_sqe(io_uring)) |s| {
+            if (c.io_uring_get_sqe(io_uring) orelse if (try ring.autoSubmit()) c.io_uring_get_sqe(io_uring) else null) |s| {
                 @memcpy(s, _sqe[0..1]);
+                holdTemplate(ring, s, sqe, &holds[0]);
                 return true;
             }
-        } else if (c.io_uring_sq_space_left(io_uring) >= sqe._len) { // multiple
+        } else if (c.io_uring_sq_space_left(io_uring) >= sqe._len or
+            (try ring.autoSubmit() and c.io_uring_sq_space_left(io_uring) >= sqe._len))
+        { // multiple: all or none, so a chain in the template is never split
             for (0..sqe._len) |i| {
                 if (c.io_uring_get_sqe(io_uring)) |s| {
                     @memcpy(s, _sqe[i .. i + 1]);
+                    holdTemplate(ring, s, sqe, &holds[i]);
                 } // else should not trigger since space left is per-checked!
             }
             return true;
@@ -203,38 +238,143 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
     } else return false;
 }
 
+/// A copy (in the ring's slot `s`) of a template entry that holds something holds the template itself until
+/// its completion, counted in `_inflight`: `del template`, or a re-prep of the entry, with the request in
+/// flight can not free what the kernel uses.
+inline fn holdTemplate(ring: *Ring, s: *c.io_uring_sqe, sqe: *Sqe, entry: *const Ring.Hold) void {
+    if (entry.isEmpty()) return;
+    const pending = ring.pendingSlot(s); // allocated: `ensurePending`
+    var old = pending.*;
+    sqe._inflight += 1;
+    pending.* = .{ .template = class.keep(SqeType.object(sqe)) };
+    old.release();
+}
+
+/// Keeps `buf` (a `py.Buffer` / `py.WritableBuffer`, an optional one, or `null`) locked and `objs` alive until
+/// the completion of the request `sqe` prepares: in its ring's slot until the submit moves them into the
+/// request's entry (`Ring.submitPtr`), or in its `Sqe` template for the template's lifetime (copies made by
+/// `put_sqe` hold the template). Replaces what an earlier prep of the same entry held. Call it once per prep.
+///
+/// Note
+///     - io_uring reads paths, `Sockaddr`, `timespec`, ... at submit time and writes into buffers until the
+///       completion: a temporary (`bytearray(5)`, `dir / "name"`) would otherwise be freed under the kernel,
+///       and a `bytearray` resized (`BufferError` now, while it is held).
+pub fn holdUntilCompletion(sqe: *SQE, buf_ptr: anytype, objs: []const *Object) py.Error!void {
+    const has_buf = @TypeOf(buf_ptr) != @TypeOf(null);
+    const B = if (has_buf) @TypeOf(buf_ptr.*) else @TypeOf(null);
+    const owned = comptime has_buf and py.owns(B); // `py.OwnedBuffer` / `py.OwnedWritableBuffer`: ours to release
+    var moved = false; // an owned view went into the hold
+    defer if (owned and !moved) releaseOwned(buf_ptr);
+    const buf = if (has_buf) buf_ptr.* else null;
+    if (objs.len == 0) switch (@typeInfo(B)) {
+        .null => return,
+        .optional => if (buf == null) return, // nothing to hold: what the slot held stays
+        else => {},
+    };
+    _ = try sqe.sqePtr(); // ring initialized (and its thread), or a template's thread
+    const where = try holdOf(sqe) orelse return;
+    var new: Ring.Hold = .{};
+    errdefer new.release();
+    var bytes: ?*Object = null;
+    switch (@typeInfo(B)) {
+        .null => {},
+        .optional => if (buf_ptr.*) |*b| try holdView(b, &new, &bytes, &moved),
+        else => try holdView(buf_ptr, &new, &bytes, &moved),
+    }
+    const count = objs.len + @intFromBool(bytes != null);
+    new.obj = switch (count) {
+        0 => null,
+        1 => class.keep(bytes orelse objs[0]),
+        else => blk: {
+            const tuple = sc.PyTuple_New(@intCast(count)) orelse return error.PythonError; // cast: a few
+            for (objs, 0..) |o, i| _ = sc.PyTuple_SetItem(tuple, @intCast(i), class.keep(o)); // steals; cast: a few
+            if (bytes) |o| _ = sc.PyTuple_SetItem(tuple, @intCast(objs.len), class.keep(o));
+            break :blk tuple;
+        },
+    };
+    if (where.template) |t| return t.replaceHold(where.hold, new); // on error: `errdefer` releases `new`
+    var old = where.hold.*;
+    where.hold.* = new;
+    old.release();
+}
+
+/// Keeps `vec` (a vectored prep's buffers and `struct iovec` array, owned from here on every path) until the
+/// completion of the request `sqe` prepares, like `holdUntilCompletion`.
+pub fn holdVecUntilCompletion(sqe: *SQE, vec: *Ring.Vec) py.Error!void {
+    var new: Ring.Hold = .{ .vec = vec };
+    errdefer new.release();
+    _ = try sqe.sqePtr(); // ring initialized (and its thread), or a template's thread
+    const where = try holdOf(sqe) orelse return; // nowhere to hold (no ring, no template): kept, not freed
+    if (where.template) |t| return t.replaceHold(where.hold, new);
+    var old = where.hold.*;
+    where.hold.* = new;
+    old.release();
+}
+
+/// A buffer argument for `holdUntilCompletion` (a pointer to it: no copy of the view). An owned one
+/// (`py.OwnedBuffer` / `py.OwnedWritableBuffer`, what the preps take) moves its own view into the hold
+/// (`moved`), released at the completion: no second `PyObject_GetBuffer`. A plain one: an exact `bytes`
+/// (immutable, its memory lives as long as the object) only needs a reference (`bytes`), any other a locked
+/// view of its own (`take`: ~35 ns more).
+inline fn holdView(b: anytype, new: *Ring.Hold, bytes: *?*Object, moved: *bool) py.Error!void {
+    if (comptime py.owns(@TypeOf(b.*))) { // its own view: kept, released at the completion
+        new.view = b.view;
+        moved.* = true;
+        return;
+    }
+    if (b.view.obj) |obj| if (sc.Py_TYPE(obj) == sc.PyBytes_Type) {
+        bytes.* = obj;
+        return;
+    };
+    new.view = (try b.take()).view;
+}
+
+/// `sqe.prepSlot(false)` for a prep taking the owned buffer `buf_ptr` (optional or not): released here when the prep
+/// stops before `holdUntilCompletion` owns it (no slot: `null`, or an error).
+pub inline fn prepSlot(sqe: *SQE, buf_ptr: anytype) py.Error!?*c.io_uring_sqe {
+    errdefer releaseOwned(buf_ptr);
+    return try sqe.prepSlot(false) orelse {
+        releaseOwned(buf_ptr);
+        return null;
+    };
+}
+
+/// Releases an owned buffer argument (optional or not) that did not go into a hold, in place: `deinit` copies
+/// the view first, a store-forwarding stall (~10 ns, Setu's notes).
+inline fn releaseOwned(buf: anytype) void {
+    if (@typeInfo(@TypeOf(buf.*)) == .optional) {
+        if (buf.*) |*b| sc.PyBuffer_Release(@constCast(&b.view));
+    } else sc.PyBuffer_Release(@constCast(&buf.view));
+}
+
+/// Where a prep holds things: its ring's pending slot, or its template's entry (and the template).
+const HoldPlace = struct { hold: *Ring.Hold, template: ?*Sqe = null };
+
+/// Where a prep of `sqe` holds things, or nowhere (`null`).
+inline fn holdOf(sqe: *SQE) py.Error!?HoldPlace {
+    const ptr = sqe._sqe orelse return null;
+    if (sqe._owner) |owner| {
+        if (RingType.check(owner)) return .{ .hold = try RingType.data(owner).pendingFor(ptr) };
+        if (SqeType.check(owner)) {
+            const t = SqeType.data(owner);
+            return .{ .hold = t.holdFor(ptr), .template = t };
+        }
+    }
+    const self = SQEType.object(sqe);
+    if (SqeType.check(self)) {
+        const t = SqeType.data(self);
+        return .{ .hold = t.holdFor(ptr), .template = t };
+    }
+    return null;
+}
+
 /// A path argument (`str` or `os.PathLike`, not `bytes`, as with PyOZ): `path` is the UTF-8 of
 /// the `str` that `os.fspath` gives, so it stays valid while that `str` lives, past the call:
-/// io_uring reads it at submit time, not when the `sqe` is prepared.
+/// io_uring reads it at submit time, not when the `sqe` is prepared (`holdUntilCompletion` keeps `obj`).
 ///
 /// Note
 ///      - `str` arguments (and `pathlib` paths, which cache their `str`) live as long as the
 ///        caller's object; `deinit` drops only the reference this took.
-/// Keeps `obj` (a path `str`, ...) alive until the kernel has read the entry `sqe`: on its `Ring`
-/// until a submit consumes it, or on its `Sqe` until `put_sqe` hands it to a ring. io_uring reads
-/// paths at submit time, so a temporary (`dir / "name"`) would otherwise be freed before that.
-pub fn keepUntilSubmit(sqe: *class.SQE, obj: *Object) py.Error!void {
-    const self = class.SQEType.object(sqe);
-    if (sqe._owner) |owner| {
-        if (class.RingType.check(owner)) return keepIn(&class.RingType.data(owner)._keep, obj);
-        if (class.SqeType.check(owner)) return keepIn(&class.SqeType.data(owner)._keep, obj);
-    }
-    if (class.SqeType.check(self)) return keepIn(&class.SqeType.data(self)._keep, obj);
-}
-
-/// Appends `obj` to the owned `list` field `field` (created on first use).
-fn keepIn(field: *?*Object, obj: *Object) py.Error!void {
-    if (field.* == null) field.* = sc.PyList_New(0) orelse return error.PythonError;
-    if (sc.PyList_Append(field.*.?, obj) < 0) return error.PythonError;
-}
-
-/// Appends every item of the `list` `items` to the owned `list` field `field`.
-fn keepAll(field: *?*Object, items: *Object) py.Error!void {
-    const count = sc.PyList_Size(items);
-    var i: sc.ssize = 0;
-    while (i < count) : (i += 1) try keepIn(field, sc.PyList_GetItem(items, i).?);
-}
-
 pub const Path = struct {
     obj: *Object,
     path: [:0]const u8,
@@ -254,4 +394,11 @@ pub fn toPath(obj: *Object) py.Error!Path {
     var len: sc.ssize = 0;
     const ptr = sc.PyUnicode_AsUTF8AndSize(text, &len) orelse return error.PythonError;
     return .{ .obj = text, .path = ptr[0..@intCast(len) :0] };
+}
+
+/// A prep's owned `buf` (`py.OwnedBuffer` / `py.OwnedWritableBuffer`) when a conversion fails before
+/// `h.holdUntilCompletion` took it: released, `err` returned.
+pub fn releaseFailed(buf: anytype, err: py.Error) py.Error {
+    buf.deinit();
+    return err;
 }

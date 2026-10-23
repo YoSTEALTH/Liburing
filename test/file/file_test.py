@@ -1,5 +1,7 @@
 import os
+
 import pytest
+
 import liburing
 
 
@@ -50,7 +52,7 @@ def test_readv_writev(ring, cqe, tmp_dir):
         # Write
         # -----
         buffer = [b"hi...", b" bye!"]
-        iovec = liburing.Iovec(buffer)
+        iovec = buffer
 
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_writev(sqe, fd, iovec)
@@ -68,7 +70,7 @@ def test_readv_writev(ring, cqe, tmp_dir):
         # Read
         # ----
         buffer = [bytearray(2), bytearray(8)]
-        iovec = liburing.Iovec(buffer)
+        iovec = buffer
 
         sqe = liburing.io_uring_get_sqe(ring)
         liburing.io_uring_prep_readv(sqe, fd, iovec)
@@ -110,7 +112,7 @@ def _onwait_flag(ring, cqe, path):
     fd = os.open(path, liburing.O_RDWR | liburing.O_CREAT | liburing.O_NONBLOCK, 0o660)
     one = bytearray(6)
     two = bytearray(4)
-    iovec = liburing.Iovec([one, two])
+    iovec = [one, two]
     try:
         # write
         # -----
@@ -147,7 +149,7 @@ def _onwait_flag(ring, cqe, path):
 def _onwait_flag_empty_file(ring, cqe, path, flag):
     fd = os.open(path, liburing.O_RDWR | liburing.O_CREAT | liburing.O_NONBLOCK, 0o660)
     read = [bytearray(5)]
-    iovec = liburing.Iovec(read)
+    iovec = read
     try:
         # read empty file
         # ---------------
@@ -166,12 +168,12 @@ def _onwait_flag_empty_file(ring, cqe, path, flag):
 
 
 def test_readv_writev_inline_iovec(ring, cqe, tmp_dir):
-    # `Iovec` holds the buffers itself: no separate variable for them
+    # the request holds the buffers itself: no separate variable for them
     fd = os.open(tmp_dir / "iovec_inline.txt", liburing.O_RDWR | liburing.O_CREAT, 0o660)
     try:
         for prep, iov in (
-            (liburing.io_uring_prep_writev, liburing.Iovec([b"hi... ", b"bye!"])),
-            (liburing.io_uring_prep_readv, liburing.Iovec([bytearray(6), bytearray(4)])),
+            (liburing.io_uring_prep_writev, [b"hi... ", b"bye!"]),
+            (liburing.io_uring_prep_readv, [bytearray(6), bytearray(4)]),
         ):
             sqe = liburing.io_uring_get_sqe(ring)
             prep(sqe, fd, iov, 0)
@@ -180,6 +182,6 @@ def test_readv_writev_inline_iovec(ring, cqe, tmp_dir):
             entry = cqe[0]
             assert entry.res == 10
             liburing.io_uring_cqe_seen(ring, entry)
-        assert iov.buffers == (b"hi... ", b"bye!")
+        assert iov == [b"hi... ", b"bye!"]
     finally:
         os.close(fd)

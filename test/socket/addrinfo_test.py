@@ -1,4 +1,5 @@
 import pytest
+
 import liburing
 
 NOT_IMPLEMENTED = "`getaddrinfo` / `getnameinfo` are not implemented yet"
@@ -9,7 +10,7 @@ def test_getaddrinfo():
     # `SOCK_STREAM` only: without hints libc also returns dgram & raw entries.
     result = [r for r in liburing.getaddrinfo(b"127.0.0.1", b"12345") if r[1] == liburing.SOCK_STREAM]
     assert len(result) == 1
-    af, sock, proto, canon, addr = result[0]
+    af, _sock, proto, canon, addr = result[0]
     assert af == liburing.AF_INET
     assert proto == liburing.IPPROTO_TCP
     assert canon == b""

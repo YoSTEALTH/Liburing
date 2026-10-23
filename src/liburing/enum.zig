@@ -1,4 +1,4 @@
-const c = @import("c.zig").c;
+const c = @import("c");
 
 pub const io_uring_op = enum(u8) {
     IORING_OP_NOP,

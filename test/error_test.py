@@ -1,4 +1,5 @@
 from pytest import raises
+
 from liburing import trap_error
 
 

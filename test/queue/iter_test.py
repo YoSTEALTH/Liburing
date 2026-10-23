@@ -27,7 +27,7 @@ def _run_for_iter(ring, cqe, seen):
         for _ in liburing.CqeIter(ring, cqe, 1):
             entry = cqe[0]  # note: only index `0` data gets updated!!!
             assert entry.user_data == i
-            assert not (i == loop + 1)  # catch overflow
+            assert i != loop + 1  # catch overflow
             if seen:
                 liburing.io_uring_cqe_seen(ring, entry)
             i += 1
@@ -56,7 +56,7 @@ def _run_while_init_next(ring, cqe, seen):
         while liburing.io_uring_cqe_iter_next(cqe_iter, cqe):
             entry = cqe[0]  # note: only index `0` data gets updated!!!
             assert entry.user_data == i
-            assert not (i == loop + 1)  # catch overflow
+            assert i != loop + 1  # catch overflow
             if seen:
                 liburing.io_uring_cqe_seen(ring, entry)
             i += 1

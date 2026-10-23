@@ -1,5 +1,5 @@
 //! Liburing - Statx related class, ...
-const c = @import("c.zig").c;
+const c = @import("c");
 const setu = @import("setu");
 const std = @import("std");
 

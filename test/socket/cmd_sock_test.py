@@ -1,4 +1,5 @@
 import socket
+
 import liburing
 
 
@@ -10,7 +11,8 @@ def test_setsockopt_getsockopt(ring, cqe):
     sqe.user_data = 1
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert (sockfd := entry.res) > 0
+    sockfd = entry.res
+    assert sockfd > 0
     assert entry.user_data == 1
     liburing.io_uring_cqe_seen(ring, entry)
 
@@ -62,7 +64,8 @@ def test_cmd_sock(ring, cqe):
     sqe.user_data = 1
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
     entry = cqe[0]
-    assert (sockfd := entry.res) > 0
+    sockfd = entry.res
+    assert sockfd > 0
     assert entry.user_data == 1
     liburing.io_uring_cqe_seen(ring, entry)
 

@@ -1,4 +1,5 @@
 import pytest
+
 import liburing
 
 
@@ -8,6 +9,7 @@ def test_file_index():
     ids.update([4, 5, 6])
     assert ids[1] == 5
     assert list(ids) == [4, 5, 6]
+    assert [(a, b) for a in ids for b in ids][:4] == [(4, 4), (4, 5), (4, 6), (5, 4)]  # a position per loop
 
     # error
     with pytest.raises(ValueError):

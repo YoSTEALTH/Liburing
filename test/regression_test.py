@@ -3,9 +3,11 @@
 import gc
 import mmap
 import os
-import pytest
-import liburing
+import sys
 
+import pytest
+
+import liburing
 
 # 1. Paths are read by the kernel at submit time, not when the `sqe` is prepared.
 
@@ -33,7 +35,7 @@ def test_temporary_path_with_put_sqe(tmp_dir, ring, cqe):
         junk = [str(tmp_dir) + f"/other_name_{i:02}.zzz" for i in range(50)]  # reuses freed memory
         assert liburing.put_sqe(ring, sqe)
         del sqe, junk
-        junk = [str(tmp_dir) + f"/other_name_{i:02}.yyy" for i in range(50)]
+        _junk = [str(tmp_dir) + f"/other_name_{i:02}.yyy" for i in range(50)]
         assert liburing.io_uring_submit(ring) == 1
         assert liburing.io_uring_wait_cqe(ring, cqe) == 0
         os.close(cqe[0].res)
@@ -60,9 +62,8 @@ def test_trap_error_int_min():
 
 
 def test_buffer_longer_than_c_length():
-    with mmap.mmap(-1, 2**32 + 1) as big:  # anonymous: no memory is touched
-        with pytest.raises(OverflowError):
-            liburing.io_uring_prep_read(liburing.Sqe(), 0, big)
+    with mmap.mmap(-1, 2**32 + 1) as big, pytest.raises(OverflowError):  # anonymous: no memory is touched
+        liburing.io_uring_prep_read(liburing.Sqe(), 0, big)
 
 
 def test_cqe_index_past_ring(ring, cqe):
@@ -122,7 +123,7 @@ def test_entries_after_exit():
     sqe2 = liburing.io_uring_get_sqe(ring)
     liburing.io_uring_queue_exit(ring)
     with pytest.raises(RuntimeError):
-        entry.user_data
+        _ = entry.user_data
     with pytest.raises(RuntimeError):
         cqe[0]
     with pytest.raises(RuntimeError):
@@ -134,11 +135,20 @@ def test_entries_after_exit():
 # 5. Same behaviour as the PyOZ build.
 
 
-@pytest.mark.parametrize("cls", [liburing.Ring, liburing.Statx, liburing.Param, liburing.Timespec])
+@pytest.mark.parametrize("cls", [liburing.Statx, liburing.Param, liburing.Timespec])
 def test_no_argument_constructors(cls):
     cls()
     with pytest.raises(TypeError):
         cls(1)
+
+
+def test_ring_constructor():
+    liburing.Ring()
+    liburing.Ring(auto_submit=True)  # its one argument
+    with pytest.raises(TypeError):
+        liburing.Ring(True, 1)
+    with pytest.raises(TypeError):
+        liburing.Ring(entries=8)
 
 
 def test_negative_index():
@@ -270,3 +280,55 @@ def test_temporary_timespec_link_timeout_and_update(ring, cqe):
     finally:
         os.close(r)
         os.close(w)
+
+
+# 9. `put_sqe` on a full queue (`False`, then a retry) holds nothing; a copy that went in holds its template.
+
+
+def test_put_sqe_full_queue_keeps_paths_once(tmp_dir, cqe):
+    ring = liburing.Ring()
+    liburing.io_uring_queue_init(2, ring)
+    try:
+        path = str(tmp_dir) + "/target.txt"
+        sqe = liburing.Sqe()
+        liburing.io_uring_prep_open(sqe, path, liburing.O_RDONLY)  # the template holds `path`
+        for _ in range(2):
+            liburing.io_uring_prep_nop(liburing.io_uring_get_sqe(ring))  # queue full
+        before = sys.getrefcount(sqe)
+        for _ in range(5):
+            assert not liburing.put_sqe(ring, sqe)
+        assert sys.getrefcount(sqe) == before
+        assert liburing.io_uring_submit_and_wait(ring, 2) == 2
+        liburing.io_uring_peek_cqe(ring, cqe)
+        liburing.io_uring_cq_advance(ring, 2)
+        assert liburing.put_sqe(ring, sqe)
+        assert sys.getrefcount(sqe) == before + 1  # the copy's, until its completion
+        assert liburing.io_uring_submit_and_wait(ring, 1) == 1
+        assert sys.getrefcount(sqe) == before + 1
+        liburing.io_uring_wait_cqe(ring, cqe)
+        liburing.io_uring_cqe_seen(ring, cqe[0])
+        assert sys.getrefcount(sqe) == before
+    finally:
+        liburing.io_uring_queue_exit(ring)
+
+
+# 10. Each loop over a `CqeBatch` has its own position: nested loops don't interfere.
+
+
+def test_cqe_batch_nested_loops(ring):
+    for i in range(2):
+        sqe = liburing.io_uring_get_sqe(ring)
+        liburing.io_uring_prep_nop(sqe)
+        sqe.user_data = i + 1
+    assert liburing.io_uring_submit_and_wait(ring, 2) == 2
+    batch = liburing.CqeBatch(4)
+    assert liburing.io_uring_peek_batch_cqe(ring, batch) == 2
+    assert [(a.user_data, b.user_data) for a in batch for b in batch] == [(1, 1), (1, 2), (2, 1), (2, 2)]
+    it = iter(batch)
+    assert iter(it) is it and next(it).user_data == 1
+    assert [c.user_data for c in batch] == [1, 2] and next(it).user_data == 2
+    with pytest.raises(StopIteration):
+        next(it)
+    with pytest.raises(TypeError):
+        type(it)()
+    liburing.io_uring_cq_advance(ring, 2)

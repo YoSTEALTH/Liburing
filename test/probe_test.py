@@ -1,6 +1,6 @@
 # from re import escape
-from errno import EINVAL
-from pytest import raises, mark
+from pytest import raises
+
 import liburing
 
 
@@ -17,7 +17,7 @@ def test_probe():
     p = liburing.io_uring_get_probe()
     liburing.io_uring_free_probe(p)
     with raises(MemoryError):
-        p.ops_len
+        _ = p.ops_len
 
 
 def test_probe_ring():
@@ -33,19 +33,5 @@ def test_probe_ring():
         liburing.io_uring_queue_exit(ring)
 
 
-@mark.skip("Bug in struct size!?")
-def test_probe_register():
-    ring = liburing.Ring()
-    liburing.io_uring_queue_init(8, ring)
-    try:
-        p = liburing.io_uring_probe(1)
-        with raises(OSError) as e:
-            liburing.io_uring_register_probe(ring, p, 256)
-        assert e.value.errno == EINVAL
-        # free is done by `__del__` since `num` is set
-
-        p = liburing.io_uring_probe(2)
-        assert liburing.io_uring_register_probe(ring, p, 2) == 0
-        # free is done by `__del__` since `num` is set
-    finally:
-        liburing.io_uring_queue_exit(ring)
+def test_register_probe_removed():
+    assert not hasattr(liburing, "io_uring_register_probe")  # `io_uring_get_probe_ring` does it

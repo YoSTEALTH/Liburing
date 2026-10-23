@@ -1,5 +1,7 @@
 import socket
+
 import pytest
+
 import liburing
 
 
@@ -8,9 +10,9 @@ def test_Sockaddr():
         liburing.Sockaddr(liburing.AF_UNIX, " " * 109)
     addr = liburing.Sockaddr(liburing.AF_UNIX, "./path")
     with pytest.raises(NotImplementedError):
-        addr.port
+        _ = addr.port
     with pytest.raises(NotImplementedError):
-        addr.ip
+        _ = addr.ip
     assert addr.family == liburing.AF_UNIX
     assert addr.path == "./path"
 
@@ -26,7 +28,7 @@ def test_Sockaddr():
     assert addr.port == 80
     assert addr.ip == "127.0.0.1"
     with pytest.raises(NotImplementedError):
-        addr.path
+        _ = addr.path
 
     with pytest.raises(ValueError):
         liburing.Sockaddr(liburing.AF_INET6, "./path")
@@ -34,6 +36,33 @@ def test_Sockaddr():
         liburing.Sockaddr(liburing.AF_INET6, "123.123.123.123", 123, 234)  # IPv4 in IPv6
     assert liburing.Sockaddr(liburing.AF_INET6, "::fb%321", 12345)
     assert liburing.Sockaddr(liburing.AF_INET6, "::1", 65535)
+
+
+@pytest.mark.parametrize(
+    "given",
+    [
+        "::1",
+        "::",
+        "2001:db8:0:0:0:0:0:1",
+        "2001:DB8:0:0:1:0:0:1",
+        "::ffff:1.2.3.4",
+        "1::",
+        "0:0:1:0:0:0:0:0",
+        "fe80::a:b:c:d",
+    ],
+)
+def test_sockaddr_ip6(given):
+    addr = liburing.Sockaddr(liburing.AF_INET6, given, 80)
+    assert addr.ip == socket.inet_ntop(socket.AF_INET6, socket.inet_pton(socket.AF_INET6, given))
+    assert liburing.Sockaddr(liburing.AF_INET6, addr.ip, 80).ip == addr.ip  # round trip
+    assert addr.port == 80
+
+
+def test_sockaddr_ip6_scope():
+    assert liburing.Sockaddr(liburing.AF_INET6, "fe80::1%2", 80).ip == "fe80::1%2"
+    assert liburing.Sockaddr(liburing.AF_INET6, "ff01::fb%4294967295", 80).ip == "ff01::fb%4294967295"  # max
+    lo = socket.if_nametoindex("lo")
+    assert liburing.Sockaddr(liburing.AF_INET6, "fe80::1%lo", 80).ip == f"fe80::1%{lo}"  # a name: its index
 
 
 def test_sockadr_un_connect(ring, cqe, tmp_dir):

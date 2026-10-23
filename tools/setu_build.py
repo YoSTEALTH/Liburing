@@ -36,7 +36,9 @@ Note
     - The project's `requires-python` should be `>=3.14`. Any pip installs the wheel on 3.14, 3.14t,
       3.15 and 3.15t: `cp314-abi3` for the GIL builds, `cp314-cp314t` / `cp315-cp315t` for pips that
       do not know `abi3t` (before 26.2). 3.16t and later need pip 26.2+ (`abi3t`).
-    - Metadata comes from `pyproject.toml`; the version from `build.zig.zon`.
+    - Metadata comes from `pyproject.toml`; the version from `build.zig.zon`, `<year>.<month>.<day>[-<n>]`
+      (Zig takes only SemVer): the wheel gets the PEP 440 form, a same-day `-<n>` as `.post<n>`
+      (`2026.10.20-3` -> `2026.10.20.post3`, which sorts after `2026.10.20`).
     - `zig build` also writes `<name>.pyi` (type stubs); the wheel ships it with `py.typed`.
     - A file in `src/<name>/` that `zig build` also installs (`py.typed`, ...) is shipped once, the
       built copy; the wheel never holds a name twice.
@@ -68,10 +70,19 @@ RELEASE_TARGETS = ('x86_64-linux-gnu.2.28', 'aarch64-linux-gnu.2.28', 'x86_64-li
 EPOCH = (1980, 1, 1, 0, 0, 0)
 
 
+def pep440(ver):
+    '''The PEP 440 form of a `build.zig.zon` version `<major>.<minor>.<patch>[-<n>]` (the wheel's file name
+    and `METADATA`): a same-day `-<n>` is a post-release, `2026.10.20-3` -> `2026.10.20.post3`.'''
+    m = re.fullmatch(r'(\d+\.\d+\.\d+)(?:-(\d+))?', ver)
+    if m is None:
+        raise SystemExit(f'build.zig.zon .version {ver!r}: expected <year>.<month>.<day>[-<n>], like 2026.10.20-2')
+    return m[1] if m[2] is None else f'{m[1]}.post{int(m[2])}'
+
+
 def version():
-    '''`.version` from `build.zig.zon` (also `<name>.__version__`).'''
+    '''`.version` from `build.zig.zon` (also `<name>.__version__`), in its PEP 440 form (`pep440`).'''
     with open(os.path.join(ROOT, 'build.zig.zon')) as f:
-        return re.search(r'\.version\s*=\s*"([^"]+)"', f.read()).group(1)
+        return pep440(re.search(r'\.version\s*=\s*"([^"]+)"', f.read()).group(1))
 
 
 def pyproject():

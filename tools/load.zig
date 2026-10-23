@@ -69,10 +69,10 @@ fn once(fd: i32) bool {
         if (!ok(n) or n == 0) return false;
         have += n;
         if (want == null) {
-            const end = std.mem.indexOf(u8, buf[0..have], "\r\n\r\n") orelse continue;
+            const end = std.mem.find(u8, buf[0..have], "\r\n\r\n") orelse continue;
             const key = "Content-Length:";
-            const at = std.mem.indexOf(u8, buf[0..end], key) orelse return false;
-            const line_end = std.mem.indexOfPos(u8, buf[0..end], at, "\r\n") orelse end;
+            const at = std.mem.find(u8, buf[0..end], key) orelse return false;
+            const line_end = std.mem.findPos(u8, buf[0..end], at, "\r\n") orelse end;
             const text = std.mem.trim(u8, buf[at + key.len .. line_end], " ");
             want = end + 4 + (std.fmt.parseInt(usize, text, 10) catch return false);
             if (want.? > buf.len) return false;

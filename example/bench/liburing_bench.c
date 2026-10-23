@@ -2,11 +2,12 @@
 // `liburing_bench.py` (from Shakti's `example/bench`).
 //
 //   zig cc -O2 -D_GNU_SOURCE -Ilib/liburing/src/include -o zig-out/bin/liburing_bench_c example/bench/liburing_bench.c lib/liburing/src/{setup,queue,register,syscall,version}.c
-//   zig-out/bin/liburing_bench_c 12345 [--defer]
+//   zig-out/bin/liburing_bench_c 12345 [--defer] [--tmpl]
 //
 // One thread, one ring, default flags. Each connection: recv, send the response, recv again.
 // Closes the connection when recv or send returns 0 or an error. `--defer` sets the ring up with
-// `IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN` (default: no flags).
+// `IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN` (default: no flags). `--tmpl` prepares each
+// connection's recv and send once and copies them into the ring per request (`liburing_bench.py --tmpl`).
 
 #include <arpa/inet.h>
 #include <liburing.h>
@@ -40,10 +41,12 @@ struct conn {
     int fd;
     size_t sent;
     char buf[BUFSIZE];
+    struct io_uring_sqe recv_tmpl, send_tmpl;  // `--tmpl`: prepared once
 };
 
 static struct io_uring ring;
 static int listen_fd;
+static int use_tmpl;
 
 static struct io_uring_sqe *get_sqe(void) {
     struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
@@ -61,12 +64,20 @@ static void arm_accept(void) {
 }
 
 static void arm_recv(struct conn *c) {
+    if (use_tmpl) {
+        *get_sqe() = c->recv_tmpl;
+        return;
+    }
     struct io_uring_sqe *sqe = get_sqe();
     io_uring_prep_recv(sqe, c->fd, c->buf, BUFSIZE, 0);
     io_uring_sqe_set_data64(sqe, (uint64_t)(uintptr_t)c | OP_RECV);
 }
 
 static void arm_send(struct conn *c) {
+    if (use_tmpl && !c->sent) {
+        *get_sqe() = c->send_tmpl;
+        return;
+    }
     struct io_uring_sqe *sqe = get_sqe();
     io_uring_prep_send(sqe, c->fd, RESPONSE + c->sent, RESPONSE_LEN - c->sent, 0);
     io_uring_sqe_set_data64(sqe, (uint64_t)(uintptr_t)c | OP_SEND);
@@ -86,6 +97,12 @@ static void handle(struct io_uring_cqe *cqe) {
         if (cqe->res >= 0) {
             c = calloc(1, sizeof *c);
             c->fd = cqe->res;
+            if (use_tmpl) {
+                io_uring_prep_recv(&c->recv_tmpl, c->fd, c->buf, BUFSIZE, 0);
+                io_uring_sqe_set_data64(&c->recv_tmpl, (uint64_t)(uintptr_t)c | OP_RECV);
+                io_uring_prep_send(&c->send_tmpl, c->fd, RESPONSE, RESPONSE_LEN, 0);
+                io_uring_sqe_set_data64(&c->send_tmpl, (uint64_t)(uintptr_t)c | OP_SEND);
+            }
             arm_recv(c);
         }
         arm_accept();
@@ -119,6 +136,8 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--defer") == 0)
             flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN;
+        else if (strcmp(argv[i], "--tmpl") == 0)
+            use_tmpl = 1;
         else
             port = atoi(argv[i]);
     }

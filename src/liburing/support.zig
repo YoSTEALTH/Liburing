@@ -4,7 +4,7 @@
 //! For a call that needs an `IORING_FEAT_*`, the ring's `features` (what the kernel said at setup) tell.
 const std = @import("std");
 const setu = @import("setu");
-const c = @import("c.zig").c;
+const c = @import("c");
 const consts = @import("const.zig");
 
 const py = setu.py;
@@ -61,7 +61,7 @@ pub inline fn registerOp(opcode: u32, res: c_int) py.Error!c_int {
     if (res >= 0) return res;
     const op = opcode & ~@as(u32, c.IORING_REGISTER_USE_REGISTERED_RING);
     var buf: [32]u8 = undefined;
-    return registerFailed(std.fmt.bufPrint(&buf, "register opcode {d}", .{op}) catch &buf, op, res);
+    return registerFailed(std.mem.print(&buf, "register opcode {d}", .{op}) catch &buf, op, res);
 }
 
 fn registerFailed(name: []const u8, op: u32, res: c_int) py.Error {
@@ -85,7 +85,7 @@ fn setupFailed(res: c_int, flags: u32) py.Error {
         const missing = flags & ~@as(u32, @truncate(q.ring_setup_flags));
         if (missing != 0) {
             var buf: [32]u8 = undefined;
-            const name = setupName(missing) orelse std.fmt.bufPrint(&buf, "setup flag 0x{x}", .{missing}) catch &buf;
+            const name = setupName(missing) orelse std.mem.print(&buf, "setup flag 0x{x}", .{missing}) catch &buf;
             return unsupported(name, res);
         }
     };
@@ -117,7 +117,7 @@ const EOPNOTSUPP: c_int = @backingInt(std.os.linux.E.OPNOTSUPP);
 fn unsupported(name: []const u8, res: c_int) py.Error {
     const k = kernel();
     var buf: [128]u8 = undefined;
-    const msg = std.fmt.bufPrint(&buf, "Kernel `{d}.{d}` does not support `{s}`", .{ k >> 8, k & 0xff, name }) catch &buf;
+    const msg = std.mem.print(&buf, "Kernel `{d}.{d}` does not support `{s}`", .{ k >> 8, k & 0xff, name }) catch &buf;
     return py.raiseWith(unsupported_error.?, .{ -res, msg });
 }
 

@@ -1,4 +1,5 @@
 import pytest
+
 import liburing
 
 
@@ -15,7 +16,7 @@ def test_Sqe():
 
     sqe = liburing.Sqe(2)
     assert len(sqe) == 2
-    assert True if sqe[1] else False
+    assert bool(sqe[1])
     sqe.user_data = 123
     assert sqe.user_data == 123
     assert sqe[0].user_data == 123
@@ -38,8 +39,8 @@ def test_Cqe(ring, cqe):
     with pytest.raises(IndexError):
         cqe[1]
     with pytest.raises(AttributeError):
-        cqe.user_data
-    assert not (True if cqe else False)
+        _ = cqe.user_data
+    assert not cqe
 
     sqe = liburing.io_uring_get_sqe(ring)
     liburing.io_uring_prep_nop(sqe)
@@ -53,12 +54,46 @@ def test_Cqe(ring, cqe):
     assert liburing.io_uring_wait_cqe_nr(ring, cqe, 2) == 0
     assert liburing.io_uring_cq_ready(ring) == 2
 
-    assert True if cqe else False
+    assert bool(cqe)
     entry = cqe[0]
     assert entry.user_data == 1
     assert liburing.io_uring_cqe_seen(ring, entry) is None
 
-    assert True if cqe[1] else False
+    assert bool(cqe[1])
     entry = cqe[1]
     assert entry.user_data == 2
     assert liburing.io_uring_cqe_seen(ring, entry) is None
+
+
+@pytest.mark.parametrize(
+    "flags, wide",
+    [
+        (0, False),
+        (liburing.IORING_SETUP_CQE32, True),
+        (liburing.IORING_SETUP_CQE_MIXED, False),
+    ],
+)
+def test_big_cqe(flags, wide):
+    ring, cqe = liburing.Ring(), liburing.Cqe()
+    try:
+        liburing.io_uring_queue_init(4, ring, flags)
+    except OSError:
+        pytest.skip("kernel lacks this setup flag")
+    try:
+        sqe = liburing.io_uring_get_sqe(ring)
+        liburing.io_uring_prep_nop(sqe)
+        sqe.user_data = 5
+        assert liburing.io_uring_submit_and_wait(ring, 1) == 1
+        liburing.io_uring_peek_cqe(ring, cqe)
+        entry = cqe[0]
+        assert entry.user_data == 5
+        # a NOP's 32-byte completion carries zeros (16-byte ones on a mixed ring: none)
+        assert entry.big_cqe == (bytes(16) if wide else None)
+        liburing.io_uring_cqe_seen(ring, entry)
+    finally:
+        liburing.io_uring_queue_exit(ring)
+
+
+def test_cqe_takes_no_size():
+    with pytest.raises(TypeError):  # batches: `CqeBatch(no)`
+        liburing.Cqe(4)

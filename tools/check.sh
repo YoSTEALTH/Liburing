@@ -22,6 +22,22 @@ step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 step "zig fmt"
 "$ZIG" fmt --check src tools build.zig build.zig.zon
 
+step "c.io_uring_submit* only through Ring.submitPtr"
+# `submitPtr` makes the in-flight table's entries and runs the skip checks: a submit with any other pointer
+# (`checkedPtr`, `_ring`) would send SQEs whose `user_data` is no table index.
+for f in src/liburing/*.zig; do
+    awk -v f="$f" '
+        function check() {
+            if (body ~ /c\.io_uring_submit/ && (body !~ /submitPtr\(\)/ || body ~ /checkedPtr\(\)/)) {
+                print f ": " name; bad = 1
+            }
+        }
+        /^[[:space:]]*(pub )?(inline )?fn / { check(); name = $0; body = "" }
+        { body = body "\n" $0 }
+        END { check(); exit bad }
+    ' "$f"
+done
+
 step "tools/setu_build.py is the pinned Setu's copy"
 "$ZIG" build setu-build-check
 

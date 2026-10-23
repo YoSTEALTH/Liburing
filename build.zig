@@ -37,7 +37,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     // `-Drelease` (what `tools/setu_build.py` passes) is ReleaseSafe: a bug hit from Python stops the
     // process instead of corrupting memory.
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .safe });
     const strip = b.option(bool, "strip", "Strip debug symbols from the binary") orelse false;
     const ext_suffix = b.option([]const u8, "ext-suffix", "Python extension module suffix") orelse
         @import("setu").ext_suffix;
@@ -104,10 +104,10 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/liburing/stubgen.zig"),
             .target = b.graph.host,
-            .optimize = .Debug,
+            .optimize = .debug,
             .imports = &.{
                 .{ .name = "setu", .module = setu_dep.module("setu") },
-                .{ .name = "c", .module = cModule(b, b.graph.host, .Debug, &configure.step) },
+                .{ .name = "c", .module = cModule(b, b.graph.host, .debug, &configure.step) },
             },
         }),
     });
@@ -134,7 +134,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("tools/load.zig"),
             .target = target,
-            .optimize = .ReleaseFast,
+            .optimize = .fast,
         }),
     });
     b.step("load", "Build the HTTP load generator into zig-out/bin/").dependOn(&b.addInstallArtifact(load, .{}).step);
@@ -145,7 +145,7 @@ pub fn build(b: *std.Build) void {
 fn cModule(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     configure: *std.Build.Step,
 ) *std.Build.Module {
     const translate_c = b.addTranslateC(.{
@@ -162,7 +162,7 @@ fn cModule(
     }));
     c_externs.addFileArg(translate_c.getOutput());
     return b.createModule(.{
-        .root_source_file = c_externs.addOutputFileArg("c.zig"),
+        .root_source_file = c_externs.addOutputFileArg2("c.zig", .{}),
         .target = target,
         .optimize = optimize,
         .link_libc = true,

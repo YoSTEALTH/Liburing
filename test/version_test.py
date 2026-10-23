@@ -1,10 +1,11 @@
 import pytest
+
 from liburing import (
-    liburing_version_major,
-    liburing_version_minor,
-    liburing_version_check,
     LINUX_VERSION_MAJOR,
     LINUX_VERSION_MINOR,
+    liburing_version_check,
+    liburing_version_major,
+    liburing_version_minor,
     linux_version_check,
 )
 

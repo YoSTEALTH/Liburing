@@ -1,4 +1,4 @@
-const c = @import("c.zig").c;
+const c = @import("c");
 const std = @import("std");
 
 // Liburing
@@ -115,6 +115,10 @@ pub const IORING_OFF_SQES = c.IORING_OFF_SQES;
 pub const IORING_OFF_PBUF_RING = c.IORING_OFF_PBUF_RING;
 pub const IORING_OFF_PBUF_SHIFT = c.IORING_OFF_PBUF_SHIFT;
 pub const IORING_OFF_MMAP_MASK = c.IORING_OFF_MMAP_MASK;
+
+// io_uring_buf_reg.flags (`BufReg.flags`)
+pub const IOU_PBUF_RING_MMAP = c.IOU_PBUF_RING_MMAP;
+pub const IOU_PBUF_RING_INC = c.IOU_PBUF_RING_INC;
 
 // sq_ring.flags
 pub const IORING_SQ_NEED_WAKEUP = c.IORING_SQ_NEED_WAKEUP;

@@ -6,12 +6,14 @@ import pathlib
 import subprocess
 import sys
 import textwrap
-import pytest
-import liburing as L
 
-KERNEL = f"Kernel `{L.LINUX_VERSION_MAJOR}.{L.LINUX_VERSION_MINOR}`"
+import pytest
+
+import liburing as u
+
+KERNEL = f"Kernel `{u.LINUX_VERSION_MAJOR}.{u.LINUX_VERSION_MINOR}`"
 ROOT = pathlib.Path(__file__).parent.parent
-PACKAGE_DIR = str(pathlib.Path(L.__file__).parent.parent)  # where this `liburing` was imported from
+PACKAGE_DIR = str(pathlib.Path(u.__file__).parent.parent)  # where this `liburing` was imported from
 
 # Runs in a child process: a seccomp filter makes `io_uring_register` fail with `EINVAL` for opcodes from
 # `IORING_REGISTER_QUERY` (35) on, which is what a kernel without `QUERY` does. Irreversible, hence the child.
@@ -45,59 +47,60 @@ def run_without_query(code):
         capture_output=True,
         text=True,
         timeout=60,
+        check=False,  # the caller reads its output and exit status
     )
 
 
 def test_UnsupportedError_is_OSError():
-    assert issubclass(L.UnsupportedError, OSError)
+    assert issubclass(u.UnsupportedError, OSError)
 
 
 def test_unknown_register_opcode(ring):
-    with pytest.raises(L.UnsupportedError, match="does not support `register opcode 200`") as e:
-        L.io_uring_register(ring.ring_fd, 200, 0, None)
+    with pytest.raises(u.UnsupportedError, match="does not support `register opcode 200`") as e:
+        u.io_uring_register(ring.ring_fd, 200, 0, None)
     assert e.value.errno == errno.EINVAL
 
 
 def test_bad_argument_stays_OSError(ring):
     # `IORING_REGISTER_EVENTFD` is supported: a bad fd is the caller's error.
     with pytest.raises(OSError) as e:
-        L.io_uring_register_eventfd(ring, -1)
-    assert type(e.value) is not L.UnsupportedError
+        u.io_uring_register_eventfd(ring, -1)
+    assert type(e.value) is not u.UnsupportedError
     assert e.value.errno == errno.EBADF
 
 
 def test_unknown_setup_flag():
-    L.io_uring_register_query(L.Query())  # setup flags are known only from `QUERY`: skips without it
-    with pytest.raises(L.UnsupportedError, match="does not support `setup flag 0x40000000`") as e:
-        L.io_uring_queue_init(1, L.Ring(), 1 << 30)
+    u.io_uring_register_query(u.Query())  # setup flags are known only from `QUERY`: skips without it
+    with pytest.raises(u.UnsupportedError, match="does not support `setup flag 0x40000000`") as e:
+        u.io_uring_queue_init(1, u.Ring(), 1 << 30)
     assert e.value.errno == errno.EINVAL
 
 
 def test_bad_setup_flags_stay_OSError():
     # `IORING_SETUP_SQ_AFF` is supported, it just needs `IORING_SETUP_SQPOLL`.
     with pytest.raises(OSError) as e:
-        L.io_uring_queue_init(1, L.Ring(), L.IORING_SETUP_SQ_AFF)
-    assert type(e.value) is not L.UnsupportedError
+        u.io_uring_queue_init(1, u.Ring(), u.IORING_SETUP_SQ_AFF)
+    assert type(e.value) is not u.UnsupportedError
 
 
 def test_kernel_without_query():
     r = run_without_query("""
-        import liburing as L
+        import liburing as u
         try:
-            L.io_uring_register_query(L.Query())
-        except L.UnsupportedError as e:
+            u.io_uring_register_query(u.Query())
+        except u.UnsupportedError as e:
             print("query:", e.errno, e.strerror)
-        ring = L.Ring()
-        L.io_uring_queue_init(1, ring)
+        ring = u.Ring()
+        u.io_uring_queue_init(1, ring)
         try:  # opcode 36 came after `QUERY`, so a kernel without it has no 36 either
-            L.io_uring_register(ring.ring_fd, 36, 0, None)
-        except L.UnsupportedError as e:
+            u.io_uring_register(ring.ring_fd, 36, 0, None)
+        except u.UnsupportedError as e:
             print("36:", e.strerror)
         try:  # `EVENTFD` (5.2) is in the version table: a bad fd stays `OSError`
-            L.io_uring_register_eventfd(ring, -1)
+            u.io_uring_register_eventfd(ring, -1)
         except OSError as e:
             print("eventfd:", type(e).__name__, e.errno)
-        L.io_uring_queue_exit(ring)
+        u.io_uring_queue_exit(ring)
     """)
     assert r.returncode == 0, r.stderr
     assert r.stdout.splitlines() == [
@@ -111,7 +114,8 @@ def test_pytest_skips_unsupported():
     # `conftest.py` turns `UnsupportedError` into a skip: `test_Query` needs no `skip_linux`.
     r = run_without_query("""
         import sys, pytest
-        sys.exit(pytest.main(["-q", "-rs", "-p", "no:cacheprovider", "test/queue/register_structs_test.py::test_Query"]))
+        test = "test/queue/register_structs_test.py::test_Query"
+        sys.exit(pytest.main(["-q", "-rs", "-p", "no:cacheprovider", test]))
     """)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "1 skipped" in r.stdout

@@ -1,5 +1,7 @@
 import mmap
+
 import pytest
+
 import liburing
 
 
@@ -25,7 +27,7 @@ def test_io_uring_init_exit():
     assert liburing.io_uring_queue_exit(ring) is None
     # Trying to exit again
     with pytest.raises(RuntimeError):
-        liburing.io_uring_queue_exit(ring) is None  # will not call internally but
+        liburing.io_uring_queue_exit(ring)  # will not call internally but
 
     ring = liburing.Ring()
     with pytest.raises(RuntimeError):
@@ -59,11 +61,10 @@ def test_init_max():
         liburing.io_uring_prep_nop(sqe)
         sqe.flags = liburing.IOSQE_IO_LINK | liburing.IOSQE_ASYNC
         sqe.user_data = i + 1  # `sqe.user_data` can not be `0`
-    else:  # last
-        sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_nop(sqe)
-        sqe.flags = liburing.IOSQE_ASYNC
-        sqe.user_data = i + 1 + 1
+    sqe = liburing.io_uring_get_sqe(ring)
+    liburing.io_uring_prep_nop(sqe)
+    sqe.flags = liburing.IOSQE_ASYNC
+    sqe.user_data = i + 1 + 1
 
     assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, maximum) == maximum
 
@@ -103,5 +104,88 @@ def test_io_uring_init_mem():
         liburing.io_uring_wait_cqe(ring, cqe)
         assert cqe[0].user_data == 7
         liburing.io_uring_cqe_seen(ring, cqe[0])
+    finally:
+        liburing.io_uring_queue_exit(ring)
+
+
+def submit_nop(ring, cqe, user_data):
+    sqe = liburing.io_uring_get_sqe(ring)
+    liburing.io_uring_prep_nop(sqe)
+    sqe.user_data = user_data
+    assert liburing.io_uring_submit_and_wait(ring, 1) == 1
+    liburing.io_uring_peek_cqe(ring, cqe)
+
+
+STALE = "initialized again"
+
+
+def test_sqe_from_before_reinit():
+    ring = liburing.Ring()
+    liburing.io_uring_queue_init(4, ring)
+    sqe = liburing.io_uring_get_sqe(ring)
+    bound = liburing.Sqe(ring)
+    liburing.io_uring_prep_nop(bound)
+    liburing.io_uring_queue_exit(ring)
+    liburing.io_uring_queue_init(4, ring)  # new memory: `sqe` and `bound` point into the old, unmapped one
+    try:
+        for s in (sqe, bound):
+            with pytest.raises(RuntimeError, match=STALE):
+                s.user_data = 1
+            with pytest.raises(RuntimeError, match=STALE):
+                _ = s.flags
+            with pytest.raises(RuntimeError, match=STALE):
+                liburing.io_uring_sqe_set_data64(s, 1)
+        with pytest.raises(RuntimeError, match=STALE):
+            liburing.io_uring_prep_nop(sqe)
+        assert liburing.io_uring_sq_ready(ring) == 0  # nothing written
+        # `Sqe(ring)`: its next prep takes a slot of the new memory
+        assert liburing.io_uring_prep_nop(bound) is True
+        bound.user_data = 5
+        cqe = liburing.Cqe()
+        assert liburing.io_uring_submit_and_wait(ring, 1) == 1
+        liburing.io_uring_peek_cqe(ring, cqe)
+        assert cqe[0].user_data == 5
+        liburing.io_uring_cqe_seen(ring, cqe[0])
+    finally:
+        liburing.io_uring_queue_exit(ring)
+
+
+def test_cqe_from_before_reinit():
+    ring = liburing.Ring()
+    cqe = liburing.Cqe()
+    batch = liburing.CqeBatch(4)
+    liburing.io_uring_queue_init(4, ring)
+    submit_nop(ring, cqe, 1)
+    entry = cqe[0]
+    assert liburing.io_uring_peek_batch_cqe(ring, batch) == 1
+    it = liburing.io_uring_cqe_iter_init(ring)
+    for_loop = liburing.CqeIter(ring, cqe)
+    liburing.io_uring_queue_exit(ring)
+    liburing.io_uring_queue_init(4, ring)
+    try:
+        with pytest.raises(RuntimeError, match=STALE):
+            _ = entry.user_data
+        with pytest.raises(RuntimeError, match=STALE):
+            liburing.io_uring_cqe_seen(ring, entry)
+        with pytest.raises(RuntimeError, match=STALE):
+            cqe[0]
+        with pytest.raises(RuntimeError, match=STALE):
+            cqe.user_data_at(0)
+        with pytest.raises(RuntimeError, match=STALE):
+            cqe.res_at(0)
+        with pytest.raises(RuntimeError, match=STALE):
+            batch[0]
+        with pytest.raises(RuntimeError, match=STALE):
+            list(batch)
+        with pytest.raises(RuntimeError, match=STALE):
+            liburing.io_uring_cqe_iter_next(it, cqe)
+        with pytest.raises(RuntimeError, match=STALE):
+            next(for_loop)
+        # a wait / peek on the new memory makes them usable again
+        submit_nop(ring, cqe, 2)
+        assert cqe[0].user_data == 2
+        assert liburing.io_uring_peek_batch_cqe(ring, batch) == 1
+        assert batch[0].user_data == 2
+        liburing.io_uring_cq_advance(ring, 1)
     finally:
         liburing.io_uring_queue_exit(ring)

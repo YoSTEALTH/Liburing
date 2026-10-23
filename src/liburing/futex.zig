@@ -1,4 +1,4 @@
-const c = @import("c.zig").c;
+const c = @import("c");
 const e = @import("error.zig");
 const keep = @import("class.zig").keep;
 const setu = @import("setu");
@@ -74,12 +74,15 @@ pub const FUTEX = struct {
 ///     False
 ///
 ///     >>> io_uring_prep_futex_wait(sqe, futex)
+///     True
 ///     >>> futex.state = 1
 ///     >>> io_uring_prep_futex_wake(sqe, futex)
+///     True
 ///
 ///     >>> futex.state = 0
 ///     >>> fwv = Futex()
 ///     >>> io_uring_prep_futex_waitv(sqe, fwv)
+///     True
 ///
 ///     >>> futex = Futex(2, FUTEX2_PRIVATE | FUTEX2_SIZE_U32)
 ///     >>> futex.private
