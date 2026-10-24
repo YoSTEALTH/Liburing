@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {% if page and page.url.startswith("api/") %}
+    {# the API pages are identifiers and code: browsers guess a wrong language (Danish) and offer to translate #}
+    <meta name="google" content="notranslate">
+  {% endif %}
+  {{ super() }}
+{% endblock %}

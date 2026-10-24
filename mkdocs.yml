@@ -7,6 +7,8 @@ edit_uri: edit/dev/docs/
 
 theme:
   name: material
+  language: en
+  custom_dir: overrides
   features:
     - navigation.sections
     - navigation.top
