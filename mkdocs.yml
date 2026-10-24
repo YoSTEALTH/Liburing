@@ -1,0 +1,73 @@
+site_name: Liburing
+site_description: Python + Zig wrapper around C liburing (io_uring)
+site_url: https://yostealth.github.io/Liburing/
+repo_url: https://github.com/YoSTEALTH/Liburing
+repo_name: YoSTEALTH/Liburing
+edit_uri: edit/dev/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      toggle: {icon: material/weather-night, name: Dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      toggle: {icon: material/weather-sunny, name: Light mode}
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Install: install.md
+  - Guide:
+      - Examples: guide.md
+  - Benchmarks: bench.md
+  - API reference:
+      - Overview: api/index.md
+      - Ring and setup: api/ring.md
+      - Submission queue: api/submission.md
+      - Completion queue: api/completion.md
+      - "Prep: files": api/prep-file.md
+      - "Prep: sockets": api/prep-net.md
+      - "Prep: other": api/prep-other.md
+      - Register and buffers: api/register.md
+      - Network helpers: api/network.md
+      - Types, enums and errors: api/types.md
+      - Constants: api/constants.md
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - gen-files:
+      scripts: [docs/gen_api.py, docs/gen_guide.py, docs/gen_bench.py]
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            extensions:
+              - docs/griffe_docs.py:Markdown
+            docstring_style: null
+            show_root_heading: true
+            show_source: false
+            heading_level: 2
+            show_root_full_path: false
+            members_order: source
+            show_signature_annotations: true
+            separate_signature: true
+            show_if_no_docstring: true

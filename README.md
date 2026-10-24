@@ -9,7 +9,7 @@ Liburing is Python + Zig wrapper around [C Liburing](https://github.com/axboe/Li
 - Fast & scalable asynchronous I/O (storage, networking, ...) interface.
 - io_uring reduces number of syscalls overhead & context switches, thus improving speed.
 
-Good(old) documentation [Lord of the io_uring](https://unixism.net/loti/)
+Documentation: https://yostealth.github.io/Liburing/
 
 Benchmarks: [example/bench/bench.md](example/bench/bench.md) (HTTP server: Liburing vs `select.epoll`, asyncio and C)
 

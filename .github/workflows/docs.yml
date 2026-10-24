@@ -1,0 +1,55 @@
+name: Docs
+
+# Builds the MkDocs site and publishes it to GitHub Pages (Settings > Pages > Source: GitHub Actions).
+# `dev` deploys too: Settings > Environments > github-pages > Deployment branches must allow `dev` (and `main`).
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true  # lib/liburing (C liburing)
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Generate liburing.pyi (the API reference reads it)
+        run: zig build develop
+
+      - name: Build site
+        run: |
+          python -m pip install mkdocs-material "mkdocstrings[python]" mkdocs-gen-files
+          mkdocs build --strict
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

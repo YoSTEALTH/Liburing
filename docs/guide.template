@@ -1,0 +1,20 @@
+# Examples
+
+The code below is included straight from the `example/` directory, so it always matches the tested files.
+
+## Which operations does the kernel support?
+
+@@example/probe.py@@
+
+## Open, write, read, close
+
+@@example/open_write_read_close.py@@
+
+## Four ways to fill the submission queue
+
+- `io_uring_get_sqe(ring)`: the C way. It hands back a new `SQE` for every request (`None` when the queue is full), which you prepare and give a `user_data`.
+- `Sqe()`: prepare one entry once, then `put_sqe(ring, sqe)` copies it into the ring every time you need it. One call per request, nothing re-prepared.
+- `Sqe(ring)`: one object for the ring's lifetime. Each prep takes the ring's next free entry: no `io_uring_get_sqe`, no `put_sqe`, no object per request.
+- `Sqe(123)`: a block of 123 entries (`sqe[0]` ... `sqe[122]`), prepared in a loop and put into the ring with a single `put_sqe`: a whole batch per call.
+
+@@example/sqe_styles.py@@
