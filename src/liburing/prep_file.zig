@@ -15,6 +15,8 @@ const py = setu.py;
 const Object = setu.c.Object;
 const OpenHow = class.OpenHow;
 
+/// Moves `nbytes` from `fd_in` at `off_in` to `fd_out` at `off_out` (`splice(2)`), one of them a pipe.
+/// `-1` as an offset means the fd's own position; `splice_flags` are `SPLICE_F_*`.
 pub fn io_uring_prep_splice(
     sqe: *SQE,
     fd_in: i32,
@@ -30,6 +32,7 @@ pub fn io_uring_prep_splice(
     return true;
 }
 
+/// Copies `nbytes` between two pipes (`tee(2)`) without consuming the input; `splice_flags` are `SPLICE_F_*`.
 pub fn io_uring_prep_tee(sqe: *SQE, fd_in: i32, fd_out: i32, nbytes: u32, splice_flags: u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -67,6 +70,9 @@ pub fn io_uring_prep_readv(
     return true;
 }
 
+/// Reads into `buff` (all of it) from a registered buffer `buf_index` at `offset` (default `0`).
+/// The request holds `buff` until its completion.
+///
 /// Example
 ///     >>> # `buf_index` = registered IO buffer
 ///     >>> buffer = bytearray(5)
@@ -97,6 +103,8 @@ pub fn io_uring_prep_read_fixed(
     return true;
 }
 
+/// Reads into several buffers at once, from the registered buffer `buf_index`.
+///
 /// Example
 ///     >>> # `buf_index` = registered IO buffer
 ///     >>> bufs = [bytearray(5), bytearray(4)]
@@ -148,6 +156,9 @@ pub fn io_uring_prep_writev(sqe: *SQE, fd: i32, bufs: py.Sequence(py.Buffer), of
     return true;
 }
 
+/// Writes `buff` (all of it) from the registered buffer `buf_index` at `offset` (default `0`).
+/// The request holds `buff` until its completion.
+///
 /// Example
 ///     >>> # `buf_index` = registered IO buffer
 ///     >>> io_uring_prep_write_fixed(sqe, fd, b'hi...', buf_index)
@@ -171,6 +182,8 @@ pub fn io_uring_prep_write_fixed(sqe: *SQE, fd: i32, buff: py.OwnedBuffer, buf_i
     return true;
 }
 
+/// Writes several buffers at once, from the registered buffer `buf_index`.
+///
 /// Example
 ///     >>> # `buf_index` = registered IO buffer
 ///     >>> io_uring_prep_writev_fixed(sqe, fd, [b"hi... ", b"bye!"], buf_index)
@@ -198,6 +211,7 @@ pub fn io_uring_prep_writev_fixed(
     return true;
 }
 
+/// Syncs the file `fd` to disk (`fsync(2)`); `fsync_flags` is `0` (default) or `IORING_FSYNC_DATASYNC`.
 pub fn io_uring_prep_fsync(sqe: *SQE, fd: i32, fsync_flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -206,6 +220,8 @@ pub fn io_uring_prep_fsync(sqe: *SQE, fd: i32, fsync_flags: ?u32) py.Error!bool 
     return true;
 }
 
+/// Updates the registered files table from `fds`, starting at slot `offset` (default `0`).
+/// The request holds `fds` until its completion.
 pub fn io_uring_prep_files_update(sqe: *SQE, fds: *FileIndex, offset: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -215,6 +231,8 @@ pub fn io_uring_prep_files_update(sqe: *SQE, fds: *FileIndex, offset: ?i32) py.E
     return true;
 }
 
+/// Preallocates or deallocates the file range `offset` to `offset + len` (`fallocate(2)`).
+///
 /// Mode
 ///     FALLOC_FL_KEEP_SIZE       # default is extend size
 ///     FALLOC_FL_PUNCH_HOLE      # de-allocates range
@@ -230,7 +248,7 @@ pub fn io_uring_prep_fallocate(sqe: *SQE, fd: i32, mode: i32, offset: u64, len: 
     return true;
 }
 
-/// Open File
+/// Opens `path`; the new fd is returned in `cqe.res`.
 ///
 /// Example
 ///     >>> sqe = io_uring_get_sqe(ring)
@@ -257,25 +275,28 @@ pub fn io_uring_prep_open(sqe: *SQE, path: *Object, flags: ?i32, mode: ?c.mode_t
     return true;
 }
 
-/// Open Direct
+/// Opens `path` into the registered files table at slot `file_index` instead of returning an fd.
 ///
 /// Example
-///     >>> indexed = FileIndex([-1, -1, -1, -1])
+///     >>> fds = FileIndex([-1, -1, -1, -1])
 ///     >>> index = 3  # position of last ---^ `fds` registered
 ///     >>> io_uring_register_files(ring, fds)
-///     >>> flags = liburing.O_TMPFILE | liburing.O_WRONLY
-///     >>> sqe = liburing.io_uring_get_sqe(ring)
+///     >>> flags = O_TMPFILE | O_WRONLY
+///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> io_uring_prep_open_direct(sqe, ".", flags, index)
 ///     True
 ///     ... ...
-///     >>>.io_uring_prep_close_direct(sqe, index)
+///     >>> sqe = io_uring_get_sqe(ring)
+///     >>> io_uring_prep_close_direct(sqe, index)
+///     True
 ///     ... ...
 ///     >>> io_uring_unregister_files(ring)
 ///
 /// Note
 ///     - Open direct does not use `fd` but `index`
-///     - If `file_index=IORING_FILE_INDEX_ALLOC` free direct descriptor will be auto assigned.
-///     Allocated descriptor is returned in the `cqe.res`.
+///     - `file_index` defaults to `IORING_FILE_INDEX_ALLOC`: a free direct descriptor is auto assigned.
+///       The allocated descriptor is returned in the `cqe.res`.
+///     - `flags` defaults to `O_RDONLY`, `mode` to `0o777`.
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_open_direct` includes `io_uring_prep_openat_direct` as well.
 ///
@@ -302,8 +323,11 @@ pub fn io_uring_prep_open_direct(
     return true;
 }
 
-/// >>> io_uring_prep_close(sqe, fd)
-/// True
+/// Closes the file `fd`.
+///
+/// Example
+///     >>> io_uring_prep_close(sqe, fd)
+///     True
 pub fn io_uring_prep_close(sqe: *SQE, fd: i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -311,8 +335,11 @@ pub fn io_uring_prep_close(sqe: *SQE, fd: i32) py.Error!bool {
     return true;
 }
 
-/// >>> io_uring_prep_close_direct(sqe, file_index)
-/// True
+/// Closes the registered (direct) file at slot `file_index`.
+///
+/// Example
+///     >>> io_uring_prep_close_direct(sqe, file_index)
+///     True
 pub fn io_uring_prep_close_direct(sqe: *SQE, file_index: u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -320,6 +347,8 @@ pub fn io_uring_prep_close_direct(sqe: *SQE, file_index: u32) py.Error!bool {
     return true;
 }
 
+/// Reads into `buf` (all of it) from `fd` at `offset` (default `0`), held until the completion.
+///
 /// Example
 ///     >>> buf = bytearray(5)
 ///     >>> sqe = io_uring_get_sqe(ring)
@@ -346,6 +375,9 @@ pub fn io_uring_prep_read(sqe: *SQE, fd: i32, buf: py.OwnedWritableBuffer, offse
     return true;
 }
 
+/// Reads from `fd` repeatedly, each time into a buffer the kernel picks from the provided buffer group
+/// `buf_group`; `nbytes` of `0` (default) reads up to the buffer's size.
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 pub fn io_uring_prep_read_multishot(sqe: *SQE, fd: i32, buf_group: i32, nbytes: ?u32, offset: ?u64) py.Error!bool {
@@ -357,6 +389,8 @@ pub fn io_uring_prep_read_multishot(sqe: *SQE, fd: i32, buf_group: i32, nbytes: 
     return true;
 }
 
+/// Writes `buf` (all of it) to `fd` at `offset` (default `0`), held until the completion.
+///
 /// Example
 ///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> io_uring_prep_write(sqe, fd, b"hi...")
@@ -379,20 +413,20 @@ pub fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: py.OwnedBuffer, offset: ?u64
     return true;
 }
 
-/// Statx
+/// Gets the file's `statx(2)` info into `statxbuf` (held until the completion).
 ///
 /// Type
-///     sqe:    SQE
-///     stat:   Statx
-///     path: str | os.PathLike[str]
-///     flags:  int
-///     mask:   int
-///     dfd:    int
-///     return: None
+///     sqe:      SQE
+///     statxbuf: Statx
+///     path:     str | os.PathLike[str]
+///     flags:    int
+///     mask:     int
+///     dfd:      int
+///     return:   bool
 ///
 /// Example
 ///     >>> stat = Statx()
-///     >>> if sqe := io_uring_get_sqe(ring)
+///     >>> if sqe := io_uring_get_sqe(ring):
 ///     ...     io_uring_prep_statx(sqe, stat, __file__)
 ///     ... ...
 ///     >>> stat.isfile
@@ -400,7 +434,7 @@ pub fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: py.OwnedBuffer, offset: ?u64
 ///     >>> stat.size
 ///     123
 ///
-/// Flag
+/// Flags
 ///     AT_EMPTY_PATH
 ///     AT_NO_AUTOMOUNT
 ///     AT_SYMLINK_NOFOLLOW     # Do not follow symbolic links.
@@ -428,7 +462,7 @@ pub fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: py.OwnedBuffer, offset: ?u64
 ///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
-///     - `STATX_ALL` is depreciated, use `STATX_BASIC_STATS | STATX_BTIME` which is set by default.
+///     - `STATX_ALL` is deprecated, use `STATX_BASIC_STATS | STATX_BTIME` which is set by default.
 pub fn io_uring_prep_statx(
     sqe: *SQE,
     statxbuf: *Statx,
@@ -442,13 +476,16 @@ pub fn io_uring_prep_statx(
     const path_ = try h.toPath(path);
     defer path_.deinit();
     const _dfd = dfd orelse AT_FDCWD;
-    const _mask = mask orelse c.STATX_BASIC_STATS | c.STATX_BTIME; // replaces `STATX_ALL` as its depreciated!
+    const _mask = mask orelse c.STATX_BASIC_STATS | c.STATX_BTIME; // replaces `STATX_ALL` as its deprecated!
     const _flags = flags orelse 0;
     c.io_uring_prep_statx(s, _dfd, path_.path, _flags, _mask, &statxbuf._statx);
     try h.holdUntilCompletion(sqe, null, &.{ path_.obj, StatxType.object(statxbuf) });
     return true;
 }
 
+/// Advises the kernel on the file use of `len` bytes from `offset` (default `0`) (`posix_fadvise(2)`);
+/// `advice` is `POSIX_FADV_*`. Up to `4 GiB - 1`; `io_uring_prep_fadvise64` for more.
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 pub fn io_uring_prep_fadvise(sqe: *SQE, fd: i32, len: u32, advice: i32, offset: ?u64) py.Error!bool {
@@ -483,6 +520,8 @@ pub fn io_uring_prep_madvise(sqe: *SQE, buf: py.OwnedWritableBuffer, advice: i32
     return true;
 }
 
+/// `io_uring_prep_fadvise` for any `len`.
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 pub fn io_uring_prep_fadvise64(sqe: *SQE, fd: i32, len: c.off_t, advice: i32, offset: ?u64) py.Error!bool {
@@ -507,6 +546,8 @@ pub fn io_uring_prep_madvise64(sqe: *SQE, buf: py.OwnedWritableBuffer, advice: i
     return true;
 }
 
+/// Opens `path` as described by `how` (`openat2(2)`).
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 ///
@@ -523,9 +564,12 @@ pub fn io_uring_prep_openat2(sqe: *SQE, path: *Object, how: *OpenHow, dfd: ?i32)
     return true;
 }
 
+/// `io_uring_prep_openat2`, but the file goes into the registered files table at slot `file_index`
+/// (default `IORING_FILE_INDEX_ALLOC`) instead of becoming an fd.
+///
 /// Note
-///     - If `file_index=IORING_FILE_INDEX_ALLOC` free direct descriptor will be auto assigned.
-///     Allocated descriptor is returned in the `cqe.res`.
+///     - `file_index` defaults to `IORING_FILE_INDEX_ALLOC`: a free direct descriptor is auto assigned.
+///       The allocated descriptor is returned in the `cqe.res`.
 ///
 /// Type
 ///     path: str | os.PathLike[str]
@@ -547,6 +591,8 @@ pub fn io_uring_prep_openat2_direct(
     return true;
 }
 
+/// Removes the file `path` (`unlinkat(2)`); `flags` is `0` (default) or `AT_REMOVEDIR`.
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_unlink` includes `io_uring_prep_unlinkat` feature.
@@ -564,6 +610,8 @@ pub fn io_uring_prep_unlink(sqe: *SQE, path: *Object, flags: ?i32, dfd: ?i32) py
     return true;
 }
 
+/// Renames `oldpath` to `newpath` (`renameat2(2)`); `flags` are `RENAME_*` (default `0`).
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_rename` includes `io_uring_prep_renameat` feature.
@@ -593,6 +641,9 @@ pub fn io_uring_prep_rename(
     return true;
 }
 
+/// Syncs `len` bytes of the file `fd` from `offset` (default `0`) (`sync_file_range(2)`);
+/// `flags` are `SYNC_FILE_RANGE_*` (default `0`).
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 pub fn io_uring_prep_sync_file_range(sqe: *SQE, fd: i32, len: u32, offset: ?u64, flags: ?i32) py.Error!bool {
@@ -604,6 +655,8 @@ pub fn io_uring_prep_sync_file_range(sqe: *SQE, fd: i32, len: u32, offset: ?u64,
     return true;
 }
 
+/// Creates the directory `path` with `mode` (`mkdirat(2)`).
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_mkdir` includes `io_uring_prep_mkdirat` feature.
@@ -621,6 +674,8 @@ pub fn io_uring_prep_mkdir(sqe: *SQE, path: *Object, mode: c.mode_t, dfd: ?i32) 
     return true;
 }
 
+/// Creates the symbolic link `linkpath` (relative to `newdirfd`) pointing to `target` (`symlinkat(2)`).
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_symlink` includes `io_uring_prep_symlinkat` feature.
@@ -641,6 +696,8 @@ pub fn io_uring_prep_symlink(sqe: *SQE, target: *Object, linkpath: *Object, newd
     return true;
 }
 
+/// Creates the hard link `newpath` to `oldpath` (`linkat(2)`); `flags` are `AT_SYMLINK_FOLLOW` or `0` (default).
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_link` includes `io_uring_prep_linkat` feature.
@@ -670,6 +727,8 @@ pub fn io_uring_prep_link(
     return true;
 }
 
+/// Reads the extended attribute `name` of `path` into `value`, `len` bytes at most (`getxattr(2)`).
+///
 /// Type
 ///     name: str
 ///     path: str | os.PathLike[str]
@@ -691,6 +750,9 @@ pub fn io_uring_prep_getxattr(
     return true;
 }
 
+/// Sets the extended attribute `name` of `path` to `value`, `len` bytes (`setxattr(2)`);
+/// `flags` is `0`, `XATTR_CREATE` or `XATTR_REPLACE`.
+///
 /// Type
 ///     name: str
 ///     path: str | os.PathLike[str]
@@ -720,6 +782,8 @@ pub fn io_uring_prep_setxattr(
     return true;
 }
 
+/// `io_uring_prep_getxattr` for the open file `fd`.
+///
 /// Type
 ///     name: str
 pub fn io_uring_prep_fgetxattr(
@@ -738,6 +802,8 @@ pub fn io_uring_prep_fgetxattr(
     return true;
 }
 
+/// `io_uring_prep_setxattr` for the open file `fd`.
+///
 /// Type
 ///     name: str
 pub fn io_uring_prep_fsetxattr(
@@ -757,6 +823,8 @@ pub fn io_uring_prep_fsetxattr(
     return true;
 }
 
+/// Installs the registered (direct) file `fd` as a normal fd; the new fd is returned in `cqe.res`.
+/// `flags` is `0` (default) or `IORING_FIXED_FD_NO_CLOEXEC`.
 pub fn io_uring_prep_fixed_fd_install(sqe: *SQE, fd: i32, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -764,6 +832,7 @@ pub fn io_uring_prep_fixed_fd_install(sqe: *SQE, fd: i32, flags: ?u32) py.Error!
     return true;
 }
 
+/// Truncates the file `fd` to `len` bytes (default `0`) (`ftruncate(2)`).
 pub fn io_uring_prep_ftruncate(sqe: *SQE, fd: i32, len: ?c.loff_t) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();

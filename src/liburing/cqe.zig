@@ -21,6 +21,15 @@ pub const CqeBatchIterType = setu.Class(CqeBatchIter, @embedFile("cqe.zig"));
 pub const CqeIterType = setu.Class(CqeIter, @embedFile("cqe.zig"));
 
 /// Completion Queue Entry (CQE)
+///
+/// Example
+///     >>> entry = cqe[0]
+///     >>> entry.user_data, entry.res, entry.flags
+///     (1, 0, 0)
+///
+/// Note
+///     - Points into the ring's completion queue: `RuntimeError` once the ring has exited, and the entry is
+///       only valid until `io_uring_cqe_seen` / `io_uring_cq_advance`.
 pub const CQE = struct {
     _cqe: ?*c.io_uring_cqe = null,
     _owner: ?*Object = null, // the `Ring` whose completion queue `_cqe` points into
@@ -40,17 +49,20 @@ pub const CQE = struct {
         return self._cqe.?;
     }
 
+    /// The `user_data` set on the request's `sqe` (an `int`).
     pub fn get_user_data(self: *const Self) py.Error!u64 {
         const kernel = (try self.cqePtr()).user_data;
         return if (self._ring) |r| ringOf(r).userData(kernel) else kernel;
     }
 
+    /// The request's result (e.g. bytes read); raises `OSError` for a negative one (`-errno`).
     pub fn get_res(self: *const Self) py.Error!i32 {
         const res = (try self.cqePtr()).res;
         if (res >= 0) return res; // inline fast path: `checkErrno` is a call
         return py.checkErrno(res);
     }
 
+    /// The completion's `IORING_CQE_F_*` flags.
     pub fn get_flags(self: *const Self) py.Error!u32 {
         return (try self.cqePtr()).flags;
     }
@@ -84,7 +96,7 @@ pub const CQE = struct {
 ///     >>> for i in range(ready):
 ///     ...     cqe[i] # do stuff
 ///
-///     >>> io_uring_cq_advance(ready) # free cqe already viewed.
+///     >>> io_uring_cq_advance(ring, ready) # free cqe already viewed.
 ///
 /// Note
 ///     - `cqe` items e.g: `cqe[0], cqe[1], ...` are not cached (should be called/used only once) and
@@ -103,9 +115,10 @@ pub const Cqe = struct {
     /// `entry = cqe[i]` in a loop still holds the previous entry while asking for the next one.
     const reuse_len = 4;
 
-    /// For batches of completions: `CqeBatch(no)`.
+    /// Takes no arguments (`TypeError` for any). For batches of completions use `CqeBatch(no)`.
     pub fn __new__(_: *Cqe) void {}
 
+    /// `False` until a wait or peek has set it to a completion.
     pub fn __bool__(self: *const Cqe) bool {
         return if (self._io_uring_cqe) |_| true else false;
     }
@@ -130,6 +143,8 @@ pub const Cqe = struct {
         return Ring.checkGen(&RingType.data(self._ring.?)._io_uring, self._gen);
     }
 
+    /// The `i`-th completion, as a `CQE`.
+    ///
     /// Note
     ///     - `cqe[i]` is the `i`-th entry after `cqe[0]` in the ring's completion queue (wrapping
     ///       around its end); `IndexError` past the queue size.
@@ -163,6 +178,10 @@ pub const Cqe = struct {
     }
 
     /// The `res` of `cqe[index]` (`OSError` if negative, as `CQE.res`), without creating an entry object.
+    ///
+    /// Example
+    ///     >>> cqe.res_at(0)
+    ///     0
     pub fn res_at(self: *const Cqe, index: isize) py.Error!i32 {
         const res = (try self.slotPtr(index)).res;
         if (res >= 0) return res;
@@ -209,7 +228,8 @@ pub const Cqe = struct {
     }
 };
 
-/// Caller owned array of CQE pointers, filled by `io_uring_peek_batch_cqe`.
+/// Caller owned array of CQE pointers, filled by `io_uring_peek_batch_cqe`. `CqeBatch(no)` holds up to `no` of
+/// them (`no` must be `> 0`, else `ValueError`); `len(batch)` is how many the last peek found.
 ///
 /// Example
 ///     >>> batch = CqeBatch(64)
@@ -236,6 +256,7 @@ pub const CqeBatch = struct {
         if (!claim(&self._thread, pthread_self())) return raiseNotOwner("CqeBatch", "peek");
     }
 
+    /// `CqeBatch(no)`: room for `no` completions.
     pub fn __new__(self: *Self, no: u32) py.Error!void {
         if (no == 0) return py.raiseValueError("`CqeBatch(no)` - `no` must be > 0", .{});
         const array = std.heap.c_allocator.alloc(?*c.io_uring_cqe, no) catch return e.raiseMemoryError(
@@ -249,10 +270,13 @@ pub const CqeBatch = struct {
         if (self._array) |array| std.heap.c_allocator.free(array[0..self._len]);
     }
 
+    /// How many completions the last `io_uring_peek_batch_cqe` placed in it.
     pub fn __len__(self: *const Self) usize {
         return self._count;
     }
 
+    /// The `index`-th completion of the last peek, as a `CQE` (`IndexError` past `len(batch)`).
+    ///
     /// Type
     ///     return: CQE
     pub fn __getitem__(self: *const Self, index: isize) py.Error!*Object {
@@ -287,6 +311,8 @@ pub const CqeBatchIter = struct {
 
     const Self = @This();
 
+    /// The next completion of the batch, as a `CQE`.
+    ///
     /// Type
     ///     return: CQE
     pub fn __next__(self: *Self) py.Error!?*Object {
@@ -297,12 +323,16 @@ pub const CqeBatchIter = struct {
     }
 };
 
+/// Iterator over the ready completions of `ring`: each step sets `cqe[0]` to the next one and gives its index
+/// (counted from `index`, default `0`).
+///
 /// Example
 ///     >>> for i in CqeIter(ring, cqe):
 ///     ...     cqe[0].user_data == i  # do stuff
 ///
 /// Note
 ///     - Only `cqe[0]` gets updated with new completed entry value.
+///     - Does not consume the completions: call `io_uring_cq_advance(ring, n)` afterwards.
 pub const CqeIter = struct {
     _io_uring_cqe_iter: c.io_uring_cqe_iter = std.mem.zeroes(c.io_uring_cqe_iter),
     _index: usize = 0,
@@ -312,6 +342,7 @@ pub const CqeIter = struct {
 
     const Self = @This();
 
+    /// `CqeIter(ring, cqe, index=None)`.
     pub fn __new__(self: *Self, ring: *Ring, cqe: *Cqe, index: ?usize) py.Error!void {
         self._io_uring_cqe_iter = c.io_uring_cqe_iter_init(try ring.checkedPtr());
         self._index = index orelse 0;
@@ -320,6 +351,7 @@ pub const CqeIter = struct {
         self._gen = ring._gen;
     }
 
+    /// Sets `cqe[0]` to the next ready completion and returns its index; stops when none is left.
     pub fn __next__(self: *Self) py.Error!?usize {
         if (self._cqe) |o| {
             const _cqe = CqeType.data(o);

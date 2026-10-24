@@ -123,6 +123,7 @@ pub const Ring = struct {
             if (self.vec) |vec| try vec.traverse(v);
         }
 
+        /// Whether it holds nothing.
         pub fn isEmpty(self: *const Hold) bool {
             return self.view == null and self.obj == null and self.template == null and self.vec == null;
         }
@@ -260,6 +261,8 @@ pub const Ring = struct {
     /// no entry has it, so the kernel answers `-ENOENT`.
     pub const no_match = std.math.maxInt(u64);
 
+    /// Create an uninitialized `Ring`: `io_uring_queue_init*` sets it up.
+    ///
     /// Type
     ///     auto_submit: bool | None
     pub fn __new__(self: *Ring, auto_submit: ?bool) void {
@@ -275,6 +278,7 @@ pub const Ring = struct {
         return self._auto_submit;
     }
 
+    /// Sets `auto_submit`.
     pub fn set_auto_submit(self: *Ring, value: bool) void {
         self._auto_submit = value;
     }
@@ -717,7 +721,7 @@ pub const Ring = struct {
     }
 
     /// A completion is consumed: its entry is freed with what it holds, unless more completions follow
-    /// (`IORING_CQE_F_MORE`).
+    /// (`IORING_CQE_F_MORE`), or the completion is a skip marker (`IORING_CQE_F_SKIP`).
     ///
     /// Note
     ///     - A tracked chain (`Entry.end`): a member's completion takes it out of the list; the end's frees what
@@ -911,22 +915,27 @@ pub const Ring = struct {
         );
     }
 
+    /// `IORING_SETUP_*` flags the ring was set up with.
     pub fn get_flags(self: *const Ring) u32 {
         return self._io_uring.flags;
     }
 
+    /// The ring's file descriptor (`0` before `io_uring_queue_init*` and after `io_uring_queue_exit`).
     pub fn get_ring_fd(self: *const Ring) i32 {
         return self._io_uring.ring_fd;
     }
 
+    /// `IORING_FEAT_*` flags the kernel reported at setup.
     pub fn get_features(self: *const Ring) u32 {
         return self._io_uring.features;
     }
 
+    /// liburing's internal flags (`IORING_INT_FLAG_*`).
     pub fn get_int_flags(self: *const Ring) u8 {
         return self._io_uring.int_flags;
     }
 
+    /// The file descriptor used for `io_uring_enter` (differs from `ring_fd` with a registered ring fd).
     pub fn get_enter_ring_fd(self: *const Ring) i32 {
         return self._io_uring.enter_ring_fd;
     }

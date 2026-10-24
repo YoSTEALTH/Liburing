@@ -1,5 +1,14 @@
 const c = @import("c");
 
+/// The `IORING_OP_*` operations (`sqe.opcode`), in kernel order.
+///
+/// Example
+///     >>> io_uring_op.IORING_OP_NOP
+///     <io_uring_op.IORING_OP_NOP: 0>
+///
+/// Note
+///     - `IORING_OP_LAST` is the number of operations known, not an operation. `probe()` tells which the
+///       running kernel supports.
 pub const io_uring_op = enum(u8) {
     IORING_OP_NOP,
     IORING_OP_READV,
@@ -69,6 +78,11 @@ pub const io_uring_op = enum(u8) {
     IORING_OP_LAST,
 };
 
+/// The `SOCKET_URING_OP_*` commands of `io_uring_prep_cmd_sock`.
+///
+/// Note
+///     - `SOCKET_URING_OP_TX_TIMESTAMP` (6.17) and `SOCKET_URING_OP_GETSOCKNAME` (6.19) are `0` when the
+///       liburing headers lack them.
 pub const io_uring_socket_op = enum(u8) {
     SOCKET_URING_OP_SIOCINQ = c.SOCKET_URING_OP_SIOCINQ,
     SOCKET_URING_OP_SIOCOUTQ = c.SOCKET_URING_OP_SIOCOUTQ,

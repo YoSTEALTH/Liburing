@@ -2,7 +2,7 @@ const setu = @import("setu");
 
 const py = setu.py;
 
-/// Trap Error
+/// Trap Error: `errno` as is when it is `>= 0`, else raises the `OSError` for `-errno`.
 ///
 /// Type
 ///     errno  int
@@ -16,12 +16,11 @@ const py = setu.py;
 ///     BlockingIOError: [Errno 11] Resource temporarily unavailable
 ///
 ///     >>> trap_error(-1)
-///     # dynamic error based on `errno`
+///     PermissionError: [Errno 1] Operation not permitted
 ///
 /// Note
-///     - any `no >= 0` is considered safe.
-///     - if `no=-1` it will check with `errno` first to see if proper error is set,
-///       and raise that as exception
+///     - any `errno >= 0` is considered safe and is returned.
+///     - the C `errno` variable is not looked at: `-1` raises `PermissionError` (`EPERM`), as `-N` raises errno `N`.
 pub fn trap_error(errno: i32) py.Error!i32 {
     return py.checkErrno(errno);
 }

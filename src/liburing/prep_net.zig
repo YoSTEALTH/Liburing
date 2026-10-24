@@ -18,6 +18,10 @@ const SQE = @import("sqe.zig").SQE;
 const py = setu.py;
 const Object = setu.c.Object;
 
+/// Receives a message into `msg` (`recvmsg`); `cqe.res` is the number of bytes received.
+///
+/// Note
+///     - `TypeError` if the `iov` or `control` of `msg` is read-only. `msg` is held until the completion.
 pub fn io_uring_prep_recvmsg(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -28,6 +32,12 @@ pub fn io_uring_prep_recvmsg(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.E
     return true;
 }
 
+/// Receives messages into the provided buffer group (`IOSQE_BUFFER_SELECT`), one completion per message; parse each
+/// buffer with `io_uring_recvmsg_validate`.
+///
+/// Note
+///     - `msg` only gives `namelen` and `controllen` (`Msghdr(namelen=16, controllen=0)`).
+///     - `TypeError` if the `iov` or `control` of `msg` is read-only. `msg` is held until the completion.
 pub fn io_uring_prep_recvmsg_multishot(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -38,6 +48,10 @@ pub fn io_uring_prep_recvmsg_multishot(sqe: *SQE, fd: i32, msg: *Msghdr, flags: 
     return true;
 }
 
+/// Sends the message `msg` (`sendmsg`); `cqe.res` is the number of bytes sent.
+///
+/// Note
+///     - `msg` is held until the completion.
 pub fn io_uring_prep_sendmsg(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -47,9 +61,11 @@ pub fn io_uring_prep_sendmsg(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.E
     return true;
 }
 
+/// Accepts a connection on the listening socket `fd`; `cqe.res` is the new fd. `addr` (optional) gets the peer
+/// address at the completion and is held until then.
+///
 /// Example
-///     >>> addr = Sockaddr(AF_INET, "127.0.0.1", 12345)
-///     ... ...
+///     >>> addr = Sockaddr()
 ///     >>> io_uring_prep_accept(sqe, fd, addr)
 ///     True
 pub fn io_uring_prep_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) py.Error!bool {
@@ -62,10 +78,12 @@ pub fn io_uring_prep_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) p
     return true;
 }
 
+/// Like `io_uring_prep_accept`, but the connection goes into a direct (registered) descriptor.
+///
 /// Note
 ///     - Function argument `file_index` position has changed for C origin for better usability.
-///     - If `file_index=IORING_FILE_INDEX_ALLOC` free direct descriptor will be auto assigned.
-///     Allocated descriptor is returned in the `cqe.res`.
+///     - If `file_index` is `None` (or `IORING_FILE_INDEX_ALLOC`) a free direct descriptor will be auto assigned.
+///       The allocated descriptor is returned in the `cqe.res`.
 pub fn io_uring_prep_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockaddr, file_index: ?u32, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -84,6 +102,11 @@ pub fn io_uring_prep_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockaddr, file_in
     return true;
 }
 
+/// Accepts connections repeatedly, one completion per connection (`cqe.res` is the new fd); `addr` (optional) gets
+/// the peer address.
+///
+/// Note
+///     - Same as `io_uring_prep_accept`, but keeps going while `IORING_CQE_F_MORE` is set.
 pub fn io_uring_prep_multishot_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -100,6 +123,8 @@ pub fn io_uring_prep_multishot_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flag
     return true;
 }
 
+/// Like `io_uring_prep_multishot_accept`, but each connection goes into a free direct (registered) descriptor,
+/// returned in `cqe.res`.
 pub fn io_uring_prep_multishot_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -116,6 +141,7 @@ pub fn io_uring_prep_multishot_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockadd
     return true;
 }
 
+/// Connects `fd` to the address `addr`; `addr` is held until the completion.
 pub fn io_uring_prep_connect(sqe: *SQE, fd: i32, addr: *Sockaddr) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -124,6 +150,7 @@ pub fn io_uring_prep_connect(sqe: *SQE, fd: i32, addr: *Sockaddr) py.Error!bool 
     return true;
 }
 
+/// Binds `fd` to the address `addr`; `addr` is held until the completion.
 pub fn io_uring_prep_bind(sqe: *SQE, fd: i32, addr: *Sockaddr) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -132,6 +159,7 @@ pub fn io_uring_prep_bind(sqe: *SQE, fd: i32, addr: *Sockaddr) py.Error!bool {
     return true;
 }
 
+/// Marks `fd` as a listening socket with the given `backlog`.
 pub fn io_uring_prep_listen(sqe: *SQE, fd: i32, backlog: i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -139,6 +167,10 @@ pub fn io_uring_prep_listen(sqe: *SQE, fd: i32, backlog: i32) py.Error!bool {
     return true;
 }
 
+/// Sends `buf` on the socket `sockfd`; `cqe.res` is the number of bytes sent.
+///
+/// Note
+///     - `buf` is held (locked: no resize) until the completion.
 pub fn io_uring_prep_send(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, flags: ?i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
     errdefer sqe.undoSlot();
@@ -148,6 +180,8 @@ pub fn io_uring_prep_send(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, flags: ?i
     return true;
 }
 
+/// Sends a bundle of provided buffers (`IOSQE_BUFFER_SELECT`) in one request, `len` at most bytes (`None`/`0`: all
+/// that fit).
 pub fn io_uring_prep_send_bundle(sqe: *SQE, sockfd: i32, len: ?usize, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -155,6 +189,8 @@ pub fn io_uring_prep_send_bundle(sqe: *SQE, sockfd: i32, len: ?usize, flags: ?i3
     return true;
 }
 
+/// Sets the destination address of a send already prepared on this `sqe` (UDP); `dest_addr` is held until the
+/// completion.
 pub fn io_uring_prep_send_set_addr(sqe: *SQE, dest_addr: *Sockaddr) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -163,6 +199,8 @@ pub fn io_uring_prep_send_set_addr(sqe: *SQE, dest_addr: *Sockaddr) py.Error!boo
     return true;
 }
 
+/// Sends `buf` to the address `addr` (UDP); `addr` and `buf` are held until the completion.
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 pub fn io_uring_prep_sendto(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, addr: *Sockaddr, flags: ?i32) py.Error!bool {
@@ -182,6 +220,11 @@ pub fn io_uring_prep_sendto(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, addr: *
     return true;
 }
 
+/// Zero-copy send of `buf`; `zc_flags` are `IORING_RECVSEND_*` flags. Completes twice: the result, then a
+/// notification (`IORING_CQE_F_NOTIF`) once `buf` can be reused.
+///
+/// Note
+///     - `buf` is held (locked: no resize) until the completion.
 pub fn io_uring_prep_send_zc(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, flags: ?i32, zc_flags: ?u32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
     errdefer sqe.undoSlot();
@@ -190,6 +233,8 @@ pub fn io_uring_prep_send_zc(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, flags:
     return true;
 }
 
+/// Zero-copy send of `buf`, which must lie in the registered buffer `buf_index` (`None`: `0`).
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 pub fn io_uring_prep_send_zc_fixed(
@@ -215,6 +260,8 @@ pub fn io_uring_prep_send_zc_fixed(
     return true;
 }
 
+/// Zero-copy `io_uring_prep_sendmsg`: completes twice, the result then a notification (`IORING_CQE_F_NOTIF`) once
+/// the buffers can be reused. `msg` is held until the completion.
 pub fn io_uring_prep_sendmsg_zc(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -223,11 +270,10 @@ pub fn io_uring_prep_sendmsg_zc(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) p
     return true;
 }
 
+/// Zero-copy `io_uring_prep_sendmsg` whose `iov` buffers lie in the registered buffer `buf_index`.
+///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
-///
-/// Warning
-///     - Coded but not tested!!!
 pub fn io_uring_prep_sendmsg_zc_fixed(sqe: *SQE, fd: i32, msg: *Msghdr, buf_index: u32, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -236,6 +282,11 @@ pub fn io_uring_prep_sendmsg_zc_fixed(sqe: *SQE, fd: i32, msg: *Msghdr, buf_inde
     return true;
 }
 
+/// Receives into `buf` from the socket `sockfd`; `cqe.res` is the number of bytes received.
+///
+/// Note
+///     - `buf` may be `None` when the buffer comes from a provided buffer group (`IOSQE_BUFFER_SELECT`).
+///     - `buf` is held (locked: no resize) until the completion.
 pub fn io_uring_prep_recv(sqe: *SQE, sockfd: i32, buf: ?py.OwnedWritableBuffer, flags: ?i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
     errdefer sqe.undoSlot();
@@ -248,6 +299,10 @@ pub fn io_uring_prep_recv(sqe: *SQE, sockfd: i32, buf: ?py.OwnedWritableBuffer, 
     return true;
 }
 
+/// Like `io_uring_prep_recv`, but keeps receiving, one completion per message, while `IORING_CQE_F_MORE` is set.
+///
+/// Note
+///     - `buf` is normally `None`: the buffers come from a provided buffer group (`IOSQE_BUFFER_SELECT`).
 pub fn io_uring_prep_recv_multishot(sqe: *SQE, sockfd: i32, buf: ?py.OwnedWritableBuffer, flags: ?i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
     errdefer sqe.undoSlot();
@@ -329,6 +384,7 @@ pub fn io_uring_recvmsg_payload_length(o: *RecvmsgOut, buf_len: i32, msgh: *Msgh
 ///       resize) until its exit; giving a part of an area it already holds again takes nothing more.
 ///     - `sqe` must come from `io_uring_get_sqe` or be an `Sqe(ring)` (`TypeError` for an `Sqe` template: no ring
 ///       to hold `addr`).
+///     - `ValueError` if `nr` is less than 1 or `addr` is shorter than `nr` bytes.
 pub fn io_uring_prep_provide_buffers(
     sqe: *SQE,
     addr: py.OwnedWritableBuffer,
@@ -360,6 +416,8 @@ pub fn io_uring_prep_provide_buffers(
     return true;
 }
 
+/// Removes up to `nr` buffers of the group `bgid` that `io_uring_prep_provide_buffers` gave; `cqe.res` is the
+/// number removed.
 pub fn io_uring_prep_remove_buffers(sqe: *SQE, nr: i32, bgid: i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -367,6 +425,7 @@ pub fn io_uring_prep_remove_buffers(sqe: *SQE, nr: i32, bgid: i32) py.Error!bool
     return true;
 }
 
+/// Shuts down part of a full-duplex connection; `how` is `SHUT_RD`, `SHUT_WR` or `SHUT_RDWR`.
 pub fn io_uring_prep_shutdown(sqe: *SQE, fd: i32, how: i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -374,6 +433,7 @@ pub fn io_uring_prep_shutdown(sqe: *SQE, fd: i32, how: i32) py.Error!bool {
     return true;
 }
 
+/// Creates a socket; `cqe.res` is the new fd. `protocol` and `flags` default to `0`.
 pub fn io_uring_prep_socket(sqe: *SQE, domain: i32, @"type": i32, protocol: ?i32, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -383,8 +443,11 @@ pub fn io_uring_prep_socket(sqe: *SQE, domain: i32, @"type": i32, protocol: ?i32
     return true;
 }
 
+/// Creates a socket into a direct (registered) descriptor. `protocol` and `flags` default to `0`.
+///
 /// Note
-///     - `io_uring_prep_socket_direct` includes `io_uring_prep_socket_direct_alloc` feature.
+///     - `io_uring_prep_socket_direct` includes `io_uring_prep_socket_direct_alloc` feature: `file_index=None`
+///       (or `IORING_FILE_INDEX_ALLOC`) assigns a free direct descriptor, returned in `cqe.res`.
 pub fn io_uring_prep_socket_direct(
     sqe: *SQE,
     domain: i32,
@@ -402,13 +465,19 @@ pub fn io_uring_prep_socket_direct(
     return true;
 }
 
+/// Runs a socket command (`io_uring_socket_op`) on `fd`; `optval` is the data going in or out.
+///
 /// Example
 ///     >>> buf = bytearray((1).to_bytes(4, "little"))
-///     >>> io_uring_prep_cmd_sock(sqe, SOCKET_URING_OP_SETSOCKOPT, sockfd, SOL_SOCKET, SO_KEEPALIVE, buf)
+///     >>> io_uring_prep_cmd_sock(
+///     ...     sqe, io_uring_socket_op.SOCKET_URING_OP_SETSOCKOPT, sockfd, SOL_SOCKET, SO_KEEPALIVE, buf,
+///     ... )
 ///     True
 ///     # or
 ///     >>> buf = bytearray(b'eth1')
-///     >>> io_uring_prep_cmd_sock(sqe, SOCKET_URING_OP_SETSOCKOPT, sockfd, SOL_SOCKET, ..., buf)
+///     >>> io_uring_prep_cmd_sock(
+///     ...     sqe, io_uring_socket_op.SOCKET_URING_OP_SETSOCKOPT, sockfd, SOL_SOCKET, SO_BINDTODEVICE, buf,
+///     ... )
 ///     True
 ///
 /// Opcode
@@ -447,6 +516,9 @@ pub fn io_uring_prep_cmd_sock(
     return true;
 }
 
+/// Gets the local address of `fd` (`peer=0`, the default) or of its peer (`peer=1`) into `sockaddr`, written at the
+/// completion; `sockaddr` is held until then.
+///
 /// Example
 ///     >>> sockaddr = Sockaddr()
 ///     >>> sqe = io_uring_get_sqe(ring)

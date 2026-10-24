@@ -14,29 +14,39 @@ const py = setu.py;
 const Timespec = class.Timespec;
 const SiginfoT = class.SiginfoT;
 
-/// >>> io_uring_sqe_set_data(sqe, python_object)
+/// Sets the `user_data` of `sqe` to the address-sized int `data`.
 ///
-/// Warning
-///     - Not tested!!!
+/// Example
+///     >>> io_uring_sqe_set_data(sqe, 98)
 pub fn io_uring_sqe_set_data(sqe: *SQE, data: usize) py.Error!void {
     c.io_uring_sqe_set_data(try sqe.sqePtr(), @ptrFromInt(data)); // `data`: an address, as `PyLong_AsVoidPtr` read it
 }
 
-/// >>> io_uring_sqe_set_data64(sqe, 123)
+/// Sets the `user_data` of `sqe` to `data`.
+///
+/// Example
+///     >>> io_uring_sqe_set_data64(sqe, 123)
 pub fn io_uring_sqe_set_data64(sqe: *SQE, data: u64) py.Error!void {
     c.io_uring_sqe_set_data64(try sqe.sqePtr(), data);
 }
 
-/// >>> io_uring_sqe_set_flags(sqe, IOSQE_IO_HARDLINK)
+/// Sets the `IOSQE_*` flags of `sqe`.
+///
+/// Example
+///     >>> io_uring_sqe_set_flags(sqe, IOSQE_IO_HARDLINK)
 pub fn io_uring_sqe_set_flags(sqe: *SQE, flags: u32) py.Error!void {
     c.io_uring_sqe_set_flags(try sqe.sqePtr(), flags);
 }
 
-/// >>> io_uring_sqe_set_buf_group(sqe, 123)
+/// Sets the provided buffer group `bgid` of `sqe`.
+///
+/// Example
+///     >>> io_uring_sqe_set_buf_group(sqe, 123)
 pub fn io_uring_sqe_set_buf_group(sqe: *SQE, bgid: i32) py.Error!void {
     c.io_uring_sqe_set_buf_group(try sqe.sqePtr(), bgid);
 }
 
+/// Polls `fd` once for the `poll_mask` events (`POLLIN`, `POLLOUT`, ...); the ready events are returned in `cqe.res`.
 pub fn io_uring_prep_poll_add(sqe: *SQE, fd: i32, poll_mask: u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -44,6 +54,7 @@ pub fn io_uring_prep_poll_add(sqe: *SQE, fd: i32, poll_mask: u32) py.Error!bool 
     return true;
 }
 
+/// `io_uring_prep_poll_add` that stays armed: it posts a completion on every event, until removed.
 pub fn io_uring_prep_poll_multishot(sqe: *SQE, fd: i32, poll_mask: u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -51,6 +62,7 @@ pub fn io_uring_prep_poll_multishot(sqe: *SQE, fd: i32, poll_mask: u32) py.Error
     return true;
 }
 
+/// Removes the poll request with `user_data`.
 pub fn io_uring_prep_poll_remove(sqe: *SQE, user_data: u64) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -58,6 +70,8 @@ pub fn io_uring_prep_poll_remove(sqe: *SQE, user_data: u64) py.Error!bool {
     return true;
 }
 
+/// Updates the poll request `old_user_data`: its `user_data` to `new_user_data` and its events to `poll_mask`;
+/// `flags` (default `0`) are `IORING_POLL_UPDATE_EVENTS`, `IORING_POLL_UPDATE_USER_DATA`.
 pub fn io_uring_prep_poll_update(
     sqe: *SQE,
     old_user_data: u64,
@@ -72,8 +86,11 @@ pub fn io_uring_prep_poll_update(
     return true;
 }
 
-/// >>> io_uring_prep_nop(sqe)
-/// True
+/// Does nothing and completes.
+///
+/// Example
+///     >>> io_uring_prep_nop(sqe)
+///     True
 pub fn io_uring_prep_nop(sqe: *SQE) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -81,8 +98,11 @@ pub fn io_uring_prep_nop(sqe: *SQE) py.Error!bool {
     return true;
 }
 
-/// >>> io_uring_prep_nop128(sqe)
-/// True
+/// `io_uring_prep_nop` in a 128-byte entry (the ring needs `IORING_SETUP_SQE128` or `IORING_SETUP_SQE_MIXED`).
+///
+/// Example
+///     >>> io_uring_prep_nop128(sqe)
+///     True
 pub fn io_uring_prep_nop128(sqe: *SQE) py.Error!bool {
     const s = try sqe.prepSlot(true) orelse return false;
     errdefer sqe.undoSlot();
@@ -90,6 +110,8 @@ pub fn io_uring_prep_nop128(sqe: *SQE) py.Error!bool {
     return true;
 }
 
+/// Completes after the time `ts` (`Timespec`, held until the completion) or after `count` other completions,
+/// whichever comes first; `flags` (default `0`) are `IORING_TIMEOUT_*`.
 pub fn io_uring_prep_timeout(sqe: *SQE, ts: *Timespec, count: u32, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -99,6 +121,7 @@ pub fn io_uring_prep_timeout(sqe: *SQE, ts: *Timespec, count: u32, flags: ?u32) 
     return true;
 }
 
+/// Removes the timeout request with `user_data`; `flags` (default `0`) are `IORING_TIMEOUT_*`.
 pub fn io_uring_prep_timeout_remove(sqe: *SQE, user_data: u64, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -107,6 +130,8 @@ pub fn io_uring_prep_timeout_remove(sqe: *SQE, user_data: u64, flags: ?u32) py.E
     return true;
 }
 
+/// Updates the time of the timeout request with `user_data` to `ts` (held until the completion);
+/// `flags` (default `0`) are `IORING_TIMEOUT_*`.
 pub fn io_uring_prep_timeout_update(sqe: *SQE, ts: *Timespec, user_data: u64, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -152,6 +177,8 @@ pub fn io_uring_prep_cancel(sqe: *SQE, user_data: usize, flags: ?i32) py.Error!b
     return true;
 }
 
+/// Cancels the in-flight requests of `fd`; `flags` (default `0`) are `IORING_ASYNC_CANCEL_*`
+/// (`IORING_ASYNC_CANCEL_ALL` for all of them, not only the first).
 pub fn io_uring_prep_cancel_fd(sqe: *SQE, fd: i32, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -159,6 +186,8 @@ pub fn io_uring_prep_cancel_fd(sqe: *SQE, fd: i32, flags: ?u32) py.Error!bool {
     return true;
 }
 
+/// Limits the time of the previous request, linked to it with `IOSQE_IO_LINK`, to `ts` (`Timespec`, held until
+/// the completion); `flags` are `IORING_TIMEOUT_*`.
 pub fn io_uring_prep_link_timeout(sqe: *SQE, ts: *Timespec, flags: u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -167,6 +196,8 @@ pub fn io_uring_prep_link_timeout(sqe: *SQE, ts: *Timespec, flags: u32) py.Error
     return true;
 }
 
+/// Waits for events of the epoll `fd`, into `events` (held until the completion); `maxevents` is `1` to the size
+/// of `EpollEvent(no=...)`, else `ValueError`. `events` must be one made with `no=`, not a single item.
 pub fn io_uring_prep_epoll_wait(sqe: *SQE, fd: i32, events: *EpollEvent, maxevents: i32, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -177,6 +208,7 @@ pub fn io_uring_prep_epoll_wait(sqe: *SQE, fd: i32, events: *EpollEvent, maxeven
     return true;
 }
 
+/// `epoll_ctl(2)` on the epoll `epfd`: `op` (`EPOLL_CTL_*`) for `fd` with the event `ev` (held until the completion).
 pub fn io_uring_prep_epoll_ctl(sqe: *SQE, epfd: i32, fd: i32, op: i32, ev: *EpollEvent) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -185,6 +217,8 @@ pub fn io_uring_prep_epoll_ctl(sqe: *SQE, epfd: i32, fd: i32, op: i32, ev: *Epol
     return true;
 }
 
+/// `io_uring_prep_msg_ring` that also sets the `cqe.flags` of the posted completion to `cqe_flags`.
+///
 /// Note
 ///     - `data` is the target's `cqe.user_data`, below `2**63` (`ValueError`): Liburing sends it with bit 63 set,
 ///       which tells the target ring the completion is a message, not one of its own requests.
@@ -225,6 +259,9 @@ pub fn io_uring_prep_msg_ring(sqe: *SQE, fd: i32, len: u32, data: u64, flags: ?u
     return true;
 }
 
+/// Sends the registered file `source_fd` of this ring to the slot `target_fd` of the ring `fd`; the target ring gets a
+/// completion with `user_data` `data`.
+///
 /// Note
 ///     - `data` is the target's `cqe.user_data`, below `2**63` (`ValueError`): Liburing sends it with bit 63 set,
 ///       which tells the target ring the completion is a message, not one of its own requests.
@@ -242,6 +279,8 @@ pub fn io_uring_prep_msg_ring_fd(
     return true;
 }
 
+/// `io_uring_prep_msg_ring_fd`, but the target ring picks a free slot, returned in its `cqe.res`.
+///
 /// Note
 ///     - `data` is the target's `cqe.user_data`, below `2**63` (`ValueError`): Liburing sends it with bit 63 set,
 ///       which tells the target ring the completion is a message, not one of its own requests.
@@ -265,6 +304,7 @@ noinline fn raiseMessageData(data: u64) py.Error {
     );
 }
 
+/// Sends the file-specific command `cmd_op` to `fd` (`IORING_OP_URING_CMD`).
 pub fn io_uring_prep_uring_cmd(sqe: *SQE, cmd_op: i32, fd: i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -272,6 +312,7 @@ pub fn io_uring_prep_uring_cmd(sqe: *SQE, cmd_op: i32, fd: i32) py.Error!bool {
     return true;
 }
 
+/// `io_uring_prep_uring_cmd` in a 128-byte entry (the ring needs `IORING_SETUP_SQE128` or `IORING_SETUP_SQE_MIXED`).
 pub fn io_uring_prep_uring_cmd128(sqe: *SQE, cmd_op: i32, fd: i32) py.Error!bool {
     const s = try sqe.prepSlot(true) orelse return false;
     errdefer sqe.undoSlot();
@@ -309,6 +350,8 @@ pub fn io_uring_prep_waitid(
     return true;
 }
 
+/// Wakes up to `val` waiters of `futex` whose wait mask matches `mask`; the number woken is returned in `cqe.res`.
+/// `futex_flags` are `FUTEX2_*` (default `0`); `futex` is held until the completion.
 pub fn io_uring_prep_futex_wake(
     sqe: *SQE,
     futex: *Futex,
@@ -324,6 +367,8 @@ pub fn io_uring_prep_futex_wake(
     return true;
 }
 
+/// Waits on `futex` while its value is `val` (matched with `mask`); `futex_flags` are `FUTEX2_*` (default `0`);
+/// `futex` is held until the completion.
 pub fn io_uring_prep_futex_wait(
     sqe: *SQE,
     futex: *Futex,
@@ -339,6 +384,7 @@ pub fn io_uring_prep_futex_wait(
     return true;
 }
 
+/// Waits on several futexes at once: `Futex` made with a vector (else `ValueError`), held until the completion.
 pub fn io_uring_prep_futex_waitv(sqe: *SQE, futex: *Futex, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -349,6 +395,7 @@ pub fn io_uring_prep_futex_waitv(sqe: *SQE, futex: *Futex, flags: ?u32) py.Error
     return true;
 }
 
+/// Discards `nbytes` of the block device `fd` from `offset` (`BLOCK_URING_CMD_DISCARD`).
 pub fn io_uring_prep_cmd_discard(sqe: *SQE, fd: i32, offset: u64, nbytes: u64) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();

@@ -22,7 +22,8 @@ const doc =
     \\    (22, 'Kernel `6.12` does not support `IORING_REGISTER_QUERY`')
     \\
     \\Note
-    \\    - `errno` is the kernel's (`EINVAL`, or `EBADF` for a call without a ring on kernels before 6.13).
+    \\    - `errno` is the kernel's (`EINVAL`, `EOPNOTSUPP`, or `EBADF` for a call without a ring on kernels
+    \\    before 6.13).
     \\    - Raised by the `io_uring_register_*` functions, by `io_uring_queue_init*` (setup flags, on kernels
     \\    that have `IORING_REGISTER_QUERY`) and by calls that need an `IORING_FEAT_*` the ring lacks
     \\    (`io_uring_set_iowait`, the `*_min_timeout` waits). An unsupported `IORING_OP_*` fails in its CQE:
@@ -56,6 +57,8 @@ pub inline fn registerOp(opcode: u32, res: c_int) py.Error!c_int {
     return registerFailed(std.mem.print(&buf, "register opcode {d}", .{op}) catch &buf, op, res);
 }
 
+/// The error for a failed register call `res` (`< 0`): `UnsupportedError` if the kernel lacks opcode `op`
+/// (called `name`), else the `OSError` of `res`.
 fn registerFailed(name: []const u8, op: u32, res: c_int) py.Error {
     @branchHint(.cold);
     // An opcode the kernel doesn't know is rejected before its arguments are read: any of these.
@@ -74,6 +77,8 @@ pub inline fn setup(res: c_int, flags: u32) py.Error!c_int {
     return setupFailed(res, flags);
 }
 
+/// The error for a failed setup `res` (`< 0`): `UnsupportedError` if `flags` has a setup flag the kernel lacks,
+/// else the `OSError` of `res`.
 fn setupFailed(res: c_int, flags: u32) py.Error {
     @branchHint(.cold);
     if (res == -EINVAL) if (queried()) |q| {
@@ -98,6 +103,7 @@ pub inline fn feature(comptime name: [:0]const u8, features: u32, res: c_int) py
     return featureFailed(name, features & @field(c, name) != 0, res);
 }
 
+/// The error for a failed call `res` (`< 0`): `UnsupportedError` unless the ring `has` the feature `name`.
 fn featureFailed(name: []const u8, has: bool, res: c_int) py.Error {
     @branchHint(.cold);
     if (!has) return unsupported(name, res);
@@ -109,6 +115,7 @@ const EINVAL: c_int = @backingInt(std.os.linux.E.INVAL);
 const EBADF: c_int = @backingInt(std.os.linux.E.BADF);
 const EOPNOTSUPP: c_int = @backingInt(std.os.linux.E.OPNOTSUPP);
 
+/// `UnsupportedError` for `name`, with the errno `-res` and the running kernel in the message.
 fn unsupported(name: []const u8, res: c_int) py.Error {
     const k = kernel();
     var buf: [128]u8 = undefined;
@@ -136,6 +143,7 @@ const register_since = [_]u16{
     v(6, 15), v(6, 13), v(6, 13), // 32-34 ZCRX_IFQ, RESIZE_RINGS, MEM_REGION
 };
 
+/// `major.minor` as `major << 8 | minor`.
 fn v(major: u16, minor: u16) u16 {
     return major << 8 | minor;
 }
@@ -161,10 +169,12 @@ fn setupName(flags: u32) ?[]const u8 {
 /// `IO_URING_QUERY_OPCODES` of the running kernel, `null` without `IORING_REGISTER_QUERY` (set by `init`).
 var query: ?c.io_uring_query_opcode = null;
 
+/// What `IORING_REGISTER_QUERY` said, or `null` (the kernel has no such opcode).
 fn queried() ?*const c.io_uring_query_opcode {
     return if (query) |*q| q else null;
 }
 
+/// Asks the kernel with `IORING_REGISTER_QUERY` (`IO_URING_QUERY_OPCODES`).
 fn queryOpcodes() ?c.io_uring_query_opcode {
     var data = std.mem.zeroes(c.io_uring_query_opcode);
     var hdr = std.mem.zeroes(c.io_uring_query_hdr);
@@ -177,10 +187,12 @@ fn queryOpcodes() ?c.io_uring_query_opcode {
 /// The running kernel, `major << 8 | minor` (set by `init`).
 var kernel_version: u16 = 0;
 
+/// The running kernel, `major << 8 | minor`.
 fn kernel() u16 {
     return kernel_version;
 }
 
+/// The running kernel from `uname` (`0` for a part that does not parse).
 fn unameVersion() u16 {
     var uts: std.os.linux.utsname = undefined;
     _ = std.os.linux.uname(&uts);

@@ -11,6 +11,17 @@ const linux = std.os.linux;
 pub const FUTEXType = setu.Class(FUTEX, @embedFile("futex.zig"));
 pub const FutexType = setu.Class(Futex, @embedFile("futex.zig"));
 
+/// One futex of a `Futex`: `futex[i]`, or the `Futex` itself (its first one).
+///
+/// Example
+///     >>> futex = Futex(2)
+///     >>> futex[1].state = 5
+///     >>> futex[1].state
+///     5
+///
+/// Note
+///     - `val` and `flags` are the `futex_waitv` entry's, only for a `Futex` made with `vector=True`
+///       (`MemoryError` otherwise).
 pub const FUTEX = struct {
     _state: usize = 0, // address of this entry's `u32` in the `Futex` memory
     _vector: ?*c.futex_waitv = null,
@@ -23,15 +34,18 @@ pub const FUTEX = struct {
 
     // GET
 
+    /// The futex's value (a `u32`).
     pub fn get_state(self: *const Self) u32 {
         return @as(*u32, @ptrFromInt(self._state)).*;
     }
 
+    /// The value the `futex_waitv` entry waits for.
     pub fn get_val(self: *const Self) py.Error!u64 {
         if (self._vector) |v| return v.val;
         return e.raiseMemoryError("Futex(vector) Memory not set!");
     }
 
+    /// The `futex_waitv` entry's `FUTEX2_*` flags.
     pub fn get_flags(self: *const Self) py.Error!u32 {
         if (self._vector) |v| return v.flags;
         return e.raiseMemoryError("Futex(vector) Memory not set!");
@@ -39,16 +53,20 @@ pub const FUTEX = struct {
 
     // SET
 
+    /// Set the futex's value (a `u32`).
     pub fn set_state(self: *Self, value: u32) void {
         @as(*u32, @ptrFromInt(self._state)).* = value;
     }
 
+    /// Set the value the `futex_waitv` entry waits for.
     pub fn set_val(self: *Self, value: u64) py.Error!void {
         if (self._vector) |v| {
             v.val = value;
         } else return e.raiseMemoryError("Futex(vector) Memory not set!");
     }
 
+    /// Set the `futex_waitv` entry's `FUTEX2_*` flags.
+    ///
     /// Note
     ///     - Overwrite `.flags` value.
     pub fn set_flags(self: *Self, value: u32) py.Error!void {
@@ -73,14 +91,13 @@ pub const FUTEX = struct {
 ///     >>> futex.private
 ///     False
 ///
-///     >>> io_uring_prep_futex_wait(sqe, futex)
+///     >>> io_uring_prep_futex_wait(sqe, futex, 0, FUTEX_BITSET_MATCH_ANY, FUTEX2_SIZE_U32)
 ///     True
 ///     >>> futex.state = 1
-///     >>> io_uring_prep_futex_wake(sqe, futex)
+///     >>> io_uring_prep_futex_wake(sqe, futex, 1, FUTEX_BITSET_MATCH_ANY, FUTEX2_SIZE_U32)
 ///     True
 ///
-///     >>> futex.state = 0
-///     >>> fwv = Futex()
+///     >>> fwv = Futex(1, None, True)  # `vector=True` for `io_uring_prep_futex_waitv`
 ///     >>> io_uring_prep_futex_waitv(sqe, fwv)
 ///     True
 ///
@@ -93,9 +110,13 @@ pub const FUTEX = struct {
 ///     FUTEX2_PRIVATE
 ///
 /// Note
+///     - Defaults: `no=1`, `flags=FUTEX2_SIZE_U32`, `vector=False`.
 ///     - By default `SHARED` memory is created, set `Futex(123, FUTEX2_PRIVATE)` to use `PRIVATE` memory.
 ///     - For now only `FUTEX2_SIZE_U32` is supported by Linux https://github.com/axboe/liburing/issues/1556
-///     - Coded and basic test, missing real world testing
+///     - `no` is `1` to `FUTEX_WAITV_MAX` (`ValueError` otherwise); `RuntimeError` when built without `futex2`
+///       (Linux headers before `6.7`).
+///     - `len(futex)` is `no`, `futex[i]` the `i`-th futex.
+///     - Wait, wake and waitv are tested, missing real world testing
 pub const Futex = struct {
     _len: u8 = 0,
     _futex: usize = 0, // `mmap` address of `_len` `u32`s
@@ -159,14 +180,18 @@ pub const Futex = struct {
         if (self._futex_waitv) |v| std.heap.c_allocator.free(v[0..self._len]);
     }
 
+    /// How many futexes (`no`) it holds.
     pub fn __len__(self: *const Self) usize {
         return self._len;
     }
 
+    /// `True` if it holds any futex.
     pub fn __bool__(self: *const Self) bool {
         return (self._len > 0);
     }
 
+    /// The `index`-th futex, as a `FUTEX` (`IndexError` out of range).
+    ///
     /// Type
     ///     return: FUTEX
     pub fn __getitem__(self: *Object, index: isize) py.Error!*Object {
@@ -182,6 +207,7 @@ pub const Futex = struct {
         return py.raiseIndexError("Index out of range", .{});
     }
 
+    /// Whether it was made with `FUTEX2_PRIVATE` (read only).
     pub fn get_private(self: *const Self) bool {
         return self._private;
     }

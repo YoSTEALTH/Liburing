@@ -336,11 +336,9 @@ def test_prep_pipe_direct(ring, cqe):
     fds = array.array("i", [-1, -1])
     assert io_uring_register_files_sparse(ring, 4) == 0
     assert one(ring, cqe, io_uring_prep_pipe_direct, fds, 0, 0) == 0
-    if linux_version_check(7.0):
-        # kernel bug fixed in 7.0 (stable backports vary): `io_pipe_fixed()` reported `(0, 0)`
-        assert fds[0] == 0
-    else:
-        assert tuple(fds) == (0, 1)  # the slots used in the file table
+    # kernels before 7.0 (stable backports vary) reported `(0, 0)`: `io_pipe_fixed()` bug
+    assert fds[0] == 0
+    assert fds[1] in (0, 1)  # the slots used in the file table
     assert one(ring, cqe, io_uring_prep_close_direct, 0) == 0
     assert one(ring, cqe, io_uring_prep_close_direct, 1) == 0
     assert io_uring_unregister_files(ring) == 0
@@ -426,7 +424,7 @@ def test_send_set_addr_udp(ring, cqe):
 
 
 # `SOCKET_URING_OP_GETSOCKNAME`: a socket command has no probe, the CQE says `EOPNOTSUPP`.
-NO_GETSOCKNAME = f"Kernel `{LINUX_VERSION_MAJOR}.{LINUX_VERSION_MINOR}` does not support `SOCKET_URING_OP_GETSOCKNAME`"
+NO_GETSOCKNAME = f"Kernel `{kernel.LINUX_VERSION}` does not support `SOCKET_URING_OP_GETSOCKNAME`"
 
 
 def test_cmd_getsockname(ring, cqe, pair):

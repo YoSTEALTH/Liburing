@@ -16,6 +16,18 @@ pub const SQEType = setu.Class(SQE, @embedFile("sqe.zig"));
 pub const SqeType = setu.Class(Sqe, @embedFile("sqe.zig"));
 
 /// Submission Queue Entry (SQE)
+///
+/// Example
+///     >>> sqe = io_uring_get_sqe(ring)
+///     >>> io_uring_prep_nop(sqe)
+///     True
+///     >>> sqe.user_data = 1
+///     >>> sqe.opcode, sqe.flags
+///     (0, 0)
+///
+/// Note
+///     - Points into the ring's submission queue (or an `Sqe` template): `RuntimeError` once the ring has
+///       exited or was initialized again.
 pub const SQE = struct {
     _sqe: ?*c.io_uring_sqe = null, // `Sqe(ring)`: the slot of its last prep (`null`: none yet, or the queue was full)
     _owner: ?*Object = null, // keeps the memory `_sqe` points into alive (`Sqe` or `Ring`)
@@ -91,40 +103,49 @@ pub const SQE = struct {
 
     // GET
 
+    /// The `IORING_OP_*` the entry was prepped with.
     pub fn get_opcode(self: *const Self) py.Error!u8 {
         return (try self.sqePtr()).opcode;
     }
 
+    /// The entry's `IOSQE_*` flags.
     pub fn get_flags(self: *const Self) py.Error!u8 {
         return (try self.sqePtr()).flags;
     }
 
+    /// The entry's I/O priority.
     pub fn get_ioprio(self: *const Self) py.Error!u16 {
         return (try self.sqePtr()).ioprio;
     }
 
+    /// The file descriptor (or fixed file index) the entry works on.
     pub fn get_fd(self: *const Self) py.Error!i32 {
         return (try self.sqePtr()).fd;
     }
 
+    /// The entry's `len` field (e.g. bytes to read, or number of `iovec`).
     pub fn get_len(self: *const Self) py.Error!u32 {
         return (try self.sqePtr()).len;
     }
 
+    /// The `user_data` of the entry, given back in its completion.
     pub fn get_user_data(self: *const Self) py.Error!u64 {
         return (try self.sqePtr()).user_data;
     }
 
+    /// The registered personality id the request runs with (`0`: none).
     pub fn get_personality(self: *const Self) py.Error!u16 {
         return (try self.sqePtr()).personality;
     }
 
     // SET
 
+    /// Set the entry's `IOSQE_*` flags (replaces them, see `io_uring_sqe_set_flags`).
     pub fn set_flags(self: *Self, flags: u8) py.Error!void {
         (try self.sqePtr()).flags = flags;
     }
 
+    /// Set the entry's `user_data` (an `int`, up to 64 bits).
     pub fn set_user_data(self: *Self, data: u64) py.Error!void {
         (try self.sqePtr()).user_data = data;
     }
@@ -174,7 +195,7 @@ pub const SQE = struct {
 ///         `help(put_sqe)` to see more detail.
 ///         3. `sqe = Sqe(ring)`: one object for the ring's lifetime, written straight into the ring's
 ///         submission queue: no `io_uring_get_sqe()`, no `put_sqe()`, no object per request.
-///     - `Sqe(no)` is limited to max `0-255` items.
+///     - `Sqe(no)`: `no` must be `> 0` (`RuntimeError`).
 ///     - `Sqe(ring)`: every prep takes the next free entry and returns `False` if the queue is full
 ///     (`io_uring_submit()` and prep again; `Ring(auto_submit=True)` does that for you);
 ///     `user_data` starts at `0`. Properties and
@@ -196,6 +217,7 @@ pub const Sqe = struct {
 
     const Self = @This();
 
+    /// `Sqe(no=None)`: `no` entries (default `1`) to prep and `put_sqe` later, or a `Ring` to prep into.
     pub fn __new__(self: *Object, no: ?*Object) py.Error!void {
         const arg = if (no) |o| (if (o == py.none()) null else o) else null;
         if (arg) |o| if (RingType.check(o)) { // `Sqe(ring)`: no memory of its own, preps take the ring's slots
@@ -304,10 +326,13 @@ pub const Sqe = struct {
         return SqeType.data(self)._len;
     }
 
+    /// Always `True`: an `Sqe` is bound to a ring or has at least one entry.
     pub fn __bool__(self: *Object) bool {
         return SQEType.data(self)._bound or SqeType.data(self)._len > 0;
     }
 
+    /// The `index`-th entry of the template (`IndexError` out of range; `TypeError` for an `Sqe(ring)`).
+    ///
     /// Type
     ///     return: SQE
     pub fn __getitem__(self: *Object, index: isize) py.Error!*Object {

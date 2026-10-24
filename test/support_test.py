@@ -6,11 +6,12 @@ import pathlib
 import subprocess
 import sys
 import textwrap
+import kernel
 import pytest
 import liburing
 from liburing import *
 
-KERNEL = f"Kernel `{LINUX_VERSION_MAJOR}.{LINUX_VERSION_MINOR}`"
+KERNEL = f"Kernel `{kernel.LINUX_VERSION}`"
 ROOT = pathlib.Path(__file__).parent.parent
 PACKAGE_DIR = str(pathlib.Path(liburing.__file__).parent.parent)  # where this `liburing` was imported from
 
@@ -110,7 +111,7 @@ def test_kernel_without_query():
 
 
 def test_pytest_skips_unsupported():
-    # `conftest.py` turns `UnsupportedError` into a skip: `test_Query` needs no `skip_linux`.
+    # `conftest.py` turns `UnsupportedError` into a skip: `test_Query` needs no marker.
     r = run_without_query("""
         import sys, pytest
         test = "test/queue/register_structs_test.py::test_Query"

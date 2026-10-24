@@ -14,24 +14,28 @@ pub const SockaddrType = setu.Class(Sockaddr, @embedFile("socket.zig"));
 /// libc: an interface name (`eth0`) to its index, `0` if unknown.
 extern fn if_nametoindex(name: [*:0]const u8) c_uint;
 
-/// Generic Socket Address.
+/// Generic Socket Address. `Sockaddr()` (no arguments) is empty: room for the kernel to fill in, e.g. for
+/// `io_uring_prep_accept`.
 ///
 /// Example
 ///     >>> addr = Sockaddr(AF_UNIX, './path')
 ///     >>> addr = Sockaddr(AF_INET, '0.0.0.0', 12345)
 ///     >>> addr = Sockaddr(AF_INET6, '::1', 12345)
-///     >>> bind(sockfd, addr)
+///     >>> io_uring_prep_bind(sqe, sockfd, addr)
+///     True
 ///
 /// Note
-///     - IPv6 `scope_id` can be added like so `"ff01::fb%123"`
+///     - IPv6 `scope_id` (an index or an interface name) can be added like so `"ff01::fb%123"`, `"fe80::1%eth0"`
+///     - `ValueError` for a missing/invalid `addr` or `port`, `OverflowError` for `port > 65_535`,
+///       `NotImplementedError` for any other family.
 ///     - `Sockaddr()` is low level setup, letting you serve/connect directly using path/ip.
 ///     If you need higher level features you can use `getaddrinfo()` this lets you connect
 ///     using domain names, ...
 ///
 /// Type
-///     family: int
-///     addr:   str | os.PathLike[str]
-///     port:   int
+///     family: int | None
+///     addr:   str | os.PathLike[str] | None
+///     port:   int | None
 pub const Sockaddr = struct {
     _family: c.sa_family_t = AF_UNSPEC,
     _socklen: c.socklen_t = @sizeOf(c.sockaddr_storage),
@@ -112,16 +116,22 @@ pub const Sockaddr = struct {
         return if (self._family == AF_UNSPEC) self._storage.ss_family else self._family;
     }
 
-    /// >>> sock.path
-    /// "./path"
+    /// The path of an `AF_UNIX` address (`NotImplementedError` for other families).
+    ///
+    /// Example
+    ///     >>> sock.path
+    ///     './path'
+    ///
+    /// Type
+    ///     return: str
     pub fn get_path(self: *Self) py.Error![]const u8 {
         const _family = self.currentFamily();
         if (_family == AF_UNIX) return std.mem.sliceTo(&self.as(c.sockaddr_un).sun_path, 0);
         return py.raiseNotImplementedError("`Sockaddr` - `path` is not implemented for {}", .{_family});
     }
 
-    /// The address as text: IPv6 as `socket.inet_ntop` writes it, with `%scope_id` when it has one (as
-    /// `Sockaddr(AF_INET6, ...)` reads it).
+    /// The address as text (`AF_INET` / `AF_INET6`, `NotImplementedError` otherwise): IPv6 as `socket.inet_ntop`
+    /// writes it, with `%scope_id` when it has one (as `Sockaddr(AF_INET6, ...)` reads it).
     ///
     /// Example
     ///     >>> Sockaddr(AF_INET, '1.2.3.4', 80).ip
@@ -160,8 +170,11 @@ pub const Sockaddr = struct {
         }
     }
 
-    /// >>> sock.port
-    /// 1234
+    /// The port of an `AF_INET` / `AF_INET6` address (`NotImplementedError` for other families).
+    ///
+    /// Example
+    ///     >>> sock.port
+    ///     1234
     pub fn get_port(self: *Self) py.Error!u16 {
         const _family = self.currentFamily();
         switch (_family) {
@@ -171,8 +184,11 @@ pub const Sockaddr = struct {
         }
     }
 
-    /// >>> sock.family
-    /// 1
+    /// The address family (`AF_UNIX`, ...).
+    ///
+    /// Example
+    ///     >>> sock.family
+    ///     1
     pub fn get_family(self: *const Self) i32 {
         return self.currentFamily();
     }
@@ -200,6 +216,8 @@ fn scopeId(text: []const u8) py.Error!u32 {
     return index;
 }
 
+/// Sets the socket option `optname` of `level` on `sockfd` to `optval` (`SOCKET_URING_OP_SETSOCKOPT`).
+///
 /// Example
 ///     >>> val = (1).to_bytes(4, "big")
 ///     >>> sqe = io_uring_get_sqe(ring)
@@ -236,6 +254,8 @@ pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.O
     return true;
 }
 
+/// Gets the socket option `optname` of `level` of `sockfd` into `optval` (`SOCKET_URING_OP_GETSOCKOPT`).
+///
 /// Example
 ///     # assuming `SO_KEEPALIVE` was previous set to `1`
 ///     >>> buf = bytearray(4)
@@ -243,7 +263,7 @@ pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.O
 ///     >>> getsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, buf)
 ///     True
 ///     ... # after submit and wait
-///     >>> int.from_bytes(buf)
+///     >>> int.from_bytes(buf, "little")  # the kernel writes the system's byte order
 ///     1
 ///
 /// Note
@@ -267,6 +287,9 @@ pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.O
     return true;
 }
 
+/// Gets the local address of `fd` (`peer=0`, the default) or of its peer (`peer=1`) into `sockaddr`, written at the
+/// completion; `sockaddr` is held until then.
+///
 /// Example
 ///     >>> sockaddr = Sockaddr()
 ///     >>> sqe = io_uring_get_sqe(ring)

@@ -10,7 +10,7 @@ pub const IO_URING_VERSION_MINOR = c.IO_URING_VERSION_MINOR;
 pub const IOV_MAX = std.posix.IOV_MAX;
 // liburing.h START >>>
 pub const LIBURING_UDATA_TIMEOUT = c.LIBURING_UDATA_TIMEOUT;
-// Tell the app the have the 64-bit variants of the get/set userdata
+// Tell the app we have the 64-bit variants of the get/set userdata
 // `LIBURING_HAVE_DATA64` is an empty macro: a string constant `""`.
 pub const LIBURING_HAVE_DATA64 = "";
 // liburing.h END <<<
@@ -220,11 +220,11 @@ pub const O_LARGEFILE = c.__O_LARGEFILE;
 pub const O_NOATIME = c.__O_NOATIME;
 pub const O_NOCTTY = c.O_NOCTTY;
 pub const O_NOFOLLOW = c.O_NOFOLLOW;
-pub const O_NONBLOCK = c.O_NONBLOCK; // 'O_NDELA;
+pub const O_NONBLOCK = c.O_NONBLOCK; // 'O_NDELAY'
 pub const O_PATH = c.__O_PATH;
 // ...
 pub const O_SYNC = c.O_SYNC;
-pub const O_TMPFILE = c.__O_TMPFILE; // must be specified with `O_RDWR` | `O_WRONLY`. `O_EXCL` (optiona;
+pub const O_TMPFILE = c.__O_TMPFILE; // must be specified with `O_RDWR` | `O_WRONLY`. `O_EXCL` (optional).
 pub const O_TRUNC = c.O_TRUNC;
 
 // flags for `renameat2`.

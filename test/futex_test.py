@@ -3,8 +3,8 @@ from liburing import *
 
 
 def test_futex_6_7():
-    # this should run if linux `< 6.7`
-    if linux_version_check(6.7):
+    # built without `futex2` (headers before Linux 6.7): `FUTEX2_PRIVATE == 0`
+    if FUTEX2_PRIVATE == 0:
         with pytest.raises(RuntimeError):
             Futex()
 
@@ -189,7 +189,7 @@ def test_futex_define():
     assert FUTEX_CMP_REQUEUE_PI == 12
     assert FUTEX_LOCK_PI2 == 13
 
-    if linux_version_check(6.7):
+    if FUTEX2_PRIVATE == 0:
         assert FUTEX2_PRIVATE == 0
         assert FUTEX2_SIZE_U32 == 0
         assert FUTEX2_NUMA == 0

@@ -8,6 +8,23 @@ import errno
 import functools
 from liburing import *
 
+LINUX_VERSION_MAJOR = 0
+LINUX_VERSION_MINOR = 0
+
+
+def _set_linux_version() -> None:
+    global LINUX_VERSION_MAJOR, LINUX_VERSION_MINOR
+    if not LINUX_VERSION_MAJOR:
+        with open("/proc/version", "rb") as file:
+            data = file.read()
+        major, minor, *_ = data.split()[2].split(b".", 2)
+        LINUX_VERSION_MAJOR = int(major)
+        LINUX_VERSION_MINOR = int(minor)
+
+
+_set_linux_version()  # initialize
+LINUX_VERSION = f"{LINUX_VERSION_MAJOR}.{LINUX_VERSION_MINOR}"  # `6.12`, as in `UnsupportedError` messages
+
 
 @functools.cache
 def _ops() -> tuple[tuple[str, bool], ...]:
@@ -38,6 +55,6 @@ def res(entry: CQE, *ops: int | str, name: str | None = None) -> int:
             for op in ops:
                 op_name, ok = supported(op)
                 if not ok:
-                    msg = f"Kernel `{LINUX_VERSION_MAJOR}.{LINUX_VERSION_MINOR}` does not support "
+                    msg = f"Kernel `{LINUX_VERSION}` does not support "
                     raise UnsupportedError(e.errno, msg + (name or f"`{op_name}`")) from None
         raise

@@ -52,6 +52,15 @@ pub const Msghdr = struct {
 
     const Self = @This();
 
+    /// All arguments are optional; `name` must be a `Sockaddr`, `iov` a list of buffers, `control` a buffer.
+    ///
+    /// Type
+    ///     name:       Sockaddr | None
+    ///     iov:        list[Buffer] | None
+    ///     control:    Buffer | None
+    ///     flags:      int | None
+    ///     namelen:    int | None
+    ///     controllen: int | None
     pub fn __new__(
         self: *Self,
         name: ?*Object,
@@ -95,6 +104,7 @@ pub const Msghdr = struct {
         }
     }
 
+    /// The `msg_flags`: set by the kernel at a completion (`MSG_*`).
     pub fn get_flags(self: *const Self) i32 {
         return self._msghdr.msg_flags;
     }
@@ -103,6 +113,8 @@ pub const Msghdr = struct {
         self._msghdr.msg_flags = value;
     }
 
+    /// The size of `name`: the kernel writes back the real length of the address (`ValueError` when set longer
+    /// than a `Sockaddr`).
     pub fn get_namelen(self: *const Self) u32 {
         return self._msghdr.msg_namelen;
     }
@@ -113,6 +125,8 @@ pub const Msghdr = struct {
         self._msghdr.msg_namelen = value;
     }
 
+    /// The size of `control`: the kernel writes back the length of the ancillary data (`ValueError` when set
+    /// longer than `control`).
     pub fn get_controllen(self: *const Self) usize {
         return self._msghdr.msg_controllen;
     }
@@ -123,6 +137,7 @@ pub const Msghdr = struct {
         self._msghdr.msg_controllen = value;
     }
 
+    /// The number of `iov` buffers.
     pub fn get_iovlen(self: *const Self) usize {
         return self._msghdr.msg_iovlen;
     }
@@ -165,10 +180,12 @@ pub const Cmsghdr = struct {
 
     const Self = @This();
 
+    /// The protocol level (`cmsg_level`, e.g. `SOL_SOCKET`).
     pub fn get_level(self: *const Self) i32 {
         return self._cmsghdr.?.cmsg_level;
     }
 
+    /// The protocol specific type (`cmsg_type`).
     pub fn get_type(self: *const Self) i32 {
         return self._cmsghdr.?.cmsg_type;
     }
@@ -187,6 +204,7 @@ pub const Cmsghdr = struct {
         return .{ .data = (base + header)[0..len] };
     }
 
+    /// `True` while it points at a control message.
     pub fn __bool__(self: *const Self) bool {
         return self._cmsghdr != null;
     }
@@ -198,6 +216,7 @@ pub const Cmsghdr = struct {
 /// Example
 ///     >>> out = io_uring_recvmsg_validate(buf, msg)
 ///     >>> out.namelen, out.controllen, out.payloadlen, out.flags
+///     (16, 0, 5, 0)
 ///     >>> io_uring_recvmsg_payload(out, msg)
 ///     b"hello"
 pub const RecvmsgOut = struct {
@@ -209,18 +228,22 @@ pub const RecvmsgOut = struct {
 
     const Self = @This();
 
+    /// The length of the address the kernel put in the buffer.
     pub fn get_namelen(self: *const Self) u32 {
         return self._recvmsg_out.?.namelen;
     }
 
+    /// The length of the control data the kernel put in the buffer.
     pub fn get_controllen(self: *const Self) u32 {
         return self._recvmsg_out.?.controllen;
     }
 
+    /// The length of the message data (it can be more than fit in the buffer).
     pub fn get_payloadlen(self: *const Self) u32 {
         return self._recvmsg_out.?.payloadlen;
     }
 
+    /// The `msg_flags` of the received message (`MSG_*`).
     pub fn get_flags(self: *const Self) u32 {
         return self._recvmsg_out.?.flags;
     }
@@ -273,10 +296,12 @@ pub const EpollEvent = struct {
         if (self._owns) if (self._events) |ptr| std.heap.c_allocator.free(ptr[0..self._len]);
     }
 
+    /// The number of events (`1` for an `events[i]` item).
     pub fn __len__(self: *const Self) usize {
         return if (self._owner == null) self._len else 1;
     }
 
+    /// The event `index` as an `EpollEvent` sharing the array (`IndexError` out of range, or on an item itself).
     pub fn __getitem__(self: *Self, index: isize) py.Error!*Object {
         if (self._owner != null or index < 0 or index >= self._len) return py.raiseIndexError(
             "Index out of range",
@@ -291,6 +316,7 @@ pub const EpollEvent = struct {
         });
     }
 
+    /// The event mask (`EPOLLIN`, ...) of the event.
     pub fn get_events(self: *const Self) u32 {
         return self._events.?[self._index].events;
     }
@@ -299,6 +325,7 @@ pub const EpollEvent = struct {
         self._events.?[self._index].events = value;
     }
 
+    /// The user data of the event.
     pub fn get_data(self: *const Self) u64 {
         return self._events.?[self._index].data.u64;
     }

@@ -4,6 +4,7 @@ import os
 import os.path
 import pathlib
 import tempfile
+import kernel
 import pytest
 from liburing import *
 
@@ -69,40 +70,13 @@ def cqe():
 # liburing end <<<
 
 
-# linux version start >>>
-LINUX_VERSION = f"{LINUX_VERSION_MAJOR}.{LINUX_VERSION_MINOR}"
-
-
-@pytest.fixture(autouse=True)
-def skip_by_platform(request):
-    """
-    Example
-        >>> @pytest.mark.skip_linux(6.7)
-        >>> def test_function():
-        ...
-        test.py::test_function SKIPPED (Linux `6.7 < 6.8`)
-
-        >>> @pytest.mark.skip_linux(6.7, 'custom message')
-        >>> def test_function():
-        ...
-        test.py::test_function SKIPPED (custom message)
-
-        >>> @pytest.mark.skip_linux('6.7', '')
-        >>> def test_function():
-        ...
-        test.py::test_function SKIPPED
-    """
-    if (r := request.node.get_closest_marker("skip_linux")) and linux_version_check(version := r.args[0]):
-        msg = r.args[1] if len(r.args) > 1 else f"Kernel `{LINUX_VERSION} < {version}`"
-        pytest.skip(msg)
-
-
+# kernel start >>>
 @pytest.fixture(autouse=True)
 def skip_by_opcode(request):
     """Skip when the running kernel does not support an io_uring opcode (asked from the kernel itself).
 
-    Prefer this over `skip_linux` for `IORING_OP_*`: it is right on backported / patched kernels too.
-    `skip_linux` stays for what the probe can't tell (register opcodes, flags, setup features).
+    Right on backported / patched kernels too. What the probe can't tell (register opcodes, flags, setup features)
+    raises `UnsupportedError`, which `pytest_runtest_call` turns into a skip.
 
     Example
         >>> @pytest.mark.requires_op("IORING_OP_FUTEX_WAIT", "IORING_OP_FUTEX_WAKE")
@@ -114,12 +88,12 @@ def skip_by_opcode(request):
         supported = probe()
         for op in r.args:
             if not supported.get(op, False):
-                pytest.skip(f"Kernel `{LINUX_VERSION}` has no `{op}`")
+                pytest.skip(f"Kernel `{kernel.LINUX_VERSION}` has no `{op}`")
 
 
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_call(item):
-    """A test the kernel can't run skips (`UnsupportedError`) instead of failing: no `skip_linux` needed.
+    """A test the kernel can't run skips (`UnsupportedError`) instead of failing.
 
     Example
         test.py::test_Query SKIPPED (Kernel `6.12` does not support `IORING_REGISTER_QUERY`)
@@ -134,12 +108,8 @@ def pytest_runtest_call(item):
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
-        "skip_linux(version:str|float|int, message:str): skipping linux version not supported.",
-    )
-    config.addinivalue_line(
-        "markers",
         "requires_op(*names:str): skip unless the kernel's probe lists every `IORING_OP_*` name.",
     )
 
 
-# linux version end <<<
+# kernel end <<<

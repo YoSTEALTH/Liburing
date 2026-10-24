@@ -23,6 +23,9 @@ pub const OpenHowType = setu.Class(OpenHow, @embedFile("class.zig"));
 ///     0
 ///     >>> ts.sec = 1           # second
 ///     >>> ts.nsec = 500000000  # nanosecond
+///
+/// Note
+///     - Takes no arguments (`TypeError` for any): use `timespec(second)` to make one from seconds.
 pub const Timespec = struct {
     _timespec: ?*c.__kernel_timespec = null,
 
@@ -35,11 +38,13 @@ pub const Timespec = struct {
 
     // Get
 
+    /// Whole seconds.
     pub fn get_sec(self: *const Self) py.Error!i64 {
         if (self._timespec) |ts| return ts.tv_sec;
         return e.raiseMemoryError("`kernel_timespec()` - Memory not set!");
     }
 
+    /// Nanoseconds, after the whole seconds.
     pub fn get_nsec(self: *const Self) py.Error!i64 {
         if (self._timespec) |ts| return ts.tv_nsec;
         return e.raiseMemoryError("`kernel_timespec()` - Memory not set!");
@@ -64,6 +69,19 @@ pub const Timespec = struct {
     }
 };
 
+/// Result of `io_uring_get_probe` / `io_uring_get_probe_ring`: which `io_uring` operations the kernel supports.
+///
+/// Example
+///     >>> probe = io_uring_get_probe()
+///     >>> probe.last_op, probe.ops_len
+///     (64, 65)
+///     >>> io_uring_opcode_supported(probe, io_uring_op.IORING_OP_NOP)
+///     True
+///     >>> io_uring_free_probe(probe)
+///
+/// Note
+///     - Can not be created directly (`NotImplementedError`), the `io_uring_get_probe*` functions make it.
+///     - Reading `last_op` / `ops_len` after `io_uring_free_probe` raises `MemoryError`.
 pub const Probe = struct {
     _io_uring_probe: ?*c.io_uring_probe = null,
 
@@ -77,23 +95,39 @@ pub const Probe = struct {
         if (self._io_uring_probe) |p| c.io_uring_free_probe(p); // clean up in case user forgot to do so!
     }
 
+    /// The last `IORING_OP_*` the kernel knows.
     pub fn get_last_op(self: *const Self) py.Error!u8 {
         if (self._io_uring_probe) |p| return p.last_op;
         return e.raiseMemoryError("`Probe()` is null!");
     }
 
+    /// How many opcodes the probe reports on.
     pub fn get_ops_len(self: *const Self) py.Error!u8 {
         if (self._io_uring_probe) |p| return p.ops_len;
         return e.raiseMemoryError("`Probe()` is null!");
     }
 };
 
+/// `io_uring` setup parameters (`struct io_uring_params`): set `flags` and the sizes before
+/// `io_uring_queue_init_params` / `io_uring_setup`, read back what the kernel gave after.
+///
+/// Example
+///     >>> param = Param()
+///     >>> param.flags = IORING_SETUP_CQSIZE
+///     >>> param.cq_entries = 256
+///     >>> io_uring_queue_init_params(8, ring, param)
+///     0
+///     >>> param.sq_entries, param.features
+///
+/// Note
+///     - Takes no arguments (`TypeError` for any). `features` is read only.
 pub const Param = struct {
     _io_uring_params: c.io_uring_params = std.mem.zeroes(c.io_uring_params), // lives inside the Python object
 
     pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
+    /// Submission queue entries (filled in by the kernel).
     pub fn get_sq_entries(self: *const Self) u32 {
         return self._io_uring_params.sq_entries;
     }
@@ -102,6 +136,7 @@ pub const Param = struct {
         self._io_uring_params.sq_entries = value;
     }
 
+    /// Completion queue entries (set it with `IORING_SETUP_CQSIZE`, else the kernel fills it in).
     pub fn get_cq_entries(self: *const Self) u32 {
         return self._io_uring_params.cq_entries;
     }
@@ -110,6 +145,7 @@ pub const Param = struct {
         self._io_uring_params.cq_entries = value;
     }
 
+    /// `IORING_SETUP_*` flags.
     pub fn get_flags(self: *const Self) u32 {
         return self._io_uring_params.flags;
     }
@@ -118,6 +154,7 @@ pub const Param = struct {
         self._io_uring_params.flags = value;
     }
 
+    /// CPU the `IORING_SETUP_SQPOLL` thread is bound to (with `IORING_SETUP_SQ_AFF`).
     pub fn get_sq_thread_cpu(self: *const Self) u32 {
         return self._io_uring_params.sq_thread_cpu;
     }
@@ -126,6 +163,7 @@ pub const Param = struct {
         self._io_uring_params.sq_thread_cpu = value;
     }
 
+    /// Milliseconds the `IORING_SETUP_SQPOLL` thread idles before it sleeps.
     pub fn get_sq_thread_idle(self: *const Self) u32 {
         return self._io_uring_params.sq_thread_idle;
     }
@@ -134,10 +172,12 @@ pub const Param = struct {
         self._io_uring_params.sq_thread_idle = value;
     }
 
+    /// `IORING_FEAT_*` flags the kernel reports (read only).
     pub fn get_features(self: *const Self) u32 {
         return self._io_uring_params.features;
     }
 
+    /// Ring file descriptor whose worker pool to share (with `IORING_SETUP_ATTACH_WQ`).
     pub fn get_wq_fd(self: *const Self) u32 {
         return self._io_uring_params.wq_fd;
     }
@@ -152,6 +192,9 @@ pub const Param = struct {
 /// Example
 ///     >>> SigsetT([signal.SIGINT, signal.SIGTERM])
 ///     >>> SigsetT()  # empty set
+///
+/// Note
+///     - `ValueError` for an invalid signal number.
 pub const SigsetT = struct {
     _sigset_t: ?*c.__sigset_t = null,
 
@@ -195,22 +238,27 @@ pub const SiginfoT = struct {
     pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
+    /// Signal number.
     pub fn get_si_signo(self: *const Self) i32 {
         return self._siginfo_t.si_signo;
     }
 
+    /// Errno value, if any.
     pub fn get_si_errno(self: *const Self) i32 {
         return self._siginfo_t.si_errno;
     }
 
+    /// Signal code (e.g. `os.CLD_EXITED`).
     pub fn get_si_code(self: *const Self) i32 {
         return self._siginfo_t.si_code;
     }
 
+    /// Process id of the child (`SIGCHLD` / `waitid` info).
     pub fn get_si_pid(self: *const Self) i32 {
         return self._siginfo_t._sifields._sigchld.si_pid;
     }
 
+    /// Real user id of the child (`SIGCHLD` / `waitid` info).
     pub fn get_si_uid(self: *const Self) u32 {
         return self._siginfo_t._sifields._sigchld.si_uid;
     }
@@ -244,7 +292,7 @@ pub fn writableView(o: *Object, view: *setu.c.Buffer) py.Error!bool {
 ///     >>> io_uring_prep_openat2(..., how)
 ///     True
 ///
-/// flags
+/// Flags
 ///     O_CREAT
 ///     O_RDWR
 ///     O_RDONLY
@@ -268,6 +316,7 @@ pub const OpenHow = struct {
 
     const Self = @This();
 
+    /// `OpenHow(flags=None, mode=None, resolve=None)`: each defaults to `0`.
     pub fn __new__(self: *Self, flags: ?u64, mode: ?u64, resolve: ?u64) void {
         self._open_how.flags = flags orelse 0;
         self._open_how.mode = mode orelse 0;

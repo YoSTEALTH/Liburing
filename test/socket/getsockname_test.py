@@ -4,7 +4,7 @@ import pytest
 from liburing import *
 
 # `SOCKET_URING_OP_GETSOCKNAME`: a socket command has no probe, the CQE says `EOPNOTSUPP`.
-NO_GETSOCKNAME = f"Kernel `{LINUX_VERSION_MAJOR}.{LINUX_VERSION_MINOR}` does not support `SOCKET_URING_OP_GETSOCKNAME`"
+NO_GETSOCKNAME = f"Kernel `{kernel.LINUX_VERSION}` does not support `SOCKET_URING_OP_GETSOCKNAME`"
 
 
 def test_getsockname(ring, cqe):

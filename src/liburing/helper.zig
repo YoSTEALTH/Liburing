@@ -43,6 +43,7 @@ pub const FileIndex = struct {
 
     const Self = @This();
 
+    /// `FileIndex(list)`: a copy of the file descriptors in `list` (`-1`: a free slot).
     pub fn __new__(self: *Self, list: py.Sequence(i32)) py.Error!void {
         const fds = std.heap.c_allocator.dupe(i32, list.items) catch return e.raiseMemoryError("Out of Memory!");
         self._fds = fds.ptr;
@@ -61,11 +62,16 @@ pub const FileIndex = struct {
         return FileIndexIterType.new(.{ ._ids = class.keep(self) });
     }
 
+    /// The file descriptor at `index` (`IndexError` out of range).
     pub fn __getitem__(self: *const Self, index: isize) py.Error!i32 {
         if (index >= 0 and index < self._len) return self._fds.?[@intCast(index)]; // cast: checked
         return py.raiseIndexError("`FileIndex` - index out of range", .{});
     }
 
+    /// Replace the file descriptors with `list`, which must have the same length (`ValueError` otherwise).
+    ///
+    /// Example
+    ///     >>> ids.update([4, 5, 6])
     pub fn update(self: *Self, list: py.Sequence(i32)) py.Error!void {
         if (self._len != list.items.len) return py.raiseValueError(
             "`FileIndex.update(list)` - length of {d} does not match {d}",
@@ -90,6 +96,7 @@ pub const FileIndexIter = struct {
 
     const Self = @This();
 
+    /// The next file descriptor.
     pub fn __next__(self: *Self) ?i32 {
         const ids = FileIndexType.data(self._ids.?);
         if (self._index >= ids._len) return null; // StopIteration
@@ -98,7 +105,8 @@ pub const FileIndexIter = struct {
     }
 };
 
-/// Probe your system to find out which `io_uring` operations are available.
+/// Probe your system to find out which `io_uring` operations are available: a `dict` of every `IORING_OP_*` name
+/// (up to, not including, `IORING_OP_LAST`) and whether the running kernel supports it.
 ///
 /// Example
 ///     >>> probe()
@@ -141,8 +149,11 @@ pub fn probe() py.Error!*Object {
 ///     >>> io_uring_prep_timeout(sqe, ts, ...)
 ///     True
 ///
+/// Note
+///     - `ValueError` if `second` is negative, `nan` or `inf`; `OverflowError` if too large.
 ///
 /// Type
+///     second: float
 ///     return: Timespec
 pub fn timespec(second: f64) py.Error!*Object {
     if (!std.math.isFinite(second) or second < 0) {
@@ -189,7 +200,7 @@ pub fn timespec(second: f64) py.Error!*Object {
 ///     ...     # do stuff
 ///
 ///     # failed: `ring` was full, submit and try to again.
-///     >>> if put_sqe(self.ring, sqe):
+///     >>> if not put_sqe(self.ring, sqe):
 ///     ...     io_uring_submit(self.ring)
 ///     ...     if put_sqe(self.ring, sqe):
 ///     ...         # do stuff
@@ -374,7 +385,7 @@ inline fn holdOf(sqe: *SQE) py.Error!?HoldPlace {
     return null;
 }
 
-/// A path argument (`str` or `os.PathLike`, not `bytes`, as with PyOZ): `path` is the UTF-8 of
+/// A path argument (`str` or `os.PathLike`, not `bytes`): `path` is the UTF-8 of
 /// the `str` that `os.fspath` gives, so it stays valid while that `str` lives, past the call:
 /// io_uring reads it at submit time, not when the `sqe` is prepared (`holdUntilCompletion` keeps `obj`).
 ///
@@ -392,6 +403,7 @@ pub const Path = struct {
 
 extern fn PyOS_FSPath(*Object) ?*Object;
 
+/// `obj` (`str` or `os.PathLike`) as a `Path`; `TypeError` for `bytes`. The caller calls `deinit`.
 pub fn toPath(obj: *Object) py.Error!Path {
     if (sc.PyBytes_Check(obj) != 0) return py.raiseTypeError("expected `str` or `os.PathLike`, not `bytes`", .{});
     const text = PyOS_FSPath(obj) orelse return error.PythonError; // a new reference
