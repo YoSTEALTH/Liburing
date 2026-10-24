@@ -2,23 +2,7 @@
 
 import os
 import tempfile
-
-from liburing import (
-    O_CREAT,
-    O_RDWR,
-    Cqe,
-    Ring,
-    io_uring_cqe_seen,
-    io_uring_get_sqe,
-    io_uring_prep_close,
-    io_uring_prep_open,
-    io_uring_prep_read,
-    io_uring_prep_write,
-    io_uring_queue_exit,
-    io_uring_queue_init,
-    io_uring_submit,
-    io_uring_wait_cqe,
-)
+from liburing import *
 
 
 def submit_and_wait(ring, cqe):

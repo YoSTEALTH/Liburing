@@ -50,7 +50,7 @@ jobs:
 
       - name: Install tools
         run: |
-          "${{ steps.py_ft.outputs.python-path }}" -m pip install pytest mypy
+          "${{ steps.py_ft.outputs.python-path }}" -m pip install pytest mypy ruff==0.17.2
           "${{ steps.py_gil.outputs.python-path }}" -m pip install pytest
           "${{ steps.py314_ft.outputs.python-path }}" -m pip install pytest
           "${{ steps.py314_gil.outputs.python-path }}" -m pip install pytest

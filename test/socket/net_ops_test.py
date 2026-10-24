@@ -5,28 +5,26 @@ import errno
 import os
 import select
 import socket
-
 import kernel
 import pytest
-
-import liburing as u
+from liburing import *
 
 
 def one(ring, cqe, prep, *args, **kwargs):
     """Prepares one operation and gives its `res` (`OSError` for a failed one, `UnsupportedError` for
     one the kernel doesn't have)."""
-    sqe = u.io_uring_get_sqe(ring)
+    sqe = io_uring_get_sqe(ring)
     prep(sqe, *args, **kwargs)
     op = sqe.opcode
     sqe.user_data = 9
-    assert u.io_uring_submit(ring) == 1
-    assert u.io_uring_wait_cqe(ring, cqe) == 0
+    assert io_uring_submit(ring) == 1
+    assert io_uring_wait_cqe(ring, cqe) == 0
     entry = cqe[0]
     try:
         assert entry.user_data == 9
         return kernel.res(entry, op)
     finally:
-        u.io_uring_cqe_seen(ring, entry)
+        io_uring_cqe_seen(ring, entry)
 
 
 @pytest.fixture
@@ -44,25 +42,25 @@ def pair():
 
 def test_send_recv(ring, cqe, pair):
     _, client, conn = pair
-    assert one(ring, cqe, u.io_uring_prep_send, client.fileno(), b"ping") == 4
+    assert one(ring, cqe, io_uring_prep_send, client.fileno(), b"ping") == 4
     buf = bytearray(8)
-    assert one(ring, cqe, u.io_uring_prep_recv, conn.fileno(), buf) == 4
+    assert one(ring, cqe, io_uring_prep_recv, conn.fileno(), buf) == 4
     assert buf[:4] == b"ping"
 
 
 def test_send_zc(ring, cqe, pair):
     _, client, conn = pair
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_send_zc(sqe, client.fileno(), b"zero-copy")
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_send_zc(sqe, client.fileno(), b"zero-copy")
     sqe.user_data = 1
-    assert u.io_uring_submit(ring) == 1
+    assert io_uring_submit(ring) == 1
     seen = 0
     while True:  # a result cqe (more=notification follows), then the notification cqe
-        assert u.io_uring_wait_cqe(ring, cqe) == 0
+        assert io_uring_wait_cqe(ring, cqe) == 0
         flags, _ = cqe[0].flags, cqe[0].res
-        u.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(ring, cqe[0])
         seen += 1
-        if not flags & u.IORING_CQE_F_MORE:
+        if not flags & IORING_CQE_F_MORE:
             break
     assert seen == 2
     assert conn.recv(16) == b"zero-copy"
@@ -73,8 +71,8 @@ def test_sendto_recv_udp(ring, cqe):
     tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         rx.bind(("127.0.0.1", 0))
-        addr = u.Sockaddr(u.AF_INET, "127.0.0.1", rx.getsockname()[1])
-        assert one(ring, cqe, u.io_uring_prep_sendto, tx.fileno(), b"udp", addr) == 3
+        addr = Sockaddr(AF_INET, "127.0.0.1", rx.getsockname()[1])
+        assert one(ring, cqe, io_uring_prep_sendto, tx.fileno(), b"udp", addr) == 3
         assert rx.recv(8) == b"udp"
     finally:
         rx.close()
@@ -89,27 +87,27 @@ def test_accept_and_multishot_accept(ring, cqe):
     clients = []
     try:
         clients.append(socket.create_connection(("127.0.0.1", port)))
-        fd = one(ring, cqe, u.io_uring_prep_accept, listener.fileno())
+        fd = one(ring, cqe, io_uring_prep_accept, listener.fileno())
         assert fd > 0
         os.close(fd)
 
-        sqe = u.io_uring_get_sqe(ring)
-        u.io_uring_prep_multishot_accept(sqe, listener.fileno())
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_multishot_accept(sqe, listener.fileno())
         sqe.user_data = 5
-        u.io_uring_submit(ring)
+        io_uring_submit(ring)
         clients.append(socket.create_connection(("127.0.0.1", port)))
         clients.append(socket.create_connection(("127.0.0.1", port)))
         got = 0
         while got < 2:  # one cqe per connection (the first connect was accepted above)
-            assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
-            assert cqe[0].flags & u.IORING_CQE_F_MORE
+            assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0
+            assert cqe[0].flags & IORING_CQE_F_MORE
             os.close(cqe[0].res)
-            u.io_uring_cqe_seen(ring, cqe[0])
+            io_uring_cqe_seen(ring, cqe[0])
             got += 1
-        assert one(ring, cqe, u.io_uring_prep_cancel, 5) == 0
-        assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0  # the cancelled multishot accept
+        assert one(ring, cqe, io_uring_prep_cancel, 5) == 0
+        assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0  # the cancelled multishot accept
         assert cqe[0].user_data == 5
-        u.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(ring, cqe[0])
     finally:
         for s in clients + [listener]:
             s.close()
@@ -121,30 +119,30 @@ def test_accept_direct(ring, cqe):
     listener.listen(4)
     client = socket.create_connection(listener.getsockname())
     try:
-        assert u.io_uring_register_files_sparse(ring, 4) == 0
-        assert one(ring, cqe, u.io_uring_prep_accept_direct, listener.fileno(), None, 2) == 0
-        assert one(ring, cqe, u.io_uring_prep_close_direct, 2) == 0
-        assert u.io_uring_unregister_files(ring) == 0
+        assert io_uring_register_files_sparse(ring, 4) == 0
+        assert one(ring, cqe, io_uring_prep_accept_direct, listener.fileno(), None, 2) == 0
+        assert one(ring, cqe, io_uring_prep_close_direct, 2) == 0
+        assert io_uring_unregister_files(ring) == 0
     finally:
         client.close()
         listener.close()
 
 
 def test_socket_listen_bind_connect_shutdown(ring, cqe):
-    fd = one(ring, cqe, u.io_uring_prep_socket, u.AF_INET, u.SOCK_STREAM, 0)
+    fd = one(ring, cqe, io_uring_prep_socket, AF_INET, SOCK_STREAM, 0)
     assert fd > 0
     cl = None
     try:
-        addr = u.Sockaddr(u.AF_INET, "127.0.0.1", 0)
-        assert one(ring, cqe, u.io_uring_prep_bind, fd, addr) == 0
-        assert one(ring, cqe, u.io_uring_prep_listen, fd, 4) == 0
+        addr = Sockaddr(AF_INET, "127.0.0.1", 0)
+        assert one(ring, cqe, io_uring_prep_bind, fd, addr) == 0
+        assert one(ring, cqe, io_uring_prep_listen, fd, 4) == 0
         port = socket.socket(fileno=os.dup(fd)).getsockname()[1]
         cl = socket.socket()
-        target = u.Sockaddr(u.AF_INET, "127.0.0.1", port)
-        cfd = one(ring, cqe, u.io_uring_prep_socket, u.AF_INET, u.SOCK_STREAM, 0)
+        target = Sockaddr(AF_INET, "127.0.0.1", port)
+        cfd = one(ring, cqe, io_uring_prep_socket, AF_INET, SOCK_STREAM, 0)
         try:
-            assert one(ring, cqe, u.io_uring_prep_connect, cfd, target) == 0
-            assert one(ring, cqe, u.io_uring_prep_shutdown, cfd, u.SHUT_WR) == 0
+            assert one(ring, cqe, io_uring_prep_connect, cfd, target) == 0
+            assert one(ring, cqe, io_uring_prep_shutdown, cfd, SHUT_WR) == 0
         finally:
             os.close(cfd)
     finally:
@@ -154,156 +152,156 @@ def test_socket_listen_bind_connect_shutdown(ring, cqe):
 
 
 def test_socket_direct(ring, cqe):
-    assert u.io_uring_register_files_sparse(ring, 2) == 0
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_socket_direct(sqe, u.AF_INET, u.SOCK_STREAM, 0, 1)
+    assert io_uring_register_files_sparse(ring, 2) == 0
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_socket_direct(sqe, AF_INET, SOCK_STREAM, 0, 1)
     sqe.user_data = 1
-    assert u.io_uring_submit(ring) == 1
-    assert u.io_uring_wait_cqe(ring, cqe) == 0
+    assert io_uring_submit(ring) == 1
+    assert io_uring_wait_cqe(ring, cqe) == 0
     assert cqe[0].res == 0
-    u.io_uring_cqe_seen(ring, cqe[0])
-    assert one(ring, cqe, u.io_uring_prep_close_direct, 1) == 0
-    assert u.io_uring_unregister_files(ring) == 0
+    io_uring_cqe_seen(ring, cqe[0])
+    assert one(ring, cqe, io_uring_prep_close_direct, 1) == 0
+    assert io_uring_unregister_files(ring) == 0
 
 
 def test_poll(ring, cqe, pair):
     _, client, conn = pair
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_poll_add(sqe, conn.fileno(), select.POLLIN)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_poll_add(sqe, conn.fileno(), select.POLLIN)
     sqe.user_data = 1
-    assert u.io_uring_submit(ring) == 1
+    assert io_uring_submit(ring) == 1
     client.send(b"x")
-    assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
+    assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0
     assert cqe[0].res & select.POLLIN
-    u.io_uring_cqe_seen(ring, cqe[0])
+    io_uring_cqe_seen(ring, cqe[0])
 
 
 def test_poll_multishot_remove(ring, cqe, pair):
     _, client, conn = pair
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_poll_multishot(sqe, conn.fileno(), select.POLLIN)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_poll_multishot(sqe, conn.fileno(), select.POLLIN)
     sqe.user_data = 77
-    assert u.io_uring_submit(ring) == 1
+    assert io_uring_submit(ring) == 1
     client.send(b"x")
-    assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
-    assert cqe[0].flags & u.IORING_CQE_F_MORE
-    u.io_uring_cqe_seen(ring, cqe[0])
-    assert one(ring, cqe, u.io_uring_prep_poll_remove, 77) == 0
+    assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0
+    assert cqe[0].flags & IORING_CQE_F_MORE
+    io_uring_cqe_seen(ring, cqe[0])
+    assert one(ring, cqe, io_uring_prep_poll_remove, 77) == 0
     # the removed poll posts a final cqe of its own
-    assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
-    u.io_uring_cqe_seen(ring, cqe[0])
+    assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0
+    io_uring_cqe_seen(ring, cqe[0])
 
 
 def test_poll_update(ring, cqe, pair):
     _, client, conn = pair
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_poll_add(sqe, conn.fileno(), select.POLLOUT | select.POLLIN)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_poll_add(sqe, conn.fileno(), select.POLLOUT | select.POLLIN)
     sqe.user_data = 1
-    u.io_uring_submit(ring)
-    u.io_uring_wait_cqe(ring, cqe)  # POLLOUT is ready at once
-    u.io_uring_cqe_seen(ring, cqe[0])
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_poll_add(sqe, conn.fileno(), select.POLLIN)
+    io_uring_submit(ring)
+    io_uring_wait_cqe(ring, cqe)  # POLLOUT is ready at once
+    io_uring_cqe_seen(ring, cqe[0])
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_poll_add(sqe, conn.fileno(), select.POLLIN)
     sqe.user_data = 2
-    u.io_uring_submit(ring)
-    flags = u.IORING_POLL_UPDATE_EVENTS | u.IORING_POLL_UPDATE_USER_DATA
-    r = one(ring, cqe, u.io_uring_prep_poll_update, 2, 3, select.POLLIN, flags)
+    io_uring_submit(ring)
+    flags = IORING_POLL_UPDATE_EVENTS | IORING_POLL_UPDATE_USER_DATA
+    r = one(ring, cqe, io_uring_prep_poll_update, 2, 3, select.POLLIN, flags)
     assert r == 0
     client.send(b"x")
-    assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
+    assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0
     assert cqe[0].user_data == 3  # reported under the new user_data
-    u.io_uring_cqe_seen(ring, cqe[0])
+    io_uring_cqe_seen(ring, cqe[0])
 
 
 def test_timeout_remove_update_cancel(ring, cqe):
-    ts = u.timespec(30)
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_timeout(sqe, ts, 0)
+    ts = timespec(30)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_timeout(sqe, ts, 0)
     sqe.user_data = 10
-    assert u.io_uring_submit(ring) == 1
-    assert one(ring, cqe, u.io_uring_prep_timeout_update, u.timespec(0.01), 10) == 0
-    assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
+    assert io_uring_submit(ring) == 1
+    assert one(ring, cqe, io_uring_prep_timeout_update, timespec(0.01), 10) == 0
+    assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0
     assert cqe[0].user_data == 10
     with pytest.raises(OSError) as e:  # a timeout that ran out reports ETIME
         _ = cqe[0].res
     assert e.value.errno == 62
-    u.io_uring_cqe_seen(ring, cqe[0])
+    io_uring_cqe_seen(ring, cqe[0])
 
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_timeout(sqe, ts, 0)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_timeout(sqe, ts, 0)
     sqe.user_data = 11
-    u.io_uring_submit(ring)
-    assert one(ring, cqe, u.io_uring_prep_timeout_remove, 11) == 0
-    assert u.io_uring_wait_cqe(ring, cqe) == 0
+    io_uring_submit(ring)
+    assert one(ring, cqe, io_uring_prep_timeout_remove, 11) == 0
+    assert io_uring_wait_cqe(ring, cqe) == 0
     assert cqe[0].user_data == 11
-    u.io_uring_cqe_seen(ring, cqe[0])  # removed: ECANCELED
+    io_uring_cqe_seen(ring, cqe[0])  # removed: ECANCELED
 
 
 def test_cancel_variants(ring, cqe, pair):
     _, _, conn = pair
-    for prep, arg in ((u.io_uring_prep_cancel, 3), (u.io_uring_prep_cancel64, 3)):
-        sqe = u.io_uring_get_sqe(ring)
-        u.io_uring_prep_recv(sqe, conn.fileno(), bytearray(4))
+    for prep, arg in ((io_uring_prep_cancel, 3), (io_uring_prep_cancel64, 3)):
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_recv(sqe, conn.fileno(), bytearray(4))
         sqe.user_data = 3
-        u.io_uring_submit(ring)
+        io_uring_submit(ring)
         assert one(ring, cqe, prep, arg) == 0
-        u.io_uring_wait_cqe(ring, cqe)
+        io_uring_wait_cqe(ring, cqe)
         assert cqe[0].user_data == 3
-        u.io_uring_cqe_seen(ring, cqe[0])  # the cancelled recv: ECANCELED
+        io_uring_cqe_seen(ring, cqe[0])  # the cancelled recv: ECANCELED
     # by fd
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_recv(sqe, conn.fileno(), bytearray(4))
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_recv(sqe, conn.fileno(), bytearray(4))
     sqe.user_data = 3
-    u.io_uring_submit(ring)
-    assert one(ring, cqe, u.io_uring_prep_cancel_fd, conn.fileno()) == 0
-    u.io_uring_wait_cqe(ring, cqe)
-    u.io_uring_cqe_seen(ring, cqe[0])
+    io_uring_submit(ring)
+    assert one(ring, cqe, io_uring_prep_cancel_fd, conn.fileno()) == 0
+    io_uring_wait_cqe(ring, cqe)
+    io_uring_cqe_seen(ring, cqe[0])
 
 
 def test_link_timeout(ring, cqe, pair):
     _, _, conn = pair
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_recv(sqe, conn.fileno(), bytearray(4))  # nothing will arrive
-    sqe.flags = u.IOSQE_IO_LINK
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_recv(sqe, conn.fileno(), bytearray(4))  # nothing will arrive
+    sqe.flags = IOSQE_IO_LINK
     sqe.user_data = 1
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_link_timeout(sqe, u.timespec(0.05), 0)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_link_timeout(sqe, timespec(0.05), 0)
     sqe.user_data = 2
-    assert u.io_uring_submit(ring) == 2
+    assert io_uring_submit(ring) == 2
     seen = {}
     for _ in range(2):
-        assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
+        assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0
         seen[cqe[0].user_data] = cqe[0].flags
-        u.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(ring, cqe[0])
     assert set(seen) == {1, 2}
 
 
 def test_msg_ring(ring, cqe):
-    other = u.Ring()
-    u.io_uring_queue_init(8, other)
+    other = Ring()
+    io_uring_queue_init(8, other)
     try:
-        sqe = u.io_uring_get_sqe(ring)
-        u.io_uring_prep_msg_ring(sqe, other.ring_fd, 7, 1234)
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_msg_ring(sqe, other.ring_fd, 7, 1234)
         sqe.user_data = 1
-        assert u.io_uring_submit(ring) == 1
-        got = u.Cqe()
-        assert u.io_uring_wait_cqe_timeout(other, got, u.timespec(2)) == 0
+        assert io_uring_submit(ring) == 1
+        got = Cqe()
+        assert io_uring_wait_cqe_timeout(other, got, timespec(2)) == 0
         assert (got[0].user_data, got[0].res) == (1234, 7)
-        u.io_uring_cqe_seen(other, got[0])
-        assert u.io_uring_wait_cqe(ring, cqe) == 0  # the sender's own completion
-        u.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(other, got[0])
+        assert io_uring_wait_cqe(ring, cqe) == 0  # the sender's own completion
+        io_uring_cqe_seen(ring, cqe[0])
 
-        sqe = u.io_uring_get_sqe(ring)
-        u.io_uring_prep_msg_ring_cqe_flags(sqe, other.ring_fd, 5, 99, 0, 3)
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_msg_ring_cqe_flags(sqe, other.ring_fd, 5, 99, 0, 3)
         sqe.user_data = 2
-        u.io_uring_submit(ring)
-        assert u.io_uring_wait_cqe_timeout(other, got, u.timespec(2)) == 0
+        io_uring_submit(ring)
+        assert io_uring_wait_cqe_timeout(other, got, timespec(2)) == 0
         assert (got[0].user_data, got[0].res, got[0].flags) == (99, 5, 3)
-        u.io_uring_cqe_seen(other, got[0])
-        u.io_uring_wait_cqe(ring, cqe)
-        u.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(other, got[0])
+        io_uring_wait_cqe(ring, cqe)
+        io_uring_cqe_seen(ring, cqe[0])
     finally:
-        u.io_uring_queue_exit(other)
+        io_uring_queue_exit(other)
 
 
 def test_splice_tee_pipe(ring, cqe, tmp_dir):
@@ -312,8 +310,8 @@ def test_splice_tee_pipe(ring, cqe, tmp_dir):
     f = os.open(tmp_dir / "s.txt", os.O_RDWR | os.O_CREAT, 0o600)
     try:
         os.write(f, b"spliced!")
-        assert one(ring, cqe, u.io_uring_prep_splice, f, 0, w, -1, 8, 0) == 8
-        assert one(ring, cqe, u.io_uring_prep_tee, r, w2, 8, 0) == 8
+        assert one(ring, cqe, io_uring_prep_splice, f, 0, w, -1, 8, 0) == 8
+        assert one(ring, cqe, io_uring_prep_tee, r, w2, 8, 0) == 8
         assert os.read(r, 8) == b"spliced!"
         assert os.read(r2, 8) == b"spliced!"
     finally:
@@ -323,7 +321,7 @@ def test_splice_tee_pipe(ring, cqe, tmp_dir):
 
 def test_prep_pipe(ring, cqe):
     fds = array.array("i", [-1, -1])  # the kernel fills it in when the request completes
-    assert one(ring, cqe, u.io_uring_prep_pipe, fds, 0) == 0
+    assert one(ring, cqe, io_uring_prep_pipe, fds, 0) == 0
     try:
         os.write(fds[1], b"hi")
         assert os.read(fds[0], 2) == b"hi"
@@ -331,47 +329,47 @@ def test_prep_pipe(ring, cqe):
         os.close(fds[0])
         os.close(fds[1])
     with pytest.raises(ValueError):
-        u.io_uring_prep_pipe(u.Sqe(), bytearray(4), 0)
+        io_uring_prep_pipe(Sqe(), bytearray(4), 0)
 
 
 def test_prep_pipe_direct(ring, cqe):
     fds = array.array("i", [-1, -1])
-    assert u.io_uring_register_files_sparse(ring, 4) == 0
-    assert one(ring, cqe, u.io_uring_prep_pipe_direct, fds, 0, 0) == 0
-    if u.linux_version_check(7.0):
+    assert io_uring_register_files_sparse(ring, 4) == 0
+    assert one(ring, cqe, io_uring_prep_pipe_direct, fds, 0, 0) == 0
+    if linux_version_check(7.0):
         # kernel bug fixed in 7.0 (stable backports vary): `io_pipe_fixed()` reported `(0, 0)`
         assert fds[0] == 0
     else:
         assert tuple(fds) == (0, 1)  # the slots used in the file table
-    assert one(ring, cqe, u.io_uring_prep_close_direct, 0) == 0
-    assert one(ring, cqe, u.io_uring_prep_close_direct, 1) == 0
-    assert u.io_uring_unregister_files(ring) == 0
+    assert one(ring, cqe, io_uring_prep_close_direct, 0) == 0
+    assert one(ring, cqe, io_uring_prep_close_direct, 1) == 0
+    assert io_uring_unregister_files(ring) == 0
 
 
 def test_provide_remove_buffers(ring, cqe):
     area = bytearray(32)
-    assert one(ring, cqe, u.io_uring_prep_provide_buffers, area, 2, 1, 0) == 0
-    assert one(ring, cqe, u.io_uring_prep_remove_buffers, 2, 1) == 2
+    assert one(ring, cqe, io_uring_prep_provide_buffers, area, 2, 1, 0) == 0
+    assert one(ring, cqe, io_uring_prep_remove_buffers, 2, 1) == 2
 
 
 def test_read_multishot_with_provided_buffers(ring, cqe):
     r, w = os.pipe()
     area = bytearray(64)
     try:
-        assert one(ring, cqe, u.io_uring_prep_provide_buffers, area, 4, 1, 0) == 0
-        sqe = u.io_uring_get_sqe(ring)
-        u.io_uring_prep_read_multishot(sqe, r, 1)
+        assert one(ring, cqe, io_uring_prep_provide_buffers, area, 4, 1, 0) == 0
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_read_multishot(sqe, r, 1)
         sqe.user_data = 1
-        assert u.io_uring_submit(ring) == 1
+        assert io_uring_submit(ring) == 1
         os.write(w, b"abc")
-        assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
+        assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0
         assert cqe[0].res == 3
-        assert cqe[0].flags & u.IORING_CQE_F_MORE
-        u.io_uring_cqe_seen(ring, cqe[0])
-        assert one(ring, cqe, u.io_uring_prep_cancel, 1) == 0
-        assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0  # the cancelled read
+        assert cqe[0].flags & IORING_CQE_F_MORE
+        io_uring_cqe_seen(ring, cqe[0])
+        assert one(ring, cqe, io_uring_prep_cancel, 1) == 0
+        assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0  # the cancelled read
         assert cqe[0].user_data == 1
-        u.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(ring, cqe[0])
     finally:
         os.close(r)
         os.close(w)
@@ -381,30 +379,30 @@ def test_provide_buffers_are_split_evenly(ring, cqe):
     r, w = os.pipe()
     area = bytearray(b"\xaa" * 64)
     try:
-        assert one(ring, cqe, u.io_uring_prep_provide_buffers, area, 4, 1, 0) == 0  # 4 buffers of 16 bytes
+        assert one(ring, cqe, io_uring_prep_provide_buffers, area, 4, 1, 0) == 0  # 4 buffers of 16 bytes
         os.write(w, b"x" * 40)
-        sqe = u.io_uring_get_sqe(ring)
-        u.io_uring_prep_read_multishot(sqe, r, 1)  # picks a buffer from group 1
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_read_multishot(sqe, r, 1)  # picks a buffer from group 1
         sqe.user_data = 1
-        assert u.io_uring_submit(ring) == 1
-        assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(2)) == 0
+        assert io_uring_submit(ring) == 1
+        assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0
         assert cqe[0].res == 16  # one buffer, never more: nothing is written past `area`
-        u.io_uring_cqe_seen(ring, cqe[0])
-        u.io_uring_prep_cancel(u.io_uring_get_sqe(ring), 1)
-        assert u.io_uring_submit(ring) == 1
-        assert u.io_uring_wait_cqe_nr(ring, cqe, 2) == 0  # the cancel and the cancelled read
-        u.io_uring_cq_advance(ring, 2)
+        io_uring_cqe_seen(ring, cqe[0])
+        io_uring_prep_cancel(io_uring_get_sqe(ring), 1)
+        assert io_uring_submit(ring) == 1
+        assert io_uring_wait_cqe_nr(ring, cqe, 2) == 0  # the cancel and the cancelled read
+        io_uring_cq_advance(ring, 2)
     finally:
         os.close(r)
         os.close(w)
 
 
 def test_provide_buffers_arguments(ring):
-    sqe = u.io_uring_get_sqe(ring)
+    sqe = io_uring_get_sqe(ring)
     with pytest.raises(ValueError):
-        u.io_uring_prep_provide_buffers(sqe, bytearray(8), 0, 1, 0)
+        io_uring_prep_provide_buffers(sqe, bytearray(8), 0, 1, 0)
     with pytest.raises(ValueError):
-        u.io_uring_prep_provide_buffers(sqe, bytearray(2), 4, 1, 0)
+        io_uring_prep_provide_buffers(sqe, bytearray(2), 4, 1, 0)
 
 
 def test_send_set_addr_udp(ring, cqe):
@@ -412,15 +410,15 @@ def test_send_set_addr_udp(ring, cqe):
     tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         rx.bind(("127.0.0.1", 0))
-        addr = u.Sockaddr(u.AF_INET, "127.0.0.1", rx.getsockname()[1])
-        sqe = u.io_uring_get_sqe(ring)
-        u.io_uring_prep_send(sqe, tx.fileno(), b"set-addr")
-        u.io_uring_prep_send_set_addr(sqe, addr)  # a temporary would be fine too: kept until the submit
+        addr = Sockaddr(AF_INET, "127.0.0.1", rx.getsockname()[1])
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_send(sqe, tx.fileno(), b"set-addr")
+        io_uring_prep_send_set_addr(sqe, addr)  # a temporary would be fine too: kept until the submit
         sqe.user_data = 4
-        assert u.io_uring_submit(ring) == 1
-        assert u.io_uring_wait_cqe(ring, cqe) == 0
+        assert io_uring_submit(ring) == 1
+        assert io_uring_wait_cqe(ring, cqe) == 0
         assert cqe[0].res == 8
-        u.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(ring, cqe[0])
         assert rx.recv(16) == b"set-addr"
     finally:
         rx.close()
@@ -428,25 +426,23 @@ def test_send_set_addr_udp(ring, cqe):
 
 
 # `SOCKET_URING_OP_GETSOCKNAME`: a socket command has no probe, the CQE says `EOPNOTSUPP`.
-NO_GETSOCKNAME = (
-    f"Kernel `{u.LINUX_VERSION_MAJOR}.{u.LINUX_VERSION_MINOR}` does not support `SOCKET_URING_OP_GETSOCKNAME`"
-)
+NO_GETSOCKNAME = f"Kernel `{LINUX_VERSION_MAJOR}.{LINUX_VERSION_MINOR}` does not support `SOCKET_URING_OP_GETSOCKNAME`"
 
 
 def test_cmd_getsockname(ring, cqe, pair):
     _, client, _ = pair
     for peer, expect in ((0, client.getsockname()), (1, client.getpeername())):
-        out = u.Sockaddr()
-        sqe = u.io_uring_get_sqe(ring)
-        u.io_uring_prep_cmd_getsockname(sqe, client.fileno(), out, peer)
+        out = Sockaddr()
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_cmd_getsockname(sqe, client.fileno(), out, peer)
         sqe.user_data = 6
-        assert u.io_uring_submit(ring) == 1
-        assert u.io_uring_wait_cqe(ring, cqe) == 0
+        assert io_uring_submit(ring) == 1
+        assert io_uring_wait_cqe(ring, cqe) == 0
         try:
             assert cqe[0].res >= 0
         except OSError as e:
             if e.errno == errno.EOPNOTSUPP:
                 pytest.skip(NO_GETSOCKNAME)
             raise
-        u.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(ring, cqe[0])
         assert (out.ip, out.port) == expect

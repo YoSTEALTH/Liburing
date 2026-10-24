@@ -1,85 +1,48 @@
 //! Liburing: the `liburing` extension module (Setu's `py.exportModule`).
-const std = @import("std");
-const api = @import("api.zig");
 const setu = @import("setu");
 const build_options = @import("build_options");
+const support = @import("support.zig");
 
-const sc = setu.c;
-const py = setu.py;
-const Object = sc.Object;
+const Object = setu.c.Object;
 
-/// Setu settings, read by `setu.Class` from the root file.
-pub const setu_options = api.setu_options;
-
-/// The module functions, from every file in `api.files`.
-const module_methods = blk: {
-    var defs: []const sc.MethodDef = &.{};
-    for (api.files) |f| defs = defs ++ py.exportFns(f.M, f.source);
-    break :blk defs[0..].* ++ [_]sc.MethodDef{py.method_end};
+/// Setu finds the functions (lowercase `pub fn`, needs `.source`), `setu.Class`es, `UnsupportedError`, UPPER_CASE
+/// constants and `enum.zig`'s `IntEnum`s in `from`, creates them (bases first) in its `exec`, adds `__version__`,
+/// then runs `init`. `zig build stubs` writes `liburing.pyi` from this declaration too.
+pub const module: setu.Module = .{
+    .name = "liburing",
+    .doc = "Python + Zig wrapper around C liburing.",
+    .version = build_options.version,
+    .from = &.{
+        .{ .ns = @import("const.zig") }, // constants only (`LIBURING_HAVE_DATA64 = ""` included)
+        .{ .ns = @import("enum.zig"), .enums = .int_enum }, // `io_uring_op`, `io_uring_socket_op`
+        .{ .ns = @import("class.zig"), .functions = false }, // 6 classes; `keep` / `claim` are Zig helpers
+        .{ .ns = @import("ring.zig") }, // class-only files: no `.source` needed
+        .{ .ns = @import("cqe.zig") },
+        .{ .ns = @import("sqe.zig") },
+        .{ .ns = @import("msghdr.zig") },
+        .{ .ns = @import("statx.zig") }, // `Statx` + `STATX_*`
+        .{ .ns = @import("futex.zig") }, // `FUTEX` / `Futex` + `FUTEX_*`
+        .{ .ns = support, .functions = false }, // `UnsupportedError`; its `pub fn`s are Zig helpers
+        .{ .ns = @import("error.zig"), .source = @embedFile("error.zig") },
+        .{ .ns = @import("helper.zig"), .source = @embedFile("helper.zig") }, // + `FileIndex`, `FileIndexIter`
+        .{ .ns = @import("queue.zig"), .source = @embedFile("queue.zig") },
+        .{ .ns = @import("complete.zig"), .source = @embedFile("complete.zig") },
+        .{ .ns = @import("register.zig"), .source = @embedFile("register.zig") }, // + 12 classes
+        .{ .ns = @import("prep_file.zig"), .source = @embedFile("prep_file.zig") },
+        .{ .ns = @import("prep_net.zig"), .source = @embedFile("prep_net.zig") },
+        .{ .ns = @import("prep_ctl.zig"), .source = @embedFile("prep_ctl.zig") },
+        .{ .ns = @import("socket.zig"), .source = @embedFile("socket.zig") }, // + `Sockaddr`, `AF_*`, ...
+    },
+    .init = init,
 };
 
-/// `Py_mod_exec`: creates the classes, constants and enums.
-fn exec(module: *Object) callconv(.c) c_int {
-    initModule(module) catch return -1;
-    return 0;
+/// After Setu's part: asks the kernel once what it supports (`IORING_REGISTER_QUERY`, `uname`).
+fn init(_: *Object) setu.py.Error!void {
+    support.init();
 }
 
-fn initModule(module: *Object) py.Error!void {
-    inline for (api.classes) |C| try C.create(module);
-    try @import("support.zig").init(module);
-    inline for (api.constant_files) |F| try py.addConstants(module, F);
-    if (sc.PyModule_AddStringConstant(module, "LIBURING_HAVE_DATA64", "") < 0) return error.PythonError;
-    if (sc.PyModule_AddStringConstant(module, "__version__", build_options.version) < 0) return error.PythonError;
-    inline for (api.enums) |E| try addIntEnum(module, E);
-}
-
-/// Adds the Zig enum `E` to `module` as an `enum.IntEnum` of the same name.
-fn addIntEnum(module: *Object, comptime E: type) py.Error!void {
-    const enum_mod = sc.PyImport_ImportModule("enum") orelse return error.PythonError;
-    defer py.decref(enum_mod);
-    const int_enum = sc.PyObject_GetAttrString(enum_mod, "IntEnum") orelse return error.PythonError;
-    defer py.decref(int_enum);
-
-    const fields = @typeInfo(E).@"enum".field_names;
-    const members = sc.PyList_New(0) orelse return error.PythonError;
-    defer py.decref(members);
-    inline for (fields) |f| {
-        const item = try py.new(.{ f, @as(i64, @backingInt(@field(E, f))) });
-        defer py.decref(item);
-        if (sc.PyList_Append(members, item) < 0) return error.PythonError;
-    }
-
-    const name = comptime shortName(@typeName(E));
-    py.incref(members); // the tuple takes this reference
-    const args = try py.new(.{ name, members });
-    defer py.decref(args);
-    const kwargs = sc.PyDict_New() orelse return error.PythonError;
-    defer py.decref(kwargs);
-    const module_name = try py.new("liburing");
-    defer py.decref(module_name);
-    const key = try py.new("module");
-    defer py.decref(key);
-    if (sc.PyDict_SetItem(kwargs, key, module_name) < 0) return error.PythonError;
-
-    const cls = sc.PyObject_Call(int_enum, args, kwargs) orelse return error.PythonError;
-    defer py.decref(cls);
-    if (sc.PyModule_AddObjectRef(module, name, cls) < 0) return error.PythonError;
-}
-
-/// `io_uring_op` for `enum.io_uring_op`.
-fn shortName(comptime full: []const u8) [:0]const u8 {
-    const i = std.mem.findScalarLast(u8, full, '.') orelse return full ++ "";
-    const s = full[i + 1 ..];
-    return (s ++ "\x00")[0..s.len :0];
-}
-
-// The module: `PyModExport_liburing` (3.15+) and `PyInit_liburing` (3.14), one stable-ABI binary.
-// Setu's default `gil` (`Py_MOD_GIL_NOT_USED`): the free-threaded CPython keeps the GIL off.
+// `PyModExport_liburing` (3.15+) and `PyInit_liburing` (3.14), one stable-ABI binary. Setu's default `gil`
+// (`Py_MOD_GIL_NOT_USED`): the free-threaded CPython keeps the GIL off.
 comptime {
-    py.exportModule(.{
-        .name = "liburing",
-        .doc = "Python + Zig wrapper around C liburing.",
-        .methods = &module_methods,
-        .exec = &exec,
-    });
+    setu.py.exportModule(module);
 }

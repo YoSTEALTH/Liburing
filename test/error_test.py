@@ -1,6 +1,5 @@
 from pytest import raises
-
-from liburing import trap_error
+from liburing import *
 
 
 def test_trap_error():

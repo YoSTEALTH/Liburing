@@ -1,55 +1,50 @@
 import errno
-
 import kernel
 import pytest
-
-import liburing
+from liburing import *
 
 # `SOCKET_URING_OP_GETSOCKNAME`: a socket command has no probe, the CQE says `EOPNOTSUPP`.
-NO_GETSOCKNAME = (
-    f"Kernel `{liburing.LINUX_VERSION_MAJOR}.{liburing.LINUX_VERSION_MINOR}` "
-    "does not support `SOCKET_URING_OP_GETSOCKNAME`"
-)
+NO_GETSOCKNAME = f"Kernel `{LINUX_VERSION_MAJOR}.{LINUX_VERSION_MINOR}` does not support `SOCKET_URING_OP_GETSOCKNAME`"
 
 
 def test_getsockname(ring, cqe):
     with pytest.raises(TypeError):
-        addr = liburing.Sockaddr(liburing.AF_UNIX, "./path")
-        liburing.getsockname(-1, addr)
+        addr = Sockaddr(AF_UNIX, "./path")
+        getsockname(-1, addr)
 
-    ts = liburing.timespec(3)
+    ts = timespec(3)
     for i in range(2):
         # socket
-        sqe = liburing.io_uring_get_sqe(ring)
+        sqe = io_uring_get_sqe(ring)
         if i:
-            addr = liburing.Sockaddr(liburing.AF_INET6, "::1", 0)  # port will be auto set to whatever is available.
-            liburing.io_uring_prep_socket(sqe, addr.family, liburing.SOCK_STREAM)
+            addr = Sockaddr(AF_INET6, "::1", 0)  # port will be auto set to whatever is available.
+            io_uring_prep_socket(sqe, addr.family, SOCK_STREAM)
         else:
-            addr = liburing.Sockaddr(liburing.AF_INET, "127.0.0.1", 0)
-            liburing.io_uring_prep_socket(sqe, addr.family, liburing.SOCK_STREAM)
+            addr = Sockaddr(AF_INET, "127.0.0.1", 0)
+            io_uring_prep_socket(sqe, addr.family, SOCK_STREAM)
         sqe.user_data = i
-        assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
+        assert io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
         entry = cqe[0]
         sockfd = entry.res
         assert entry.user_data == i
-        liburing.io_uring_cqe_seen(ring, entry)
+        io_uring_cqe_seen(ring, entry)
 
         # bind
-        sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_bind(sqe, sockfd, addr)
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_bind(sqe, sockfd, addr)
         sqe.user_data = i + 1
-        assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
+        assert io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
         entry = cqe[0]
         assert kernel.res(entry, "IORING_OP_BIND") == 0
         assert entry.user_data == i + 1
-        liburing.io_uring_cqe_seen(ring, entry)
+        io_uring_cqe_seen(ring, entry)
 
         # get sock name
-        sockaddr = liburing.Sockaddr()
-        sqe = liburing.io_uring_get_sqe(ring)
-        liburing.getsockname(sqe, sockfd, sockaddr)
+        sockaddr = Sockaddr()
+        sqe = io_uring_get_sqe(ring)
+        getsockname(sqe, sockfd, sockaddr)
         sqe.user_data = i + 2
-        assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
+        assert io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
         entry = cqe[0]
         try:
             res = entry.res
@@ -59,7 +54,7 @@ def test_getsockname(ring, cqe):
             raise
         assert res == 0
         assert entry.user_data == i + 2
-        liburing.io_uring_cqe_seen(ring, entry)
+        io_uring_cqe_seen(ring, entry)
 
         if i:
             assert sockaddr.ip == "::1"  # filled in by the kernel
@@ -69,11 +64,11 @@ def test_getsockname(ring, cqe):
             assert sockaddr.port >= 1000
 
         # close
-        sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_close(sqe, sockfd)
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_close(sqe, sockfd)
         sqe.user_data = i + 1
-        assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
+        assert io_uring_submit_and_wait_timeout(ring, cqe, 1, ts) == 1
         entry = cqe[0]
         assert entry.res == 0
         assert entry.user_data == i + 1
-        liburing.io_uring_cqe_seen(ring, entry)
+        io_uring_cqe_seen(ring, entry)

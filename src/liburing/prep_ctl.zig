@@ -259,7 +259,10 @@ inline fn messageData(data: u64) py.Error!u64 {
 }
 
 noinline fn raiseMessageData(data: u64) py.Error {
-    return py.raiseValueError("`io_uring_prep_msg_ring*(data)` must be below 2**63 (bit 63 marks a message): {d}", .{data});
+    return py.raiseValueError(
+        "`io_uring_prep_msg_ring*(data)` must be below 2**63 (bit 63 marks a message): {d}",
+        .{data},
+    );
 }
 
 pub fn io_uring_prep_uring_cmd(sqe: *SQE, cmd_op: i32, fd: i32) py.Error!bool {

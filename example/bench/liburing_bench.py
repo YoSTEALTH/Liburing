@@ -1,5 +1,6 @@
 '''HTTP keep-alive echo server on Liburing's Python API: the same server, response and load as
-`liburing_bench.c` (translated line by line; both from Shakti's `example/bench`).
+`liburing_bench.c` (translated line by line: `io_uring_sqe_set_data64` as in C, which also measures
+1 ns under the `sqe.user_data` property).
 
     python3.15t example/bench/liburing_bench.py [port=12345] [--peek | --at] [--defer] [--tmpl] [--ring]
     zig-out/bin/load 12345 64 5 100     # `zig build load`: port, connections, seconds, requests/connection
@@ -23,26 +24,7 @@ request).
 import os
 import socket
 import sys
-from liburing import (
-    IORING_SETUP_DEFER_TASKRUN,
-    IORING_SETUP_SINGLE_ISSUER,
-    SOCK_CLOEXEC,
-    Cqe,
-    Ring,
-    Sqe,
-    io_uring_cq_advance,
-    io_uring_cq_ready,
-    io_uring_cqe_seen,
-    io_uring_get_sqe,
-    io_uring_peek_cqe,
-    io_uring_prep_accept,
-    io_uring_prep_recv,
-    io_uring_prep_send,
-    io_uring_queue_init,
-    io_uring_submit,
-    io_uring_submit_and_wait,
-    put_sqe,
-)
+from liburing import *
 
 LISTEN = 1024
 ENTRIES = 4096
@@ -62,7 +44,7 @@ OP_ACCEPT, OP_RECV, OP_SEND, OP_MASK = 0, 1, 2, 3
 class Conn:
     '''One client: its fd, receive buffer and how much of the response has been sent.'''
 
-    __slots__ = ('fd', 'buf', 'sent', 'out', 'recv', 'send')
+    __slots__ = ('buf', 'fd', 'out', 'recv', 'send', 'sent')
 
     def __init__(self, fd, cid=0, tmpl=False):
         self.fd = fd
@@ -73,10 +55,10 @@ class Conn:
         if tmpl:  # `--tmpl`: this connection's recv and send, prepared once
             self.recv = Sqe()
             io_uring_prep_recv(self.recv, fd, self.buf)
-            self.recv.user_data = cid << 2 | OP_RECV
+            io_uring_sqe_set_data64(self.recv, cid << 2 | OP_RECV)
             self.send = Sqe()
             io_uring_prep_send(self.send, fd, RESPONSE)
-            self.send.user_data = cid << 2 | OP_SEND
+            io_uring_sqe_set_data64(self.send, cid << 2 | OP_SEND)
 
 
 def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
@@ -102,7 +84,7 @@ def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
         if io_uring_prep_accept(s, listen.fileno(), None, SOCK_CLOEXEC) is False:  # `Sqe(ring)` SQ full: flush, retry
             io_uring_submit(ring)
             io_uring_prep_accept(s, listen.fileno(), None, SOCK_CLOEXEC)
-        s.user_data = OP_ACCEPT
+        io_uring_sqe_set_data64(s, OP_ACCEPT)
 
     def arm_recv(cid, c):
         if tmpl:
@@ -111,7 +93,7 @@ def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
         if io_uring_prep_recv(s, c.fd, c.buf) is False:  # `Sqe(ring)` SQ full: flush, retry
             io_uring_submit(ring)
             io_uring_prep_recv(s, c.fd, c.buf)
-        s.user_data = cid << 2 | OP_RECV
+        io_uring_sqe_set_data64(s, cid << 2 | OP_RECV)
 
     def arm_send(cid, c):
         if tmpl and not c.sent:
@@ -121,7 +103,7 @@ def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
         if io_uring_prep_send(s, c.fd, c.out) is False:  # `Sqe(ring)` SQ full: flush, retry
             io_uring_submit(ring)
             io_uring_prep_send(s, c.fd, c.out)
-        s.user_data = cid << 2 | OP_SEND
+        io_uring_sqe_set_data64(s, cid << 2 | OP_SEND)
 
     def close_conn(cid):
         os.close(conns.pop(cid).fd)

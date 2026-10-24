@@ -1,19 +1,4 @@
-from liburing import (
-    O_CREAT,
-    O_RDWR,
-    Ring,
-    Cqe,
-    io_uring_get_sqe,
-    io_uring_prep_open,
-    io_uring_prep_write,
-    io_uring_prep_read,
-    io_uring_prep_close,
-    io_uring_submit,
-    io_uring_wait_cqe,
-    io_uring_cqe_seen,
-    io_uring_queue_init,
-    io_uring_queue_exit,
-)
+from liburing import *
 
 
 def open(ring, cqe, path, flags):
@@ -52,10 +37,7 @@ def _submit_and_wait(ring, cqe):
     io_uring_submit(ring)  # submit entry
     io_uring_wait_cqe(ring, cqe)  # wait for entry to finish
     entry = cqe[0]
-    try:
-        result = entry.res  # auto raises appropriate exception if failed
-    except Exception as e:
-        raise e  # do stuff with error
+    result = entry.res  # raises the matching `OSError` if the operation failed
     # done with current entry so clear it from completion queue.
     io_uring_cqe_seen(ring, entry)
     return result  # type: int

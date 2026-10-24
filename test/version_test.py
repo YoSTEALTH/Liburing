@@ -1,13 +1,5 @@
 import pytest
-
-from liburing import (
-    LINUX_VERSION_MAJOR,
-    LINUX_VERSION_MINOR,
-    liburing_version_check,
-    liburing_version_major,
-    liburing_version_minor,
-    linux_version_check,
-)
+from liburing import *
 
 
 def test_set_linux_version_define():

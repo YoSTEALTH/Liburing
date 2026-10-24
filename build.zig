@@ -98,20 +98,14 @@ pub fn build(b: *std.Build) void {
     const ext_name = b.fmt("liburing{s}", .{ext_suffix});
     b.getInstallStep().dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .lib, ext_name).step);
 
-    // Type stubs, generated on the build machine (`src/liburing/stubgen.zig`).
-    const stubgen = b.addExecutable(.{
-        .name = "stubgen",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/liburing/stubgen.zig"),
-            .target = b.graph.host,
-            .optimize = .debug,
-            .imports = &.{
-                .{ .name = "setu", .module = setu_dep.module("setu") },
-                .{ .name = "c", .module = cModule(b, b.graph.host, .debug, &configure.step) },
-            },
-        }),
+    // Type stubs, generated on the build machine by Setu's stub generator from `root.zig`'s `module`.
+    const pyi = @import("setu").addStubs(b, setu_dep, .{
+        .root_source_file = b.path("src/liburing/root.zig"),
+        .imports = &.{
+            .{ .name = "c", .module = cModule(b, b.graph.host, .debug, &configure.step) },
+            .{ .name = "build_options", .module = options.createModule() },
+        },
     });
-    const pyi = b.addRunArtifact(stubgen).captureStdOut(.{ .basename = "liburing.pyi" });
     b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "liburing.pyi").step);
     // PEP 561 marker: type checkers read `liburing.pyi` only next to it. Installed with the stubs (not
     // copied by `develop`: `tools/setu_build.py` also packs src/liburing/, which would ship it twice).

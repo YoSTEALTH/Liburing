@@ -77,21 +77,17 @@ help(liburing)
 
 ```python
 # example/probe.py
-import liburing
+from liburing import *
 
-for k, v in liburing.probe().items():
+for k, v in probe().items():
     print(k, v)
-
 ```
 
 ## Simple File Example
 
 ```python
 # example/open_write_read_close.py
-from liburing import O_CREAT, O_RDWR, Ring, Cqe, io_uring_get_sqe, \
-                     io_uring_prep_open, io_uring_prep_write, io_uring_prep_read, \
-                     io_uring_prep_close, io_uring_submit, io_uring_wait_cqe, \
-                     io_uring_cqe_seen, io_uring_queue_init, io_uring_queue_exit
+from liburing import *
 
 
 def open(ring, cqe, path, flags):
@@ -130,10 +126,7 @@ def _submit_and_wait(ring, cqe):
     io_uring_submit(ring)  # submit entry
     io_uring_wait_cqe(ring, cqe)  # wait for entry to finish
     entry = cqe[0]
-    try:
-        result = entry.res  # auto raises appropriate exception if failed
-    except Exception as e:
-        raise e  # do stuff with error
+    result = entry.res  # raises the matching `OSError` if the operation failed
     # done with current entry so clear it from completion queue.
     io_uring_cqe_seen(ring, entry)
     return result  # type: int
@@ -162,7 +155,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 ```
 
 ## Without `io_uring_get_sqe`: `Sqe(ring)`
@@ -172,16 +164,15 @@ each prep on it takes the next free entry of the submission queue, so a busy loo
 
 ```python
 # example/sqe_ring.py
-from liburing import Ring, Cqe, Sqe, io_uring_prep_nop, io_uring_submit_and_wait, io_uring_peek_cqe, \
-                     io_uring_cq_ready, io_uring_cq_advance, io_uring_queue_init, io_uring_queue_exit
+from liburing import *
 
 
 def main():
     ring = Ring()
+    sqe = Sqe(ring)  # one object for the ring's lifetime: each prep takes the next free entry
     cqe = Cqe()
     try:
         io_uring_queue_init(8, ring)
-        sqe = Sqe(ring)  # one object for the ring's lifetime: each prep takes the next free entry
         for i in range(3):
             io_uring_prep_nop(sqe)  # `True`; `False` when the queue is full: submit, then prep again
             sqe.user_data = i  # acts on the entry of the last prep
@@ -196,16 +187,11 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 ```
 
 ## Note
  - This project has been moved to using Zig as back-end, thus leading to breaking changes from previous release.
  - Try using latest Linux if possible to enable all `io_uring` features.
-
-<!--
-## Other Projects
- - [Shakti](https://github.com/YoSTEALTH/Shakti) -->
 
 ## License
 Free, Public Domain (CC0). [Read more](https://github.com/YoSTEALTH/Liburing/blob/dev/LICENSE.txt)

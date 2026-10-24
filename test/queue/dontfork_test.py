@@ -2,24 +2,22 @@ import faulthandler
 import os
 import resource
 import signal
-
 import pytest
-
-import liburing
+from liburing import *
 
 
 def test_dontfork_not_initialized():
     with pytest.raises(RuntimeError):
-        liburing.io_uring_ring_dontfork(liburing.Ring())
+        io_uring_ring_dontfork(Ring())
 
 
 def _child_touches_ring(ring):
-    ''' Fork, use `ring` in child, return child's wait status. '''
+    '''Fork, use `ring` in child, return child's wait status.'''
     pid = os.fork()
     if pid == 0:
         faulthandler.disable()  # expected crash, no traceback noise
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))  # and no core dump
-        liburing.io_uring_get_sqe(ring)  # SIGSEGV if ring memory is not in the child.
+        io_uring_get_sqe(ring)  # SIGSEGV if ring memory is not in the child.
         os._exit(0)
     return os.waitpid(pid, 0)[1]
 
@@ -27,10 +25,10 @@ def _child_touches_ring(ring):
 def test_dontfork(ring):
     assert os.waitstatus_to_exitcode(_child_touches_ring(ring)) == 0  # shared by default
 
-    assert liburing.io_uring_ring_dontfork(ring) == 0
+    assert io_uring_ring_dontfork(ring) == 0
     assert os.waitstatus_to_exitcode(_child_touches_ring(ring)) == -signal.SIGSEGV
 
     # parent is still fine
-    sqe = liburing.io_uring_get_sqe(ring)
-    liburing.io_uring_prep_nop(sqe)
-    assert liburing.io_uring_submit(ring) == 1
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_nop(sqe)
+    assert io_uring_submit(ring) == 1

@@ -48,8 +48,8 @@ pub const Ring = struct {
     _thread: usize = 0, // `pthread_self()` of the thread that initialized it: the only one that may use it
     /// `Ring(auto_submit=True)`: a full submission queue is submitted to make room (`autoSubmit`).
     _auto_submit: bool = false,
-    /// Bumped by every `io_uring_queue_init*` (`own`): an entry (`SQE`, `CQE`, `Cqe`, ...) records it when made,
-    /// so one from before an exit and a new init can not reach the old, unmapped memory (`checkGen`).
+    /// Bumped by every `io_uring_queue_init*` (`ownByCaller`): an entry (`SQE`, `CQE`, `Cqe`, ...) records it when
+    /// made, so one from before an exit and a new init can not reach the old, unmapped memory (`checkGen`).
     _gen: u32 = 0,
     /// The `buf` of `io_uring_queue_init_mem`, locked until `io_uring_queue_exit`.
     _mem: ?py.WritableBuffer = null,
@@ -130,16 +130,23 @@ pub const Ring = struct {
         /// Drops what it holds (may run Python code: an object's last reference).
         pub inline fn release(self: *Hold) void {
             if (self.isEmpty()) return; // most requests hold nothing: no copy of the ~100 bytes
-            self.releaseHeld();
-        }
-
-        fn releaseHeld(self: *Hold) void {
             var old = self.*;
             self.* = .{};
-            if (old.view) |*v| setu.c.PyBuffer_Release(v);
-            py.decref(old.obj);
-            if (old.vec) |v| v.destroy();
-            if (old.template) |t| {
+            old.consume();
+        }
+
+        /// `release` of a hold already taken out of its place (`takeHold`: a copy of its own): no second
+        /// copy.
+        pub inline fn consume(self: *Hold) void {
+            if (self.isEmpty()) return;
+            self.consumeHeld();
+        }
+
+        fn consumeHeld(self: *Hold) void {
+            if (self.view) |*v| setu.c.PyBuffer_Release(v);
+            py.decref(self.obj);
+            if (self.vec) |v| v.destroy();
+            if (self.template) |t| {
                 SqeType.data(t).copyDone();
                 py.decref(t);
             }
@@ -169,7 +176,8 @@ pub const Ring = struct {
             for (items, 0..) |item, i| {
                 self.views[i] = (try item.take()).view;
                 done += 1;
-                self.iov[i] = .{ .iov_base = self.views[i].buf, .iov_len = @intCast(self.views[i].len) }; // cast: a size
+                // cast: a size
+                self.iov[i] = .{ .iov_base = self.views[i].buf, .iov_len = @intCast(self.views[i].len) };
             }
             return self;
         }
@@ -186,7 +194,8 @@ pub const Ring = struct {
             for (items, 0..) |o, i| {
                 self.readonly = !try writableView(o, &self.views[i]) or self.readonly;
                 done += 1;
-                self.iov[i] = .{ .iov_base = self.views[i].buf, .iov_len = @intCast(self.views[i].len) }; // cast: a size
+                // cast: a size
+                self.iov[i] = .{ .iov_base = self.views[i].buf, .iov_len = @intCast(self.views[i].len) };
             }
             return self;
         }
@@ -194,7 +203,10 @@ pub const Ring = struct {
         fn alloc(n: usize, comptime what: []const u8) py.Error!*Vec {
             if (n == 0) return py.raiseValueError("`" ++ what ++ "` is empty", .{});
             if (n > std.posix.IOV_MAX)
-                return py.raiseValueError("`" ++ what ++ "`: {d} buffers, more than `IOV_MAX` ({d})", .{ n, std.posix.IOV_MAX });
+                return py.raiseValueError(
+                    "`" ++ what ++ "`: {d} buffers, more than `IOV_MAX` ({d})",
+                    .{ n, std.posix.IOV_MAX },
+                );
             const gpa = std.heap.c_allocator;
             const self = gpa.create(Vec) catch return e.raiseMemoryError("Out of Memory!");
             const views = gpa.alloc(setu.c.Buffer, n) catch {
@@ -310,7 +322,7 @@ pub const Ring = struct {
     /// Exits the ring (if it is initialized) and releases everything it holds; again: nothing to do.
     fn shutdown(self: *Ring) void {
         if (self._io_uring.ring_fd > 0) {
-            self.drain();
+            self.drainRequests();
             c.io_uring_queue_exit(&self._io_uring);
             self._io_uring.ring_fd = 0;
         }
@@ -324,7 +336,7 @@ pub const Ring = struct {
     /// them all (`IORING_ASYNC_CANCEL_ANY | ALL`, synchronous) and consume their completions. What does not
     /// complete (an error, or no completion within a second) is never released: leaked, not freed under the
     /// kernel. Requests prepared but not submitted release theirs.
-    pub fn drain(self: *Ring) void {
+    pub fn drainRequests(self: *Ring) void {
         if (self._pending) |pending| for (pending[0..self._pending_len]) |*hold| hold.release();
         if (self._live == 0 or self._io_uring.ring_fd <= 0) return;
         const ring = &self._io_uring;
@@ -463,14 +475,18 @@ pub const Ring = struct {
     }
 
     /// The pending hold of the SQ slot `sqe` points into (allocating them at the first use).
-    pub fn pendingFor(self: *Ring, sqe: *const c.io_uring_sqe) py.Error!*Hold {
+    pub inline fn pendingFor(self: *Ring, sqe: *const c.io_uring_sqe) py.Error!*Hold {
         try self.ensurePending();
         return self.pendingSlot(sqe);
     }
 
     /// Allocates the pending holds (`sq.ring_entries`), once.
-    pub fn ensurePending(self: *Ring) py.Error!void {
+    pub inline fn ensurePending(self: *Ring) py.Error!void {
         if (self._pending != null) return;
+        return self.allocPending();
+    }
+
+    noinline fn allocPending(self: *Ring) py.Error!void {
         const n = self._io_uring.sq.ring_entries;
         const holds = std.heap.c_allocator.alloc(Hold, n) catch return e.raiseMemoryError("Out of Memory!");
         @memset(holds, .{});
@@ -479,7 +495,7 @@ pub const Ring = struct {
     }
 
     /// `pendingFor` after `ensurePending`.
-    pub fn pendingSlot(self: *Ring, sqe: *const c.io_uring_sqe) *Hold {
+    pub inline fn pendingSlot(self: *Ring, sqe: *const c.io_uring_sqe) *Hold {
         const ring = &self._io_uring;
         const base: [*]c.io_uring_sqe = ring.sq.sqes;
         const shift: u5 = @intCast(c.io_uring_sqe_shift(ring)); // cast: 0 or 1
@@ -635,7 +651,7 @@ pub const Ring = struct {
     }
 
     /// A new entry holding `user_data`, its index (capacity reserved by `submitPtr`).
-    fn take(self: *Ring, user_data: u64) u64 {
+    inline fn take(self: *Ring, user_data: u64) u64 {
         const items = self._table.items;
         self._live += 1;
         if (self._free != 0) {
@@ -709,11 +725,22 @@ pub const Ring = struct {
     ///       failed, and the kernel cancels the rest without completions: the whole chain is released (none of
     ///       the rest ever ran). If its result is `-ECANCELED` the rest may still post (an earlier member
     ///       failed): they are buried instead of freed.
-    pub fn releaseCqe(self: *Ring, cqe: *const c.io_uring_cqe) void {
+    pub inline fn releaseCqe(self: *Ring, cqe: *const c.io_uring_cqe) void {
         if (cqe.flags & (c.IORING_CQE_F_MORE | c.IORING_CQE_F_SKIP) != 0) return;
         const kernel = cqe.user_data;
         if (kernel < reserved or kernel >= self._table.items.len) return;
         const index: u32 = @intCast(kernel); // cast: checked
+        const entry = &self._table.items[index];
+        if (entry.live and entry.end == 0 and entry.next == 0) { // a request on its own: the usual case
+            var hold = self.freeEntry(index);
+            hold.consume(); // after the table is updated: may run Python code (which may use the ring)
+            return;
+        }
+        self.releaseCqeTracked(cqe, index);
+    }
+
+    /// `releaseCqe` past the usual case: a zombie, a chain member or a chain's end.
+    noinline fn releaseCqeTracked(self: *Ring, cqe: *const c.io_uring_cqe, index: u32) void {
         const entry = &self._table.items[index];
         if (!entry.live) {
             if (entry.zombie) self.freeZombie(index);
@@ -724,12 +751,12 @@ pub const Ring = struct {
             if (entry.breaks) return self.releaseChain(end, index, cqe.res == -c.ECANCELED);
             self.unlinkMember(index, end);
             var hold = self.freeEntry(index);
-            hold.release(); // after the table is updated: may run Python code (which may use the ring)
+            hold.consume(); // after the table is updated: may run Python code (which may use the ring)
             return;
         }
         const members = entry.next; // the end of a tracked chain: its members still listed
         var hold = self.freeEntry(index);
-        hold.release();
+        hold.consume();
         var m = members;
         while (m != 0) {
             const member = self.live(m) orelse break;
@@ -737,7 +764,7 @@ pub const Ring = struct {
             const after = member.next;
             // skipped and succeeded: done; any other still listed posts later (consumed out of order)
             hold = if (member.skips) self.freeEntry(m) else self.bury(m);
-            hold.release();
+            hold.consume();
             m = after;
         }
     }
@@ -757,17 +784,17 @@ pub const Ring = struct {
             const free = m == failed or (if (after_failed) !uncertain else member.skips);
             if (m == failed) after_failed = true;
             var hold = if (free) self.freeEntry(m) else self.bury(m);
-            hold.release();
+            hold.consume();
             m = next;
         }
         if (self.live(end) != null) {
             var hold = if (uncertain) self.bury(end) else self.freeEntry(end);
-            hold.release();
+            hold.consume();
         }
     }
 
     /// Frees the live entry `index`, giving what it held (to release).
-    fn freeEntry(self: *Ring, index: u32) Hold {
+    inline fn freeEntry(self: *Ring, index: u32) Hold {
         const entry = &self._table.items[index];
         const hold = self.takeHold(index);
         entry.* = .{ .user_data = self._free };
@@ -828,7 +855,7 @@ pub const Ring = struct {
 
     /// The `io_uring` for C, or `RuntimeError` if the ring is not initialised (or already exited):
     /// liburing would read unmapped memory.
-    pub fn checkedPtr(self: *Ring) py.Error!*c.io_uring {
+    pub inline fn checkedPtr(self: *Ring) py.Error!*c.io_uring {
         return checkRing(&self._io_uring);
     }
 
@@ -859,7 +886,7 @@ pub const Ring = struct {
 
     /// Marks the calling thread as the owner and starts a new generation (`checkGen`), before an
     /// `io_uring_queue_init*`.
-    pub fn own(self: *Ring) void {
+    pub fn ownByCaller(self: *Ring) void {
         self._thread = pthread_self();
         self._gen +%= 1;
     }

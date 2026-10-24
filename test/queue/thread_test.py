@@ -3,10 +3,8 @@
 import gc
 import threading
 import time
-
 import pytest
-
-import liburing as u
+from liburing import *
 
 OTHER_THREAD = "belongs to the thread that initialized it"
 
@@ -30,24 +28,24 @@ def in_thread(fn):
 
 
 def test_other_thread_raises(ring):
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_nop(sqe)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_nop(sqe)
     sqe.user_data = 7
-    cqe = u.Cqe()
-    assert u.io_uring_submit_and_wait(ring, 1) == 1
-    assert u.io_uring_peek_cqe(ring, cqe) == 0
+    cqe = Cqe()
+    assert io_uring_submit_and_wait(ring, 1) == 1
+    assert io_uring_peek_cqe(ring, cqe) == 0
     entry = cqe[0]
-    batch = u.CqeBatch(4)
-    assert u.io_uring_peek_batch_cqe(ring, batch) == 1
+    batch = CqeBatch(4)
+    assert io_uring_peek_batch_cqe(ring, batch) == 1
 
     for use in (
-        lambda: u.io_uring_get_sqe(ring),
-        lambda: u.io_uring_submit(ring),
-        lambda: u.io_uring_submit_and_wait(ring, 1),
-        lambda: u.io_uring_wait_cqe(ring, u.Cqe()),
-        lambda: u.io_uring_cq_ready(ring),
-        lambda: u.io_uring_cq_advance(ring, 1),
-        lambda: u.io_uring_queue_exit(ring),
+        lambda: io_uring_get_sqe(ring),
+        lambda: io_uring_submit(ring),
+        lambda: io_uring_submit_and_wait(ring, 1),
+        lambda: io_uring_wait_cqe(ring, Cqe()),
+        lambda: io_uring_cq_ready(ring),
+        lambda: io_uring_cq_advance(ring, 1),
+        lambda: io_uring_queue_exit(ring),
         lambda: sqe.user_data,
         lambda: entry.user_data,
         lambda: cqe[0],
@@ -59,23 +57,25 @@ def test_other_thread_raises(ring):
 
     # the owner is not affected
     assert entry.user_data == 7 and cqe.user_data_at(0) == 7 and batch[0].user_data == 7
-    u.io_uring_cq_advance(ring, 1)
+    io_uring_cq_advance(ring, 1)
 
 
 def test_owner_is_who_initialized():
-    ring = u.Ring()  # made here, initialized and used by another thread
+    ring = Ring()  # made here, initialized and used by another thread
+
     def use():
-        u.io_uring_queue_init(8, ring)
-        u.io_uring_prep_nop(u.io_uring_get_sqe(ring))
-        return u.io_uring_submit_and_wait(ring, 1)
+        io_uring_queue_init(8, ring)
+        io_uring_prep_nop(io_uring_get_sqe(ring))
+        return io_uring_submit_and_wait(ring, 1)
+
     assert in_thread(use) == 1
     with pytest.raises(RuntimeError, match=OTHER_THREAD):
-        u.io_uring_cq_ready(ring)
-    in_thread(lambda: u.io_uring_queue_exit(ring))
+        io_uring_cq_ready(ring)
+    in_thread(lambda: io_uring_queue_exit(ring))
 
-    u.io_uring_queue_init(8, ring)  # exited: anyone can initialize it again, and owns it
-    assert u.io_uring_cq_ready(ring) == 0
-    u.io_uring_queue_exit(ring)
+    io_uring_queue_init(8, ring)  # exited: anyone can initialize it again, and owns it
+    assert io_uring_cq_ready(ring) == 0
+    io_uring_queue_exit(ring)
 
 
 def waiting(seconds, wait):
@@ -84,14 +84,14 @@ def waiting(seconds, wait):
     started = threading.Event()
 
     def run():
-        ring = u.Ring()
-        u.io_uring_queue_init(8, ring)
+        ring = Ring()
+        io_uring_queue_init(8, ring)
         try:
-            u.io_uring_prep_timeout(u.io_uring_get_sqe(ring), u.timespec(seconds), 0, 0)
+            io_uring_prep_timeout(io_uring_get_sqe(ring), timespec(seconds), 0, 0)
             started.set()
             wait(ring)
         finally:
-            u.io_uring_queue_exit(ring)
+            io_uring_queue_exit(ring)
 
     t = threading.Thread(target=run)
     t.start()
@@ -100,13 +100,17 @@ def waiting(seconds, wait):
     return t
 
 
-@pytest.mark.parametrize('wait', [
-    lambda ring: u.io_uring_submit_and_wait(ring, 1),
-    lambda ring: (u.io_uring_submit(ring), u.io_uring_wait_cqe(ring, u.Cqe())),
-    lambda ring: (u.io_uring_submit(ring), u.io_uring_wait_cqe_nr(ring, u.Cqe(), 1)),
-    lambda ring: (u.io_uring_submit(ring), u.io_uring_wait_cqes(ring, u.Cqe(), 1)),
-    lambda ring: u.io_uring_submit_and_wait_timeout(ring, u.Cqe(), 1, u.timespec(5)),
-], ids=['submit_and_wait', 'wait_cqe', 'wait_cqe_nr', 'wait_cqes', 'submit_and_wait_timeout'])
+@pytest.mark.parametrize(
+    'wait',
+    [
+        lambda ring: io_uring_submit_and_wait(ring, 1),
+        lambda ring: (io_uring_submit(ring), io_uring_wait_cqe(ring, Cqe())),
+        lambda ring: (io_uring_submit(ring), io_uring_wait_cqe_nr(ring, Cqe(), 1)),
+        lambda ring: (io_uring_submit(ring), io_uring_wait_cqes(ring, Cqe(), 1)),
+        lambda ring: io_uring_submit_and_wait_timeout(ring, Cqe(), 1, timespec(5)),
+    ],
+    ids=['submit_and_wait', 'wait_cqe', 'wait_cqe_nr', 'wait_cqes', 'submit_and_wait_timeout'],
+)
 def test_wait_lets_other_threads_run(wait):
     t = waiting(1, wait)
     try:
@@ -120,24 +124,24 @@ def test_wait_lets_other_threads_run(wait):
 
 def test_ring_per_thread():
     def run():
-        ring, cqe = u.Ring(), u.Cqe()
-        u.io_uring_queue_init(32, ring)
+        ring, cqe = Ring(), Cqe()
+        io_uring_queue_init(32, ring)
         try:
             done = 0
             for i in range(200):
                 for j in range(8):
-                    sqe = u.io_uring_get_sqe(ring)
-                    u.io_uring_prep_nop(sqe)
+                    sqe = io_uring_get_sqe(ring)
+                    io_uring_prep_nop(sqe)
                     sqe.user_data = i * 8 + j
-                u.io_uring_submit_and_wait(ring, 8)
-                ready = u.io_uring_cq_ready(ring)
-                u.io_uring_peek_cqe(ring, cqe)
+                io_uring_submit_and_wait(ring, 8)
+                ready = io_uring_cq_ready(ring)
+                io_uring_peek_cqe(ring, cqe)
                 assert sorted(cqe.user_data_at(k) for k in range(ready)) == list(range(i * 8, i * 8 + 8))
-                u.io_uring_cq_advance(ring, ready)
+                io_uring_cq_advance(ring, ready)
                 done += ready
             return done
         finally:
-            u.io_uring_queue_exit(ring)
+            io_uring_queue_exit(ring)
 
     results = []
     threads = [threading.Thread(target=lambda: results.append(run())) for _ in range(8)]
@@ -155,97 +159,102 @@ NOT_OWNER = "belongs to the thread of its first"
 
 def own_ring(fn):
     """`fn(ring)` in a new thread with a ring of its own: what it returned or raised."""
+
     def run():
-        ring = u.Ring()
-        u.io_uring_queue_init(4, ring)
+        ring = Ring()
+        io_uring_queue_init(4, ring)
         try:
             return fn(ring)
         finally:
-            u.io_uring_queue_exit(ring)
+            io_uring_queue_exit(ring)
+
     return in_thread(run)
 
 
 def test_cqe_belongs_to_its_first_thread(ring):
-    cqe = u.Cqe()
-    u.io_uring_prep_nop(u.io_uring_get_sqe(ring))
-    assert u.io_uring_submit_and_wait(ring, 1) == 1
-    assert u.io_uring_peek_cqe(ring, cqe) == 0  # this thread's from now on
+    cqe = Cqe()
+    io_uring_prep_nop(io_uring_get_sqe(ring))
+    assert io_uring_submit_and_wait(ring, 1) == 1
+    assert io_uring_peek_cqe(ring, cqe) == 0  # this thread's from now on
     for fill in (
-        lambda r: u.io_uring_peek_cqe(r, cqe),
-        lambda r: u.io_uring_wait_cqe_timeout(r, cqe, u.timespec(0.01)),
-        lambda r: u.io_uring_cqe_iter_next(u.io_uring_cqe_iter_init(r), cqe),
+        lambda r: io_uring_peek_cqe(r, cqe),
+        lambda r: io_uring_wait_cqe_timeout(r, cqe, timespec(0.01)),
+        lambda r: io_uring_cqe_iter_next(io_uring_cqe_iter_init(r), cqe),
     ):
         with pytest.raises(RuntimeError, match=NOT_OWNER):
             own_ring(fill)
     assert cqe.user_data_at(0) == 0  # untouched: still this ring's completion
-    u.io_uring_cq_advance(ring, 1)
+    io_uring_cq_advance(ring, 1)
 
 
 def test_refused_cqe_submits_nothing():
-    cqe = u.Cqe()
+    cqe = Cqe()
     assert in_thread(lambda: cqe) is cqe  # nothing claims it there
-    ring = u.Ring()
-    u.io_uring_queue_init(4, ring)
+    ring = Ring()
+    io_uring_queue_init(4, ring)
     try:
-        u.io_uring_peek_cqe(ring, cqe)  # claimed here (`EAGAIN`: none ready)
+        io_uring_peek_cqe(ring, cqe)  # claimed here (`EAGAIN`: none ready)
     except BlockingIOError:
         pass
     finally:
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
     def other(r):
-        u.io_uring_prep_nop(u.io_uring_get_sqe(r))
+        io_uring_prep_nop(io_uring_get_sqe(r))
         with pytest.raises(RuntimeError, match=NOT_OWNER):
-            u.io_uring_submit_and_wait_timeout(r, cqe, 1, u.timespec(1))
-        return u.io_uring_sq_ready(r)  # refused before the submit
+            io_uring_submit_and_wait_timeout(r, cqe, 1, timespec(1))
+        return io_uring_sq_ready(r)  # refused before the submit
+
     assert own_ring(other) == 1
 
 
 def test_cqe_batch_belongs_to_its_first_thread(ring):
-    batch = u.CqeBatch(4)
-    assert u.io_uring_peek_batch_cqe(ring, batch) == 0
+    batch = CqeBatch(4)
+    assert io_uring_peek_batch_cqe(ring, batch) == 0
     with pytest.raises(RuntimeError, match=NOT_OWNER):
-        own_ring(lambda r: u.io_uring_peek_batch_cqe(r, batch))
+        own_ring(lambda r: io_uring_peek_batch_cqe(r, batch))
 
 
 def test_first_use_in_another_thread():
-    cqe, batch, tmpl = u.Cqe(), u.CqeBatch(2), u.Sqe()
+    cqe, batch, tmpl = Cqe(), CqeBatch(2), Sqe()
 
     def use(r):  # made here, first used there: that thread's
-        u.io_uring_prep_nop(tmpl)
-        assert u.put_sqe(r, tmpl)
-        assert u.io_uring_submit_and_wait(r, 1) == 1
-        assert u.io_uring_peek_batch_cqe(r, batch) == 1
-        assert u.io_uring_peek_cqe(r, cqe) == 0
-        u.io_uring_cq_advance(r, 1)
+        io_uring_prep_nop(tmpl)
+        assert put_sqe(r, tmpl)
+        assert io_uring_submit_and_wait(r, 1) == 1
+        assert io_uring_peek_batch_cqe(r, batch) == 1
+        assert io_uring_peek_cqe(r, cqe) == 0
+        io_uring_cq_advance(r, 1)
+
     own_ring(use)
-    ring = u.Ring()
-    u.io_uring_queue_init(4, ring)
+    ring = Ring()
+    io_uring_queue_init(4, ring)
     try:
         with pytest.raises(RuntimeError, match=NOT_OWNER):
-            u.io_uring_peek_cqe(ring, cqe)
+            io_uring_peek_cqe(ring, cqe)
         with pytest.raises(RuntimeError, match=NOT_OWNER):
-            u.io_uring_peek_batch_cqe(ring, batch)
+            io_uring_peek_batch_cqe(ring, batch)
         with pytest.raises(RuntimeError, match=NOT_OWNER):
-            u.io_uring_prep_nop(tmpl)
+            io_uring_prep_nop(tmpl)
     finally:
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def test_template_belongs_to_its_first_prep():
-    tmpl = u.Sqe()
-    u.io_uring_prep_nop(tmpl)  # this thread's, before any `put_sqe`
+    tmpl = Sqe()
+    io_uring_prep_nop(tmpl)  # this thread's, before any `put_sqe`
     with pytest.raises(RuntimeError, match=NOT_OWNER):
-        in_thread(lambda: u.io_uring_prep_recv(tmpl, 0, bytearray(1)))
+        in_thread(lambda: io_uring_prep_recv(tmpl, 0, bytearray(1)))
     with pytest.raises(RuntimeError, match=NOT_OWNER):
-        own_ring(lambda r: u.put_sqe(r, tmpl))
+        own_ring(lambda r: put_sqe(r, tmpl))
 
 
 def test_shared_structs_under_threads():
     # free-threaded: gets, sets and registers of one object's fields from several threads at once (critical
     # sections), no crash and no reference lost; with the GIL a plain run
     import mmap
-    bpf, res, reg, region, ifq = u.Bpf(), u.Restriction(), u.BufReg(), u.MemRegionReg(), u.ZcrxIfqReg()
+
+    bpf, res, reg, region, ifq = Bpf(), Restriction(), BufReg(), MemRegionReg(), ZcrxIfqReg()
     programs = [bytes(8 * i) for i in range(1, 5)]
     memory = [mmap.mmap(-1, 4096) for _ in range(4)]
 
@@ -258,7 +267,7 @@ def test_shared_structs_under_threads():
             ifq.area, ifq.region = memory[n % 4], None
             assert reg.ring in memory and region.region in memory and ifq.area in memory
             if i % 300 == 0:
-                res.add(u.IORING_RESTRICTION_SQE_OP, u.io_uring_op.IORING_OP_NOP)
+                res.add(IORING_RESTRICTION_SQE_OP, io_uring_op.IORING_OP_NOP)
 
     threads = [threading.Thread(target=hammer, args=(n,)) for n in range(4)]
     for t in threads:

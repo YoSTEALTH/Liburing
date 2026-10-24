@@ -49,9 +49,14 @@ pub const Sockaddr = struct {
 
         switch (_family) {
             AF_UNIX => {
-                const _addr = try h.toPath(addr orelse return py.raiseValueError("`Sockaddr` - `addr` not provided.", .{}));
+                const _addr = try h.toPath(
+                    addr orelse return py.raiseValueError("`Sockaddr` - `addr` not provided.", .{}),
+                );
                 defer _addr.deinit();
-                if (_addr.path.len > 108) return py.raiseValueError("`Sockaddr` - length of `addr` can not be `> 108`", .{});
+                if (_addr.path.len > 108) return py.raiseValueError(
+                    "`Sockaddr` - length of `addr` can not be `> 108`",
+                    .{},
+                );
                 if (_addr.path.len == 0) return py.raiseValueError("`Sockaddr` - `addr` can not be empty.", .{});
 
                 const sock = self.as(c.sockaddr_un);
@@ -134,7 +139,12 @@ pub const Sockaddr = struct {
             AF_INET => {
                 const bytes: *const [4]u8 = @ptrCast(&self.as(c.sockaddr_in).sin_addr.s_addr);
                 var buf: [16]u8 = undefined;
-                const text = std.mem.print(&buf, "{d}.{d}.{d}.{d}", .{ bytes[0], bytes[1], bytes[2], bytes[3] }) catch unreachable; // fits
+                // fits
+                const text = std.mem.print(
+                    &buf,
+                    "{d}.{d}.{d}.{d}",
+                    .{ bytes[0], bytes[1], bytes[2], bytes[3] },
+                ) catch unreachable;
                 return py.new(text);
             },
             AF_INET6 => {
@@ -180,7 +190,10 @@ fn ipText(addr: ?*Object) py.Error![]const u8 {
 fn scopeId(text: []const u8) py.Error!u32 {
     if (std.fmt.parseInt(u32, text, 10)) |n| return n else |_| {}
     var name: [16:0]u8 = @splat(0); // IF_NAMESIZE
-    if (text.len == 0 or text.len >= name.len) return py.raiseValueError("`Sockaddr` - invalid IPv6 scope `{s}`", .{text});
+    if (text.len == 0 or text.len >= name.len) return py.raiseValueError(
+        "`Sockaddr` - invalid IPv6 scope `{s}`",
+        .{text},
+    );
     @memcpy(name[0..text.len], text);
     const index = if_nametoindex(&name);
     if (index == 0) return py.raiseValueError("`Sockaddr` - unknown IPv6 scope `{s}`", .{text});
@@ -217,7 +230,8 @@ pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.O
         level,
         optname,
         @constCast(optval.data.ptr),
-        try py.narrow(c_int, optval.data.len, "`setsockopt(optval)` length"), // cast: a buffer the size of a socket option
+        // cast: a buffer the size of a socket option
+        try py.narrow(c_int, optval.data.len, "`setsockopt(optval)` length"),
     );
     return true;
 }
@@ -247,7 +261,8 @@ pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.O
         level,
         optname,
         optval.data.ptr,
-        try py.narrow(c_int, optval.data.len, "`getsockopt(optval)` length"), // cast: a buffer the size of a socket option
+        // cast: a buffer the size of a socket option
+        try py.narrow(c_int, optval.data.len, "`getsockopt(optval)` length"),
     );
     return true;
 }

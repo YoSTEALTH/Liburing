@@ -30,8 +30,8 @@ pub const SQE = struct {
 
     /// The entry for C, or `RuntimeError` once its ring has exited (its memory is unmapped), also when it
     /// was initialized again since, or for an `Sqe(ring)` without a slot (no prep yet, or the last one found
-    /// the queue full).
-    pub fn sqePtr(self: *const Self) py.Error!*c.io_uring_sqe {
+    /// the queue full). Inline: an out-of-line call returning an error union costs 3-5 ns here, the checks ~1.
+    pub inline fn sqePtr(self: *const Self) py.Error!*c.io_uring_sqe {
         if (self._owner) |o| {
             if (RingType.check(o)) {
                 _ = try Ring.checkGen(&RingType.data(o)._io_uring, self._gen);
@@ -55,7 +55,7 @@ pub const SQE = struct {
         return self.takeRingSlot(wide);
     }
 
-    fn takeRingSlot(self: *Self, comptime wide: bool) py.Error!?*c.io_uring_sqe {
+    inline fn takeRingSlot(self: *Self, comptime wide: bool) py.Error!?*c.io_uring_sqe {
         const ring = try RingType.data(self._owner.?).checkedPtr();
         self._gen = ringOf(ring)._gen; // a slot of this generation from here on (`null` too: `raiseNoSlot`)
         if (wide and ring.flags & (c.IORING_SETUP_SQE128 | c.IORING_SETUP_SQE_MIXED) == 0) return py.raiseValueError(
@@ -275,7 +275,8 @@ pub const Sqe = struct {
 
     noinline fn raiseTemplateThread() py.Error {
         return py.raiseRuntimeError(
-            "`Sqe` template belongs to the thread of its first prep or `put_sqe` (its copies are counted there): use one per thread",
+            "`Sqe` template belongs to the thread of its first prep or `put_sqe` (its copies are counted there): " ++
+                "use one per thread",
             .{},
         );
     }

@@ -13,23 +13,7 @@ for a small value or to pass a registered file (`io_uring_prep_msg_ring_fd`).
 
 import collections
 import threading
-from liburing import (
-    FUTEX2_PRIVATE,
-    FUTEX2_SIZE_U32,
-    FUTEX_BITSET_MATCH_ANY,
-    Cqe,
-    Futex,
-    Ring,
-    io_uring_cqe_seen,
-    io_uring_get_sqe,
-    io_uring_prep_futex_wait,
-    io_uring_prep_futex_wake,
-    io_uring_queue_exit,
-    io_uring_queue_init,
-    io_uring_submit,
-    io_uring_submit_and_wait,
-    io_uring_wait_cqe,
-)
+from liburing import *
 
 FLAGS = FUTEX2_SIZE_U32 | FUTEX2_PRIVATE  # one process: a private futex is cheaper
 WAIT = 1  # the receiver's `user_data` for its futex wait
@@ -52,7 +36,7 @@ def receiver(got):
             entry = cqe[0]
             assert entry.user_data == WAIT  # our own request: an entry of this ring's table
             try:
-                entry.res  # 0: woken
+                _ = entry.res  # 0: woken
             except BlockingIOError:
                 pass  # `EAGAIN`: a message came between reading `seen` and arming the wait
             io_uring_cqe_seen(ring, entry)

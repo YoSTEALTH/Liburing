@@ -55,7 +55,8 @@ pub fn io_uring_prep_sendmsg(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.E
 pub fn io_uring_prep_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
-    try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{}); // written at the completion
+    // written at the completion
+    try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{});
     const _flags = flags orelse 0;
     c.io_uring_prep_accept(s, fd, if (addr) |a| a.addrPtr() else null, if (addr) |a| &a._socklen else null, _flags);
     return true;
@@ -68,28 +69,50 @@ pub fn io_uring_prep_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) p
 pub fn io_uring_prep_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockaddr, file_index: ?u32, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
-    try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{}); // written at the completion
+    // written at the completion
+    try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{});
     const _flags = flags orelse 0;
     const _file_index = file_index orelse c.IORING_FILE_INDEX_ALLOC;
-    c.io_uring_prep_accept_direct(s, fd, if (addr) |a| a.addrPtr() else null, if (addr) |a| &a._socklen else null, _flags, _file_index);
+    c.io_uring_prep_accept_direct(
+        s,
+        fd,
+        if (addr) |a| a.addrPtr() else null,
+        if (addr) |a| &a._socklen else null,
+        _flags,
+        _file_index,
+    );
     return true;
 }
 
 pub fn io_uring_prep_multishot_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
-    try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{}); // written at the completion
+    // written at the completion
+    try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{});
     const _flags = flags orelse 0;
-    c.io_uring_prep_multishot_accept(s, fd, if (addr) |a| a.addrPtr() else null, if (addr) |a| &a._socklen else null, _flags);
+    c.io_uring_prep_multishot_accept(
+        s,
+        fd,
+        if (addr) |a| a.addrPtr() else null,
+        if (addr) |a| &a._socklen else null,
+        _flags,
+    );
     return true;
 }
 
 pub fn io_uring_prep_multishot_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
-    try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{}); // written at the completion
+    // written at the completion
+    try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{});
     const _flags = flags orelse 0;
-    c.io_uring_prep_multishot_accept_direct(s, fd, if (addr) |a| a.addrPtr() else null, if (addr) |a| &a._socklen else null, _flags);
+    c.io_uring_prep_multishot_accept_direct(
+        s,
+        fd,
+        if (addr) |a| a.addrPtr() else null,
+        if (addr) |a| &a._socklen else null,
+        _flags,
+    );
     return true;
 }
 
@@ -145,7 +168,8 @@ pub fn io_uring_prep_send_set_addr(sqe: *SQE, dest_addr: *Sockaddr) py.Error!boo
 pub fn io_uring_prep_sendto(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, addr: *Sockaddr, flags: ?i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
     errdefer sqe.undoSlot();
-    try h.holdUntilCompletion(sqe, &buf, &.{SockaddrType.object(addr)}); // first: owns the buffer from here, on every path
+    // first: owns the buffer from here, on every path
+    try h.holdUntilCompletion(sqe, &buf, &.{SockaddrType.object(addr)});
     c.io_uring_prep_sendto(
         s,
         sockfd,
@@ -246,9 +270,14 @@ pub fn io_uring_recvmsg_validate(buf: *Object, msgh: *Msghdr) py.Error!*Object {
     errdefer view.deinit();
     const len = try py.narrow(c_int, view.data.len, "`io_uring_recvmsg_validate(buf)` length");
     const out = c.io_uring_recvmsg_validate(view.data.ptr, len, &msgh._msghdr) orelse
-        return py.raiseValueError("`io_uring_recvmsg_validate(buf)` - `buf` is too short for the header, name and control data", .{});
+        return py.raiseValueError(
+            "`io_uring_recvmsg_validate(buf)` - `buf` is too short for the header, name and control data",
+            .{},
+        );
     // the view moves into the result, so the buffer stays locked (can not be resized) while it lives
-    return RecvmsgOutType.new(.{ ._recvmsg_out = out, ._len = view.data.len, ._view = .{ .data = view.data, .view = view.view } });
+    return RecvmsgOutType.new(
+        .{ ._recvmsg_out = out, ._len = view.data.len, ._view = .{ .data = view.data, .view = view.view } },
+    );
 }
 
 /// The socket address the message came from (`bytes`: the start of a `sockaddr`, `out.namelen` long).
@@ -300,16 +329,30 @@ pub fn io_uring_recvmsg_payload_length(o: *RecvmsgOut, buf_len: i32, msgh: *Msgh
 ///       resize) until its exit; giving a part of an area it already holds again takes nothing more.
 ///     - `sqe` must come from `io_uring_get_sqe` or be an `Sqe(ring)` (`TypeError` for an `Sqe` template: no ring
 ///       to hold `addr`).
-pub fn io_uring_prep_provide_buffers(sqe: *SQE, addr: py.OwnedWritableBuffer, nr: i32, bgid: i32, bid: i32) py.Error!bool {
+pub fn io_uring_prep_provide_buffers(
+    sqe: *SQE,
+    addr: py.OwnedWritableBuffer,
+    nr: i32,
+    bgid: i32,
+    bid: i32,
+) py.Error!bool {
     const ring_obj = if (sqe._owner) |o| (if (RingType.check(o)) o else null) else null;
     const ring = RingType.data(ring_obj orelse return releaseFailed(addr, py.raiseTypeError(
         "`io_uring_prep_provide_buffers(sqe)` is from `io_uring_get_sqe` or an `Sqe(ring)`: the ring holds `addr`",
         .{},
     )));
-    if (nr <= 0) return releaseFailed(addr, py.raiseValueError("`io_uring_prep_provide_buffers(nr)` must be at least 1", .{}));
+    if (nr <= 0) return releaseFailed(
+        addr,
+        py.raiseValueError("`io_uring_prep_provide_buffers(nr)` must be at least 1", .{}),
+    );
     const each = addr.data.len / @as(usize, @intCast(nr)); // cast: nr > 0
-    if (each == 0) return releaseFailed(addr, py.raiseValueError("`io_uring_prep_provide_buffers(addr)` is shorter than `nr` buffers", .{}));
-    const len = py.narrow(c_int, each, "`io_uring_prep_provide_buffers(addr)` buffer length") catch |err| return releaseFailed(addr, err);
+    if (each == 0) return releaseFailed(
+        addr,
+        py.raiseValueError("`io_uring_prep_provide_buffers(addr)` is shorter than `nr` buffers", .{}),
+    );
+    const len = py.narrow(c_int, each, "`io_uring_prep_provide_buffers(addr)` buffer length") catch |err| {
+        return releaseFailed(addr, err);
+    };
     const s = try h.prepSlot(sqe, &addr) orelse return false;
     errdefer sqe.undoSlot();
     try ring.keepProvided(addr.view); // owns the view from here (released if it fails)
@@ -392,7 +435,15 @@ pub fn io_uring_prep_cmd_sock(
     const s = try h.prepSlot(sqe, &optval) orelse return false;
     errdefer sqe.undoSlot();
     try h.holdUntilCompletion(sqe, &optval, &.{}); // first: owns the buffer from here, on every path
-    c.io_uring_prep_cmd_sock(s, cmd_op, fd, level, optname, optval.data.ptr, try py.narrow(c_int, optval.data.len, "`io_uring_prep_cmd_sock(optval)` length"));
+    c.io_uring_prep_cmd_sock(
+        s,
+        cmd_op,
+        fd,
+        level,
+        optname,
+        optval.data.ptr,
+        try py.narrow(c_int, optval.data.len, "`io_uring_prep_cmd_sock(optval)` length"),
+    );
     return true;
 }
 

@@ -1,10 +1,9 @@
 import pytest
-
-import liburing
+from liburing import *
 
 
 def test_file_index():
-    ids = liburing.FileIndex([-1, -1, 3])
+    ids = FileIndex([-1, -1, 3])
     assert ids[1] == -1
     ids.update([4, 5, 6])
     assert ids[1] == 5
@@ -20,19 +19,19 @@ def test_file_index():
 
 
 def test_timespec():
-    ts = liburing.timespec(1)
+    ts = timespec(1)
     assert ts.sec == 1
     assert ts.nsec == 0
 
-    ts = liburing.timespec(1.5)
+    ts = timespec(1.5)
     assert ts.sec == 1
     assert ts.nsec == 500_000_000
 
-    ts = liburing.timespec(0.5)
+    ts = timespec(0.5)
     assert ts.sec == 0
     assert ts.nsec == 500_000_000
 
-    ts = liburing.timespec(0)
+    ts = timespec(0)
     assert ts.sec == 0
     assert ts.nsec == 0
     ts.sec = 1
@@ -41,7 +40,7 @@ def test_timespec():
     assert ts.nsec == 500_000
 
     with pytest.raises(MemoryError):
-        ts = liburing.Timespec()
+        ts = Timespec()
         assert ts.sec == 123
 
 
@@ -60,23 +59,23 @@ def test_put_sqe():
 
 
 def _loop(entries, num):
-    ring = liburing.Ring()
-    cqe = liburing.Cqe()
+    ring = Ring()
+    cqe = Cqe()
     try:
-        assert liburing.io_uring_queue_init(entries, ring) == 0
-        sqe = liburing.Sqe(num)
+        assert io_uring_queue_init(entries, ring) == 0
+        sqe = Sqe(num)
         for i in range(num):
-            liburing.io_uring_prep_nop(sqe[i])
+            io_uring_prep_nop(sqe[i])
             sqe[i].user_data = i
-        if liburing.put_sqe(ring, sqe):
-            liburing.io_uring_submit(ring)
+        if put_sqe(ring, sqe):
+            io_uring_submit(ring)
         else:
             return False
         if num:
-            assert liburing.io_uring_wait_cqes(ring, cqe, num) == 0
+            assert io_uring_wait_cqes(ring, cqe, num) == 0
             for i in range(num):
                 assert cqe[i].user_data == i
-            liburing.io_uring_cq_advance(ring, num)
+            io_uring_cq_advance(ring, num)
         return True
     finally:
-        liburing.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)

@@ -218,7 +218,9 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
             if (!hold_.isEmpty()) break try ring.ensurePending(); // before any copy: no error after one
         }
         if (sqe._len == 1) { // single
-            if (c.io_uring_get_sqe(io_uring) orelse if (try ring.autoSubmit()) c.io_uring_get_sqe(io_uring) else null) |s| {
+            const slot = c.io_uring_get_sqe(io_uring) orelse
+                if (try ring.autoSubmit()) c.io_uring_get_sqe(io_uring) else null;
+            if (slot) |s| {
                 @memcpy(s, _sqe[0..1]);
                 holdTemplate(ring, s, sqe, &holds[0]);
                 return true;
@@ -293,6 +295,10 @@ pub fn holdUntilCompletion(sqe: *SQE, buf_ptr: anytype, objs: []const *Object) p
         },
     };
     if (where.template) |t| return t.replaceHold(where.hold, new); // on error: `errdefer` releases `new`
+    if (where.hold.isEmpty()) { // the usual case (the submit emptied the slot): no copy of the old hold
+        where.hold.* = new;
+        return;
+    }
     var old = where.hold.*;
     where.hold.* = new;
     old.release();

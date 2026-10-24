@@ -2,64 +2,62 @@
 
 import mmap
 import os
-
 import pytest
-
-import liburing as u
+from liburing import *
 
 
 def nop(ring, user_data, submit=True):
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_prep_nop(sqe)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_nop(sqe)
     sqe.user_data = user_data
-    return u.io_uring_submit(ring) if submit else sqe
+    return io_uring_submit(ring) if submit else sqe
 
 
 # sqe_set_* / cqe_get_*
 
 
 def test_sqe_set_flags_data(ring):
-    sqe = u.io_uring_get_sqe(ring)
-    u.io_uring_sqe_set_flags(sqe, u.IOSQE_IO_LINK)
-    assert sqe.flags == u.IOSQE_IO_LINK
-    u.io_uring_sqe_set_data64(sqe, 99)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_sqe_set_flags(sqe, IOSQE_IO_LINK)
+    assert sqe.flags == IOSQE_IO_LINK
+    io_uring_sqe_set_data64(sqe, 99)
     assert sqe.user_data == 99
-    u.io_uring_sqe_set_data(sqe, 98)
+    io_uring_sqe_set_data(sqe, 98)
     assert sqe.user_data == 98
-    u.io_uring_sqe_set_buf_group(sqe, 5)  # shares `buf_index` with the fixed buffer index
+    io_uring_sqe_set_buf_group(sqe, 5)  # shares `buf_index` with the fixed buffer index
 
 
 def test_cqe_get_data(ring, cqe):
     assert nop(ring, 7) == 1
-    assert u.io_uring_wait_cqe(ring, cqe) == 0
-    assert u.io_uring_cqe_get_data64(cqe[0]) == 7
-    assert u.io_uring_cqe_get_data(cqe[0]) == 7
-    u.io_uring_cqe_seen(ring, cqe[0])
+    assert io_uring_wait_cqe(ring, cqe) == 0
+    assert io_uring_cqe_get_data64(cqe[0]) == 7
+    assert io_uring_cqe_get_data(cqe[0]) == 7
+    io_uring_cqe_seen(ring, cqe[0])
 
 
 # queue state
 
 
 def test_sq_space_left(ring):
-    left = u.io_uring_sq_space_left(ring)
+    left = io_uring_sq_space_left(ring)
     assert left == 1024
-    u.io_uring_get_sqe(ring)
-    assert u.io_uring_sq_space_left(ring) == left - 1
+    io_uring_get_sqe(ring)
+    assert io_uring_sq_space_left(ring) == left - 1
 
 
 def test_cq_overflow_events(ring, cqe):
-    assert u.io_uring_cq_has_overflow(ring) is False
-    assert u.io_uring_sqring_wait(ring) == 0  # room in the queue: returns at once
+    assert io_uring_cq_has_overflow(ring) is False
+    assert io_uring_sqring_wait(ring) == 0  # room in the queue: returns at once
     nop(ring, 1, submit=False)
-    assert u.io_uring_submit_and_get_events(ring) == 1
-    assert u.io_uring_get_events(ring) == 0
-    assert u.io_uring_cq_ready(ring) == 1
-    u.io_uring_cq_advance(ring, 1)
+    assert io_uring_submit_and_get_events(ring) == 1
+    assert io_uring_get_events(ring) == 0
+    assert io_uring_cq_ready(ring) == 1
+    io_uring_cq_advance(ring, 1)
 
 
 def test_set_iowait(ring):
-    assert u.io_uring_set_iowait(ring, True) == 0
-    assert u.io_uring_set_iowait(ring, False) == 0
+    assert io_uring_set_iowait(ring, True) == 0
+    assert io_uring_set_iowait(ring, False) == 0
 
 
 # waiting with a timeout
@@ -67,32 +65,32 @@ def test_set_iowait(ring):
 
 def test_wait_cqe_timeout(ring, cqe):
     assert nop(ring, 3) == 1
-    assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(1)) == 0
+    assert io_uring_wait_cqe_timeout(ring, cqe, timespec(1)) == 0
     assert cqe[0].user_data == 3
-    u.io_uring_cqe_seen(ring, cqe[0])
+    io_uring_cqe_seen(ring, cqe[0])
     with pytest.raises(OSError) as e:  # nothing left: ETIME
-        u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(0.01))
+        io_uring_wait_cqe_timeout(ring, cqe, timespec(0.01))
     assert e.value.errno == 62
 
 
 def test_wait_cqes_min_timeout(ring, cqe):
     nop(ring, 1)
     nop(ring, 2)
-    assert u.io_uring_wait_cqes_min_timeout(ring, cqe, 2, u.timespec(1), 1000) >= 0
-    assert u.io_uring_cq_ready(ring) == 2
-    u.io_uring_cq_advance(ring, 2)
+    assert io_uring_wait_cqes_min_timeout(ring, cqe, 2, timespec(1), 1000) >= 0
+    assert io_uring_cq_ready(ring) == 2
+    io_uring_cq_advance(ring, 2)
     with pytest.raises(OSError) as e:
-        u.io_uring_wait_cqes_min_timeout(ring, cqe, 1, u.timespec(0.01), 1000)
+        io_uring_wait_cqes_min_timeout(ring, cqe, 1, timespec(0.01), 1000)
     assert e.value.errno == 62
 
 
 def test_submit_and_wait_min_timeout(ring, cqe):
     nop(ring, 1, submit=False)
-    assert u.io_uring_submit_and_wait_min_timeout(ring, cqe, 1, u.timespec(1), 1000) >= 0
+    assert io_uring_submit_and_wait_min_timeout(ring, cqe, 1, timespec(1), 1000) >= 0
     assert cqe[0].user_data == 1
-    u.io_uring_cqe_seen(ring, cqe[0])
+    io_uring_cqe_seen(ring, cqe[0])
     with pytest.raises(OSError):
-        u.io_uring_submit_and_wait_min_timeout(ring, cqe, 1, u.timespec(0.01), 1000)
+        io_uring_submit_and_wait_min_timeout(ring, cqe, 1, timespec(0.01), 1000)
 
 
 # eventfd
@@ -101,17 +99,17 @@ def test_submit_and_wait_min_timeout(ring, cqe):
 def test_eventfd(ring, cqe):
     efd = os.eventfd(0)
     try:
-        assert u.io_uring_register_eventfd(ring, efd) == 0
-        assert u.io_uring_cq_eventfd_enabled(ring) is True
+        assert io_uring_register_eventfd(ring, efd) == 0
+        assert io_uring_cq_eventfd_enabled(ring) is True
         nop(ring, 1)
-        u.io_uring_wait_cqe(ring, cqe)
+        io_uring_wait_cqe(ring, cqe)
         assert os.eventfd_read(efd) >= 1
-        u.io_uring_cqe_seen(ring, cqe[0])
-        assert u.io_uring_cq_eventfd_toggle(ring, False) == 0
-        assert u.io_uring_cq_eventfd_enabled(ring) is False
-        assert u.io_uring_unregister_eventfd(ring) == 0
-        assert u.io_uring_register_eventfd_async(ring, efd) == 0
-        assert u.io_uring_unregister_eventfd(ring) == 0
+        io_uring_cqe_seen(ring, cqe[0])
+        assert io_uring_cq_eventfd_toggle(ring, False) == 0
+        assert io_uring_cq_eventfd_enabled(ring) is False
+        assert io_uring_unregister_eventfd(ring) == 0
+        assert io_uring_register_eventfd_async(ring, efd) == 0
+        assert io_uring_unregister_eventfd(ring) == 0
     finally:
         os.close(efd)
 
@@ -120,44 +118,44 @@ def test_eventfd(ring, cqe):
 
 
 def test_personality(ring):
-    pid = u.io_uring_register_personality(ring)
+    pid = io_uring_register_personality(ring)
     assert pid > 0
-    assert u.io_uring_unregister_personality(ring, pid) == 0
+    assert io_uring_unregister_personality(ring, pid) == 0
     with pytest.raises(OSError):
-        u.io_uring_unregister_personality(ring, pid)
+        io_uring_unregister_personality(ring, pid)
 
 
 def test_register_ring_fd(ring, cqe):
-    assert u.io_uring_register_ring_fd(ring) == 1
+    assert io_uring_register_ring_fd(ring) == 1
     nop(ring, 1)  # still works through the registered fd
-    assert u.io_uring_wait_cqe(ring, cqe) == 0
-    u.io_uring_cqe_seen(ring, cqe[0])
-    assert u.io_uring_unregister_ring_fd(ring) == 1
+    assert io_uring_wait_cqe(ring, cqe) == 0
+    io_uring_cqe_seen(ring, cqe[0])
+    assert io_uring_unregister_ring_fd(ring) == 1
 
 
 def test_file_alloc_range_and_sparse(ring):
     with pytest.raises(OSError):  # no table yet
-        u.io_uring_register_file_alloc_range(ring, 0, 4)
-    assert u.io_uring_register_files_sparse(ring, 4) == 0
-    assert u.io_uring_register_file_alloc_range(ring, 0, 4) == 0
-    assert u.io_uring_unregister_files(ring) == 0
+        io_uring_register_file_alloc_range(ring, 0, 4)
+    assert io_uring_register_files_sparse(ring, 4) == 0
+    assert io_uring_register_file_alloc_range(ring, 0, 4) == 0
+    assert io_uring_unregister_files(ring) == 0
 
 
 def test_register_files_tags(ring):
     with pytest.raises(OSError):  # a table is already registered: EBUSY
-        assert u.io_uring_register_files_sparse(ring, 2) == 0
-        u.io_uring_register_files_tags(ring, u.FileIndex([-1, -1]), [0, 0])
-    assert u.io_uring_unregister_files(ring) == 0
+        assert io_uring_register_files_sparse(ring, 2) == 0
+        io_uring_register_files_tags(ring, FileIndex([-1, -1]), [0, 0])
+    assert io_uring_unregister_files(ring) == 0
 
 
 def test_register_files_tags_list(ring):
     r, w = os.pipe()  # a tag needs a real file: `-1` (sparse) can only have tag `0`
     try:
-        assert u.io_uring_register_files_tags(ring, u.FileIndex([r, w]), [7, 8]) == 0
-        assert u.io_uring_register_files_update_tag(ring, u.FileIndex([w]), [9], 1) == 1
+        assert io_uring_register_files_tags(ring, FileIndex([r, w]), [7, 8]) == 0
+        assert io_uring_register_files_update_tag(ring, FileIndex([w]), [9], 1) == 1
         with pytest.raises(ValueError):  # one tag for each file
-            u.io_uring_register_files_update_tag(ring, u.FileIndex([r, w]), [1])
-        assert u.io_uring_unregister_files(ring) == 0
+            io_uring_register_files_update_tag(ring, FileIndex([r, w]), [1])
+        assert io_uring_unregister_files(ring) == 0
     finally:
         os.close(r)
         os.close(w)
@@ -165,62 +163,62 @@ def test_register_files_tags_list(ring):
 
 def test_register_buffers(ring):
     iov = [bytearray(4096)]
-    assert u.io_uring_register_buffers_sparse(ring, 4) == 0
-    assert u.io_uring_unregister_buffers(ring) == 0
-    assert u.io_uring_register_buffers(ring, iov) == 0
-    assert u.io_uring_unregister_buffers(ring) == 0
-    assert u.io_uring_register_buffers(ring, iov, [5]) == 0  # with tags
-    assert u.io_uring_register_buffers_update_tag(ring, iov, [6]) == 1
+    assert io_uring_register_buffers_sparse(ring, 4) == 0
+    assert io_uring_unregister_buffers(ring) == 0
+    assert io_uring_register_buffers(ring, iov) == 0
+    assert io_uring_unregister_buffers(ring) == 0
+    assert io_uring_register_buffers(ring, iov, [5]) == 0  # with tags
+    assert io_uring_register_buffers_update_tag(ring, iov, [6]) == 1
     with pytest.raises(ValueError):  # one tag for each buffer
-        u.io_uring_register_buffers(ring, iov, [1, 2])
+        io_uring_register_buffers(ring, iov, [1, 2])
     with pytest.raises(ValueError):
-        u.io_uring_register_buffers_update_tag(ring, iov, [])
-    assert u.io_uring_unregister_buffers(ring) == 0
+        io_uring_register_buffers_update_tag(ring, iov, [])
+    assert io_uring_unregister_buffers(ring) == 0
 
 
 def test_clone_buffers(ring):
-    dst = u.Ring()
-    u.io_uring_queue_init(8, dst)
+    dst = Ring()
+    io_uring_queue_init(8, dst)
     try:
-        assert u.io_uring_register_buffers(ring, [bytearray(4096)]) == 0
-        assert u.io_uring_clone_buffers(dst, ring) == 0
-        assert u.io_uring_unregister_buffers(dst) == 0
-        assert u.io_uring_unregister_buffers(ring) == 0
+        assert io_uring_register_buffers(ring, [bytearray(4096)]) == 0
+        assert io_uring_clone_buffers(dst, ring) == 0
+        assert io_uring_unregister_buffers(dst) == 0
+        assert io_uring_unregister_buffers(ring) == 0
     finally:
-        u.io_uring_queue_exit(dst)
+        io_uring_queue_exit(dst)
 
 
 def test_ring_dontfork_and_enable(ring):
-    assert u.io_uring_ring_dontfork(ring) == 0
+    assert io_uring_ring_dontfork(ring) == 0
     with pytest.raises(OSError):  # already enabled: EBADFD
-        u.io_uring_enable_rings(ring)
+        io_uring_enable_rings(ring)
 
 
 def test_enable_rings_disabled_start():
-    ring = u.Ring()
-    u.io_uring_queue_init(8, ring, u.IORING_SETUP_R_DISABLED)
+    ring = Ring()
+    io_uring_queue_init(8, ring, IORING_SETUP_R_DISABLED)
     try:
-        assert u.io_uring_enable_rings(ring) == 0
+        assert io_uring_enable_rings(ring) == 0
     finally:
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def test_opcode_supported():
-    ring = u.Ring()
-    u.io_uring_queue_init(8, ring)
+    ring = Ring()
+    io_uring_queue_init(8, ring)
     try:
-        probe = u.io_uring_get_probe_ring(ring)
-        assert u.io_uring_opcode_supported(probe, u.io_uring_op.IORING_OP_NOP) is True
-        assert u.io_uring_opcode_supported(probe, 200) is False
+        probe = io_uring_get_probe_ring(ring)
+        assert io_uring_opcode_supported(probe, io_uring_op.IORING_OP_NOP) is True
+        assert io_uring_opcode_supported(probe, 200) is False
     finally:
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 # Param / init variants
 
 
 def test_param():
-    p = u.Param()
+    p = Param()
     assert p.sq_entries == p.cq_entries == p.flags == p.features == 0
     p.sq_entries = 4
     p.cq_entries = 8
@@ -232,32 +230,32 @@ def test_param():
 
 
 def test_queue_init_params():
-    ring, p = u.Ring(), u.Param()
-    assert u.io_uring_queue_init_params(8, ring, p) == 0
+    ring, p = Ring(), Param()
+    assert io_uring_queue_init_params(8, ring, p) == 0
     try:
         assert p.sq_entries == 8
         assert p.cq_entries == 16
         assert p.features != 0
         with pytest.raises(RuntimeError):  # already initialized
-            u.io_uring_queue_init_params(8, ring, u.Param())
+            io_uring_queue_init_params(8, ring, Param())
     finally:
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def test_queue_init_params_flags():
-    ring, p = u.Ring(), u.Param()
-    p.flags = u.IORING_SETUP_CQSIZE
+    ring, p = Ring(), Param()
+    p.flags = IORING_SETUP_CQSIZE
     p.cq_entries = 64
-    assert u.io_uring_queue_init_params(8, ring, p) == 0
+    assert io_uring_queue_init_params(8, ring, p) == 0
     try:
         assert p.cq_entries == 64
     finally:
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def test_io_uring_setup_enter():
-    p = u.Param()
-    fd = u.io_uring_setup(4, p)
+    p = Param()
+    fd = io_uring_setup(4, p)
     try:
         assert fd > 0
         assert p.sq_entries == 4
@@ -266,54 +264,54 @@ def test_io_uring_setup_enter():
 
 
 def test_resize_rings():
-    ring, p = u.Ring(), u.Param()
-    u.io_uring_queue_init(8, ring, u.IORING_SETUP_DEFER_TASKRUN | u.IORING_SETUP_SINGLE_ISSUER)
+    ring, p = Ring(), Param()
+    io_uring_queue_init(8, ring, IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_SINGLE_ISSUER)
     try:
-        p.flags = u.IORING_SETUP_CQSIZE
+        p.flags = IORING_SETUP_CQSIZE
         p.sq_entries = 32
         p.cq_entries = 64
-        assert u.io_uring_resize_rings(ring, p) == 0
+        assert io_uring_resize_rings(ring, p) == 0
         assert p.sq_entries == 32
         assert p.cq_entries == 64
-        assert u.io_uring_sq_space_left(ring) == 32
+        assert io_uring_sq_space_left(ring) == 32
     finally:
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def test_close_ring_fd_needs_registered_fd(ring):
     with pytest.raises(OSError):
-        u.io_uring_close_ring_fd(ring)
+        io_uring_close_ring_fd(ring)
 
 
 # buffer ring
 
 
 def test_buf_ring(ring):
-    assert u.io_uring_buf_ring_mask(8) == 7
-    br = u.io_uring_setup_buf_ring(ring, 8, 1, 0)
+    assert io_uring_buf_ring_mask(8) == 7
+    br = io_uring_setup_buf_ring(ring, 8, 1, 0)
     try:
-        assert u.io_uring_buf_ring_available(ring, br, 1) == 0
+        assert io_uring_buf_ring_available(ring, br, 1) == 0
         bufs = [bytearray(16) for _ in range(4)]
         for bid, buf in enumerate(bufs):
-            u.io_uring_buf_ring_add(br, buf, bid, u.io_uring_buf_ring_mask(8), bid)
-        u.io_uring_buf_ring_advance(br, 4)
-        assert u.io_uring_buf_ring_available(ring, br, 1) == 4
+            io_uring_buf_ring_add(br, buf, bid, io_uring_buf_ring_mask(8), bid)
+        io_uring_buf_ring_advance(br, 4)
+        assert io_uring_buf_ring_available(ring, br, 1) == 4
     finally:
-        assert u.io_uring_free_buf_ring(ring, br, 8, 1) == 0
+        assert io_uring_free_buf_ring(ring, br, 8, 1) == 0
 
 
 def test_buf_ring_init_cq_advance(ring):
-    br = u.io_uring_setup_buf_ring(ring, 4, 2, 0)
+    br = io_uring_setup_buf_ring(ring, 4, 2, 0)
     try:
-        u.io_uring_buf_ring_init(br)
-        u.io_uring_buf_ring_cq_advance(ring, br, 0)
+        io_uring_buf_ring_init(br)
+        io_uring_buf_ring_cq_advance(ring, br, 0)
     finally:
-        u.io_uring_free_buf_ring(ring, br, 4, 2)
+        io_uring_free_buf_ring(ring, br, 4, 2)
 
 
 def test_setup_buf_ring_error(ring):
     with pytest.raises(OSError):  # entries must be a power of two
-        u.io_uring_setup_buf_ring(ring, 3, 1, 0)
+        io_uring_setup_buf_ring(ring, 3, 1, 0)
 
 
 # sizes, shifts and low-level helpers
@@ -321,158 +319,156 @@ def test_setup_buf_ring_error(ring):
 
 def test_cqe_nr(ring, cqe):
     nop(ring, 1)
-    u.io_uring_wait_cqe(ring, cqe)
-    assert u.io_uring_cqe_nr(cqe[0]) == 1
-    u.io_uring_cqe_seen(ring, cqe[0])
+    io_uring_wait_cqe(ring, cqe)
+    assert io_uring_cqe_nr(cqe[0]) == 1
+    io_uring_cqe_seen(ring, cqe[0])
 
 
 def test_memory_and_mlock_size():
-    assert u.io_uring_memory_size(8, 0) > 0
-    assert u.io_uring_memory_size(4096, 0) > u.io_uring_memory_size(8, 0)
-    assert u.io_uring_mlock_size(8, 0) >= 0  # 0 on kernels that no longer count rings against RLIMIT_MEMLOCK
-    p = u.Param()
-    assert u.io_uring_memory_size_params(8, p) > 0
-    assert u.io_uring_mlock_size_params(8, p) >= 0
+    assert io_uring_memory_size(8, 0) > 0
+    assert io_uring_memory_size(4096, 0) > io_uring_memory_size(8, 0)
+    assert io_uring_mlock_size(8, 0) >= 0  # 0 on kernels that no longer count rings against RLIMIT_MEMLOCK
+    p = Param()
+    assert io_uring_memory_size_params(8, p) > 0
+    assert io_uring_mlock_size_params(8, p) >= 0
     with pytest.raises(OSError):  # 0 entries
-        u.io_uring_memory_size(0, 0)
+        io_uring_memory_size(0, 0)
 
 
 def test_prep_rw_removed():
-    assert not hasattr(u, 'io_uring_prep_rw')  # took any address: the kernel read / wrote memory nothing held
+    assert 'io_uring_prep_rw' not in globals()  # took any address: the kernel read / wrote memory nothing held
 
 
 def test_iowq_aff(ring):
-    assert u.io_uring_register_iowq_aff(ring, bytes([1])) == 0  # cpu 0
-    assert u.io_uring_unregister_iowq_aff(ring) == 0
-    assert u.io_uring_register_iowq_aff(ring, bytes([3])) == 0  # cpus 0 and 1
-    assert u.io_uring_unregister_iowq_aff(ring) == 0
+    assert io_uring_register_iowq_aff(ring, bytes([1])) == 0  # cpu 0
+    assert io_uring_unregister_iowq_aff(ring) == 0
+    assert io_uring_register_iowq_aff(ring, bytes([3])) == 0  # cpus 0 and 1
+    assert io_uring_unregister_iowq_aff(ring) == 0
 
 
 def test_iowq_max_workers(ring):
-    old = u.io_uring_register_iowq_max_workers(ring, 0, 0)  # read the limits
+    old = io_uring_register_iowq_max_workers(ring, 0, 0)  # read the limits
     assert len(old) == 2 and old[0] > 0 and old[1] > 0
-    assert u.io_uring_register_iowq_max_workers(ring, 2, 3) == old
-    assert u.io_uring_register_iowq_max_workers(ring, 0, 0) == (2, 3)
-    assert u.io_uring_register_iowq_max_workers(ring, *old) == (2, 3)
+    assert io_uring_register_iowq_max_workers(ring, 2, 3) == old
+    assert io_uring_register_iowq_max_workers(ring, 0, 0) == (2, 3)
+    assert io_uring_register_iowq_max_workers(ring, *old) == (2, 3)
 
 
 # the rest of the ring functions
 
 
 def test_buf_ring_head_and_unregister(ring):
-    br = u.io_uring_setup_buf_ring(ring, 8, 1, 0)
-    assert u.io_uring_buf_ring_head(ring, 1) == 0
+    br = io_uring_setup_buf_ring(ring, 8, 1, 0)
+    assert io_uring_buf_ring_head(ring, 1) == 0
     with pytest.raises(FileNotFoundError):  # no ring for group 9
-        u.io_uring_buf_ring_head(ring, 9)
-    assert u.io_uring_unregister_buf_ring(ring, 1) == 0
+        io_uring_buf_ring_head(ring, 9)
+    assert io_uring_unregister_buf_ring(ring, 1) == 0
     with pytest.raises(FileNotFoundError):
-        u.io_uring_unregister_buf_ring(ring, 1)
+        io_uring_unregister_buf_ring(ring, 1)
     del br
 
 
 def test_queue_init_mem():
-    ring = u.Ring()
-    size = u.io_uring_queue_init_mem(8, ring, u.Param())  # liburing allocates the memory
+    ring = Ring()
+    size = io_uring_queue_init_mem(8, ring, Param())  # liburing allocates the memory
     try:
         assert size > 0  # the bytes of the memory it used
         assert ring.ring_fd > 0
         with pytest.raises(RuntimeError):
-            u.io_uring_queue_init_mem(8, ring, u.Param())
+            io_uring_queue_init_mem(8, ring, Param())
     finally:
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def test_queue_init_mem_buffer():
-    ring, buf = u.Ring(), mmap.mmap(-1, 2 * 1024 * 1024)
-    size = u.io_uring_queue_init_mem(8, ring, u.Param(), buf)
+    ring, buf = Ring(), mmap.mmap(-1, 2 * 1024 * 1024)
+    size = io_uring_queue_init_mem(8, ring, Param(), buf)
     try:
         assert 0 < size <= len(buf)
         with pytest.raises(BufferError):
             buf.close()  # the ring holds it until `io_uring_queue_exit`
     finally:
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
     buf.close()
 
     with pytest.raises(TypeError):
-        u.io_uring_queue_init_mem(8, u.Ring(), u.Param(), b"read only")
+        io_uring_queue_init_mem(8, Ring(), Param(), b"read only")
     with pytest.raises(OSError):  # too small for the rings: ENOMEM
-        u.io_uring_queue_init_mem(8, ring, u.Param(), mmap.mmap(-1, 4096))
+        io_uring_queue_init_mem(8, ring, Param(), mmap.mmap(-1, 4096))
     assert ring.ring_fd <= 0
 
 
 def test_queue_mmap():
-    p, ring = u.Param(), u.Ring()
-    fd = u.io_uring_setup(8, p)
-    assert u.io_uring_queue_mmap(fd, ring, p) == 0
+    p, ring = Param(), Ring()
+    fd = io_uring_setup(8, p)
+    assert io_uring_queue_mmap(fd, ring, p) == 0
     try:
         assert ring.ring_fd == fd
-        assert u.io_uring_sq_space_left(ring) == 8
+        assert io_uring_sq_space_left(ring) == 8
     finally:
-        u.io_uring_queue_exit(ring)  # closes the fd
+        io_uring_queue_exit(ring)  # closes the fd
 
 
 def test_clone_buffers_offset(ring):
-    dst = u.Ring()
-    u.io_uring_queue_init(8, dst)
+    dst = Ring()
+    io_uring_queue_init(8, dst)
     try:
-        assert u.io_uring_register_buffers(ring, [bytearray(4096)]) == 0
-        assert u.io_uring_clone_buffers_offset(dst, ring, 0, 0, 1) == 0
-        assert u.io_uring_unregister_buffers(dst) == 0
-        assert u.io_uring_unregister_buffers(ring) == 0
+        assert io_uring_register_buffers(ring, [bytearray(4096)]) == 0
+        assert io_uring_clone_buffers_offset(dst, ring, 0, 0, 1) == 0
+        assert io_uring_unregister_buffers(dst) == 0
+        assert io_uring_unregister_buffers(ring) == 0
     finally:
-        u.io_uring_queue_exit(dst)
+        io_uring_queue_exit(dst)
 
 
 def test_register_files_update_tag(ring):
-    assert u.io_uring_register_files_sparse(ring, 4) == 0
-    assert u.io_uring_register_files_update_tag(ring, u.FileIndex([-1]), [0]) == 1
-    assert u.io_uring_unregister_files(ring) == 0
+    assert io_uring_register_files_sparse(ring, 4) == 0
+    assert io_uring_register_files_update_tag(ring, FileIndex([-1]), [0]) == 1
+    assert io_uring_unregister_files(ring) == 0
 
 
 def test_enter2(ring, cqe):
     nop(ring, 1)
-    assert u.io_uring_enter2(ring.ring_fd, 0, 1, u.IORING_ENTER_GETEVENTS, 0) == 0
-    assert u.io_uring_cq_ready(ring) == 1
-    u.io_uring_cq_advance(ring, 1)
+    assert io_uring_enter2(ring.ring_fd, 0, 1, IORING_ENTER_GETEVENTS, 0) == 0
+    assert io_uring_cq_ready(ring) == 1
+    io_uring_cq_advance(ring, 1)
 
 
 def test_register_raw(ring):
-    assert u.io_uring_register(ring.ring_fd, 9, 0, None) >= 0  # IORING_REGISTER_PERSONALITY
+    assert io_uring_register(ring.ring_fd, 9, 0, None) >= 0  # IORING_REGISTER_PERSONALITY
     with pytest.raises(OSError):  # unknown opcode
-        u.io_uring_register(ring.ring_fd, 9999, 0, None)
+        io_uring_register(ring.ring_fd, 9999, 0, None)
 
 
 def test_get_sqe128():
-    ring = u.Ring()
-    u.io_uring_queue_init(8, ring, u.IORING_SETUP_SQE128)
+    ring = Ring()
+    io_uring_queue_init(8, ring, IORING_SETUP_SQE128)
     try:
-        sqe = u.io_uring_get_sqe128(ring)
-        u.io_uring_prep_nop128(sqe)
-        assert sqe.opcode == u.io_uring_op.IORING_OP_NOP128
+        sqe = io_uring_get_sqe128(ring)
+        io_uring_prep_nop128(sqe)
+        assert sqe.opcode == io_uring_op.IORING_OP_NOP128
     finally:
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def test_get_sqe128_uninitialized_ring():
     with pytest.raises(RuntimeError):
-        u.io_uring_get_sqe128(u.Ring())
+        io_uring_get_sqe128(Ring())
 
 
 def test_register_sync_msg():
-    ring = u.Ring()
-    u.io_uring_queue_init(8, ring)
+    ring = Ring()
+    io_uring_queue_init(8, ring)
     try:
-        sqe = u.Sqe()
-        u.io_uring_prep_msg_ring(sqe, ring.ring_fd, 5, 77)
-        assert u.io_uring_register_sync_msg(sqe) == 0
-        cqe = u.Cqe()
-        assert u.io_uring_wait_cqe_timeout(ring, cqe, u.timespec(1)) == 0
+        sqe = Sqe()
+        io_uring_prep_msg_ring(sqe, ring.ring_fd, 5, 77)
+        assert io_uring_register_sync_msg(sqe) == 0
+        cqe = Cqe()
+        assert io_uring_wait_cqe_timeout(ring, cqe, timespec(1)) == 0
         assert (cqe[0].user_data, cqe[0].res) == (77, 5)
-        u.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(ring, cqe[0])
     finally:
-        u.io_uring_queue_exit(ring)
-
-
+        io_uring_queue_exit(ring)
 
 
 def test_ring_collected_without_exit():
@@ -481,8 +477,8 @@ def test_ring_collected_without_exit():
 
     before = len(os.listdir("/proc/self/fd"))
     for _ in range(20):
-        ring = u.Ring()
-        u.io_uring_queue_init(8, ring)
+        ring = Ring()
+        io_uring_queue_init(8, ring)
         del ring
     gc.collect()
     assert len(os.listdir("/proc/self/fd")) == before

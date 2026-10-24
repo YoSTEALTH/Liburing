@@ -139,7 +139,9 @@ pub const Futex = struct {
 
         var waitv: ?[*]c.futex_waitv = null;
         if (_vector) {
-            const list = std.heap.c_allocator.alloc(c.futex_waitv, _no) catch return e.raiseMemoryError("Out of memory!");
+            const list = std.heap.c_allocator.alloc(c.futex_waitv, _no) catch return e.raiseMemoryError(
+                "Out of memory!",
+            );
             for (list, 0..) |*v, i| {
                 v.val = 0;
                 v.uaddr = @intFromPtr(&states[i]);

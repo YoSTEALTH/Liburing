@@ -1,5 +1,5 @@
 '''HTTP keep-alive echo server on asyncio (`loop.sock_recv` / `sock_sendall`), the same response and
-load as `liburing_bench.py` (from Shakti's `example/bench`).
+load as `liburing_bench.py`.
 
     python3.15t example/bench/asyncio_bench.py [port=12345]
     zig-out/bin/load 12345 64 5 100     # `zig build load`: port, connections, seconds, requests/connection
@@ -7,7 +7,7 @@ load as `liburing_bench.py` (from Shakti's `example/bench`).
 
 import asyncio
 import sys
-from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket
+from socket import AF_INET, SO_REUSEADDR, SOCK_STREAM, SOL_SOCKET, socket
 
 LISTEN = 1024
 BUFFSIZE = 1024
@@ -29,7 +29,7 @@ async def echo_server(loop, address):
     sock.setblocking(False)
     with sock:
         while True:
-            client, addr = await loop.sock_accept(sock)
+            client, _ = await loop.sock_accept(sock)
             loop.create_task(echo_client(loop, client))
     print('Asyncio Closed')
 

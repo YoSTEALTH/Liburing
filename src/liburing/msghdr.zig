@@ -39,9 +39,9 @@ pub const EpollEventType = setu.Class(EpollEvent, @embedFile("msghdr.zig"));
 ///     submitting and writes `namelen`, `controllen` and `flags` back when done.
 ///     - `iov` is a list of buffers (`bytes`, `bytearray`, `memoryview`, ...); `io_uring_prep_recvmsg*` needs
 ///     them and `control` writable (`TypeError`).
-///     - `name`, `iov` and `control` are kept alive and locked (no resize) by the `Msghdr`; `namelen` / `controllen` start as the
-///     size of the `Sockaddr` / `control` given and can be set (e.g. for a multishot receive, where the
-///     kernel puts both, with the data, into a provided buffer).
+///     - `name`, `iov` and `control` are kept alive and locked (no resize) by the `Msghdr`; `namelen` /
+///     `controllen` start as the size of the `Sockaddr` / `control` given and can be set (e.g. for a multishot
+///     receive, where the kernel puts both, with the data, into a provided buffer).
 pub const Msghdr = struct {
     _msghdr: c.msghdr = std.mem.zeroes(c.msghdr), // lives inside the Python object
     _name: ?*Object = null, // the `Sockaddr` `msg_name` points into
@@ -142,7 +142,10 @@ pub const Msghdr = struct {
 
     /// `TypeError` when `iov` or `control` is read-only: a receive would write into it.
     pub fn checkWritable(self: *const Self, comptime what: []const u8) py.Error!void {
-        if (self._readonly) return py.raiseTypeError("`" ++ what ++ "(msg)` - `msg`'s `iov` / `control` must be writable (not `bytes`)", .{});
+        if (self._readonly) return py.raiseTypeError(
+            "`" ++ what ++ "(msg)` - `msg`'s `iov` / `control` must be writable (not `bytes`)",
+            .{},
+        );
     }
 };
 
@@ -255,7 +258,9 @@ pub const EpollEvent = struct {
         if (count == 0) return py.raiseValueError("`EpollEvent(no)` must be at least 1", .{});
         if (no != null and (events != null or data != null))
             return py.raiseValueError("`EpollEvent`: give `no`, or `events` and `data`", .{});
-        const all = std.heap.c_allocator.alloc(linux.epoll_event, count) catch return e.raiseMemoryError("Out of Memory!");
+        const all = std.heap.c_allocator.alloc(linux.epoll_event, count) catch return e.raiseMemoryError(
+            "Out of Memory!",
+        );
         @memset(all, std.mem.zeroes(linux.epoll_event));
         all[0].events = events orelse 0;
         all[0].data.u64 = data orelse 0;
@@ -273,7 +278,10 @@ pub const EpollEvent = struct {
     }
 
     pub fn __getitem__(self: *Self, index: isize) py.Error!*Object {
-        if (self._owner != null or index < 0 or index >= self._len) return py.raiseIndexError("Index out of range", .{});
+        if (self._owner != null or index < 0 or index >= self._len) return py.raiseIndexError(
+            "Index out of range",
+            .{},
+        );
         const root = EpollEventType.object(self);
         return EpollEventType.new(.{
             ._events = self._events,

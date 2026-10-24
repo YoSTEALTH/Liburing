@@ -1,12 +1,10 @@
 import mmap
-
 import pytest
-
-import liburing
+from liburing import *
 
 
 def test_io_uring_init_exit():
-    ring = liburing.Ring()
+    ring = Ring()
     assert ring.flags == 0
     assert ring.ring_fd == 0
     assert ring.features == 0
@@ -14,119 +12,119 @@ def test_io_uring_init_exit():
     assert ring.int_flags == 0
 
     with pytest.raises(OverflowError):
-        liburing.io_uring_queue_init(-1, ring, 0)
+        io_uring_queue_init(-1, ring, 0)
 
     with pytest.raises(OverflowError):
-        liburing.io_uring_queue_init(8, ring, -1)
+        io_uring_queue_init(8, ring, -1)
 
-    assert liburing.io_uring_queue_init(1, ring, 0) == 0
+    assert io_uring_queue_init(1, ring, 0) == 0
     assert ring.ring_fd > -1
     assert ring.enter_ring_fd > -1
     with pytest.raises(RuntimeError):  # Trying to init again
-        liburing.io_uring_queue_init(4, ring, 0)
-    assert liburing.io_uring_queue_exit(ring) is None
+        io_uring_queue_init(4, ring, 0)
+    assert io_uring_queue_exit(ring) is None
     # Trying to exit again
     with pytest.raises(RuntimeError):
-        liburing.io_uring_queue_exit(ring)  # will not call internally but
+        io_uring_queue_exit(ring)  # will not call internally but
 
-    ring = liburing.Ring()
+    ring = Ring()
     with pytest.raises(RuntimeError):
-        liburing.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def test_setup_iopoll_sqpoll():
-    for i, setup in enumerate((liburing.IORING_SETUP_IOPOLL, liburing.IORING_SETUP_SQPOLL), 1):
-        ring = liburing.Ring()
-        assert liburing.io_uring_queue_init(1, ring, setup) == 0
-        assert liburing.io_uring_queue_exit(ring) is None
+    for i, setup in enumerate((IORING_SETUP_IOPOLL, IORING_SETUP_SQPOLL), 1):
+        ring = Ring()
+        assert io_uring_queue_init(1, ring, setup) == 0
+        assert io_uring_queue_exit(ring) is None
 
 
 def test_max_entries_plus():
     max_plus = 32768 + 1
-    ring = liburing.Ring()
+    ring = Ring()
     with pytest.raises(OSError):  # OSError: [Errno 22] Invalid argument
-        liburing.io_uring_queue_init(max_plus, ring)
+        io_uring_queue_init(max_plus, ring)
     with pytest.raises(RuntimeError):
-        liburing.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def test_init_max():
-    ring = liburing.Ring()
-    cqe = liburing.Cqe()
+    ring = Ring()
+    cqe = Cqe()
     maximum = 32768
-    liburing.io_uring_queue_init(maximum, ring)
+    io_uring_queue_init(maximum, ring)
 
     for i in range(maximum - 1):
-        sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_nop(sqe)
-        sqe.flags = liburing.IOSQE_IO_LINK | liburing.IOSQE_ASYNC
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_nop(sqe)
+        sqe.flags = IOSQE_IO_LINK | IOSQE_ASYNC
         sqe.user_data = i + 1  # `sqe.user_data` can not be `0`
-    sqe = liburing.io_uring_get_sqe(ring)
-    liburing.io_uring_prep_nop(sqe)
-    sqe.flags = liburing.IOSQE_ASYNC
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_nop(sqe)
+    sqe.flags = IOSQE_ASYNC
     sqe.user_data = i + 1 + 1
 
-    assert liburing.io_uring_submit_and_wait_timeout(ring, cqe, maximum) == maximum
+    assert io_uring_submit_and_wait_timeout(ring, cqe, maximum) == maximum
 
     for i in range(maximum):
         assert cqe[i].user_data == i + 1
 
-    liburing.io_uring_cq_advance(ring, maximum)
+    io_uring_cq_advance(ring, maximum)
     with pytest.raises(BlockingIOError):
-        liburing.io_uring_peek_cqe(ring, cqe)
-    liburing.io_uring_queue_exit(ring)
+        io_uring_peek_cqe(ring, cqe)
+    io_uring_queue_exit(ring)
 
 
 def test_io_uring_submit_and_wait(ring, cqe):
-    sqe = liburing.io_uring_get_sqe(ring)
+    sqe = io_uring_get_sqe(ring)
     sqe.user_data = 123
-    assert liburing.io_uring_sq_ready(ring) == 1
-    assert liburing.io_uring_submit_and_wait(ring, 1) == 1
-    assert liburing.io_uring_sq_ready(ring) == 0
-    liburing.io_uring_peek_cqe(ring, cqe)
+    assert io_uring_sq_ready(ring) == 1
+    assert io_uring_submit_and_wait(ring, 1) == 1
+    assert io_uring_sq_ready(ring) == 0
+    io_uring_peek_cqe(ring, cqe)
     assert cqe[0].user_data == 123
 
 
 def test_io_uring_init_mem():
-    ring = liburing.Ring()
-    param = liburing.Param()
+    ring = Ring()
+    param = Param()
     buf = mmap.mmap(-1, 2 * 1024 * 1024)  # page-aligned & zeroed; keep alive until exit
-    used = liburing.io_uring_queue_init_mem(8, ring, param, buf)
+    used = io_uring_queue_init_mem(8, ring, param, buf)
 
     try:
         assert used > 0
 
-        sqe = liburing.io_uring_get_sqe(ring)
-        liburing.io_uring_prep_nop(sqe)
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_nop(sqe)
         sqe.user_data = 7
-        assert liburing.io_uring_submit(ring) == 1
-        cqe = liburing.Cqe()
-        liburing.io_uring_wait_cqe(ring, cqe)
+        assert io_uring_submit(ring) == 1
+        cqe = Cqe()
+        io_uring_wait_cqe(ring, cqe)
         assert cqe[0].user_data == 7
-        liburing.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(ring, cqe[0])
     finally:
-        liburing.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def submit_nop(ring, cqe, user_data):
-    sqe = liburing.io_uring_get_sqe(ring)
-    liburing.io_uring_prep_nop(sqe)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_nop(sqe)
     sqe.user_data = user_data
-    assert liburing.io_uring_submit_and_wait(ring, 1) == 1
-    liburing.io_uring_peek_cqe(ring, cqe)
+    assert io_uring_submit_and_wait(ring, 1) == 1
+    io_uring_peek_cqe(ring, cqe)
 
 
 STALE = "initialized again"
 
 
 def test_sqe_from_before_reinit():
-    ring = liburing.Ring()
-    liburing.io_uring_queue_init(4, ring)
-    sqe = liburing.io_uring_get_sqe(ring)
-    bound = liburing.Sqe(ring)
-    liburing.io_uring_prep_nop(bound)
-    liburing.io_uring_queue_exit(ring)
-    liburing.io_uring_queue_init(4, ring)  # new memory: `sqe` and `bound` point into the old, unmapped one
+    ring = Ring()
+    io_uring_queue_init(4, ring)
+    sqe = io_uring_get_sqe(ring)
+    bound = Sqe(ring)
+    io_uring_prep_nop(bound)
+    io_uring_queue_exit(ring)
+    io_uring_queue_init(4, ring)  # new memory: `sqe` and `bound` point into the old, unmapped one
     try:
         for s in (sqe, bound):
             with pytest.raises(RuntimeError, match=STALE):
@@ -134,39 +132,39 @@ def test_sqe_from_before_reinit():
             with pytest.raises(RuntimeError, match=STALE):
                 _ = s.flags
             with pytest.raises(RuntimeError, match=STALE):
-                liburing.io_uring_sqe_set_data64(s, 1)
+                io_uring_sqe_set_data64(s, 1)
         with pytest.raises(RuntimeError, match=STALE):
-            liburing.io_uring_prep_nop(sqe)
-        assert liburing.io_uring_sq_ready(ring) == 0  # nothing written
+            io_uring_prep_nop(sqe)
+        assert io_uring_sq_ready(ring) == 0  # nothing written
         # `Sqe(ring)`: its next prep takes a slot of the new memory
-        assert liburing.io_uring_prep_nop(bound) is True
+        assert io_uring_prep_nop(bound) is True
         bound.user_data = 5
-        cqe = liburing.Cqe()
-        assert liburing.io_uring_submit_and_wait(ring, 1) == 1
-        liburing.io_uring_peek_cqe(ring, cqe)
+        cqe = Cqe()
+        assert io_uring_submit_and_wait(ring, 1) == 1
+        io_uring_peek_cqe(ring, cqe)
         assert cqe[0].user_data == 5
-        liburing.io_uring_cqe_seen(ring, cqe[0])
+        io_uring_cqe_seen(ring, cqe[0])
     finally:
-        liburing.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 def test_cqe_from_before_reinit():
-    ring = liburing.Ring()
-    cqe = liburing.Cqe()
-    batch = liburing.CqeBatch(4)
-    liburing.io_uring_queue_init(4, ring)
+    ring = Ring()
+    cqe = Cqe()
+    batch = CqeBatch(4)
+    io_uring_queue_init(4, ring)
     submit_nop(ring, cqe, 1)
     entry = cqe[0]
-    assert liburing.io_uring_peek_batch_cqe(ring, batch) == 1
-    it = liburing.io_uring_cqe_iter_init(ring)
-    for_loop = liburing.CqeIter(ring, cqe)
-    liburing.io_uring_queue_exit(ring)
-    liburing.io_uring_queue_init(4, ring)
+    assert io_uring_peek_batch_cqe(ring, batch) == 1
+    it = io_uring_cqe_iter_init(ring)
+    for_loop = CqeIter(ring, cqe)
+    io_uring_queue_exit(ring)
+    io_uring_queue_init(4, ring)
     try:
         with pytest.raises(RuntimeError, match=STALE):
             _ = entry.user_data
         with pytest.raises(RuntimeError, match=STALE):
-            liburing.io_uring_cqe_seen(ring, entry)
+            io_uring_cqe_seen(ring, entry)
         with pytest.raises(RuntimeError, match=STALE):
             cqe[0]
         with pytest.raises(RuntimeError, match=STALE):
@@ -178,14 +176,14 @@ def test_cqe_from_before_reinit():
         with pytest.raises(RuntimeError, match=STALE):
             list(batch)
         with pytest.raises(RuntimeError, match=STALE):
-            liburing.io_uring_cqe_iter_next(it, cqe)
+            io_uring_cqe_iter_next(it, cqe)
         with pytest.raises(RuntimeError, match=STALE):
             next(for_loop)
         # a wait / peek on the new memory makes them usable again
         submit_nop(ring, cqe, 2)
         assert cqe[0].user_data == 2
-        assert liburing.io_uring_peek_batch_cqe(ring, batch) == 1
+        assert io_uring_peek_batch_cqe(ring, batch) == 1
         assert batch[0].user_data == 2
-        liburing.io_uring_cq_advance(ring, 1)
+        io_uring_cq_advance(ring, 1)
     finally:
-        liburing.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)

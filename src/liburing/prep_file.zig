@@ -51,12 +51,19 @@ pub fn io_uring_prep_tee(sqe: *SQE, fd_in: i32, fd_out: i32, nbytes: u32, splice
 ///     - `bufs`: 1 to `IOV_MAX` writable buffers (`bytearray`, `memoryview`, `array.array`, ...); the request
 ///       holds them (locked: no resize) and their `struct iovec` array until its completion.
 ///     - `io_uring_prep_readv` includes `io_uring_prep_readv2` feature as well.
-pub fn io_uring_prep_readv(sqe: *SQE, fd: i32, bufs: py.Sequence(py.WritableBuffer), offset: ?u64, flags: ?i32) py.Error!bool {
+pub fn io_uring_prep_readv(
+    sqe: *SQE,
+    fd: i32,
+    bufs: py.Sequence(py.WritableBuffer),
+    offset: ?u64,
+    flags: ?i32,
+) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
     const vec = try Ring.Vec.fromBuffers(bufs.items, "io_uring_prep_readv(bufs)");
     try h.holdVecUntilCompletion(sqe, vec); // owns `vec` from here
-    c.io_uring_prep_readv2(s, fd, vec.iov.ptr, @intCast(vec.iov.len), offset orelse 0, flags orelse 0); // cast: <= IOV_MAX
+    // cast: <= IOV_MAX
+    c.io_uring_prep_readv2(s, fd, vec.iov.ptr, @intCast(vec.iov.len), offset orelse 0, flags orelse 0);
     return true;
 }
 
@@ -68,12 +75,25 @@ pub fn io_uring_prep_readv(sqe: *SQE, fd: i32, bufs: py.Sequence(py.WritableBuff
 ///     ...
 ///     >>> buffer
 ///     bytearray(b"hi...")
-pub fn io_uring_prep_read_fixed(sqe: *SQE, fd: i32, buff: py.OwnedWritableBuffer, buf_index: i32, offset: ?u64) py.Error!bool {
+pub fn io_uring_prep_read_fixed(
+    sqe: *SQE,
+    fd: i32,
+    buff: py.OwnedWritableBuffer,
+    buf_index: i32,
+    offset: ?u64,
+) py.Error!bool {
     const s = try h.prepSlot(sqe, &buff) orelse return false;
     errdefer sqe.undoSlot();
     try h.holdUntilCompletion(sqe, &buff, &.{}); // first: owns the buffer from here, on every path
     const _offset = offset orelse 0;
-    c.io_uring_prep_read_fixed(s, fd, buff.data.ptr, try py.narrow(c_uint, buff.data.len, "`io_uring_prep_read_fixed(buff)` length"), _offset, buf_index);
+    c.io_uring_prep_read_fixed(
+        s,
+        fd,
+        buff.data.ptr,
+        try py.narrow(c_uint, buff.data.len, "`io_uring_prep_read_fixed(buff)` length"),
+        _offset,
+        buf_index,
+    );
     return true;
 }
 
@@ -100,7 +120,8 @@ pub fn io_uring_prep_readv_fixed(
     errdefer sqe.undoSlot();
     const vec = try Ring.Vec.fromBuffers(bufs.items, "io_uring_prep_readv_fixed(bufs)");
     try h.holdVecUntilCompletion(sqe, vec);
-    c.io_uring_prep_readv_fixed(s, fd, vec.iov.ptr, @intCast(vec.iov.len), offset orelse 0, flags orelse 0, buf_index); // cast: <= IOV_MAX
+    // cast: <= IOV_MAX
+    c.io_uring_prep_readv_fixed(s, fd, vec.iov.ptr, @intCast(vec.iov.len), offset orelse 0, flags orelse 0, buf_index);
     return true;
 }
 
@@ -122,7 +143,8 @@ pub fn io_uring_prep_writev(sqe: *SQE, fd: i32, bufs: py.Sequence(py.Buffer), of
     errdefer sqe.undoSlot();
     const vec = try Ring.Vec.fromBuffers(bufs.items, "io_uring_prep_writev(bufs)");
     try h.holdVecUntilCompletion(sqe, vec);
-    c.io_uring_prep_writev2(s, fd, vec.iov.ptr, @intCast(vec.iov.len), offset orelse 0, flags orelse 0); // cast: <= IOV_MAX
+    // cast: <= IOV_MAX
+    c.io_uring_prep_writev2(s, fd, vec.iov.ptr, @intCast(vec.iov.len), offset orelse 0, flags orelse 0);
     return true;
 }
 
@@ -138,7 +160,14 @@ pub fn io_uring_prep_write_fixed(sqe: *SQE, fd: i32, buff: py.OwnedBuffer, buf_i
     errdefer sqe.undoSlot();
     try h.holdUntilCompletion(sqe, &buff, &.{}); // first: owns the buffer from here, on every path
     const _offset = offset orelse 0;
-    c.io_uring_prep_write_fixed(s, fd, buff.data.ptr, try py.narrow(c_uint, buff.data.len, "`io_uring_prep_write_fixed(buff)` length"), _offset, buf_index);
+    c.io_uring_prep_write_fixed(
+        s,
+        fd,
+        buff.data.ptr,
+        try py.narrow(c_uint, buff.data.len, "`io_uring_prep_write_fixed(buff)` length"),
+        _offset,
+        buf_index,
+    );
     return true;
 }
 
@@ -164,7 +193,8 @@ pub fn io_uring_prep_writev_fixed(
     errdefer sqe.undoSlot();
     const vec = try Ring.Vec.fromBuffers(bufs.items, "io_uring_prep_writev_fixed(bufs)");
     try h.holdVecUntilCompletion(sqe, vec);
-    c.io_uring_prep_writev_fixed(s, fd, vec.iov.ptr, @intCast(vec.iov.len), offset orelse 0, flags orelse 0, buf_index); // cast: <= IOV_MAX
+    // cast: <= IOV_MAX
+    c.io_uring_prep_writev_fixed(s, fd, vec.iov.ptr, @intCast(vec.iov.len), offset orelse 0, flags orelse 0, buf_index);
     return true;
 }
 
@@ -306,7 +336,13 @@ pub fn io_uring_prep_read(sqe: *SQE, fd: i32, buf: py.OwnedWritableBuffer, offse
     errdefer sqe.undoSlot();
     try h.holdUntilCompletion(sqe, &buf, &.{}); // first: owns the buffer from here, on every path
     const _offset = offset orelse 0;
-    c.io_uring_prep_read(s, fd, buf.data.ptr, try py.narrow(c_uint, buf.data.len, "`io_uring_prep_read(buf)` length"), _offset);
+    c.io_uring_prep_read(
+        s,
+        fd,
+        buf.data.ptr,
+        try py.narrow(c_uint, buf.data.len, "`io_uring_prep_read(buf)` length"),
+        _offset,
+    );
     return true;
 }
 
@@ -333,7 +369,13 @@ pub fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: py.OwnedBuffer, offset: ?u64
     errdefer sqe.undoSlot();
     try h.holdUntilCompletion(sqe, &buf, &.{}); // first: owns the buffer from here, on every path
     const _offset = offset orelse 0;
-    c.io_uring_prep_write(s, fd, buf.data.ptr, try py.narrow(c_uint, buf.data.len, "`io_uring_prep_write(buf)` length"), _offset);
+    c.io_uring_prep_write(
+        s,
+        fd,
+        buf.data.ptr,
+        try py.narrow(c_uint, buf.data.len, "`io_uring_prep_write(buf)` length"),
+        _offset,
+    );
     return true;
 }
 
@@ -387,7 +429,14 @@ pub fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: py.OwnedBuffer, offset: ?u64
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `STATX_ALL` is depreciated, use `STATX_BASIC_STATS | STATX_BTIME` which is set by default.
-pub fn io_uring_prep_statx(sqe: *SQE, statxbuf: *Statx, path: *Object, flags: ?i32, mask: ?u32, dfd: ?i32) py.Error!bool {
+pub fn io_uring_prep_statx(
+    sqe: *SQE,
+    statxbuf: *Statx,
+    path: *Object,
+    flags: ?i32,
+    mask: ?u32,
+    dfd: ?i32,
+) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
     const path_ = try h.toPath(path);
@@ -425,7 +474,12 @@ pub fn io_uring_prep_madvise(sqe: *SQE, buf: py.OwnedWritableBuffer, advice: i32
     const s = try h.prepSlot(sqe, &buf) orelse return false;
     errdefer sqe.undoSlot();
     try h.holdUntilCompletion(sqe, &buf, &.{}); // first: owns the buffer from here, on every path
-    c.io_uring_prep_madvise(s, buf.data.ptr, try py.narrow(u32, buf.data.len, "`io_uring_prep_madvise(buf)` length"), advice);
+    c.io_uring_prep_madvise(
+        s,
+        buf.data.ptr,
+        try py.narrow(u32, buf.data.len, "`io_uring_prep_madvise(buf)` length"),
+        advice,
+    );
     return true;
 }
 
@@ -475,7 +529,13 @@ pub fn io_uring_prep_openat2(sqe: *SQE, path: *Object, how: *OpenHow, dfd: ?i32)
 ///
 /// Type
 ///     path: str | os.PathLike[str]
-pub fn io_uring_prep_openat2_direct(sqe: *SQE, path: *Object, how: *OpenHow, file_index: ?u32, dfd: ?i32) py.Error!bool {
+pub fn io_uring_prep_openat2_direct(
+    sqe: *SQE,
+    path: *Object,
+    how: *OpenHow,
+    file_index: ?u32,
+    dfd: ?i32,
+) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
     const path_ = try h.toPath(path);
@@ -613,10 +673,17 @@ pub fn io_uring_prep_link(
 /// Type
 ///     name: str
 ///     path: str | os.PathLike[str]
-pub fn io_uring_prep_getxattr(sqe: *SQE, name: *Object, value: py.OwnedWritableBuffer, path: *Object, len: u32) py.Error!bool {
+pub fn io_uring_prep_getxattr(
+    sqe: *SQE,
+    name: *Object,
+    value: py.OwnedWritableBuffer,
+    path: *Object,
+    len: u32,
+) py.Error!bool {
     const s = try h.prepSlot(sqe, &value) orelse return false;
     errdefer sqe.undoSlot();
-    const name_ = py.fromPython([:0]const u8, name) catch |err| return releaseFailed(value, err); // a `str`, read by the kernel at submit
+    // a `str`, read by the kernel at submit
+    const name_ = py.fromPython([:0]const u8, name) catch |err| return releaseFailed(value, err);
     const path_ = h.toPath(path) catch |err| return releaseFailed(value, err);
     defer path_.deinit();
     try h.holdUntilCompletion(sqe, &value, &.{ name, path_.obj }); // owns `value` from here
@@ -637,7 +704,8 @@ pub fn io_uring_prep_setxattr(
 ) py.Error!bool {
     const s = try h.prepSlot(sqe, &value) orelse return false;
     errdefer sqe.undoSlot();
-    const name_ = py.fromPython([:0]const u8, name) catch |err| return releaseFailed(value, err); // a `str`, read by the kernel at submit
+    // a `str`, read by the kernel at submit
+    const name_ = py.fromPython([:0]const u8, name) catch |err| return releaseFailed(value, err);
     const path_ = h.toPath(path) catch |err| return releaseFailed(value, err);
     defer path_.deinit();
     try h.holdUntilCompletion(sqe, &value, &.{ name, path_.obj }); // owns `value` from here
@@ -654,10 +722,17 @@ pub fn io_uring_prep_setxattr(
 
 /// Type
 ///     name: str
-pub fn io_uring_prep_fgetxattr(sqe: *SQE, fd: i32, name: *Object, value: py.OwnedWritableBuffer, len: u32) py.Error!bool {
+pub fn io_uring_prep_fgetxattr(
+    sqe: *SQE,
+    fd: i32,
+    name: *Object,
+    value: py.OwnedWritableBuffer,
+    len: u32,
+) py.Error!bool {
     const s = try h.prepSlot(sqe, &value) orelse return false;
     errdefer sqe.undoSlot();
-    const name_ = py.fromPython([:0]const u8, name) catch |err| return releaseFailed(value, err); // a `str`, read by the kernel at submit
+    // a `str`, read by the kernel at submit
+    const name_ = py.fromPython([:0]const u8, name) catch |err| return releaseFailed(value, err);
     try h.holdUntilCompletion(sqe, &value, &.{name}); // owns `value` from here
     c.io_uring_prep_fgetxattr(s, fd, name_, value.data.ptr, len);
     return true;
@@ -665,10 +740,18 @@ pub fn io_uring_prep_fgetxattr(sqe: *SQE, fd: i32, name: *Object, value: py.Owne
 
 /// Type
 ///     name: str
-pub fn io_uring_prep_fsetxattr(sqe: *SQE, fd: i32, name: *Object, value: py.OwnedBuffer, flags: i32, len: u32) py.Error!bool {
+pub fn io_uring_prep_fsetxattr(
+    sqe: *SQE,
+    fd: i32,
+    name: *Object,
+    value: py.OwnedBuffer,
+    flags: i32,
+    len: u32,
+) py.Error!bool {
     const s = try h.prepSlot(sqe, &value) orelse return false;
     errdefer sqe.undoSlot();
-    const name_ = py.fromPython([:0]const u8, name) catch |err| return releaseFailed(value, err); // a `str`, read by the kernel at submit
+    // a `str`, read by the kernel at submit
+    const name_ = py.fromPython([:0]const u8, name) catch |err| return releaseFailed(value, err);
     try h.holdUntilCompletion(sqe, &value, &.{name}); // owns `value` from here
     c.io_uring_prep_fsetxattr(s, fd, name_, value.data.ptr, flags, len);
     return true;
@@ -709,7 +792,12 @@ pub fn io_uring_prep_pipe(sqe: *SQE, fds: py.OwnedWritableBuffer, pipe_flags: i3
 
 /// Like `io_uring_prep_pipe`, but the pipe's fds go into the registered file table: `fds` gets the two
 /// slots (`file_index` for the read end; `IORING_FILE_INDEX_ALLOC` lets the kernel pick both).
-pub fn io_uring_prep_pipe_direct(sqe: *SQE, fds: py.OwnedWritableBuffer, pipe_flags: i32, file_index: ?u32) py.Error!bool {
+pub fn io_uring_prep_pipe_direct(
+    sqe: *SQE,
+    fds: py.OwnedWritableBuffer,
+    pipe_flags: i32,
+    file_index: ?u32,
+) py.Error!bool {
     const s = try h.prepSlot(sqe, &fds) orelse return false;
     errdefer sqe.undoSlot();
     try h.holdUntilCompletion(sqe, &fds, &.{}); // first: owns the buffer from here, on every path

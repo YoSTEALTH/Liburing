@@ -1,13 +1,12 @@
-from liburing import Ring, Cqe, Sqe, io_uring_prep_nop, io_uring_submit_and_wait, io_uring_peek_cqe, \
-                     io_uring_cq_ready, io_uring_cq_advance, io_uring_queue_init, io_uring_queue_exit
+from liburing import *
 
 
 def main():
     ring = Ring()
+    sqe = Sqe(ring)  # one object for the ring's lifetime: each prep takes the next free entry
     cqe = Cqe()
     try:
         io_uring_queue_init(8, ring)
-        sqe = Sqe(ring)  # one object for the ring's lifetime: each prep takes the next free entry
         for i in range(3):
             io_uring_prep_nop(sqe)  # `True`; `False` when the queue is full: submit, then prep again
             sqe.user_data = i  # acts on the entry of the last prep

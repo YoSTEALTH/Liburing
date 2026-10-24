@@ -4,10 +4,8 @@ collected, and the ring exits first, so no request in flight is left writing int
 import gc
 import os
 import weakref
-
 import pytest
-
-import liburing as u
+from liburing import *
 
 
 class Buf(bytearray):
@@ -15,8 +13,8 @@ class Buf(bytearray):
 
 
 def new_ring():
-    ring = u.Ring()
-    u.io_uring_queue_init(8, ring)
+    ring = Ring()
+    io_uring_queue_init(8, ring)
     return ring
 
 
@@ -39,9 +37,9 @@ def test_cycle_with_read_in_flight(pipe):
     def make():
         ring, buf = new_ring(), Buf(8)
         buf.ring = ring  # ring -> its table's hold -> buf -> ring
-        sqe = u.io_uring_get_sqe(ring)
-        u.io_uring_prep_read(sqe, r, buf)  # waits for data: in flight
-        assert u.io_uring_submit(ring) == 1
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_read(sqe, r, buf)  # waits for data: in flight
+        assert io_uring_submit(ring) == 1
         return weakref.ref(buf)
 
     assert collected(make())
@@ -53,7 +51,7 @@ def test_cycle_with_pending_prep():
     def make():
         ring, buf = new_ring(), Buf(8)
         buf.ring = ring  # held by the SQ slot's pending hold (prepped, not submitted)
-        u.io_uring_prep_read(u.io_uring_get_sqe(ring), -1, buf)
+        io_uring_prep_read(io_uring_get_sqe(ring), -1, buf)
         return weakref.ref(buf)
 
     assert collected(make())
@@ -63,7 +61,7 @@ def test_cycle_with_registered_buffer():
     def make():
         ring, buf = new_ring(), Buf(4096)
         buf.ring = ring
-        assert u.io_uring_register_buffers(ring, [buf]) == 0
+        assert io_uring_register_buffers(ring, [buf]) == 0
         return weakref.ref(buf)
 
     assert collected(make())
@@ -73,8 +71,8 @@ def test_cycle_with_provided_buffers(cqe):
     def make():
         ring, area = new_ring(), Buf(2 * 64)
         area.ring = ring
-        u.io_uring_prep_provide_buffers(u.io_uring_get_sqe(ring), area, 64, 2, 1)
-        assert u.io_uring_submit_and_wait(ring, 1) == 1
+        io_uring_prep_provide_buffers(io_uring_get_sqe(ring), area, 64, 2, 1)
+        assert io_uring_submit_and_wait(ring, 1) == 1
         return weakref.ref(area)
 
     assert collected(make())
@@ -82,9 +80,9 @@ def test_cycle_with_provided_buffers(cqe):
 
 def test_cycle_through_template():
     def make():
-        tmpl, buf = u.Sqe(), Buf(8)
+        tmpl, buf = Sqe(), Buf(8)
         buf.tmpl = tmpl  # tmpl -> its entry's hold -> buf -> tmpl
-        u.io_uring_prep_read(tmpl, -1, buf)
+        io_uring_prep_read(tmpl, -1, buf)
         return weakref.ref(buf)
 
     assert collected(make())
@@ -94,11 +92,11 @@ def test_cycle_with_template_copy_in_flight(pipe):
     r, w = pipe
 
     def make():
-        ring, tmpl, buf = new_ring(), u.Sqe(), Buf(8)
+        ring, tmpl, buf = new_ring(), Sqe(), Buf(8)
         buf.refs = (ring, tmpl)  # ring -> the copy's hold -> tmpl -> buf -> ring
-        u.io_uring_prep_read(tmpl, r, buf)
-        assert u.put_sqe(ring, tmpl)
-        assert u.io_uring_submit(ring) == 1  # in flight: the template keeps its hold until the ring drains
+        io_uring_prep_read(tmpl, r, buf)
+        assert put_sqe(ring, tmpl)
+        assert io_uring_submit(ring) == 1  # in flight: the template keeps its hold until the ring drains
         return weakref.ref(buf)
 
     assert collected(make())
@@ -113,12 +111,12 @@ def test_shared_registration_not_visited_twice():
     buf = Buf(4096)
     buf.ring = src
     ref = weakref.ref(buf)
-    assert u.io_uring_register_buffers(src, [buf]) == 0
-    assert u.io_uring_clone_buffers(dst, src) == 0
+    assert io_uring_register_buffers(src, [buf]) == 0
+    assert io_uring_clone_buffers(dst, src) == 0
     del buf
     gc.collect()
     assert ref() is not None
-    u.io_uring_queue_exit(dst)  # `src` alone holds it again: visited, the cycle can go
+    io_uring_queue_exit(dst)  # `src` alone holds it again: visited, the cycle can go
     del src
     assert collected(ref)
 
@@ -126,7 +124,7 @@ def test_shared_registration_not_visited_twice():
 def test_cycle_through_msghdr():
     def make():
         buf = Buf(8)
-        msg = u.Msghdr(iov=[buf])
+        msg = Msghdr(iov=[buf])
         buf.msg = msg  # msg -> its `Vec`'s view -> buf -> msg
         return weakref.ref(buf)
 
@@ -136,7 +134,7 @@ def test_cycle_through_msghdr():
 def test_cycle_through_msghdr_control():
     def make():
         control = Buf(32)
-        msg = u.Msghdr(control=control)
+        msg = Msghdr(control=control)
         control.msg = msg
         return weakref.ref(control)
 
@@ -146,9 +144,9 @@ def test_cycle_through_msghdr_control():
 def test_cycle_through_buf_ring():
     def make():
         ring, buf = new_ring(), Buf(64)
-        br = u.io_uring_setup_buf_ring(ring, 4, 1, 0)
-        u.io_uring_buf_ring_add(br, buf, 0, u.io_uring_buf_ring_mask(4))
-        u.io_uring_buf_ring_advance(br, 1)
+        br = io_uring_setup_buf_ring(ring, 4, 1, 0)
+        io_uring_buf_ring_add(br, buf, 0, io_uring_buf_ring_mask(4))
+        io_uring_buf_ring_advance(br, 1)
         buf.ring = ring  # ring -> its `BufRing` -> buf's view -> buf -> ring
         return weakref.ref(buf)
 

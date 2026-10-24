@@ -1,5 +1,5 @@
 // HTTP keep-alive echo server on io_uring (C liburing), the same server, response and load as
-// `liburing_bench.py` (from Shakti's `example/bench`).
+// `liburing_bench.py`.
 //
 //   zig cc -O2 -D_GNU_SOURCE -Ilib/liburing/src/include -o zig-out/bin/liburing_bench_c example/bench/liburing_bench.c lib/liburing/src/{setup,queue,register,syscall,version}.c
 //   zig-out/bin/liburing_bench_c 12345 [--defer] [--tmpl]

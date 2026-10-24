@@ -6,14 +6,13 @@ import pathlib
 import subprocess
 import sys
 import textwrap
-
 import pytest
+import liburing
+from liburing import *
 
-import liburing as u
-
-KERNEL = f"Kernel `{u.LINUX_VERSION_MAJOR}.{u.LINUX_VERSION_MINOR}`"
+KERNEL = f"Kernel `{LINUX_VERSION_MAJOR}.{LINUX_VERSION_MINOR}`"
 ROOT = pathlib.Path(__file__).parent.parent
-PACKAGE_DIR = str(pathlib.Path(u.__file__).parent.parent)  # where this `liburing` was imported from
+PACKAGE_DIR = str(pathlib.Path(liburing.__file__).parent.parent)  # where this `liburing` was imported from
 
 # Runs in a child process: a seccomp filter makes `io_uring_register` fail with `EINVAL` for opcodes from
 # `IORING_REGISTER_QUERY` (35) on, which is what a kernel without `QUERY` does. Irreversible, hence the child.
@@ -52,55 +51,55 @@ def run_without_query(code):
 
 
 def test_UnsupportedError_is_OSError():
-    assert issubclass(u.UnsupportedError, OSError)
+    assert issubclass(UnsupportedError, OSError)
 
 
 def test_unknown_register_opcode(ring):
-    with pytest.raises(u.UnsupportedError, match="does not support `register opcode 200`") as e:
-        u.io_uring_register(ring.ring_fd, 200, 0, None)
+    with pytest.raises(UnsupportedError, match="does not support `register opcode 200`") as e:
+        io_uring_register(ring.ring_fd, 200, 0, None)
     assert e.value.errno == errno.EINVAL
 
 
 def test_bad_argument_stays_OSError(ring):
     # `IORING_REGISTER_EVENTFD` is supported: a bad fd is the caller's error.
     with pytest.raises(OSError) as e:
-        u.io_uring_register_eventfd(ring, -1)
-    assert type(e.value) is not u.UnsupportedError
+        io_uring_register_eventfd(ring, -1)
+    assert type(e.value) is not UnsupportedError
     assert e.value.errno == errno.EBADF
 
 
 def test_unknown_setup_flag():
-    u.io_uring_register_query(u.Query())  # setup flags are known only from `QUERY`: skips without it
-    with pytest.raises(u.UnsupportedError, match="does not support `setup flag 0x40000000`") as e:
-        u.io_uring_queue_init(1, u.Ring(), 1 << 30)
+    io_uring_register_query(Query())  # setup flags are known only from `QUERY`: skips without it
+    with pytest.raises(UnsupportedError, match="does not support `setup flag 0x40000000`") as e:
+        io_uring_queue_init(1, Ring(), 1 << 30)
     assert e.value.errno == errno.EINVAL
 
 
 def test_bad_setup_flags_stay_OSError():
     # `IORING_SETUP_SQ_AFF` is supported, it just needs `IORING_SETUP_SQPOLL`.
     with pytest.raises(OSError) as e:
-        u.io_uring_queue_init(1, u.Ring(), u.IORING_SETUP_SQ_AFF)
-    assert type(e.value) is not u.UnsupportedError
+        io_uring_queue_init(1, Ring(), IORING_SETUP_SQ_AFF)
+    assert type(e.value) is not UnsupportedError
 
 
 def test_kernel_without_query():
     r = run_without_query("""
-        import liburing as u
+        from liburing import *
         try:
-            u.io_uring_register_query(u.Query())
-        except u.UnsupportedError as e:
+            io_uring_register_query(Query())
+        except UnsupportedError as e:
             print("query:", e.errno, e.strerror)
-        ring = u.Ring()
-        u.io_uring_queue_init(1, ring)
+        ring = Ring()
+        io_uring_queue_init(1, ring)
         try:  # opcode 36 came after `QUERY`, so a kernel without it has no 36 either
-            u.io_uring_register(ring.ring_fd, 36, 0, None)
-        except u.UnsupportedError as e:
+            io_uring_register(ring.ring_fd, 36, 0, None)
+        except UnsupportedError as e:
             print("36:", e.strerror)
         try:  # `EVENTFD` (5.2) is in the version table: a bad fd stays `OSError`
-            u.io_uring_register_eventfd(ring, -1)
+            io_uring_register_eventfd(ring, -1)
         except OSError as e:
             print("eventfd:", type(e).__name__, e.errno)
-        u.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
     """)
     assert r.returncode == 0, r.stderr
     assert r.stdout.splitlines() == [

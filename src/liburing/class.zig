@@ -337,7 +337,10 @@ pub inline fn claim(owner: *usize, thread: usize) bool {
 
 /// `RuntimeError` for a `Cqe`, `CqeBatch` or `Sqe` template used by a thread that does not own it.
 pub noinline fn raiseNotOwner(comptime what: []const u8, comptime first: []const u8) py.Error {
-    return py.raiseRuntimeError("`" ++ what ++ "` belongs to the thread of its first " ++ first ++ ": use one per thread", .{});
+    return py.raiseRuntimeError(
+        "`" ++ what ++ "` belongs to the thread of its first " ++ first ++ ": use one per thread",
+        .{},
+    );
 }
 
 /// A new reference to `obj`, for an owned (`?*Object`) field.

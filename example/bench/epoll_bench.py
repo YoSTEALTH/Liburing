@@ -28,7 +28,7 @@ RESPONSE += b'Hello world!</body></html>'
 class Conn:
     '''One client: its socket, receive buffer and the unsent part of the response.'''
 
-    __slots__ = ('sock', 'buf', 'out')
+    __slots__ = ('buf', 'out', 'sock')
 
     def __init__(self, sock):
         self.sock = sock

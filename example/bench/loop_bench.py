@@ -1,29 +1,12 @@
-'''Submit/complete micro benchmark: NOPs only, no sockets (Liburing's counterpart of Shakti's
-`example/bench/loop_bench.py`). Uses only API both the Setu and the old PyOZ builds have, so they
-can be compared on one machine.
+'''Submit/complete micro benchmark: NOPs only, no sockets. Uses only API both the Setu and the old
+PyOZ builds have, so they can be compared on one machine.
 
     python3.15t example/bench/loop_bench.py
 '''
 
 import sys
 from time import perf_counter
-import liburing
-from liburing import (
-    Cqe,
-    Ring,
-    Sqe,
-    io_uring_cq_advance,
-    io_uring_cqe_seen,
-    io_uring_get_sqe,
-    io_uring_prep_nop,
-    io_uring_queue_exit,
-    io_uring_queue_init,
-    io_uring_submit,
-    io_uring_submit_and_wait,
-    io_uring_wait_cqe,
-    io_uring_wait_cqe_nr,
-    put_sqe,
-)
+from liburing import *
 
 ROUNDS = 5
 BATCH = 1024
@@ -63,8 +46,8 @@ def nop_batch_read(ring, cqe, n):
         io_uring_wait_cqe_nr(ring, cqe, BATCH)
         for i in range(BATCH):
             entry = cqe[i]
-            entry.user_data
-            entry.res
+            _ = entry.user_data
+            _ = entry.res
         io_uring_cq_advance(ring, BATCH)
 
 
@@ -106,7 +89,8 @@ CASES = [
 
 def main():
     gil = getattr(sys, '_is_gil_enabled', lambda: True)()
-    print(f'liburing {getattr(liburing, "__version__", "?")} from {liburing.__file__}')
+    lib = sys.modules['liburing']
+    print(f'liburing {getattr(lib, "__version__", "?")} from {lib.__file__}')
     print(f'Python {sys.version.split()[0]} GIL={"on" if gil else "off"}, best of {ROUNDS}\n')
     print(f'{"case":<26}{"ops":>10}{"total ms":>11}{"ns/op":>9}')
     for name, n, fn in CASES:

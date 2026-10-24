@@ -1,4 +1,4 @@
-import liburing
+from liburing import *
 
-for k, v in liburing.probe().items():
+for k, v in probe().items():
     print(k, v)

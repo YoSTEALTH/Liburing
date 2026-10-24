@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Runs every Liburing check: zig fmt, `tools/setu_build.py` against the pinned Setu, `zig build develop` (the one
-# stable-ABI `liburing.so`), then with each interpreter (3.15t, 3.15, 3.14t, 3.14) Setu's `check_symbols.py` and
-# pytest, then `mypy --strict` (as 3.14 and 3.15) + `stubtest` on `liburing.pyi`.
+# Runs every Liburing check: zig fmt, Zig line width, ruff (lint + format), `tools/setu_build.py` against the pinned
+# Setu, `zig build develop` (the one stable-ABI `liburing.so`), then with each interpreter (3.15t, 3.15, 3.14t, 3.14)
+# Setu's `check_symbols.py` and pytest, then `mypy --strict` (as 3.14 and 3.15) + `stubtest` on `liburing.pyi`.
 # Interpreters: PY_FT=... / PY_GIL=... (3.15), PY314_FT=... / PY314_GIL=...; compiler: ZIG=...; Setu checkout:
-# SETU=... (default: the `setu` path in build.zig.zon); extra pytest arguments after `--`.
+# SETU=... (default: the `setu` path in build.zig.zon); ruff: RUFF=... (default: `ruff` on PATH, else `$PY_FT -m
+# ruff`); extra pytest arguments after `--`.
 set -euo pipefail
 
 [[ -n ${SETU:-} ]] && SETU=$(realpath -m -- "$SETU") # relative to the caller's cwd, not the repo root
@@ -20,7 +21,41 @@ PYTEST_ARGS=("$@")
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 
 step "zig fmt"
-"$ZIG" fmt --check src tools build.zig build.zig.zon
+"$ZIG" fmt --check src tools example build.zig build.zig.zon
+
+step "Zig lines are at most 120 characters"
+# ruff holds Python to `line-length = 120`; `zig fmt` never wraps a long line (only a trailing comma splits a call).
+"$PY_FT" - src tools example build.zig <<'PY'
+import pathlib
+import sys
+
+bad = []
+for arg in sys.argv[1:]:
+    path = pathlib.Path(arg)
+    for file in sorted(path.rglob("*.zig")) if path.is_dir() else [path]:
+        for number, line in enumerate(file.read_text(encoding="utf-8").splitlines(), 1):
+            if len(line) > 120:
+                bad.append(f"{file}:{number}: {len(line)} characters")
+print("\n".join(bad) or "ok")
+sys.exit(1 if bad else 0)
+PY
+
+step "ruff check + ruff format --check"
+if [[ -n ${RUFF:-} ]]; then
+    ruff=("$RUFF")
+elif command -v ruff >/dev/null; then
+    ruff=(ruff)
+elif "$PY_FT" -c 'import ruff' 2>/dev/null; then
+    ruff=("$PY_FT" -m ruff)
+else
+    ruff=()
+fi
+if ((${#ruff[@]})); then
+    "${ruff[@]}" check .
+    "${ruff[@]}" format --check .
+else
+    echo "skipped: no ruff (RUFF=..., on PATH, or installed for $PY_FT)"
+fi
 
 step "c.io_uring_submit* only through Ring.submitPtr"
 # `submitPtr` makes the in-flight table's entries and runs the skip checks: a submit with any other pointer

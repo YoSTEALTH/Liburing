@@ -11,9 +11,6 @@ const py = setu.py;
 const sc = setu.c;
 const Object = sc.Object;
 
-/// `liburing.UnsupportedError`, set by `init`.
-var unsupported_error: ?*Object = null;
-
 const doc =
     \\The running kernel does not support this `io_uring` feature (an `OSError` subclass).
     \\
@@ -32,16 +29,11 @@ const doc =
     \\    `probe()` tells.
 ;
 
-/// Creates `UnsupportedError` (`OSError` subclass) and adds it to `module`.
-pub fn init(module: *Object) py.Error!void {
-    const exc = sc.PyErr_NewExceptionWithDoc("liburing.UnsupportedError", doc, sc.PyExc_OSError, null) orelse
-        return error.PythonError;
-    if (sc.PyModule_AddObjectRef(module, "UnsupportedError", exc) < 0) {
-        py.decref(exc);
-        return error.PythonError;
-    }
-    unsupported_error = exc; // keeps the reference: the module is never unloaded
-    // Asked once here (module exec runs on one thread), then only read: no race between threads.
+/// `liburing.UnsupportedError` (`OSError` subclass): created and added by Setu (`root.zig` `module.from`).
+pub const UnsupportedError = setu.Exception(.{ .doc = doc, .base = .OSError });
+
+/// Asks the kernel once (module `init`, one thread), then only read: no race between threads.
+pub fn init() void {
     query = queryOpcodes();
     kernel_version = unameVersion();
 }
@@ -67,7 +59,10 @@ pub inline fn registerOp(opcode: u32, res: c_int) py.Error!c_int {
 fn registerFailed(name: []const u8, op: u32, res: c_int) py.Error {
     @branchHint(.cold);
     // An opcode the kernel doesn't know is rejected before its arguments are read: any of these.
-    if ((res == -EINVAL or res == -EBADF or res == -EOPNOTSUPP) and !registerSupported(op)) return unsupported(name, res);
+    if ((res == -EINVAL or res == -EBADF or res == -EOPNOTSUPP) and !registerSupported(op)) return unsupported(
+        name,
+        res,
+    );
     _ = try py.checkErrno(res);
     unreachable; // `res < 0` always raises
 }
@@ -118,7 +113,7 @@ fn unsupported(name: []const u8, res: c_int) py.Error {
     const k = kernel();
     var buf: [128]u8 = undefined;
     const msg = std.mem.print(&buf, "Kernel `{d}.{d}` does not support `{s}`", .{ k >> 8, k & 0xff, name }) catch &buf;
-    return py.raiseWith(unsupported_error.?, .{ -res, msg });
+    return UnsupportedError.raiseWith(.{ -res, msg });
 }
 
 /// Does the running kernel know register opcode `op`?
@@ -146,7 +141,9 @@ fn v(major: u16, minor: u16) u16 {
 }
 
 comptime {
-    if (register_since.len != c.IORING_REGISTER_QUERY) @compileError("`register_since` must end before `IORING_REGISTER_QUERY`");
+    if (register_since.len != c.IORING_REGISTER_QUERY) @compileError(
+        "`register_since` must end before `IORING_REGISTER_QUERY`",
+    );
 }
 
 /// The `IORING_SETUP_*` name of the lowest bit in `flags` (`null` when it has none).

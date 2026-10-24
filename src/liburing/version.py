@@ -20,7 +20,7 @@ _set_linux_version()  # initialize
 
 
 @lru_cache
-def linux_version_check(version: str | int | float) -> bool:
+def linux_version_check(version: str | float) -> bool:
     """Linux Version Check.
 
     Example

@@ -1,5 +1,5 @@
 //! HTTP keep-alive echo server on `std.os.linux.IoUring`, the same response and
-//! connection handling as `liburing_bench.py` (and Shakti's `example/bench`, where this file comes from).
+//! connection handling as `liburing_bench.py`.
 //!
 //!     zig build-exe -OReleaseFast -femit-bin=zig-out/bin/std_io_uring_bench example/bench/std_io_uring_bench.zig
 //!     zig-out/bin/std_io_uring_bench 12345

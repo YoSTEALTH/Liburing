@@ -70,13 +70,19 @@ pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
 ///     - `ring` holds on to `buf` until `io_uring_queue_exit`: it can not be closed or resized
 ///     (`BufferError`) while the kernel uses it.
 pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.WritableBuffer) py.Error!i32 {
-    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_mem(ring)` already initialized!", .{});
-    ring.own();
+    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError(
+        "`io_uring_queue_init_mem(ring)` already initialized!",
+        .{},
+    );
+    ring.ownByCaller();
     // Own view: the argument's is released after the call, this one at `io_uring_queue_exit`.
     const mem: ?py.WritableBuffer = if (buf) |b| try b.take() else null;
     errdefer if (mem) |m| m.deinit();
     const ptr: ?*anyopaque = if (mem) |m| m.data.ptr else null;
-    const used = try support.setup(c.io_uring_queue_init_mem(entries, &ring._io_uring, &p._io_uring_params, ptr, if (mem) |m| m.data.len else 0), p._io_uring_params.flags);
+    const used = try support.setup(
+        c.io_uring_queue_init_mem(entries, &ring._io_uring, &p._io_uring_params, ptr, if (mem) |m| m.data.len else 0),
+        p._io_uring_params.flags,
+    );
     ring._mem = mem;
     return used;
 }
@@ -103,9 +109,15 @@ pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.Wr
 ///     >>> finally:
 ///     ...     io_uring_queue_exit(ring)
 pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.Error!i32 {
-    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init_params(ring)` already initialized!", .{});
-    ring.own();
-    return support.setup(c.io_uring_queue_init_params(entries, &ring._io_uring, &param._io_uring_params), param._io_uring_params.flags);
+    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError(
+        "`io_uring_queue_init_params(ring)` already initialized!",
+        .{},
+    );
+    ring.ownByCaller();
+    return support.setup(
+        c.io_uring_queue_init_params(entries, &ring._io_uring, &param._io_uring_params),
+        param._io_uring_params.flags,
+    );
 }
 
 /// Setup `Ring` Submission & Completion Queues
@@ -118,15 +130,18 @@ pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.E
 ///     >>> finally:
 ///     ...     io_uring_queue_exit(ring)
 pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) py.Error!i32 {
-    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError("`io_uring_queue_init(ring)` already initialized!", .{});
-    ring.own();
+    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError(
+        "`io_uring_queue_init(ring)` already initialized!",
+        .{},
+    );
+    ring.ownByCaller();
     return support.setup(c.io_uring_queue_init(entries, &ring._io_uring, flags orelse 0), flags orelse 0);
 }
 
 /// >>> io_uring_queue_mmap(fd, param, ring)
 pub fn io_uring_queue_mmap(fd: i32, ring: *Ring, param: *Param) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) try ring.checkThread();
-    ring.own();
+    ring.ownByCaller();
     return py.checkErrno(c.io_uring_queue_mmap(fd, &param._io_uring_params, &ring._io_uring));
 }
 
@@ -156,7 +171,7 @@ pub fn io_uring_ring_dontfork(ring: *Ring) py.Error!i32 {
 pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
     if (ring._io_uring.ring_fd > 0) {
         try ring.checkThread(); // not under the owner while it waits in the kernel
-        ring.drain(); // requests in flight: cancelled and completed before what they hold is released
+        ring.drainRequests(); // requests in flight: cancelled and completed before what they hold is released
         c.io_uring_queue_exit(&ring._io_uring);
         ring._io_uring.ring_fd = 0;
         if (ring._mem) |m| m.deinit(); // the kernel is done with it
@@ -167,7 +182,10 @@ pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
 }
 
 pub fn io_uring_resize_rings(ring: *Ring, p: *Param) py.Error!i32 {
-    return support.register("IORING_REGISTER_RESIZE_RINGS", c.io_uring_resize_rings(try ring.checkedPtr(), &p._io_uring_params));
+    return support.register(
+        "IORING_REGISTER_RESIZE_RINGS",
+        c.io_uring_resize_rings(try ring.checkedPtr(), &p._io_uring_params),
+    );
 }
 
 pub fn io_uring_enter(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sig: ?*SigsetT) py.Error!i32 {

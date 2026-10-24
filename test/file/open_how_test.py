@@ -1,4 +1,4 @@
-from liburing import O_RDWR, RESOLVE_CACHED, OpenHow
+from liburing import *
 
 
 def test_open_how():

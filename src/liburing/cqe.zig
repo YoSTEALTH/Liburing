@@ -95,8 +95,9 @@ pub const Cqe = struct {
     _gen: u32 = 0, // `_ring`'s `_gen` when `_io_uring_cqe` was set
     /// `CQE`s handed out by `cqe[i]`, reused once nothing else holds them (see `__getitem__`).
     _reuse: [reuse_len]?*Object = @splat(null),
-    /// `pthread_self()` of the thread that filled it first (`follow`): the only one that may fill it, so two threads
-    /// can not swap `_ring` (and `_reuse`) under each other. Reads go through the ring's own check. `0`: none yet.
+    /// `pthread_self()` of the thread that filled it first (`followRing`): the only one that may fill it, so two
+    /// threads can not swap `_ring` (and `_reuse`) under each other. Reads go through the ring's own check. `0`: none
+    /// yet.
     _thread: usize = 0,
 
     /// `entry = cqe[i]` in a loop still holds the previous entry while asking for the next one.
@@ -112,13 +113,13 @@ pub const Cqe = struct {
     /// The `cqe_ptr` argument for a liburing call on `ring` (Zig side): records the ring, so
     /// `cqe[i]` can follow its completion queue.
     pub fn outFor(self: *Cqe, ring: *Ring) py.Error!*?[*]c.io_uring_cqe {
-        try self.follow(RingType.object(ring));
+        try self.followRing(RingType.object(ring));
         return &self._io_uring_cqe;
     }
 
     /// Records `ring_obj` (a `Ring`) and its generation, before `_io_uring_cqe` is set into its queue;
     /// `RuntimeError` from a thread that does not own the `Cqe` (`_thread`).
-    pub fn follow(self: *Cqe, ring_obj: *Object) py.Error!void {
+    pub inline fn followRing(self: *Cqe, ring_obj: *Object) py.Error!void {
         if (!claim(&self._thread, pthread_self())) return raiseNotOwner("Cqe", "wait or peek");
         setOwned(&self._ring, ring_obj);
         self._gen = RingType.data(ring_obj)._gen;
@@ -186,10 +187,12 @@ pub const Cqe = struct {
 
     /// A `CQE` for `cqe` (a new reference): a reused one that only `_reuse` holds (no one can see
     /// it change), else a new one, kept in `_reuse` if there is room.
-    fn entry(self: *Cqe, cqe: *c.io_uring_cqe, ring_obj: *Object, ring: *c.io_uring) py.Error!*Object {
+    inline fn entry(self: *Cqe, cqe: *c.io_uring_cqe, ring_obj: *Object, ring: *c.io_uring) py.Error!*Object {
         for (&self._reuse) |*slot| {
             const o = slot.* orelse {
-                const new = try CQEType.new(.{ ._cqe = cqe, ._owner = keep(ring_obj), ._ring = ring, ._gen = self._gen });
+                const new = try CQEType.new(
+                    .{ ._cqe = cqe, ._owner = keep(ring_obj), ._ring = ring, ._gen = self._gen },
+                );
                 slot.* = keep(new);
                 return new;
             };
@@ -235,7 +238,9 @@ pub const CqeBatch = struct {
 
     pub fn __new__(self: *Self, no: u32) py.Error!void {
         if (no == 0) return py.raiseValueError("`CqeBatch(no)` - `no` must be > 0", .{});
-        const array = std.heap.c_allocator.alloc(?*c.io_uring_cqe, no) catch return e.raiseMemoryError("Out of Memory!");
+        const array = std.heap.c_allocator.alloc(?*c.io_uring_cqe, no) catch return e.raiseMemoryError(
+            "Out of Memory!",
+        );
         self._array = array.ptr;
         self._len = no;
     }
@@ -319,8 +324,9 @@ pub const CqeIter = struct {
         if (self._cqe) |o| {
             const _cqe = CqeType.data(o);
             if (self._ring) |r| {
-                _ = try Ring.checkGen(&RingType.data(r)._io_uring, self._gen); // the iterator reads its completion queue
-                try _cqe.follow(r);
+                // the iterator reads its completion queue
+                _ = try Ring.checkGen(&RingType.data(r)._io_uring, self._gen);
+                try _cqe.followRing(r);
             }
             if (c.io_uring_cqe_iter_next(&self._io_uring_cqe_iter, &_cqe._io_uring_cqe)) {
                 defer self._index += 1;

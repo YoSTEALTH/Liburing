@@ -4,10 +4,8 @@ import os
 import os.path
 import pathlib
 import tempfile
-
 import pytest
-
-import liburing
+from liburing import *
 
 
 @pytest.fixture
@@ -47,32 +45,32 @@ def ring(request):
         queue_init_mem:
             Init queue using `io_uring_queue_init_mem`
     '''
-    ring = liburing.Ring()
+    ring = Ring()
     try:
         if request.param == 'queue_init':
-            liburing.io_uring_queue_init(1024, ring)
+            io_uring_queue_init(1024, ring)
         elif request.param == 'queue_init_params':
-            param = liburing.Param()
-            liburing.io_uring_queue_init_params(1024, ring, param)
+            param = Param()
+            io_uring_queue_init_params(1024, ring, param)
         else:
             buf = mmap.mmap(-1, 8 * 1024 * 1024)
-            param = liburing.Param()
-            liburing.io_uring_queue_init_mem(1024, ring, param, buf)
+            param = Param()
+            io_uring_queue_init_mem(1024, ring, param, buf)
         yield ring
     finally:
-        liburing.io_uring_queue_exit(ring)
+        io_uring_queue_exit(ring)
 
 
 @pytest.fixture
 def cqe():
-    return liburing.Cqe()
+    return Cqe()
 
 
 # liburing end <<<
 
 
 # linux version start >>>
-LINUX_VERSION = f"{liburing.LINUX_VERSION_MAJOR}.{liburing.LINUX_VERSION_MINOR}"
+LINUX_VERSION = f"{LINUX_VERSION_MAJOR}.{LINUX_VERSION_MINOR}"
 
 
 @pytest.fixture(autouse=True)
@@ -94,7 +92,7 @@ def skip_by_platform(request):
         ...
         test.py::test_function SKIPPED
     """
-    if (r := request.node.get_closest_marker("skip_linux")) and liburing.linux_version_check(version := r.args[0]):
+    if (r := request.node.get_closest_marker("skip_linux")) and linux_version_check(version := r.args[0]):
         msg = r.args[1] if len(r.args) > 1 else f"Kernel `{LINUX_VERSION} < {version}`"
         pytest.skip(msg)
 
@@ -113,7 +111,7 @@ def skip_by_opcode(request):
         test.py::test_function SKIPPED (kernel has no `IORING_OP_FUTEX_WAIT`)
     """
     if r := request.node.get_closest_marker("requires_op"):
-        supported = liburing.probe()
+        supported = probe()
         for op in r.args:
             if not supported.get(op, False):
                 pytest.skip(f"Kernel `{LINUX_VERSION}` has no `{op}`")
@@ -128,7 +126,7 @@ def pytest_runtest_call(item):
     """
     try:
         return (yield)
-    except liburing.UnsupportedError as e:
+    except UnsupportedError as e:
         # `_use_item_location`: `-rs` names the test, as for a skip marker, not this hook.
         raise pytest.skip.Exception(e.strerror, _use_item_location=True) from None
 

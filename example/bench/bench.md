@@ -4,22 +4,21 @@ The latest benchmark run, with each run's raw numbers.
 
 ## Setup
 
-- AMD Ryzen 9 9900X (12 cores / 24 threads, 2 CCDs: CPUs 0-5 + 12-17 and 6-11 + 18-23), Linux 7.2.11
+- AMD Ryzen 9 9900X (12 cores / 24 threads, 2 CCDs: CPUs 0-5 + 12-17 and 6-11 + 18-23), Linux 7.3.0
 - Zig 0.17.0, Python 3.15.0 / 3.15t, 3.14.8 / 3.14t, C liburing 2.15 (the `lib/liburing` submodule)
 - Liburing built with `zig build develop -Drelease`; C with `zig cc -O2`; Zig servers `-OReleaseFast`
-- HTTP load: `tools/load.zig` (from Shakti), `zig-out/bin/load PORT 64 5 100`: 64 threads, each one connection
+- HTTP load: `tools/load.zig`, `zig-out/bin/load PORT 64 5 100`: 64 threads, each one connection
   after another, 100 keep-alive requests per connection, for 5 seconds
 - HTTP server: one thread, pinned to CPU 2 (`taskset -c 2`); load on the same CCD:
   `taskset -c 0,1,3,4,5,12,13,15,16,17` (CCD0 without CPU 2 and its SMT sibling 14)
-- `net.netfilter.nf_conntrack_max = 1048576` since 2026-10-22 (was 262,144, which back-to-back runs fill up: see
-  the note under "Every run" below)
+- `net.netfilter.nf_conntrack_max = 262144` (back-to-back runs fill it up: see the note under "Every run" below)
 
-## HTTP keep-alive server, 2026-10-22
+## HTTP keep-alive server, 2026-10-24
 
 The same server (accept, recv, send the 214-byte response, recv again; close on 0 or error) written several ways:
 `liburing_bench.c` (C liburing), `epoll_bench.c` (C epoll), `liburing_bench.py` (Liburing), `epoll_bench.py`
 (`select.epoll`, written the same way as the Liburing one) and `asyncio_bench.py` (asyncio `sock_recv` /
-`sock_sendall`, from Shakti). Liburing arms each request three ways:
+`sock_sendall`). Liburing arms each request three ways:
 
 - default: a normal SQE, as the C API does. `io_uring_get_sqe(ring)`, the prep, `sqe.user_data = ...`: 3 calls and
   a new `SQE` object per request.
@@ -35,75 +34,77 @@ interleaved, `-Drelease`. `--defer` (C only here): the ring is set up with
 
 | server | req/s |
 |:--|--:|
-| C liburing | **634k** |
-| C epoll | **597k** |
-| Liburing `Sqe(n)`, 3.15 | **498k** |
-| epoll, Python 3.15 | **494k** |
-| Liburing `Sqe(ring)`, 3.15 | **478k** |
-| Liburing `get_sqe`, 3.15 | **448k** |
-| asyncio, Python 3.15 | **139k** |
+| C liburing | **627k** |
+| C epoll | **593k** |
+| Liburing `Sqe(n)`, 3.15 | **501k** |
+| epoll, Python 3.15 | **499k** |
+| Liburing `Sqe(ring)`, 3.15 | **476k** |
+| Liburing `get_sqe`, 3.15 | **446k** |
+| asyncio, Python 3.15 | **140k** |
 
 ### Summary: req/s, median, best first
 
 | server | req/s | |
 |:--|--:|:--|
-| C liburing `--defer` | 634,383 | `███████████████████████████████████████` |
-| C liburing | 633,614 | `███████████████████████████████████████` |
-| C epoll | 597,375 | `████████████████████████████████████▊` |
-| Liburing, 3.15 `--tmpl` | 497,850 | `██████████████████████████████▋` |
-| epoll, 3.15 | 494,098 | `██████████████████████████████▍` |
-| Liburing, 3.14 `--tmpl` | 492,350 | `██████████████████████████████▎` |
-| epoll, 3.15t | 490,817 | `██████████████████████████████▎` |
-| epoll, 3.14 | 484,224 | `█████████████████████████████▊` |
-| Liburing, 3.15t `--tmpl` | 483,630 | `█████████████████████████████▊` |
-| epoll, 3.14t | 482,725 | `█████████████████████████████▊` |
-| Liburing, 3.14t `--tmpl` | 480,615 | `█████████████████████████████▋` |
-| Liburing, 3.15 `--ring` | 478,123 | `█████████████████████████████▍` |
-| Liburing, 3.14 `--ring` | 470,077 | `████████████████████████████▉` |
-| Liburing, 3.15t `--ring` | 451,656 | `███████████████████████████▊` |
-| Liburing, 3.14t `--ring` | 449,273 | `███████████████████████████▋` |
-| Liburing, 3.15 | 448,454 | `███████████████████████████▋` |
-| Liburing, 3.14 | 440,786 | `███████████████████████████▏` |
-| Liburing, 3.15t | 427,378 | `██████████████████████████▎` |
-| Liburing, 3.14t | 415,696 | `█████████████████████████▋` |
-| asyncio, 3.15 | 138,831 | `████████▌` |
-| asyncio, 3.14 | 134,417 | `████████▎` |
-| asyncio, 3.15t | 129,882 | `████████` |
-| asyncio, 3.14t | 127,505 | `███████▉` |
+| C liburing | 627,427 | `███████████████████████████████████████` |
+| C liburing `--defer` | 623,016 | `██████████████████████████████████████▊` |
+| C epoll | 592,691 | `████████████████████████████████████▉` |
+| Liburing, 3.15 `--tmpl` | 500,999 | `███████████████████████████████▏` |
+| epoll, 3.15 | 499,194 | `███████████████████████████████` |
+| epoll, 3.15t | 488,873 | `██████████████████████████████▍` |
+| Liburing, 3.14 `--tmpl` | 487,520 | `██████████████████████████████▎` |
+| Liburing, 3.15t `--tmpl` | 486,087 | `██████████████████████████████▎` |
+| epoll, 3.14t | 481,487 | `█████████████████████████████▉` |
+| epoll, 3.14 | 479,860 | `█████████████████████████████▉` |
+| Liburing, 3.14t `--tmpl` | 478,660 | `█████████████████████████████▊` |
+| Liburing, 3.15 `--ring` | 475,821 | `█████████████████████████████▋` |
+| Liburing, 3.14 `--ring` | 465,683 | `█████████████████████████████` |
+| Liburing, 3.15t `--ring` | 453,713 | `████████████████████████████▎` |
+| Liburing, 3.14t `--ring` | 448,088 | `███████████████████████████▉` |
+| Liburing, 3.15 | 446,145 | `███████████████████████████▊` |
+| Liburing, 3.14 | 440,987 | `███████████████████████████▍` |
+| Liburing, 3.14t | 423,244 | `██████████████████████████▎` |
+| Liburing, 3.15t | 423,016 | `██████████████████████████▎` |
+| asyncio, 3.15 | 139,738 | `████████▋` |
+| asyncio, 3.14 | 133,654 | `████████▎` |
+| asyncio, 3.15t | 130,463 | `████████▏` |
+| asyncio, 3.14t | 126,796 | `███████▉` |
 
 ### Every run, req/s
 
 | server | run 1 | run 2 | run 3 | run 4 | run 5 | low - max (used) |
 |:--|--:|--:|--:|--:|--:|--:|
-| C liburing | 634,646 | 630,049 | 633,614 | 634,270 | 631,815 | 630,049 - 634,646 |
-| C liburing `--defer` | 634,922 | 635,241 | 632,394 | 634,383 | 629,649 | 629,649 - 635,241 |
-| C epoll | 594,138 | 599,987 | 597,375 | 599,014 | 596,489 | 594,138 - 599,987 |
-| Liburing, 3.15 | 448,537 | 448,454 | 451,617 | 448,444 | 446,563 | 446,563 - 451,617 |
-| Liburing, 3.15 `--ring` | 478,123 | 478,248 | 475,821 | 478,172 | 474,760 | 474,760 - 478,248 |
-| Liburing, 3.15t | 426,876 | 426,594 | 431,152 | 429,647 | 427,378 | 426,594 - 431,152 |
-| Liburing, 3.15t `--ring` | 451,656 | 451,345 | 454,619 | 455,701 | 449,953 | 449,953 - 455,701 |
-| Liburing, 3.14 | 440,963 | 440,786 | 440,746 | 439,202 | 445,697 | 439,202 - 445,697 |
-| Liburing, 3.14 `--ring` | 468,863 | 472,127 | 470,077 | 470,584 | 470,054 | 468,863 - 472,127 |
-| Liburing, 3.14t | 405,293 | 418,366 | 415,696 | 413,856 | 418,200 | 405,293 - 418,366 |
-| Liburing, 3.14t `--ring` | 450,422 | 446,422 | 449,061 | 452,081 | 449,273 | 446,422 - 452,081 |
-| Liburing, 3.15 `--tmpl` | 497,771 | 487,052 | 499,107 | 499,754 | 497,850 | 487,052 - 499,754 |
-| Liburing, 3.15t `--tmpl` | 483,059 | 483,630 | 481,794 | 484,992 | 485,888 | 481,794 - 485,888 |
-| Liburing, 3.14 `--tmpl` | 492,088 | 496,450 | 493,324 | 490,787 | 492,350 | 490,787 - 496,450 |
-| Liburing, 3.14t `--tmpl` | 474,213 | 483,554 | 482,474 | 479,339 | 480,615 | 474,213 - 483,554 |
-| epoll, 3.15 | 493,265 | 499,050 | 497,024 | 494,098 | 491,476 | 491,476 - 499,050 |
-| epoll, 3.15t | 492,956 | 484,976 | 490,817 | 487,887 | 492,281 | 484,976 - 492,956 |
-| epoll, 3.14 | 480,610 | 488,199 | 486,310 | 484,224 | 484,114 | 480,610 - 488,199 |
-| epoll, 3.14t | 482,373 | 483,451 | 483,267 | 479,529 | 482,725 | 479,529 - 483,451 |
-| asyncio, 3.15 | 139,052 | 138,831 | 138,704 | 139,078 | 138,152 | 138,152 - 139,078 |
-| asyncio, 3.15t | 129,044 | 129,990 | 130,473 | 129,037 | 129,882 | 129,037 - 130,473 |
-| asyncio, 3.14 | 133,788 | 132,493 | 134,436 | 134,982 | 134,417 | 132,493 - 134,982 |
-| asyncio, 3.14t | 128,103 | 126,790 | 128,528 | 127,505 | 126,643 | 126,643 - 128,528 |
+| C liburing | 627,427 | 631,626 | 628,526 | 566,305 | 564,340 | 564,340 - 631,626 |
+| C liburing `--defer` | 627,539 | 625,438 | 623,016 | 566,887 | 559,275 | 559,275 - 627,539 |
+| C epoll | 592,691 | 592,975 | 594,404 | 540,816 | 537,331 | 537,331 - 594,404 |
+| Liburing, 3.15 | 453,833 | 448,629 | 443,676 | 446,145 | 413,010 | 413,010 - 453,833 |
+| Liburing, 3.15 `--ring` | 476,744 | 475,821 | 470,441 | 476,984 | 435,829 | 435,829 - 476,984 |
+| Liburing, 3.15t | 431,540 | 423,016 | 395,022 | 429,467 | 393,761 | 393,761 - 431,540 |
+| Liburing, 3.15t `--ring` | 453,713 | 454,413 | 451,145 | 455,107 | 414,402 | 414,402 - 455,107 |
+| Liburing, 3.14 | 440,987 | 442,219 | 441,052 | 408,908 | 405,129 | 405,129 - 442,219 |
+| Liburing, 3.14 `--ring` | 465,683 | 468,446 | 469,318 | 432,806 | 429,873 | 429,873 - 469,318 |
+| Liburing, 3.14t | 423,665 | 423,244 | 433,545 | 397,743 | 391,917 | 391,917 - 433,545 |
+| Liburing, 3.14t `--ring` | 452,101 | 448,088 | 453,505 | 421,768 | 416,956 | 416,956 - 453,505 |
+| Liburing, 3.15 `--tmpl` | 506,054 | 501,616 | 496,519 | 500,999 | 454,749 | 454,749 - 506,054 |
+| Liburing, 3.15t `--tmpl` | 486,087 | 489,863 | 480,952 | 489,859 | 444,886 | 444,886 - 489,863 |
+| Liburing, 3.14 `--tmpl` | 489,486 | 489,506 | 487,520 | 447,864 | 450,910 | 447,864 - 489,506 |
+| Liburing, 3.14t `--tmpl` | 483,902 | 484,789 | 478,660 | 443,128 | 440,792 | 440,792 - 484,789 |
+| epoll, 3.15 | 506,282 | 505,375 | 499,194 | 498,575 | 444,488 | 444,488 - 506,282 |
+| epoll, 3.15t | 488,873 | 489,360 | 493,021 | 487,316 | 446,039 | 446,039 - 493,021 |
+| epoll, 3.14 | 479,860 | 482,855 | 486,838 | 435,905 | 437,990 | 435,905 - 486,838 |
+| epoll, 3.14t | 481,958 | 481,487 | 482,791 | 432,109 | 434,015 | 432,109 - 482,791 |
+| asyncio, 3.15 | 140,349 | 140,942 | 138,827 | 139,738 | 134,956 | 134,956 - 140,942 |
+| asyncio, 3.15t | 130,463 | 130,701 | 130,953 | 126,637 | 126,071 | 126,071 - 130,953 |
+| asyncio, 3.14 | 133,654 | 135,057 | 135,001 | 130,423 | 131,614 | 130,423 - 135,057 |
+| asyncio, 3.14t | 127,378 | 126,796 | 127,056 | 124,442 | 122,285 | 122,285 - 127,378 |
 
-115 runs, no failed request, no run longer than 5.04 s, every set within 5%. An earlier run of this set had runs
-far below the rest (11 of 145): the kernel's conntrack table (`net.netfilter.nf_conntrack_max`, 262,144 then)
-filled up, since each run opens ~30,000 connections and a closed one stays in the table for 120 s. A full table
-drops new connections, loopback included, so `connect` waits for its retries (1, 3, 7, ... s; up to 68 s seen) and
-the server sits idle. These runs are with `nf_conntrack_max` at 1,048,576 (the table peaked at 364,075).
+115 runs, no failed request, no run longer than 5.04 s. The runs in each set spread 4-14%: round 5 (and
+round 4 for a few) came out ~9% lower on every server, C included, so the dip is the machine, not a server; the
+median of 5 is unaffected. The kernel's conntrack table (`net.netfilter.nf_conntrack_max`, 262,144 again after a
+reboot) fills up if runs go back to back: each run opens ~30,000 connections and a closed one stays in the table
+for 120 s. A full table drops new connections, loopback included, so `connect` waits for its retries (1, 3, 7, ... s)
+and the server sits idle (11 of 145 runs in an earlier set). The runner waited while the table held more than
+200,000 entries (peak 212,556).
 
 ### Server CPU per request
 
@@ -111,36 +112,36 @@ Server CPU time (user + kernel, from `/proc/PID/stat`) over each 5 s run, the ru
 
 | server | server CPU | µs/req (median) | low - high | runs |
 |:--|--:|--:|--:|--:|
-| C liburing | 53% | 0.84 | 0.83 - 0.84 | 5 |
-| C liburing `--defer` | 53% | 0.84 | 0.83 - 0.84 | 5 |
-| C epoll | 56-57% | 0.95 | 0.94 - 0.95 | 5 |
-| Liburing, 3.15 | 66% | 1.47 | 1.46 - 1.49 | 5 |
-| Liburing, 3.15 `--ring` | 64% | 1.35 | 1.34 - 1.35 | 5 |
-| Liburing, 3.15t | 67-68% | 1.59 | 1.56 - 1.60 | 5 |
-| Liburing, 3.15t `--ring` | 66% | 1.46 | 1.44 - 1.48 | 5 |
-| Liburing, 3.14 | 67% | 1.52 | 1.50 - 1.53 | 5 |
-| Liburing, 3.14 `--ring` | 65% | 1.38 | 1.37 - 1.38 | 5 |
-| Liburing, 3.14t | 68-69% | 1.65 | 1.63 - 1.71 | 5 |
-| Liburing, 3.14t `--ring` | 66% | 1.48 | 1.46 - 1.48 | 5 |
-| Liburing, 3.15 `--tmpl` | 62-64% | 1.26 | 1.25 - 1.31 | 5 |
-| Liburing, 3.15t `--tmpl` | 64% | 1.32 | 1.31 - 1.33 | 5 |
-| Liburing, 3.14 `--tmpl` | 63% | 1.28 | 1.27 - 1.29 | 5 |
-| Liburing, 3.14t `--tmpl` | 64% | 1.33 | 1.32 - 1.36 | 5 |
-| epoll, 3.15 | 62% | 1.26 | 1.24 - 1.27 | 5 |
-| epoll, 3.15t | 62-63% | 1.28 | 1.27 - 1.29 | 5 |
-| epoll, 3.14 | 62-63% | 1.30 | 1.29 - 1.30 | 5 |
-| epoll, 3.14t | 62-63% | 1.30 | 1.29 - 1.31 | 5 |
-| asyncio, 3.15 | 87-88% | 6.31 | 6.31 - 6.34 | 5 |
-| asyncio, 3.15t | 89% | 6.83 | 6.80 - 6.88 | 5 |
-| asyncio, 3.14 | 88% | 6.58 | 6.54 - 6.67 | 5 |
-| asyncio, 3.14t | 89% | 6.95 | 6.92 - 7.02 | 5 |
+| C liburing | 53-55% | 0.85 | 0.84 - 0.97 | 5 |
+| C liburing `--defer` | 53-55% | 0.85 | 0.85 - 0.97 | 5 |
+| C epoll | 56-58% | 0.95 | 0.95 - 1.07 | 5 |
+| Liburing, 3.15 | 66-67% | 1.49 | 1.47 - 1.61 | 5 |
+| Liburing, 3.15 `--ring` | 64-65% | 1.36 | 1.35 - 1.49 | 5 |
+| Liburing, 3.15t | 68-69% | 1.62 | 1.57 - 1.73 | 5 |
+| Liburing, 3.15t `--ring` | 66% | 1.46 | 1.46 - 1.59 | 5 |
+| Liburing, 3.14 | 67% | 1.52 | 1.51 - 1.65 | 5 |
+| Liburing, 3.14 `--ring` | 65% | 1.39 | 1.38 - 1.51 | 5 |
+| Liburing, 3.14t | 68% | 1.61 | 1.56 - 1.74 | 5 |
+| Liburing, 3.14t `--ring` | 66% | 1.47 | 1.46 - 1.59 | 5 |
+| Liburing, 3.15 `--tmpl` | 63% | 1.25 | 1.24 - 1.39 | 5 |
+| Liburing, 3.15t `--tmpl` | 63-64% | 1.30 | 1.30 - 1.44 | 5 |
+| Liburing, 3.14 `--tmpl` | 63-64% | 1.30 | 1.28 - 1.42 | 5 |
+| Liburing, 3.14t `--tmpl` | 63-64% | 1.33 | 1.31 - 1.45 | 5 |
+| epoll, 3.15 | 62-63% | 1.25 | 1.24 - 1.41 | 5 |
+| epoll, 3.15t | 62-63% | 1.28 | 1.27 - 1.40 | 5 |
+| epoll, 3.14 | 63% | 1.31 | 1.29 - 1.45 | 5 |
+| epoll, 3.14t | 63-64% | 1.31 | 1.31 - 1.48 | 5 |
+| asyncio, 3.15 | 87-88% | 6.24 | 6.21 - 6.44 | 5 |
+| asyncio, 3.15t | 88-89% | 6.79 | 6.75 - 6.99 | 5 |
+| asyncio, 3.14 | 87-88% | 6.59 | 6.50 - 6.71 | 5 |
+| asyncio, 3.14t | 88-89% | 6.99 | 6.98 - 7.24 | 5 |
 
 No server uses its whole core: req/s is limited by the round trip (64 connections, one request in flight each), so
-CPU per request is the better measure. Per request on 3.15: `get_sqe` 1.47 µs, `Sqe(ring)` 1.35, `Sqe(no)` 1.26,
-epoll 1.26. `Sqe(ring)` saves 0.12-0.17 µs/req over `get_sqe`, and templates another 0.09-0.15. With templates
-Liburing ties `select.epoll` on 3.15 (1.26 vs 1.26) and beats it on 3.14 (1.28 vs 1.30); free-threaded it is
-0.03-0.04 behind (1.32 vs 1.28 on 3.15t, 1.33 vs 1.30 on 3.14t). Without templates it is ~0.08-0.09 µs/req behind
-with the GIL and ~0.18 free-threaded. In C, io_uring costs ~12% less than epoll (0.84 vs 0.95 µs).
+CPU per request is the better measure. Per request on 3.15: `get_sqe` 1.49 µs, `Sqe(ring)` 1.36, `Sqe(no)` 1.25,
+epoll 1.25. `Sqe(ring)` saves 0.12-0.16 µs/req over `get_sqe`, and templates another 0.10-0.16. With templates
+Liburing ties `select.epoll` on 3.15 (1.25 vs 1.25) and is 0.01 ahead on 3.14 (1.30 vs 1.31); free-threaded it is
+0.02 behind (1.30 vs 1.28 on 3.15t, 1.33 vs 1.31 on 3.14t). Without templates it is ~0.08-0.11 µs/req behind
+with the GIL and ~0.16-0.18 free-threaded (`Sqe(ring)`). In C, io_uring costs ~11% less than epoll (0.85 vs 0.95 µs).
 
 ### Where the Python cost goes
 
@@ -148,7 +149,7 @@ with the GIL and ~0.18 free-threaded. In C, io_uring costs ~12% less than epoll 
   cheap syscalls.
 - Liburing arms each request with 3 calls (`get_sqe`), 2 (`Sqe(ring)`) or 1 (`Sqe(no)`), then reads `cqe[i]`,
   `.user_data`, `.res`, twice per request (recv + send). Each call costs ~15-25 ns, and an object costs more.
-- asyncio is ~3.5x slower than Liburing, mostly from its own machinery (a task per connection, a future per
+- asyncio is ~3.2-3.6x slower than Liburing, mostly from its own machinery (a task per connection, a future per
   `sock_recv` / `sock_sendall`, a new `bytes` per recv), not from epoll.
 - Left to try: `--at` (`cqe.user_data_at(i)` / `res_at(i)`, no `CQE` objects: ~0.01-0.05 µs/req),
   multishot recv with a provided buffer ring (one SQE for many recvs), and the free-threaded extra cost.

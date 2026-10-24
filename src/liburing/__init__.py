@@ -1,3 +1,6 @@
-from .liburing import *  # noqa
-from .version import *  # noqa
-from .liburing import __version__  # noqa: F401  (set from `build.zig.zon`)
+from . import liburing, version
+from .liburing import *
+from .liburing import __version__ as __version__
+from .version import *
+
+del liburing, version  # the submodules: `from liburing import *` gives only their names

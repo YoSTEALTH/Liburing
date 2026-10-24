@@ -1,4 +1,4 @@
-//! Tiny HTTP load generator for `example/bench/liburing_bench.{py,c}` (no siege/wrk needed; from Shakti).
+//! Tiny HTTP load generator for `example/bench/liburing_bench.{py,c}` (no siege/wrk needed).
 //!
 //!     zig build load
 //!     zig-out/bin/load [port=12345] [connections=64] [seconds=5] [requests_per_connection=1]

@@ -92,7 +92,10 @@ fn time(case: Case) !i128 {
 }
 
 pub fn main() !void {
-    std.debug.print("std.os.linux.IoUring (Zig {s}), best of {d}\n\n", .{ @import("builtin").zig_version_string, ROUNDS });
+    std.debug.print(
+        "std.os.linux.IoUring (Zig {s}), best of {d}\n\n",
+        .{ @import("builtin").zig_version_string, ROUNDS },
+    );
     std.debug.print("{s:<26}{s:>10}{s:>11}{s:>9}\n", .{ "case", "ops", "total ms", "ns/op" });
     for (cases) |case| {
         var best: i128 = std.math.maxInt(i128);

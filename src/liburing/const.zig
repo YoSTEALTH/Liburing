@@ -11,7 +11,8 @@ pub const IOV_MAX = std.posix.IOV_MAX;
 // liburing.h START >>>
 pub const LIBURING_UDATA_TIMEOUT = c.LIBURING_UDATA_TIMEOUT;
 // Tell the app the have the 64-bit variants of the get/set userdata
-// `LIBURING_HAVE_DATA64` is an empty macro: added to the module as `""` in `root.zig`.
+// `LIBURING_HAVE_DATA64` is an empty macro: a string constant `""`.
+pub const LIBURING_HAVE_DATA64 = "";
 // liburing.h END <<<
 
 // io_uring.h START >>>

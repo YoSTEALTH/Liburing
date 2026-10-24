@@ -60,7 +60,14 @@ pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, 
 /// Note
 ///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
 ///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
-pub fn io_uring_wait_cqes_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_ts_usec: u32, sigmask: ?*SigsetT) py.Error!i32 {
+pub fn io_uring_wait_cqes_min_timeout(
+    ring: *Ring,
+    cqe: *Cqe,
+    wait_nr: u32,
+    ts: *Timespec,
+    min_ts_usec: u32,
+    sigmask: ?*SigsetT,
+) py.Error!i32 {
     const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const out = try cqe.outFor(ring);
     const r = try ring.checkedPtr();
@@ -102,7 +109,13 @@ pub fn io_uring_submit_and_wait(ring: *Ring, wait_nr: u32) py.Error!i32 {
 /// Note
 ///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
 ///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
-pub fn io_uring_submit_and_wait_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, sigmask: ?*SigsetT) py.Error!i32 {
+pub fn io_uring_submit_and_wait_timeout(
+    ring: *Ring,
+    cqe: *Cqe,
+    wait_nr: u32,
+    ts: ?*Timespec,
+    sigmask: ?*SigsetT,
+) py.Error!i32 {
     const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const _ts = if (ts) |t| t._timespec else null;
     const out = try cqe.outFor(ring); // first: a refused `Cqe` must stop the call before the submit
@@ -119,18 +132,26 @@ pub fn io_uring_submit_and_wait_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts
 /// Note
 ///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
 ///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
-pub fn io_uring_submit_and_wait_min_timeout(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: *Timespec, min_wait: u32, sigmask: ?*SigsetT) py.Error!i32 {
+pub fn io_uring_submit_and_wait_min_timeout(
+    ring: *Ring,
+    cqe: *Cqe,
+    wait_nr: u32,
+    ts: *Timespec,
+    min_wait: u32,
+    sigmask: ?*SigsetT,
+) py.Error!i32 {
     const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const out = try cqe.outFor(ring); // first: a refused `Cqe` must stop the call before the submit
     const r = try ring.submitPtr();
-    return support.feature("IORING_FEAT_MIN_TIMEOUT", r.features, wait(r, wait_nr, c.io_uring_submit_and_wait_min_timeout, .{
+    const res = wait(r, wait_nr, c.io_uring_submit_and_wait_min_timeout, .{
         r,
         out,
         wait_nr,
         ts._timespec,
         min_wait,
         _sigmask,
-    }));
+    });
+    return support.feature("IORING_FEAT_MIN_TIMEOUT", r.features, res);
 }
 
 pub fn io_uring_submit_and_wait_reg(ring: *Ring, cqe: *Cqe, wait_nr: u32, reg_index: i32) py.Error!i32 {
@@ -185,9 +206,12 @@ pub fn io_uring_cqe_iter_init(ring: *Ring) py.Error!*Object {
 ///     - Getting iter is low level and very touchy must be used as shown in example.
 ///     - Consider using `CqeIter` instead, in `for` loop.
 pub fn io_uring_cqe_iter_next(iter: *CqeIter, cqe: *Cqe) py.Error!bool {
-    const ring = iter._ring orelse return py.raiseRuntimeError("`CqeIter` - not created by `io_uring_cqe_iter_init`", .{});
+    const ring = iter._ring orelse return py.raiseRuntimeError(
+        "`CqeIter` - not created by `io_uring_cqe_iter_init`",
+        .{},
+    );
     _ = try Ring.checkGen(&RingType.data(ring)._io_uring, iter._gen); // the iterator points into its queue
-    try cqe.follow(ring); // `cqe[i]` follows this ring's completion queue
+    try cqe.followRing(ring); // `cqe[i]` follows this ring's completion queue
     return c.io_uring_cqe_iter_next(&iter._io_uring_cqe_iter, &cqe._io_uring_cqe);
 }
 
