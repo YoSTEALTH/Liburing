@@ -25,18 +25,18 @@ import os
 from liburing import *
 
 ring = Ring()
-cqe = Cqe()                                     # a completion queue entry
-io_uring_queue_init(8, ring)                    # a ring with room for 8 requests
+cqe = Cqe()  # a completion queue entry
+io_uring_queue_init(8, ring)  # a ring with room for 8 requests
 try:
     fd = os.open("/etc/hostname", os.O_RDONLY)
-    buffer = bytearray(64)                      # keep a reference until the read completes
-    sqe = io_uring_get_sqe(ring)                # a submission queue entry
-    io_uring_prep_read(sqe, fd, buffer)         # describe the request
-    sqe.user_data = 1                           # comes back in `cqe.user_data`
-    io_uring_submit(ring)                       # hand it to the kernel
-    io_uring_wait_cqe(ring, cqe)                # wait for the result
+    buffer = bytearray(64)  # keep a reference until the read completes
+    sqe = io_uring_get_sqe(ring)  # a submission queue entry
+    io_uring_prep_read(sqe, fd, buffer)  # describe the request
+    sqe.user_data = 1  # comes back in `cqe.user_data`
+    io_uring_submit(ring)  # hand it to the kernel
+    io_uring_wait_cqe(ring, cqe)  # wait for the result
     print(cqe[0].user_data, cqe[0].res, bytes(buffer[: cqe[0].res]))  # raises `OSError` if it failed
-    io_uring_cqe_seen(ring, cqe[0])             # done with this entry
+    io_uring_cqe_seen(ring, cqe[0])  # done with this entry
     os.close(fd)
 finally:
     io_uring_queue_exit(ring)
