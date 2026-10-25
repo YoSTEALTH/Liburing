@@ -32,7 +32,11 @@ pub const FileIndexIterType = setu.Class(FileIndexIter, @embedFile("helper.zig")
 ///     >>> list(ids)
 ///     [4, 5, 6]
 ///     >>> for id in ids:
-///     ...     # do something e.g.`if id != -1: os.close(id)`
+///     ...     id  # do something e.g.`if id != -1: os.close(id)`
+///     ...
+///     4
+///     5
+///     6
 ///
 /// Note
 ///     - Makes copy of the list provided & shares it with `io_uring`,
@@ -71,7 +75,10 @@ pub const FileIndex = struct {
     /// Replace the file descriptors with `list`, which must have the same length (`ValueError` otherwise).
     ///
     /// Example
+    ///     >>> ids = FileIndex([-1, -1, -1])
     ///     >>> ids.update([4, 5, 6])
+    ///     >>> list(ids)
+    ///     [4, 5, 6]
     pub fn update(self: *Self, list: py.Sequence(i32)) py.Error!void {
         if (self._len != list.items.len) return py.raiseValueError(
             "`FileIndex.update(list)` - length of {d} does not match {d}",
@@ -108,19 +115,16 @@ pub const FileIndexIter = struct {
 /// Probe your system to find out which `io_uring` operations are available: a `dict` of every `IORING_OP_*` name
 /// (up to, not including, `IORING_OP_LAST`) and whether the running kernel supports it.
 ///
-/// Example
-///     >>> probe()
-///     {'IORING_OP_NOP': True, ...}
-///
-///     # or
-///
-///     >>> for op, supported in probe().items():
-///     ...     op, supported
-///     IORING_OP_NOP True
-///
-///
 /// Type
 ///     return: dict[str, bool]
+///
+/// Example
+///     >>> probe()
+///     {'IORING_OP_NOP': True, 'IORING_OP_READV': True, 'IORING_OP_WRITEV': True, ...}
+///
+///     # or
+///     >>> probe()['IORING_OP_READ']
+///     True
 pub fn probe() py.Error!*Object {
     const last: usize = @backingInt(n.io_uring_op.IORING_OP_LAST);
     const items = @typeInfo(n.io_uring_op).@"enum".field_names;
@@ -143,18 +147,18 @@ pub fn probe() py.Error!*Object {
 
 /// Kernel Timespec
 ///
+/// Type
+///     second: float
+///     return: Timespec
+///
 /// Example
 ///     >>> ts = timespec(1)        # int
 ///     >>> ts = timespec(1.5)      # float
-///     >>> io_uring_prep_timeout(sqe, ts, ...)
+///     >>> io_uring_prep_timeout(sqe, ts, 0)
 ///     True
 ///
 /// Note
 ///     - `ValueError` if `second` is negative, `nan` or `inf`; `OverflowError` if too large.
-///
-/// Type
-///     second: float
-///     return: Timespec
 pub fn timespec(second: f64) py.Error!*Object {
     if (!std.math.isFinite(second) or second < 0) {
         return py.raiseValueError("`timespec(second)` must be a finite number >= 0, got {d}", .{second});
@@ -185,25 +189,32 @@ pub fn timespec(second: f64) py.Error!*Object {
 /// Example
 ///     # single
 ///     >>> sqe = Sqe()
-///     >>> io_uring_prep_read(sqe, ...)
+///     >>> io_uring_prep_nop(sqe)
 ///     True
 ///
 ///     # multiple
+///     >>> buf = bytearray(5)
 ///     >>> sqe = Sqe(2)
-///     >>> io_uring_prep_read(sqe[0], ...)
+///     >>> io_uring_prep_read(sqe[0], fd, buf)
 ///     True
-///     >>> io_uring_prep_write(sqe[1], ...)
+///     >>> io_uring_prep_write(sqe[1], fd, b'hi...')
 ///     True
 ///
 ///     # back-end single | multiple
-///     >>> if put_sqe(self.ring, sqe):
-///     ...     # do stuff
+///     >>> if put_sqe(ring, sqe):
+///     ...     io_uring_submit(ring)  # do stuff
+///     ...
+///     2
 ///
-///     # failed: `ring` was full, submit and try to again.
-///     >>> if not put_sqe(self.ring, sqe):
-///     ...     io_uring_submit(self.ring)
-///     ...     if put_sqe(self.ring, sqe):
-///     ...         # do stuff
+///     # failed: `ring` was full (2 entries here), submit and try again.
+///     >>> put_sqe(ring, sqe)
+///     True
+///     >>> put_sqe(ring, sqe)
+///     False
+///     >>> io_uring_submit(ring)
+///     2
+///     >>> put_sqe(ring, sqe)
+///     True
 ///
 /// Note
 ///     - Returns `False` if queue is full. Will need to `io_uring_submit()` and try again

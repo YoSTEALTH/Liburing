@@ -16,16 +16,17 @@ const Param = class.Param;
 
 /// Probe which `io_uring` operations `ring`'s kernel supports; use with `io_uring_opcode_supported`.
 ///
+/// Type
+///     return: Probe
+///
 /// Example
 ///     >>> probe = io_uring_get_probe_ring(ring)
-///     ... ...
+///     >>> io_uring_opcode_supported(probe, io_uring_op.IORING_OP_NOP)
+///     True
 ///     >>> io_uring_free_probe(probe)
 ///
 /// Note
 ///     - Don't forget to call `io_uring_free_probe(probe)` after you are done with `probe`.
-///
-/// Type
-///     return: Probe
 pub fn io_uring_get_probe_ring(ring: *Ring) py.Error!*Object {
     if (c.io_uring_get_probe_ring(try ring.checkedPtr())) |p| return class.ProbeType.new(.{ ._io_uring_probe = p });
     return py.raiseRuntimeError("Linux kernel version does not support `io_uring_get_probe_ring()`", .{});
@@ -33,15 +34,15 @@ pub fn io_uring_get_probe_ring(ring: *Ring) py.Error!*Object {
 
 /// Like `io_uring_get_probe_ring`, without a ring (a temporary one is made for it).
 ///
+/// Type
+///     return: Probe
+///
 /// Example
 ///     >>> probe = io_uring_get_probe()
 ///     >>> io_uring_free_probe(probe)
 ///
 /// Note
 ///     - Don't forget to call `io_uring_free_probe(probe)` after you are done with `probe`.
-///
-/// Type
-///     return: Probe
 pub fn io_uring_get_probe() py.Error!*Object {
     if (c.io_uring_get_probe()) |p| return class.ProbeType.new(.{ ._io_uring_probe = p });
     return py.raiseRuntimeError("Linux kernel version does not support `io_uring_get_probe()`", .{});
@@ -50,7 +51,9 @@ pub fn io_uring_get_probe() py.Error!*Object {
 /// Free `probe` (it is freed on garbage collection too). Calling it again is harmless.
 ///
 /// Example
+///     >>> probe = io_uring_get_probe()
 ///     >>> io_uring_free_probe(probe)
+///     >>> io_uring_free_probe(probe)  # again: nothing happens
 pub fn io_uring_free_probe(probe: *Probe) void {
     if (probe._io_uring_probe) |p| {
         c.io_uring_free_probe(p);
@@ -61,8 +64,10 @@ pub fn io_uring_free_probe(probe: *Probe) void {
 /// Whether the kernel supports the `IORING_OP_*` opcode `op` (from `probe`).
 ///
 /// Example
+///     >>> probe = io_uring_get_probe()
 ///     >>> io_uring_opcode_supported(probe, io_uring_op.IORING_OP_NOP)
 ///     True
+///     >>> io_uring_free_probe(probe)
 pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
     return (c.io_uring_opcode_supported(probe._io_uring_probe, op) == 1);
 }
@@ -77,8 +82,10 @@ pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
 ///     >>> try:
 ///     ...     io_uring_queue_init_mem(8, ring, Param(), buf)
 ///     ...     # do stuff ...
-///     >>> finally:
+///     ... finally:
 ///     ...     io_uring_queue_exit(ring)
+///     ...
+///     8192
 ///
 /// Note
 ///     - `buf` must be page aligned and zeroed: `mmap.mmap(-1, size)` is both, a `bytearray` is not
@@ -120,10 +127,12 @@ pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.Wr
 ///     >>> try:
 ///     ...     io_uring_queue_init_params(1024, ring, param)
 ///     ...     param.sq_entries
-///     1024
 ///     ...     # do stuff ...
-///     >>> finally:
+///     ... finally:
 ///     ...     io_uring_queue_exit(ring)
+///     ...
+///     0
+///     1024
 pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError(
         "`io_uring_queue_init_params(ring)` already initialized!",
@@ -144,8 +153,10 @@ pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.E
 ///     >>> try:
 ///     ...     io_uring_queue_init(1024, ring)
 ///     ...     # do stuff ...
-///     >>> finally:
+///     ... finally:
 ///     ...     io_uring_queue_exit(ring)
+///     ...
+///     0
 pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError(
         "`io_uring_queue_init(ring)` already initialized!",
@@ -251,6 +262,9 @@ pub fn io_uring_enter(fd: u32, to_submit: u32, min_complete: u32, flags: u32, si
 /// Example
 ///     >>> io_uring_enter2(ring.ring_fd, 0, 1, IORING_ENTER_GETEVENTS, 0)
 ///     0
+///
+/// Note
+///     - `arg` is a raw address: the caller keeps what it points to alive until the call returns.
 pub fn io_uring_enter2(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sz: usize, arg: ?usize) py.Error!i32 {
     const args = .{ fd, to_submit, min_complete, flags, if (arg) |a| @as(?*anyopaque, @ptrFromInt(a)) else null, sz };
     if (min_complete == 0) return py.checkErrno(@call(.auto, c.io_uring_enter2, args));
@@ -274,6 +288,10 @@ pub fn io_uring_setup(entries: u32, p: *Param) py.Error!i32 {
 /// Example
 ///     >>> io_uring_register(ring.ring_fd, 9, 0, None)  # IORING_REGISTER_PERSONALITY
 ///     1
+///
+/// Note
+///     - `arg` is a raw address: the caller keeps what it points to alive until the call returns (and for as
+///       long as `opcode` says the kernel reads it later).
 pub fn io_uring_register(fd: u32, opcode: u32, nr_args: u32, arg: ?usize) py.Error!i32 {
     return support.registerOp(opcode, c.io_uring_register(fd, opcode, if (arg) |a| @ptrFromInt(a) else null, nr_args));
 }
@@ -358,17 +376,19 @@ pub fn io_uring_sqring_wait(ring: *Ring) py.Error!i32 {
 
 /// Get the next free entry of the submission queue to prep a request on.
 ///
+/// Type
+///     return: SQE | None
+///
 /// Example
 ///     >>> if sqe := io_uring_get_sqe(ring):
-///     ...   # do stuff...
+///     ...     io_uring_prep_nop(sqe)
+///     ...
+///     True
 ///
 /// Note
 ///     - `None` when the submission queue is full: `io_uring_submit(ring)` and try again, or let the ring do it
 ///       (`Ring(auto_submit=True)`). Set a request's link flags before taking the next entry: the
 ///       ring submits only when the last queued request does not link on.
-///
-/// Type
-///     return: SQE | None
 pub fn io_uring_get_sqe(ring: *Ring) py.Error!?*Object {
     const r = try ring.checkedPtr();
     if (c.io_uring_get_sqe(r) orelse if (try ring.autoSubmit()) c.io_uring_get_sqe(r) else null) |sqe| {
@@ -380,12 +400,14 @@ pub fn io_uring_get_sqe(ring: *Ring) py.Error!?*Object {
 /// An entry that takes two slots (128 bytes) of the submission queue, for `io_uring_prep_nop128` and
 /// `io_uring_prep_uring_cmd128`; on a ring set up with `IORING_SETUP_SQE128` it is the same as `io_uring_get_sqe`.
 ///
-/// Example
-///     >>> if sqe := io_uring_get_sqe128(ring):
-///     ...   io_uring_prep_nop128(sqe)
-///
 /// Type
 ///     return: SQE | None
+///
+/// Example
+///     >>> if sqe := io_uring_get_sqe128(ring):  # `ring` set up with `IORING_SETUP_SQE_MIXED`
+///     ...     io_uring_prep_nop128(sqe)
+///     ...
+///     True
 pub fn io_uring_get_sqe128(ring: *Ring) py.Error!?*Object {
     const r = try ring.checkedPtr();
     if (c.io_uring_get_sqe128(r) orelse if (try ring.autoSubmit()) c.io_uring_get_sqe128(r) else null) |sqe| {

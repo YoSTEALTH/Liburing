@@ -10,12 +10,15 @@ pub const StatxType = setu.Class(Statx, @embedFile("statx.zig"));
 /// Example
 ///     >>> stat = Statx()
 ///     >>> if sqe := io_uring_get_sqe(ring):
-///     ...     io_uring_prep_statx(sqe, stat, __file__)
-///     ... ...  # submit and wait for the completion
+///     ...     io_uring_prep_statx(sqe, stat, 'file.txt')
+///     ...
+///     True
+///     >>> io_uring_submit_and_wait(ring, 1)  # submit and wait for the completion
+///     1
 ///     >>> stat.isfile
 ///     True
 ///     >>> stat.size
-///     123
+///     10
 ///
 /// Note
 ///     - Takes no arguments (`TypeError` for any); the kernel fills it in at the completion of the request.

@@ -112,12 +112,15 @@ pub const Probe = struct {
 /// `io_uring_queue_init_params` / `io_uring_setup`, read back what the kernel gave after.
 ///
 /// Example
+///     >>> ring = Ring()
 ///     >>> param = Param()
 ///     >>> param.flags = IORING_SETUP_CQSIZE
 ///     >>> param.cq_entries = 256
 ///     >>> io_uring_queue_init_params(8, ring, param)
 ///     0
-///     >>> param.sq_entries, param.features
+///     >>> param.sq_entries, param.cq_entries
+///     (8, 256)
+///     >>> io_uring_queue_exit(ring)
 ///
 /// Note
 ///     - Takes no arguments (`TypeError` for any). `features` is read only.
@@ -190,8 +193,8 @@ pub const Param = struct {
 /// Signal set (`sigset_t`), e.g. for `sigmask` of wait functions.
 ///
 /// Example
-///     >>> SigsetT([signal.SIGINT, signal.SIGTERM])
-///     >>> SigsetT()  # empty set
+///     >>> mask = SigsetT([signal.SIGINT, signal.SIGTERM])
+///     >>> mask = SigsetT()  # empty set
 ///
 /// Note
 ///     - `ValueError` for an invalid signal number.
@@ -280,7 +283,7 @@ pub fn writableView(o: *Object, view: *setu.c.Buffer) py.Error!bool {
 ///
 /// Example
 ///     >>> how = OpenHow(O_CREAT | O_RDWR, 0o777, RESOLVE_CACHED)
-///     >>> io_uring_prep_openat2(..., how)
+///     >>> io_uring_prep_openat2(sqe, 'file.txt', how)
 ///     True
 ///
 ///     # or
@@ -289,7 +292,7 @@ pub fn writableView(o: *Object, view: *setu.c.Buffer) py.Error!bool {
 ///     >>> how.flags   = O_CREAT | O_RDWR
 ///     >>> how.mode    = 0
 ///     >>> how.resolve = RESOLVE_CACHED
-///     >>> io_uring_prep_openat2(..., how)
+///     >>> io_uring_prep_openat2(sqe, 'file.txt', how)
 ///     True
 ///
 /// Flags

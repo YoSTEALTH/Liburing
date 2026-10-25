@@ -25,6 +25,9 @@ const SigsetT = class.SigsetT;
 ///     >>> n = io_uring_peek_batch_cqe(ring, batch)
 ///     >>> for cqe in batch:
 ///     ...     cqe.user_data  # do stuff
+///     ...
+///     1
+///     2
 ///     >>> io_uring_cq_advance(ring, n)
 ///
 /// Note
@@ -43,11 +46,12 @@ pub fn io_uring_peek_batch_cqe(ring: *Ring, batch: *CqeBatch, count: ?u32) py.Er
 /// the first one. Returns `0`; `OSError` (`errno.ETIME`) when `ts` ran out first.
 ///
 /// Example
-///     >>> io_uring_wait_cqes(ring, cqe, 123)
+///     >>> io_uring_wait_cqes(ring, cqe, 2)
 ///     0
+///
 ///     # or
 ///     >>> ts = timespec(1.5)  # timeout
-///     >>> io_uring_wait_cqes(ring, cqe, 123, ts)
+///     >>> io_uring_wait_cqes(ring, cqe, 2, ts)
 ///     0
 ///
 /// Note
@@ -68,7 +72,7 @@ pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, 
 ///
 /// Example
 ///     >>> ts = timespec(1)  # overall timeout
-///     >>> io_uring_wait_cqes_min_timeout(ring, cqe, 8, ts, 1000)
+///     >>> io_uring_wait_cqes_min_timeout(ring, cqe, 2, ts, 1000)
 ///     0
 ///
 /// Note
@@ -112,8 +116,8 @@ pub fn io_uring_wait_cqe_timeout(ring: *Ring, cqe: *Cqe, ts: *Timespec) py.Error
 /// Submit the queued entries to the kernel. Returns how many were submitted.
 ///
 /// Example
-///     >>> io_uring_submit(ring)
-///     123
+///     >>> io_uring_submit(ring)  # two entries queued
+///     2
 pub fn io_uring_submit(ring: *Ring) py.Error!i32 {
     return py.checkErrno(c.io_uring_submit(try ring.submitPtr()));
 }
@@ -121,8 +125,8 @@ pub fn io_uring_submit(ring: *Ring) py.Error!i32 {
 /// Submit the queued entries and wait for `wait_nr` completions. Returns how many entries were submitted.
 ///
 /// Example
-///     >>> io_uring_submit_and_wait(ring, 123)
-///     123
+///     >>> io_uring_submit_and_wait(ring, 2)  # two entries queued
+///     2
 pub fn io_uring_submit_and_wait(ring: *Ring, wait_nr: u32) py.Error!i32 {
     const r = try ring.submitPtr();
     return py.checkErrno(wait(r, wait_nr, c.io_uring_submit_and_wait, .{ r, wait_nr }));
@@ -133,9 +137,13 @@ pub fn io_uring_submit_and_wait(ring: *Ring, wait_nr: u32) py.Error!i32 {
 /// `ts` ran out first.
 ///
 /// Example
-///     >>> io_uring_submit_and_wait_timeout(ring, cqe, 1)
-///     1
+///     >>> io_uring_submit_and_wait_timeout(ring, cqe, 2)  # two entries queued
+///     2
+///     >>> io_uring_cq_advance(ring, 2)  # done with them
+///
 ///     # or
+///     >>> io_uring_prep_nop(io_uring_get_sqe(ring))
+///     True
 ///     >>> ts = timespec(0.5)
 ///     >>> io_uring_submit_and_wait_timeout(ring, cqe, 1, ts)
 ///     1
@@ -170,8 +178,8 @@ pub fn io_uring_submit_and_wait_timeout(
 ///
 /// Example
 ///     >>> ts = timespec(1)  # overall timeout
-///     >>> io_uring_submit_and_wait_min_timeout(ring, cqe, 8, ts, 1000)
-///     8
+///     >>> io_uring_submit_and_wait_min_timeout(ring, cqe, 2, ts, 1000)  # two entries queued
+///     2
 ///
 /// Note
 ///     - Needs Linux 6.12+ (`IORING_FEAT_MIN_TIMEOUT`), else `UnsupportedError`.
@@ -204,7 +212,7 @@ pub fn io_uring_submit_and_wait_min_timeout(
 /// many entries were submitted; `OSError` (`errno.ETIME`) when the region's timeout ran out first.
 ///
 /// Example
-///     >>> io_uring_submit_and_wait_reg(ring, cqe, 1, 0)
+///     >>> io_uring_submit_and_wait_reg(ring, cqe, 1, 0)  # one entry queued; wait argument 0 of the region
 ///     1
 pub fn io_uring_submit_and_wait_reg(ring: *Ring, cqe: *Cqe, wait_nr: u32, reg_index: i32) py.Error!i32 {
     const out = try cqe.outFor(ring); // first: a refused `Cqe` must stop the call before the submit
@@ -226,25 +234,29 @@ pub fn io_uring_get_events(ring: *Ring) py.Error!i32 {
 /// Returns how many entries were submitted.
 ///
 /// Example
-///     >>> io_uring_submit_and_get_events(ring)
-///     1
+///     >>> io_uring_submit_and_get_events(ring)  # two entries queued
+///     2
 pub fn io_uring_submit_and_get_events(ring: *Ring) py.Error!i32 {
     return py.checkErrno(c.io_uring_submit_and_get_events(try ring.submitPtr()));
 }
 
 /// Start an iterator over the completions that are ready now.
 ///
+/// Type
+///     return: CqeIter
+///
 /// Example
 ///     >>> cqe_iter = io_uring_cqe_iter_init(ring)
 ///     >>> while io_uring_cqe_iter_next(cqe_iter, cqe):
-///     ...     ...
+///     ...     cqe[0].user_data
+///     ...
+///     1
+///     2
+///     >>> io_uring_cq_advance(ring, 2)
 ///
 /// Note
 ///     - `io_uring_cqe_iter_init` must be used with `io_uring_cqe_iter_next`
 ///     - Refer to `help(io_uring_cqe_iter_next)` for better example.
-///
-/// Type
-///     return: CqeIter
 pub fn io_uring_cqe_iter_init(ring: *Ring) py.Error!*Object {
     return CqeIterType.new(.{
         ._io_uring_cqe_iter = c.io_uring_cqe_iter_init(try ring.checkedPtr()),
@@ -256,19 +268,17 @@ pub fn io_uring_cqe_iter_init(ring: *Ring) py.Error!*Object {
 /// Set `cqe[0]` to the next ready completion of `iter`. Returns `False` when there is none left.
 ///
 /// Example
-///     # Must submit `sqe` before:
-///     ... ...
+///     # two requests submitted and completed before
 ///     >>> ready = 0
 ///     >>> cqe_iter = io_uring_cqe_iter_init(ring)
 ///     >>> while io_uring_cqe_iter_next(cqe_iter, cqe):
-///     >>>     ready += 1
-///     >>>     entry = cqe[0]  # only index `0` data gets updated!!!
-///     >>>     entry.user_data, entry.res  # do something with info
-///     ...     ...
-///     # either:
-///     >>>     io_uring_cqe_seen(ring, entry)  # within `while` loop
-///     # or
-///     >>> io_uring_cq_advance(ring, ready)  # after `while` loop is finished (probably faster).
+///     ...     ready += 1
+///     ...     entry = cqe[0]  # only index `0` data gets updated!!!
+///     ...     entry.user_data, entry.res  # do something with info
+///     ...
+///     (1, 0)
+///     (2, 0)
+///     >>> io_uring_cq_advance(ring, ready)  # after the loop (probably faster than `io_uring_cqe_seen` in it)
 ///
 /// Note
 ///     - Only `cqe[0]` gets updated with new completed entry value.
@@ -315,7 +325,7 @@ pub fn io_uring_cqe_seen(ring: *Ring, cqe: *CQE) py.Error!void {
 ///
 /// Example
 ///     >>> io_uring_cqe_get_data(cqe[0])
-///     123
+///     1
 ///
 /// Note
 ///     - `ValueError` if it is `0` (a null pointer).
@@ -329,7 +339,7 @@ pub fn io_uring_cqe_get_data(cqe: *CQE) py.Error!usize {
 ///
 /// Example
 ///     >>> io_uring_cqe_get_data64(cqe[0])
-///     123
+///     1
 pub fn io_uring_cqe_get_data64(cqe: *CQE) py.Error!u64 {
     return cqe.get_user_data();
 }

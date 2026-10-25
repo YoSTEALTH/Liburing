@@ -49,14 +49,19 @@ fn secondsTimeout(value: ?f64) py.Error!c.__kernel_timespec {
 ///     >>> region = MemRegionReg()
 ///     >>> region.flags = IORING_MEM_REGION_REG_WAIT_ARG
 ///     >>> region.region = mem
-///     >>> io_uring_register_region(ring, region)
+///     >>> io_uring_register_region(ring, region)  # `ring` set up with `IORING_SETUP_R_DISABLED`
+///     0
+///     >>> io_uring_enable_rings(ring)
 ///     0
 ///
 ///     >>> wait = RegWait()
 ///     >>> wait.timeout = 0.5            # seconds, `None` for none
 ///     >>> wait.flags = IORING_REG_WAIT_TS
 ///     >>> mem[0 : RegWait.SIZE] = wait.to_bytes()
+///     >>> io_uring_prep_nop(io_uring_get_sqe(ring))
+///     True
 ///     >>> io_uring_submit_and_wait_reg(ring, cqe, 1, 0)   # the wait argument at index 0
+///     1
 ///
 /// Note
 ///     - `io_uring_register_wait_reg` is gone from the kernel interface: C liburing always answers `EINVAL`.
@@ -108,10 +113,12 @@ pub const RegWait = struct {
 ///
 /// Example
 ///     >>> res = Restriction()
-///     >>> res.add(IORING_RESTRICTION_SQE_OP, IORING_OP_NOP)
+///     >>> res.add(IORING_RESTRICTION_SQE_OP, io_uring_op.IORING_OP_NOP)
 ///     >>> res.add(IORING_RESTRICTION_SQE_FLAGS_ALLOWED, IOSQE_IO_LINK)
-///     >>> io_uring_register_restrictions(ring, res)
+///     >>> io_uring_register_restrictions(ring, res)  # `ring` set up with `IORING_SETUP_R_DISABLED`
+///     0
 ///     >>> io_uring_enable_rings(ring)
+///     0
 pub const Restriction = struct {
     _len: usize = 0,
     _io_uring_restriction: ?[*]c.io_uring_restriction = null,
@@ -246,9 +253,10 @@ pub const BufReg = struct {
 ///
 /// Example
 ///     >>> reg = SyncCancelReg()
-///     >>> reg.addr = 123                      # the user_data of the request
+///     >>> reg.addr = 123                      # the user_data of the request (a pending read here)
 ///     >>> reg.timeout = 1.0                   # seconds to wait (default: until done)
 ///     >>> io_uring_register_sync_cancel(ring, reg)
+///     0
 pub const SyncCancelReg = struct {
     _io_uring_sync_cancel_reg: c.io_uring_sync_cancel_reg = std.mem.zeroes(c.io_uring_sync_cancel_reg),
 
@@ -311,6 +319,7 @@ pub const SyncCancelReg = struct {
 ///     >>> napi.busy_poll_to = 50      # microseconds
 ///     >>> napi.prefer_busy_poll = True
 ///     >>> io_uring_register_napi(ring, napi)
+///     0
 pub const Napi = struct {
     _io_uring_napi: c.io_uring_napi = std.mem.zeroes(c.io_uring_napi),
 
@@ -341,12 +350,14 @@ pub const Napi = struct {
 /// Example
 ///     >>> query = Query()                   # IO_URING_QUERY_OPCODES
 ///     >>> io_uring_register_query(query)
-///     >>> query.data["nr_request_opcodes"]
-///     62
+///     0
+///     >>> query.data["nr_request_opcodes"]  # the kernel's count
+///     65
 ///     >>> query = Query(IO_URING_QUERY_SCQ)
 ///     >>> io_uring_register_query(query)
+///     0
 ///     >>> query.data
-///     {'hdr_size': 320, 'hdr_alignment': 64}
+///     {'hdr_size': 64, 'hdr_alignment': 64}
 ///
 /// Note
 ///     - `query.data` has the fields of the C struct for `op`:
@@ -644,6 +655,7 @@ pub const ZcrxIfqReg = struct {
 ///     >>> reg = ClockRegister()
 ///     >>> reg.clockid = time.CLOCK_BOOTTIME
 ///     >>> io_uring_register_clock(ring, reg)
+///     0
 pub const ClockRegister = struct {
     _io_uring_clock_register: c.io_uring_clock_register = std.mem.zeroes(c.io_uring_clock_register),
 
@@ -665,9 +677,11 @@ pub const ClockRegister = struct {
 ///
 /// Example
 ///     >>> bpf = Bpf()
-///     >>> bpf.opcode = IORING_OP_OPENAT
+///     >>> bpf.opcode = io_uring_op.IORING_OP_OPENAT
+///     >>> program = struct.pack("HBBI", 0x06, 0, 0, 0)  # `BPF_RET | BPF_K` 0: deny every `openat`
 ///     >>> bpf.filter = program          # `struct sock_filter` instructions (8 bytes each), hold on to it
 ///     >>> io_uring_register_bpf_filter(ring, bpf)
+///     0
 pub const Bpf = struct {
     _io_uring_bpf: c.io_uring_bpf = std.mem.zeroes(c.io_uring_bpf),
     _program: ?*Object = null, // the buffer `filter_ptr` points into
@@ -761,7 +775,7 @@ pub const Bpf = struct {
 ///     >>> reg = MemRegionReg()
 ///     >>> reg.region = mem      # also `region_size = len(mem)` and `IORING_MEM_REGION_TYPE_USER` in `region_flags`
 ///     >>> reg.flags = IORING_MEM_REGION_REG_WAIT_ARG
-///     >>> io_uring_register_region(ring, reg)
+///     >>> io_uring_register_region(ring, reg)  # `ring` set up with `IORING_SETUP_R_DISABLED`
 ///     0
 ///
 /// Note
@@ -1009,6 +1023,9 @@ pub fn io_uring_clone_buffers(dst_ring: *Ring, src_ring: *Ring, flags: ?u32) py.
 ///     >>> bufs = [bytearray(4096), bytearray(4096)]
 ///     >>> io_uring_register_buffers(ring, bufs)
 ///     0
+///     >>> io_uring_unregister_buffers(ring)
+///     0
+///
 ///     # with a tag for each buffer
 ///     >>> io_uring_register_buffers(ring, bufs, [1, 2])
 ///     0
@@ -1079,13 +1096,15 @@ pub fn io_uring_unregister_buffers(ring: *Ring) py.Error!i32 {
 /// Register the file descriptors of `files`.
 ///
 /// Example
-///     >>> ids = FileIndex([1, 2, 3])
+///     >>> ids = FileIndex([fd, -1, -1])  # `-1`: an empty slot
 ///     >>> io_uring_register_files(ring, ids)
-///     ...
+///     0
 ///     >>> io_uring_unregister_files(ring)
+///     0
 ///
 /// Note
-///     - Hold on to `ids` reference till the submit + wait process is done.
+///     - The kernel copies the descriptors at registration: `ids` can be freed, and the fds closed, afterwards
+///       (the ring holds its own reference to each file).
 ///     - "Registered files have less overhead per operation than normal files.
 ///     This is due to the kernel grabbing a reference count on a file when an
 ///     operation begins, and dropping it when it's done. When the process file
@@ -1103,7 +1122,8 @@ pub fn io_uring_register_files(ring: *Ring, files: *const FileIndex) py.Error!i3
 /// Register the file descriptors of `files`, with a tag for each.
 ///
 /// Example
-///     >>> io_uring_register_files_tags(ring, FileIndex([-1, -1]), [1, 2])
+///     >>> io_uring_register_files_tags(ring, FileIndex([fd, -1]), [1, 0])  # an empty slot takes no tag
+///     0
 ///
 /// Note
 ///     - `tags` needs one item for each file in `files`.
@@ -1143,7 +1163,10 @@ pub fn io_uring_register_files_update_tag(
 /// Unregister all files.
 ///
 /// Example
+///     >>> io_uring_register_files_sparse(ring, 4)
+///     0
 ///     >>> io_uring_unregister_files(ring)
+///     0
 pub fn io_uring_unregister_files(ring: *Ring) py.Error!i32 {
     return support.register("IORING_UNREGISTER_FILES", c.io_uring_unregister_files(try ring.checkedPtr()));
 }
@@ -1163,7 +1186,9 @@ pub fn io_uring_register_files_update(ring: *Ring, fds: *const FileIndex, offset
 /// Register an eventfd `fd` that is signalled for each completion.
 ///
 /// Example
-///     >>> io_uring_register_eventfd(ring, fd)
+///     >>> efd = os.eventfd(0)
+///     >>> io_uring_register_eventfd(ring, efd)
+///     0
 pub fn io_uring_register_eventfd(ring: *Ring, fd: i32) py.Error!i32 {
     return support.register("IORING_REGISTER_EVENTFD", c.io_uring_register_eventfd(try ring.checkedPtr(), fd));
 }
@@ -1179,7 +1204,10 @@ pub fn io_uring_register_eventfd_async(ring: *Ring, fd: i32) py.Error!i32 {
 /// Unregister the eventfd.
 ///
 /// Example
+///     >>> io_uring_register_eventfd(ring, os.eventfd(0))
+///     0
 ///     >>> io_uring_unregister_eventfd(ring)
+///     0
 pub fn io_uring_unregister_eventfd(ring: *Ring) py.Error!i32 {
     return support.register("IORING_UNREGISTER_EVENTFD", c.io_uring_unregister_eventfd(try ring.checkedPtr()));
 }
@@ -1188,7 +1216,7 @@ pub fn io_uring_unregister_eventfd(ring: *Ring) py.Error!i32 {
 ///
 /// Example
 ///     >>> io_uring_register_personality(ring)
-///     123
+///     1
 pub fn io_uring_register_personality(ring: *Ring) py.Error!i32 {
     return support.register("IORING_REGISTER_PERSONALITY", c.io_uring_register_personality(try ring.checkedPtr()));
 }
@@ -1196,7 +1224,9 @@ pub fn io_uring_register_personality(ring: *Ring) py.Error!i32 {
 /// Unregister the personality `id`.
 ///
 /// Example
+///     >>> id = io_uring_register_personality(ring)
 ///     >>> io_uring_unregister_personality(ring, id)
+///     0
 pub fn io_uring_unregister_personality(ring: *Ring, id: i32) py.Error!i32 {
     return support.register(
         "IORING_UNREGISTER_PERSONALITY",
@@ -1226,7 +1256,14 @@ pub fn io_uring_register_restrictions(ring: *Ring, res: *Restriction) py.Error!i
 /// Enable a ring set up with `IORING_SETUP_R_DISABLED`.
 ///
 /// Example
+///     >>> ring = Ring()
+///     >>> param = Param()
+///     >>> param.flags = IORING_SETUP_R_DISABLED
+///     >>> io_uring_queue_init_params(8, ring, param)
+///     0
 ///     >>> io_uring_enable_rings(ring)
+///     0
+///     >>> io_uring_queue_exit(ring)
 pub fn io_uring_enable_rings(ring: *Ring) py.Error!i32 {
     return support.register("IORING_REGISTER_ENABLE_RINGS", c.io_uring_enable_rings(try ring.checkedPtr()));
 }
@@ -1243,6 +1280,8 @@ pub fn io_uring_register_ring_fd(ring: *Ring) py.Error!i32 {
 /// Unregister the ring's registered file descriptor (`1` on success).
 ///
 /// Example
+///     >>> io_uring_register_ring_fd(ring)
+///     1
 ///     >>> io_uring_unregister_ring_fd(ring)
 ///     1
 pub fn io_uring_unregister_ring_fd(ring: *Ring) py.Error!i32 {
@@ -1252,7 +1291,10 @@ pub fn io_uring_unregister_ring_fd(ring: *Ring) py.Error!i32 {
 /// Close the ring's real file descriptor, keeping only the registered one (`io_uring_register_ring_fd` first).
 ///
 /// Example
+///     >>> io_uring_register_ring_fd(ring)
+///     1
 ///     >>> io_uring_close_ring_fd(ring)
+///     1
 pub fn io_uring_close_ring_fd(ring: *Ring) py.Error!i32 {
     return py.checkErrno(c.io_uring_close_ring_fd(try ring.checkedPtr()));
 }
@@ -1287,6 +1329,7 @@ pub fn io_uring_unregister_buf_ring(ring: *Ring, bgid: i32) py.Error!i32 {
 /// The kernel's current head of the buffer ring `buf_group` (how many buffers it has used).
 ///
 /// Example
+///     >>> br = io_uring_setup_buf_ring(ring, 8, 1, 0)  # group 1
 ///     >>> io_uring_buf_ring_head(ring, 1)
 ///     0
 pub fn io_uring_buf_ring_head(ring: *Ring, buf_group: i32) py.Error!u16 {
@@ -1482,6 +1525,7 @@ pub fn io_uring_free_buf_ring(ring: *Ring, br: *BufRing, nentries: u32, bgid: i3
 ///
 /// Example
 ///     >>> io_uring_register_iowq_aff(ring, bytes([0b11]))  # cpus 0 and 1
+///     0
 pub fn io_uring_register_iowq_aff(ring: *Ring, mask: py.Buffer) py.Error!i32 {
     return support.register(
         "IORING_REGISTER_IOWQ_AFF",
@@ -1498,8 +1542,8 @@ pub fn io_uring_unregister_iowq_aff(ring: *Ring) py.Error!i32 {
 /// `0` leaves one as is. Gives the previous `(bounded, unbounded)`.
 ///
 /// Example
-///     >>> io_uring_register_iowq_max_workers(ring, 0, 0)  # just read the current limits
-///     (4, 8)
+///     >>> io_uring_register_iowq_max_workers(ring, 0, 0)  # (bounded, unbounded)
+///     (96, 1048576)
 pub fn io_uring_register_iowq_max_workers(ring: *Ring, bounded: u32, unbounded: u32) py.Error!struct { u32, u32 } {
     var values = [2]c_uint{ bounded, unbounded };
     _ = try support.register(

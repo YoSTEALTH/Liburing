@@ -385,6 +385,7 @@ pub fn io_uring_recvmsg_payload_length(o: *RecvmsgOut, buf_len: i32, msgh: *Msgh
 ///     - `sqe` must come from `io_uring_get_sqe` or be an `Sqe(ring)` (`TypeError` for an `Sqe` template: no ring
 ///       to hold `addr`).
 ///     - `ValueError` if `nr` is less than 1 or `addr` is shorter than `nr` bytes.
+///     - Legacy: prefer a buffer ring (`io_uring_setup_buf_ring`), which needs no request per buffer.
 pub fn io_uring_prep_provide_buffers(
     sqe: *SQE,
     addr: py.OwnedWritableBuffer,
@@ -418,6 +419,9 @@ pub fn io_uring_prep_provide_buffers(
 
 /// Removes up to `nr` buffers of the group `bgid` that `io_uring_prep_provide_buffers` gave; `cqe.res` is the
 /// number removed.
+///
+/// Note
+///     - Legacy: prefer a buffer ring (`io_uring_setup_buf_ring`, `io_uring_free_buf_ring`).
 pub fn io_uring_prep_remove_buffers(sqe: *SQE, nr: i32, bgid: i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -451,7 +455,7 @@ pub fn io_uring_prep_socket(sqe: *SQE, domain: i32, @"type": i32, protocol: ?i32
 pub fn io_uring_prep_socket_direct(
     sqe: *SQE,
     domain: i32,
-    Type: i32,
+    @"type": i32,
     protocol: ?i32,
     file_index: ?u32,
     flags: ?u32,
@@ -461,7 +465,7 @@ pub fn io_uring_prep_socket_direct(
     const _flags = flags orelse 0;
     const _protocol = protocol orelse 0;
     const _file_index = file_index orelse c.IORING_FILE_INDEX_ALLOC;
-    c.io_uring_prep_socket_direct(s, domain, Type, _protocol, _file_index, _flags);
+    c.io_uring_prep_socket_direct(s, domain, @"type", _protocol, _file_index, _flags);
     return true;
 }
 
@@ -473,6 +477,7 @@ pub fn io_uring_prep_socket_direct(
 ///     ...     sqe, io_uring_socket_op.SOCKET_URING_OP_SETSOCKOPT, sockfd, SOL_SOCKET, SO_KEEPALIVE, buf,
 ///     ... )
 ///     True
+///
 ///     # or
 ///     >>> buf = bytearray(b'eth1')
 ///     >>> io_uring_prep_cmd_sock(
@@ -491,7 +496,7 @@ pub fn io_uring_prep_socket_direct(
 ///
 /// Note
 ///     - `cqe.res` will return `len()` of populating data(`buf`).
-///     - min length of `buf` must be `4`.
+///     - the kernel checks `len(optval)` for the option (an `int` option needs 4 bytes, else `cqe.res` is `-EINVAL`).
 ///     - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
 pub fn io_uring_prep_cmd_sock(
     sqe: *SQE,

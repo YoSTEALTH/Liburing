@@ -18,6 +18,7 @@ pub const RingType = setu.Class(Ring, @embedFile("ring.zig"));
 /// Example
 ///     >>> ring = Ring()
 ///     >>> io_uring_queue_init(8, ring)
+///     0
 ///     >>> io_uring_queue_exit(ring)
 ///
 /// Note

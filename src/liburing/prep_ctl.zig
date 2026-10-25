@@ -323,6 +323,7 @@ pub fn io_uring_prep_uring_cmd128(sqe: *SQE, cmd_op: i32, fd: i32) py.Error!bool
 /// Waits for a child process's state change, like `os.waitid`: the kernel fills `infop` at the completion.
 ///
 /// Example
+///     >>> pid = os.posix_spawn('/bin/sh', ['sh', '-c', 'exit 7'], os.environ)
 ///     >>> info = SiginfoT()
 ///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> io_uring_prep_waitid(sqe, os.P_PID, pid, info, os.WEXITED)

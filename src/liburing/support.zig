@@ -15,6 +15,7 @@ const doc =
     \\The running kernel does not support this `io_uring` feature (an `OSError` subclass).
     \\
     \\Example
+    \\    # on Linux 6.12, which has no `IORING_REGISTER_QUERY`
     \\    >>> try:
     \\    ...     io_uring_register_query(Query())
     \\    ... except UnsupportedError as e:

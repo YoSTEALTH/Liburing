@@ -89,14 +89,15 @@ pub const CQE = struct {
 ///
 /// Example
 ///     >>> cqe = Cqe()
-///     ...
 ///     >>> io_uring_wait_cqe(ring, cqe)
+///     0
 ///     >>> ready = io_uring_cq_ready(ring)
-///
 ///     >>> for i in range(ready):
-///     ...     cqe[i] # do stuff
-///
-///     >>> io_uring_cq_advance(ring, ready) # free cqe already viewed.
+///     ...     cqe[i].user_data  # do stuff
+///     ...
+///     1
+///     2
+///     >>> io_uring_cq_advance(ring, ready)  # free cqe already viewed.
 ///
 /// Note
 ///     - `cqe` items e.g: `cqe[0], cqe[1], ...` are not cached (should be called/used only once) and
@@ -172,6 +173,9 @@ pub const Cqe = struct {
     /// Example
     ///     >>> for i in range(io_uring_cq_ready(ring)):
     ///     ...     cqe.user_data_at(i)
+    ///     ...
+    ///     1
+    ///     2
     pub fn user_data_at(self: *const Cqe, index: isize) py.Error!u64 {
         const kernel = (try self.slotPtr(index)).user_data;
         return RingType.data(self._ring.?).userData(kernel);
@@ -236,6 +240,9 @@ pub const Cqe = struct {
 ///     >>> n = io_uring_peek_batch_cqe(ring, batch)
 ///     >>> for cqe in batch:
 ///     ...     cqe.user_data, cqe.res
+///     ...
+///     (1, 0)
+///     (2, 0)
 ///     >>> io_uring_cq_advance(ring, n)
 ///
 /// Note
@@ -300,6 +307,7 @@ pub const CqeBatch = struct {
 /// one batch don't interfere.
 ///
 /// Example
+///     >>> batch = CqeBatch(64)
 ///     >>> n = io_uring_peek_batch_cqe(ring, batch)
 ///     >>> [(a.user_data, b.user_data) for a in batch for b in batch]
 ///     [(1, 1), (1, 2), (2, 1), (2, 2)]
@@ -328,7 +336,11 @@ pub const CqeBatchIter = struct {
 ///
 /// Example
 ///     >>> for i in CqeIter(ring, cqe):
-///     ...     cqe[0].user_data == i  # do stuff
+///     ...     i, cqe[0].user_data  # do stuff
+///     ...
+///     (0, 1)
+///     (1, 2)
+///     >>> io_uring_cq_advance(ring, 2)
 ///
 /// Note
 ///     - Only `cqe[0]` gets updated with new completed entry value.

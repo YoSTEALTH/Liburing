@@ -79,6 +79,20 @@ def test_xattr(tmp_dir, ring, cqe):
         os.close(fd)
 
 
+def test_xattr_len_larger_than_value(ring):
+    """The kernel would read / write `len` bytes: a `len` past the buffer is refused before anything is queued."""
+    sqe = io_uring_get_sqe(ring)
+    for prep, args in (
+        (io_uring_prep_getxattr, ("user.a", bytearray(4), "/a", 5)),
+        (io_uring_prep_setxattr, ("user.a", b"1234", "/a", 0, 5)),
+        (io_uring_prep_fgetxattr, (7, "user.a", bytearray(4), 5)),
+        (io_uring_prep_fsetxattr, (7, "user.a", b"1234", 0, 5)),
+    ):
+        with pytest.raises(ValueError, match="len"):
+            prep(sqe, *args)
+    assert sqe.opcode == 0  # nothing was prepared
+
+
 def test_read_write_fixed_and_vectors(tmp_dir, ring, cqe):
     fd = os.open(tmp_dir / "v.bin", os.O_RDWR | os.O_CREAT, 0o600)
     try:
@@ -127,6 +141,41 @@ def test_openat2_direct(tmp_dir, ring, cqe):
     assert io_uring_register_files_sparse(ring, 2) == 0
     assert run(ring, cqe, io_uring_prep_openat2_direct, tmp_dir / "o2.txt", how, 1) == 0
     assert run(ring, cqe, io_uring_prep_close_direct, 1) == 0
+    assert io_uring_unregister_files(ring) == 0
+
+
+def test_pipe_direct_file_index(ring, cqe):
+    """`file_index` is the slot of the read end, the write end takes the next one."""
+    assert io_uring_register_files_sparse(ring, 4) == 0
+    fds = bytearray(8)
+    assert run(ring, cqe, io_uring_prep_pipe_direct, fds, 0, 1) == 0
+    # slots 1 (read) and 2 (write) are taken: closing a free one (0, 3) fails, a taken one works
+    for free in (0, 3):
+        with pytest.raises(OSError):
+            run(ring, cqe, io_uring_prep_close_direct, free)
+    for taken in (1, 2):
+        assert run(ring, cqe, io_uring_prep_close_direct, taken) == 0
+    assert io_uring_unregister_files(ring) == 0
+
+
+def test_register_files_ids_not_needed_after(tmp_dir, ring, cqe):
+    """The kernel copies the fds at registration: `ids` can go away and the registered file still works."""
+    (tmp_dir / "r.txt").write_text("hello")
+    fd = os.open(tmp_dir / "r.txt", os.O_RDONLY)
+    ids = FileIndex([fd])
+    assert io_uring_register_files(ring, ids) == 0
+    del ids
+    os.close(fd)  # the ring holds its own reference to the file
+    out = bytearray(5)
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_read(sqe, 0, out, 0)
+    sqe.flags = IOSQE_FIXED_FILE
+    assert io_uring_submit(ring) == 1
+    assert io_uring_wait_cqe(ring, cqe) == 0
+    entry = cqe[0]
+    assert entry.res == 5
+    io_uring_cqe_seen(ring, entry)
+    assert out == b"hello"
     assert io_uring_unregister_files(ring) == 0
 
 

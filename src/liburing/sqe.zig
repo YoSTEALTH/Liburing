@@ -153,39 +153,42 @@ pub const SQE = struct {
 
 /// IO submission data structure (Submission Queue Entry) (SQE)
 ///
+/// Type
+///     no: int | Ring | None
+///
 /// Example
 ///     # single
+///     >>> buf = bytearray(5)
 ///     >>> sqe = Sqe()  # defaults to `Sqe(1)`
-///     >>> io_uring_prep_read(sqe, ...)
+///     >>> io_uring_prep_read(sqe, fd, buf)
 ///     True
 ///     >>> sqe.user_data = 1
 ///
 ///     # multiple
 ///     >>> sqe = Sqe(2)
-///     >>> io_uring_prep_write(sqe[0], ...)
+///     >>> io_uring_prep_write(sqe[0], fd, b'hi...')
 ///     True
 ///     >>> sqe[0].user_data = 1
-///     >>> io_uring_prep_read(sqe[1], ...)
+///     >>> io_uring_prep_read(sqe[1], fd, buf)
 ///     True
 ///     >>> sqe[1].user_data = 2
 ///
 ///     # *** MUST DO ***
 ///     >>> if put_sqe(ring, sqe):
 ///     ...     io_uring_submit(ring)
+///     ...
+///     2
 ///
 ///     # bound to a ring: each prep takes the ring's next free entry
 ///     >>> sqe = Sqe(ring)
-///     >>> io_uring_prep_read(sqe, ...)    # entry 1
+///     >>> io_uring_prep_read(sqe, fd, buf)    # entry 1
 ///     True
 ///     >>> sqe.user_data = 1               # entry 1
-///     >>> io_uring_prep_read(sqe, ...)    # entry 2
+///     >>> io_uring_prep_read(sqe, fd, buf)    # entry 2
 ///     True
 ///     >>> sqe.user_data = 2               # entry 2
 ///     >>> io_uring_submit(ring)           # both
 ///     2
-///
-/// Type
-///     no: int | Ring | None
 ///
 /// Note
 ///     - This class has three usages:

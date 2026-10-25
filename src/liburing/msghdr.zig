@@ -23,13 +23,13 @@ pub const EpollEventType = setu.Class(EpollEvent, @embedFile("msghdr.zig"));
 ///     >>> io_uring_prep_sendmsg(sqe, sockfd, msg)
 ///     True
 ///
-///     >>> # receive: the kernel fills `name`, the `iov` buffers and `control`
+///     # receive: the kernel fills `name`, the `iov` buffers and `control`
 ///     >>> name, buf, control = Sockaddr(), bytearray(1024), bytearray(64)
 ///     >>> msg = Msghdr(name, [buf], control)
 ///     >>> io_uring_prep_recvmsg(sqe, sockfd, msg)
 ///     True
 ///
-///     >>> # multishot receive with provided buffers: only the lengths are given
+///     # multishot receive with provided buffers: only the lengths are given
 ///     >>> msg = Msghdr(namelen=16, controllen=0)
 ///     >>> io_uring_prep_recvmsg_multishot(sqe, sockfd, msg)
 ///     True
@@ -168,10 +168,13 @@ pub const Msghdr = struct {
 /// `io_uring_recvmsg_cmsg_nexthdr`.
 ///
 /// Example
+///     # `out = io_uring_recvmsg_validate(buf, msg)` of a message that came with one `SCM_RIGHTS` fd
 ///     >>> cmsg = io_uring_recvmsg_cmsg_firsthdr(out, msg)
 ///     >>> while cmsg:
 ///     ...     cmsg.level, cmsg.type, cmsg.data
 ///     ...     cmsg = io_uring_recvmsg_cmsg_nexthdr(out, msg, cmsg)
+///     ...
+///     (1, 1, b'\x07\x00\x00\x00')
 pub const Cmsghdr = struct {
     _cmsghdr: ?*c.cmsghdr = null,
     _owner: ?*Object = null, // the `RecvmsgOut` (and so the buffer) `_cmsghdr` points into
@@ -214,11 +217,12 @@ pub const Cmsghdr = struct {
 /// `io_uring_prep_recvmsg_multishot` into a provided buffer: `[header][name][control][payload]`.
 ///
 /// Example
+///     # `buf`: the provided buffer a multishot receive (`msg = Msghdr(namelen=16, controllen=0)`) filled
 ///     >>> out = io_uring_recvmsg_validate(buf, msg)
 ///     >>> out.namelen, out.controllen, out.payloadlen, out.flags
 ///     (16, 0, 5, 0)
 ///     >>> io_uring_recvmsg_payload(out, msg)
-///     b"hello"
+///     b'hello'
 pub const RecvmsgOut = struct {
     _recvmsg_out: ?*c.io_uring_recvmsg_out = null,
     _len: usize = 0, // the size of the buffer it points into
@@ -257,15 +261,22 @@ pub const RecvmsgOut = struct {
 /// `io_uring_prep_epoll_wait` (`EpollEvent(no=n)`: room for `n` events, read with `events[i]`).
 ///
 /// Example
-///     >>> ev = EpollEvent(events=EPOLLIN, data=123)
+///     >>> EPOLL_CTL_ADD = 1  # <sys/epoll.h>
+///     >>> ev = EpollEvent(events=select.EPOLLIN, data=123)
+///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> io_uring_prep_epoll_ctl(sqe, epfd, fd, EPOLL_CTL_ADD, ev)
 ///     True
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
 ///
 ///     >>> ready = EpollEvent(no=8)
+///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> io_uring_prep_epoll_wait(sqe, epfd, ready, 8)
 ///     True
-///     ... # after the completion `res` events are set:
-///     >>> ready[0].events, ready[0].data
+///     >>> io_uring_submit_and_wait(ring, 2)
+///     1
+///     >>> ready[0].events, ready[0].data  # after the completion: `fd` is readable
+///     (1, 123)
 pub const EpollEvent = struct {
     _events: ?[*]linux.epoll_event = null,
     _len: usize = 0,

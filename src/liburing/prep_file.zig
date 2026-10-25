@@ -46,8 +46,9 @@ pub fn io_uring_prep_tee(sqe: *SQE, fd_in: i32, fd_out: i32, nbytes: u32, splice
 ///     >>> bufs = [bytearray(6), bytearray(4)]
 ///     >>> io_uring_prep_readv(sqe, fd, bufs)
 ///     True
-///     ... # after the completion
-///     >>> bufs
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> bufs  # after the completion
 ///     [bytearray(b'hi... '), bytearray(b'bye!')]
 ///
 /// Note
@@ -74,13 +75,15 @@ pub fn io_uring_prep_readv(
 /// The request holds `buff` until its completion.
 ///
 /// Example
-///     >>> # `buf_index` = registered IO buffer
 ///     >>> buffer = bytearray(5)
-///     >>> io_uring_prep_read_fixed(sqe, fd, buffer, buf_index)
+///     >>> io_uring_register_buffers(ring, [buffer])  # `buf_index` 0
+///     0
+///     >>> io_uring_prep_read_fixed(sqe, fd, buffer, 0)
 ///     True
-///     ...
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
 ///     >>> buffer
-///     bytearray(b"hi...")
+///     bytearray(b'hi...')
 pub fn io_uring_prep_read_fixed(
     sqe: *SQE,
     fd: i32,
@@ -106,13 +109,17 @@ pub fn io_uring_prep_read_fixed(
 /// Reads into several buffers at once, from the registered buffer `buf_index`.
 ///
 /// Example
-///     >>> # `buf_index` = registered IO buffer
-///     >>> bufs = [bytearray(5), bytearray(4)]
-///     >>> io_uring_prep_readv_fixed(sqe, fd, bufs, buf_index)
+///     >>> mem = bytearray(10)
+///     >>> io_uring_register_buffers(ring, [mem])  # `buf_index` 0
+///     0
+///     >>> view = memoryview(mem)
+///     >>> bufs = [view[:6], view[6:]]  # parts of the registered buffer
+///     >>> io_uring_prep_readv_fixed(sqe, fd, bufs, 0)
 ///     True
-///     ... # after the completion
-///     >>> bufs
-///     [bytearray(b'hi...'), bytearray(b'bye!')]
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> mem  # after the completion
+///     bytearray(b'hi... bye!')
 ///
 /// Note
 ///     - `bufs`: as `io_uring_prep_readv`, held until the completion.
@@ -138,8 +145,11 @@ pub fn io_uring_prep_readv_fixed(
 /// Example
 ///     >>> io_uring_prep_writev(sqe, fd, [b'hi... ', b'bye!'])
 ///     True
-///     ... # after the completion
-///     >>> cqe[0].res
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> io_uring_wait_cqe(ring, cqe)
+///     0
+///     >>> cqe[0].res  # bytes written
 ///     10
 ///
 /// Note
@@ -160,12 +170,20 @@ pub fn io_uring_prep_writev(sqe: *SQE, fd: i32, bufs: py.Sequence(py.Buffer), of
 /// The request holds `buff` until its completion.
 ///
 /// Example
-///     >>> # `buf_index` = registered IO buffer
-///     >>> io_uring_prep_write_fixed(sqe, fd, b'hi...', buf_index)
+///     >>> buffer = bytearray(b'hi...')
+///     >>> io_uring_register_buffers(ring, [buffer])  # `buf_index` 0
+///     0
+///     >>> io_uring_prep_write_fixed(sqe, fd, buffer, 0)
 ///     True
-///     ... ...
-///     >>> cqe[0].res
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> io_uring_wait_cqe(ring, cqe)
+///     0
+///     >>> cqe[0].res  # bytes written
 ///     5
+///
+/// Note
+///     - `buff` must lie inside the registered buffer (`OSError: EFAULT` otherwise): a `bytes` object can not.
 pub fn io_uring_prep_write_fixed(sqe: *SQE, fd: i32, buff: py.OwnedBuffer, buf_index: i32, offset: ?u64) py.Error!bool {
     const s = try h.prepSlot(sqe, &buff) orelse return false;
     errdefer sqe.undoSlot();
@@ -185,11 +203,17 @@ pub fn io_uring_prep_write_fixed(sqe: *SQE, fd: i32, buff: py.OwnedBuffer, buf_i
 /// Writes several buffers at once, from the registered buffer `buf_index`.
 ///
 /// Example
-///     >>> # `buf_index` = registered IO buffer
-///     >>> io_uring_prep_writev_fixed(sqe, fd, [b"hi... ", b"bye!"], buf_index)
+///     >>> mem = bytearray(b'hi... bye!')
+///     >>> io_uring_register_buffers(ring, [mem])  # `buf_index` 0
+///     0
+///     >>> view = memoryview(mem)
+///     >>> io_uring_prep_writev_fixed(sqe, fd, [view[:6], view[6:]], 0)  # parts of the registered buffer
 ///     True
-///     ... # after the completion
-///     >>> cqe[0].res
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> io_uring_wait_cqe(ring, cqe)
+///     0
+///     >>> cqe[0].res  # bytes written
 ///     10
 ///
 /// Note
@@ -250,18 +274,25 @@ pub fn io_uring_prep_fallocate(sqe: *SQE, fd: i32, mode: i32, offset: u64, len: 
 
 /// Opens `path`; the new fd is returned in `cqe.res`.
 ///
+/// Type
+///     path: str | os.PathLike[str]
+///
 /// Example
 ///     >>> sqe = io_uring_get_sqe(ring)
-///     >>> io_uring_prep_open(sqe, b'./file.ext')
+///     >>> io_uring_prep_open(sqe, './file.txt')
 ///     True
 ///     >>> sqe.user_data = 123
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> io_uring_wait_cqe(ring, cqe)
+///     0
+///     >>> fd = cqe[0].res  # the new fd
+///     >>> os.read(fd, 5)
+///     b'hi...'
 ///
 /// Note
 ///     - Function argument `dfd` has been moved to end from how it is in C function.
 ///     - `io_uring_prep_open` includes `io_uring_prep_openat` as well.
-///
-/// Type
-///     path: str | os.PathLike[str]
 pub fn io_uring_prep_open(sqe: *SQE, path: *Object, flags: ?i32, mode: ?c.mode_t, dfd: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -277,20 +308,32 @@ pub fn io_uring_prep_open(sqe: *SQE, path: *Object, flags: ?i32, mode: ?c.mode_t
 
 /// Opens `path` into the registered files table at slot `file_index` instead of returning an fd.
 ///
+/// Type
+///     path: str | os.PathLike[str]
+///
 /// Example
 ///     >>> fds = FileIndex([-1, -1, -1, -1])
 ///     >>> index = 3  # position of last ---^ `fds` registered
 ///     >>> io_uring_register_files(ring, fds)
+///     0
 ///     >>> flags = O_TMPFILE | O_WRONLY
 ///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> io_uring_prep_open_direct(sqe, ".", flags, index)
 ///     True
-///     ... ...
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> io_uring_wait_cqe(ring, cqe)
+///     0
+///     >>> cqe[0].res  # `0`: opened into slot `index`
+///     0
+///     >>> io_uring_cqe_seen(ring, cqe[0])
 ///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> io_uring_prep_close_direct(sqe, index)
 ///     True
-///     ... ...
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
 ///     >>> io_uring_unregister_files(ring)
+///     0
 ///
 /// Note
 ///     - Open direct does not use `fd` but `index`
@@ -299,9 +342,6 @@ pub fn io_uring_prep_open(sqe: *SQE, path: *Object, flags: ?i32, mode: ?c.mode_t
 ///     - `flags` defaults to `O_RDONLY`, `mode` to `0o777`.
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_open_direct` includes `io_uring_prep_openat_direct` as well.
-///
-/// Type
-///     path: str | os.PathLike[str]
 pub fn io_uring_prep_open_direct(
     sqe: *SQE,
     path: *Object,
@@ -338,7 +378,7 @@ pub fn io_uring_prep_close(sqe: *SQE, fd: i32) py.Error!bool {
 /// Closes the registered (direct) file at slot `file_index`.
 ///
 /// Example
-///     >>> io_uring_prep_close_direct(sqe, file_index)
+///     >>> io_uring_prep_close_direct(sqe, 0)  # slot 0 of the registered files
 ///     True
 pub fn io_uring_prep_close_direct(sqe: *SQE, file_index: u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
@@ -354,10 +394,12 @@ pub fn io_uring_prep_close_direct(sqe: *SQE, file_index: u32) py.Error!bool {
 ///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> io_uring_prep_read(sqe, fd, buf)
 ///     True
-///     ... ...
-///     >>> cqe[0].res
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> io_uring_wait_cqe(ring, cqe)
+///     0
+///     >>> cqe[0].res  # bytes read
 ///     5
-///     ... ...
 ///     >>> buf
 ///     bytearray(b'hi...')
 pub fn io_uring_prep_read(sqe: *SQE, fd: i32, buf: py.OwnedWritableBuffer, offset: ?u64) py.Error!bool {
@@ -395,8 +437,11 @@ pub fn io_uring_prep_read_multishot(sqe: *SQE, fd: i32, buf_group: i32, nbytes: 
 ///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> io_uring_prep_write(sqe, fd, b"hi...")
 ///     True
-///     ... ...
-///     >>> cqe.res
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> io_uring_wait_cqe(ring, cqe)
+///     0
+///     >>> cqe[0].res  # bytes written
 ///     5
 pub fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: py.OwnedBuffer, offset: ?u64) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
@@ -427,12 +472,15 @@ pub fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: py.OwnedBuffer, offset: ?u64
 /// Example
 ///     >>> stat = Statx()
 ///     >>> if sqe := io_uring_get_sqe(ring):
-///     ...     io_uring_prep_statx(sqe, stat, __file__)
-///     ... ...
+///     ...     io_uring_prep_statx(sqe, stat, 'file.txt')
+///     ...
+///     True
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
 ///     >>> stat.isfile
 ///     True
 ///     >>> stat.size
-///     123
+///     10
 ///
 /// Flags
 ///     AT_EMPTY_PATH
@@ -729,6 +777,9 @@ pub fn io_uring_prep_link(
 
 /// Reads the extended attribute `name` of `path` into `value`, `len` bytes at most (`getxattr(2)`).
 ///
+/// Note
+///     - `ValueError` if `len` is larger than `value`.
+///
 /// Type
 ///     name: str
 ///     path: str | os.PathLike[str]
@@ -739,6 +790,10 @@ pub fn io_uring_prep_getxattr(
     path: *Object,
     len: u32,
 ) py.Error!bool {
+    if (len > value.data.len) return releaseFailed(
+        value,
+        py.raiseValueError("`io_uring_prep_getxattr(len)` is larger than `value`", .{}),
+    );
     const s = try h.prepSlot(sqe, &value) orelse return false;
     errdefer sqe.undoSlot();
     // a `str`, read by the kernel at submit
@@ -753,6 +808,9 @@ pub fn io_uring_prep_getxattr(
 /// Sets the extended attribute `name` of `path` to `value`, `len` bytes (`setxattr(2)`);
 /// `flags` is `0`, `XATTR_CREATE` or `XATTR_REPLACE`.
 ///
+/// Note
+///     - `ValueError` if `len` is larger than `value`.
+///
 /// Type
 ///     name: str
 ///     path: str | os.PathLike[str]
@@ -764,6 +822,10 @@ pub fn io_uring_prep_setxattr(
     flags: i32,
     len: u32,
 ) py.Error!bool {
+    if (len > value.data.len) return releaseFailed(
+        value,
+        py.raiseValueError("`io_uring_prep_setxattr(len)` is larger than `value`", .{}),
+    );
     const s = try h.prepSlot(sqe, &value) orelse return false;
     errdefer sqe.undoSlot();
     // a `str`, read by the kernel at submit
@@ -793,6 +855,10 @@ pub fn io_uring_prep_fgetxattr(
     value: py.OwnedWritableBuffer,
     len: u32,
 ) py.Error!bool {
+    if (len > value.data.len) return releaseFailed(
+        value,
+        py.raiseValueError("`io_uring_prep_fgetxattr(len)` is larger than `value`", .{}),
+    );
     const s = try h.prepSlot(sqe, &value) orelse return false;
     errdefer sqe.undoSlot();
     // a `str`, read by the kernel at submit
@@ -814,6 +880,10 @@ pub fn io_uring_prep_fsetxattr(
     flags: i32,
     len: u32,
 ) py.Error!bool {
+    if (len > value.data.len) return releaseFailed(
+        value,
+        py.raiseValueError("`io_uring_prep_fsetxattr(len)` is larger than `value`", .{}),
+    );
     const s = try h.prepSlot(sqe, &value) orelse return false;
     errdefer sqe.undoSlot();
     // a `str`, read by the kernel at submit
@@ -847,7 +917,10 @@ pub fn io_uring_prep_ftruncate(sqe: *SQE, fd: i32, len: ?c.loff_t) py.Error!bool
 ///     >>> fds = array.array("i", [-1, -1])  # or a `bytearray(8)`
 ///     >>> io_uring_prep_pipe(sqe, fds, O_CLOEXEC)
 ///     True
-///     ... # after the completion: fds[0], fds[1]
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> os.write(fds[1], b'hi'), os.read(fds[0], 2)  # after the completion: read end, write end
+///     (2, b'hi')
 ///
 /// Note
 ///     - The request holds `fds` until its completion.
@@ -860,7 +933,8 @@ pub fn io_uring_prep_pipe(sqe: *SQE, fds: py.OwnedWritableBuffer, pipe_flags: i3
 }
 
 /// Like `io_uring_prep_pipe`, but the pipe's fds go into the registered file table: `fds` gets the two
-/// slots (`file_index` for the read end; `IORING_FILE_INDEX_ALLOC` lets the kernel pick both).
+/// slots (`file_index` for the read end and the next slot for the write end; `IORING_FILE_INDEX_ALLOC` lets the
+/// kernel pick both).
 pub fn io_uring_prep_pipe_direct(
     sqe: *SQE,
     fds: py.OwnedWritableBuffer,

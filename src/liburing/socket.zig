@@ -17,6 +17,11 @@ extern fn if_nametoindex(name: [*:0]const u8) c_uint;
 /// Generic Socket Address. `Sockaddr()` (no arguments) is empty: room for the kernel to fill in, e.g. for
 /// `io_uring_prep_accept`.
 ///
+/// Type
+///     family: int | None
+///     addr:   str | os.PathLike[str] | None
+///     port:   int | None
+///
 /// Example
 ///     >>> addr = Sockaddr(AF_UNIX, './path')
 ///     >>> addr = Sockaddr(AF_INET, '0.0.0.0', 12345)
@@ -31,11 +36,6 @@ extern fn if_nametoindex(name: [*:0]const u8) c_uint;
 ///     - `Sockaddr()` is low level setup, letting you serve/connect directly using path/ip.
 ///     If you need higher level features you can use `getaddrinfo()` this lets you connect
 ///     using domain names, ...
-///
-/// Type
-///     family: int | None
-///     addr:   str | os.PathLike[str] | None
-///     port:   int | None
 pub const Sockaddr = struct {
     _family: c.sa_family_t = AF_UNSPEC,
     _socklen: c.socklen_t = @sizeOf(c.sockaddr_storage),
@@ -118,12 +118,13 @@ pub const Sockaddr = struct {
 
     /// The path of an `AF_UNIX` address (`NotImplementedError` for other families).
     ///
-    /// Example
-    ///     >>> sock.path
-    ///     './path'
-    ///
     /// Type
     ///     return: str
+    ///
+    /// Example
+    ///     >>> sock = Sockaddr(AF_UNIX, './path')
+    ///     >>> sock.path
+    ///     './path'
     pub fn get_path(self: *Self) py.Error![]const u8 {
         const _family = self.currentFamily();
         if (_family == AF_UNIX) return std.mem.sliceTo(&self.as(c.sockaddr_un).sun_path, 0);
@@ -133,6 +134,9 @@ pub const Sockaddr = struct {
     /// The address as text (`AF_INET` / `AF_INET6`, `NotImplementedError` otherwise): IPv6 as `socket.inet_ntop`
     /// writes it, with `%scope_id` when it has one (as `Sockaddr(AF_INET6, ...)` reads it).
     ///
+    /// Type
+    ///     return: str
+    ///
     /// Example
     ///     >>> Sockaddr(AF_INET, '1.2.3.4', 80).ip
     ///     '1.2.3.4'
@@ -140,9 +144,6 @@ pub const Sockaddr = struct {
     ///     '2001:db8::1'
     ///     >>> Sockaddr(AF_INET6, 'fe80::1%2', 80).ip
     ///     'fe80::1%2'
-    ///
-    /// Type
-    ///     return: str
     pub fn get_ip(self: *Self) py.Error!*Object {
         const _family = self.currentFamily();
         switch (_family) {
@@ -173,6 +174,7 @@ pub const Sockaddr = struct {
     /// The port of an `AF_INET` / `AF_INET6` address (`NotImplementedError` for other families).
     ///
     /// Example
+    ///     >>> sock = Sockaddr(AF_INET, '127.0.0.1', 1234)
     ///     >>> sock.port
     ///     1234
     pub fn get_port(self: *Self) py.Error!u16 {
@@ -187,8 +189,9 @@ pub const Sockaddr = struct {
     /// The address family (`AF_UNIX`, ...).
     ///
     /// Example
-    ///     >>> sock.family
-    ///     1
+    ///     >>> sock = Sockaddr(AF_UNIX, './path')
+    ///     >>> sock.family == AF_UNIX
+    ///     True
     pub fn get_family(self: *const Self) i32 {
         return self.currentFamily();
     }
@@ -235,7 +238,7 @@ fn scopeId(text: []const u8) py.Error!u32 {
 ///     True
 ///
 /// Note
-///     - min length of `val` must be `4`.
+///     - the kernel checks `len(val)` for the option (an `int` option needs 4 bytes, else `cqe.res` is `-EINVAL`).
 ///     - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
 pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.OwnedBuffer) py.Error!bool {
     const s = try h.prepSlot(sqe, &optval) orelse return false;
@@ -262,13 +265,14 @@ pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.O
 ///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> getsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, buf)
 ///     True
-///     ... # after submit and wait
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
 ///     >>> int.from_bytes(buf, "little")  # the kernel writes the system's byte order
 ///     1
 ///
 /// Note
 ///     - `cqe.res` will return `len()` of populating data(`buf`).
-///     - min length of `buf` must be `4`.
+///     - the kernel checks `len(buf)` for the option (an `int` option needs 4 bytes, else `cqe.res` is `-EINVAL`).
 ///     - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
 pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.OwnedWritableBuffer) py.Error!bool {
     const s = try h.prepSlot(sqe, &optval) orelse return false;
