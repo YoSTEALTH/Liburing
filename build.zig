@@ -6,6 +6,11 @@
 //!   zig build load     the HTTP load generator for example/bench/liburing_bench.{py,c} into zig-out/bin/
 //!   zig build setu-build-sync    copy the pinned Setu's tools/setu_build.py into tools/ (never edit it)
 //!   zig build setu-build-check   check that tools/setu_build.py is the pinned Setu's copy
+//!   zig build setu-docs-sync     copy the pinned Setu's tools/setu_docs.py into tools/ (never edit it)
+//!   zig build setu-docs-check    check that tools/setu_docs.py is the pinned Setu's copy
+//!   zig build setu-guide-sync    copy the pinned Setu's docs/setu-guide.md into docs/ (never edit it)
+//!   zig build setu-guide-check   check that docs/setu-guide.md is the pinned Setu's copy
+//!   zig build docs-web           the docs site's search (zig-out/web/docs.wasm; tools/setu_docs.py runs it)
 //!
 //! Options:
 //!   -Drelease               ReleaseSafe (wheels use it, as PyOZ did); without it, Debug. (A preferred release
@@ -117,6 +122,13 @@ pub fn build(b: *std.Build) void {
     // `zig build setu-build-sync` (copy the pinned Setu's `tools/setu_build.py` into tools/) and
     // `zig build setu-build-check` (compare with it, offline).
     @import("setu").addSetuBuildSteps(b, setu_dep);
+
+    // The same for `tools/setu_docs.py` (the docs site builder): `setu-docs-sync` / `setu-docs-check`, plus
+    // `docs-web` (`zig-out/web/docs.wasm`, the site's search; `setu_docs.py` runs it).
+    @import("setu").addSetuDocsSteps(b, setu_dep);
+
+    // And for `docs/setu-guide.md` (Setu's guide to writing bindings): `setu-guide-sync` / `setu-guide-check`.
+    @import("setu").addSetuGuideSteps(b, setu_dep);
 
     const develop = b.step("develop", "Copy the extension and its stubs into src/liburing/");
     develop.dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .{ .custom = "../src/liburing" }, ext_name).step);

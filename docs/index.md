@@ -42,7 +42,7 @@ finally:
     io_uring_queue_exit(ring)
 ```
 
-More in the [examples](guide.md): open, write, read and close a file, and one `Sqe` object for the ring's lifetime.
+[How it works](concepts.md) explains each step: the ring, entries, `user_data`, buffers, completions, errors and threads. More complete programs in the [examples](guide.md): open, write, read and close a file, copy a file with linked requests, a TCP echo server with multishot accept and receive and a buffer ring, messages between threads, and the four ways to fill the submission queue.
 
 ## Requires
 
@@ -58,8 +58,10 @@ See [Install](install.md) to build from source.
 
 ## Where next
 
-- [Install](install.md): from PyPI, or build from GitHub.
-- [Examples](guide.md): which operations the kernel supports, open / write / read / close, `Sqe`.
+- [Install](install.md): from PyPI, or build from GitHub; requirements.
+- [How it works](concepts.md): the life of a request, buffers, completions, errors, threads.
+- [Examples](guide.md): which operations the kernel supports, open / write / read / close, vectored I/O, a linked-request file copy, a multishot echo server, messages between threads, `Sqe`.
+- [Coming from C liburing](from_c.md): what maps to what, side by side.
 - [API reference](api/index.md): every function, class and constant, by topic.
 - [Benchmarks](bench.md): HTTP server, Liburing vs `select.epoll`, asyncio and C.
 

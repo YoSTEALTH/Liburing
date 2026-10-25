@@ -1,8 +1,8 @@
 '''PEP 517 build backend: builds a Zig + Setu extension's wheel with `zig build`, no setuptools.
 
-Kept in Setu (`tools/setu_build.py`) and copied unchanged into each project that uses Setu (Liburing,
-Shakti): the package name (`[project].name`, with its sources in `src/<name>/`) and the release
-matrix (`[tool.setu_build]`) come from `pyproject.toml`.
+Kept in Setu (`tools/setu_build.py`) and copied unchanged into each project that uses Setu: the package name
+(`[project].name`, with its sources in `src/<name>/`) and the release matrix (`[tool.setu_build]`) come from
+`pyproject.toml`.
 
 Only wheels are built (no sdist is published), one per Linux target: tagged `cp314.cp315-abi3.abi3t.cp314t.cp315t`,
 its one extension (`<name>.so`) loads on CPython 3.14, 3.14t, 3.15, 3.15t and later (see Setu's
@@ -144,7 +144,7 @@ def zig_build(target, debug, prefix):
     zig = os.environ.get('ZIG', 'zig')
     cmd = [zig, 'build', '--prefix', prefix]
     if not debug:
-        cmd += ['-Drelease', '-Dstrip']  # build.zig: ReleaseFast, no debug info
+        cmd += ['-Drelease', '-Dstrip']  # build.zig: optimize `fast`, no debug info
     if target is not None:
         cmd.append(f'-Dtarget={target}')
     subprocess.run(cmd, cwd=ROOT, check=True)
@@ -311,7 +311,7 @@ def main():
     parser.add_argument(
         '--all', action='store_true', help='build every release wheel (one per [tool.setu_build] target)'
     )
-    parser.add_argument('--debug', action='store_true', help='Debug build instead of ReleaseFast')
+    parser.add_argument('--debug', action='store_true', help='debug build instead of fast')
     parser.add_argument('-o', '--out', default=os.path.join(ROOT, 'dist'), help='output directory (default: dist/)')
     args = parser.parse_args()
     if args.all and args.target:

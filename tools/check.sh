@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Runs every Liburing check: zig fmt, Zig line width, ruff (lint + format), `tools/setu_build.py` against the pinned
-# Setu, `zig build develop` (the one stable-ABI `liburing.so`), then with each interpreter (3.15t, 3.15, 3.14t, 3.14)
-# Setu's `check_symbols.py` and pytest, then `mypy --strict` (as 3.14 and 3.15) + `stubtest` on `liburing.pyi`.
+# Runs every Liburing check: zig fmt, Zig line width, ruff (lint + format), `tools/setu_build.py`,
+# `tools/setu_docs.py` and `docs/setu-guide.md` against the pinned Setu, `zig build develop` (the one stable-ABI
+# `liburing.so`), then with each interpreter (3.15t, 3.15, 3.14t, 3.14) Setu's `check_symbols.py` and pytest, then
+# `mypy --strict` (as 3.14 and 3.15) + `stubtest` on `liburing.pyi`.
 # Interpreters: PY_FT=... / PY_GIL=... (3.15), PY314_FT=... / PY314_GIL=...; compiler: ZIG=...; Setu checkout:
 # SETU=... (default: the `setu` path in build.zig.zon); ruff: RUFF=... (default: `ruff` on PATH, else `$PY_FT -m
 # ruff`); extra pytest arguments after `--`.
@@ -75,6 +76,12 @@ done
 
 step "tools/setu_build.py is the pinned Setu's copy"
 "$ZIG" build setu-build-check
+
+step "tools/setu_docs.py is the pinned Setu's copy"
+"$ZIG" build setu-docs-check
+
+step "docs/setu-guide.md is the pinned Setu's copy"
+"$ZIG" build setu-guide-check
 
 step "zig build develop"
 "$ZIG" build develop # src/liburing/liburing.so: one binary for every interpreter below

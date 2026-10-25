@@ -1,0 +1,433 @@
+# Writing a Setu extension
+
+Setu turns ordinary Zig into a CPython module: you write `pub fn`s and structs, Setu writes the C-ABI
+trampolines, the type objects, the docstrings and the `.pyi` stub. One binary loads on CPython 3.14, 3.14t,
+3.15, 3.15t and later. This guide is the working reference for a session that writes bindings with Setu
+(in Setu's own `test/`, in Liburing, in Shakti). Read section 1 first; the rest is lookup. Every signature
+here is Setu's current one; Setu refuses what it can not express with a `@compileError` that says why
+(section 10), so compile early.
+
+Where things are: `setu.py` (the one namespace to use: references, conversions, raising, the module),
+`setu.c` (the C API, hand-declared, every object opaque), `setu.Class`, `setu.Exception`, `setu.Module`,
+`setu.From`, `setu.CallArgs`, `setu.Visit`, `setu.Send`, `setu.Poll`. The test extension `test/` of Setu
+has one class per hook family (`test/classes.zig`), one function per parameter type (`test/functions.zig`)
+and the model root file (`test/setu_classes.zig`); `test/class_test.py` shows what each does from Python.
+
+## 1. The ten rules
+
+1. One root file declares `pub const module: setu.Module = .{ .name, .version, .from = &.{...}, .init }`
+   and ends with `comptime { py.exportModule(module); }`. Nothing else registers anything; `build.zig`
+   writes the `.pyi` from the same declaration (`addStubs`).
+2. A lowercase `pub fn` in a `from` file is a Python function under that name (`prep_recv`, `get_label`).
+   camelCase `pub fn`s are Zig-only helpers. There is no opt-out: the case picks the audience.
+3. Give an int parameter the exact type the kernel or callee takes (`fd: i32`, `flags: u32`): Setu raises
+   `OverflowError` naming the parameter. A value no parameter type can bound goes through
+   `py.narrow(T, v, "`f(x)`")`. Every `@intCast` / `@truncate` carries a `// cast: <why it fits>` comment
+   on its line or the line above (`tools/check.sh` checks).
+4. `?T` is optional: omitted or `None` gives `null`. A positional parameter after one with a default needs a
+   default too (compile error); make it keyword-only after `_: py.KwOnly`.
+5. Return `Error!R` and raise with `return py.raise*(...)`. `error.PythonError` means "an exception is
+   set"; any other Zig error becomes `RuntimeError` (`error.OutOfMemory` becomes `MemoryError`).
+6. Buffers: `py.Buffer` / `py.WritableBuffer` are locked for the call and released after it. To keep one
+   past the call, `try buf.take()` (a second view, released by your `deinit`) or take `py.OwnedBuffer` /
+   `py.OwnedWritableBuffer` (yours to `deinit`). Never store a plain `Buffer`.
+7. A struct becomes a type with `pub const XType = setu.Class(X, @embedFile("x.zig"))`. Fields are the
+   instance data and need defaults; a `?*Object` field is an owned reference Setu traverses and clears.
+8. Hooks are `pub fn __name__` with the signatures of section 5. `__init__` / `__new__` / `__call__` take
+   named parameters or one `setu.CallArgs`, never `py.Rest` / `py.Kwargs` (compile error).
+9. Docs are `///` lines above the declaration: a description, then sections (`Type`, `Example`, `Note`,
+   `Flags`, ...) as a header on its own line with content indented 4 spaces. `Type` entries override the
+   stub's types (`return: Iterator[T]`); `Example` is a real `>>>` session, each result on the next line.
+10. Hot paths: generated code must benchmark like hand-written code. Fill arguments in place, keep slow
+    paths out of line, measure before and after with `tools/bench.py` (section 9).
+
+## 2. The module
+
+The root file (`test/setu_classes.zig` is the model):
+
+```zig
+const setu = @import("setu");
+const py = setu.py;
+
+pub const module: setu.Module = .{
+    .name = "liburing", // the extension's file name: `liburing.so`
+    .version = build_options.version, // `__version__`
+    .from = &.{
+        .{ .ns = @import("ring.zig") }, // classes only: no `source` needed
+        .{ .ns = @import("prep.zig"), .source = @embedFile("prep.zig") }, // functions need the source
+        .{ .ns = @import("sqe.zig"), .functions = false }, // lowercase Zig helpers there
+        .{ .ns = kernel, .prefixes = &.{ "IOSQE_", "IORING_OP_" } }, // constants by prefix
+        .{ .ns = @import("enums.zig"), .enums = .int_enum }, // `enum.IntEnum` classes
+    },
+    .init = init, // after Setu's part of `Py_mod_exec`
+};
+
+/// The project's own setup: classes exist, constants are set.
+fn init(mod: *setu.c.Object) py.Error!void {
+    _ = mod;
+}
+
+comptime {
+    py.exportModule(module);
+}
+```
+
+`setu.Module` fields: `name`, `doc` (default: the `//!` doc of the first `from` entry with a `source`),
+`version`, `from`, `init`, `stub_extra` (lines the stub gets for what `init` adds by hand), `methods` (a
+hand-written `c.MethodDef` table; a name there replaces the scanned function of that name), `exec` (runs
+after `init`), `gil` (`true`: the free-threaded build enables the GIL on import), `multiple_interpreters`
+(default `false`: Setu keeps state in globals).
+
+What a `from` entry (`setu.From`) takes from its `ns`: lowercase `pub fn`s (functions; need `.source`),
+`setu.Class` declarations (Python name: the struct's), `setu.Exception` declarations (Python name: the
+`pub const`'s), `pub const E = enum` (its UPPER_CASE fields as int constants, or the `IntEnum` `E` with
+`.enums = .int_enum`), UPPER_CASE `pub const` ints / floats / `bool`s / strings. Skipped: `_` names,
+camelCase functions, plain structs, lowercase values, `pub var`s. Filters take Python names: `.only`,
+`.exclude` (not together; each name must exist), `.prefixes`, `.functions = false`. Classes are created
+bases first; a Python name found twice is a compile error naming both places.
+
+`build.zig` of the project (`setu` in its `build.zig.zon`):
+
+```zig
+const setu_dep = b.dependency("setu", .{ .target = target, .optimize = optimize });
+ext.root_module.addImport("setu", setu_dep.module("setu"));
+const pyi = @import("setu").addStubs(b, setu_dep, .{
+    .root_source_file = b.path("src/liburing/root.zig"),
+    .imports = &.{.{ .name = "build_options", .module = options.createModule() }}, // what the root imports
+});
+b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "liburing.pyi").step);
+@import("setu").addSetuBuildSteps(b, setu_dep); // tools/setu_build.py: setu-build-sync / -check
+@import("setu").addSetuDocsSteps(b, setu_dep); // tools/setu_docs.py: setu-docs-sync / -check, docs-web
+@import("setu").addSetuGuideSteps(b, setu_dep); // docs/setu-guide.md: setu-guide-sync / -check
+```
+
+The extension is `<name>.so` (`@import("setu").ext_suffix`), the wheel `cp314.cp315-abi3.abi3t.cp314t.cp315t`
+(`tools/setu_build.py`, a PEP 517 backend each project keeps a byte-identical copy of).
+
+## 3. Functions
+
+A lowercase `pub fn` in a `from` file. Arguments are positional or keyword, by the Zig parameter name;
+`inspect.signature` and the stub show the names and defaults. Below: Zig parameter type (what Python accepts): notes.
+
+- `i32`, `u64`, `u8`, ... (up to 64 bits) (`int`, `__index__`): `` OverflowError: `f(x)` = 300 is out of range 0..255 ``
+- `?u32` (`int`, `None`, omitted): `None` / omitted give `null`; stub `int | None = None`
+- `bool` (anything): truthiness, like `if x:`
+- `f64`, `f32` (`float`, `int`)
+- `[]const u8`, `[:0]const u8` (`str`): UTF-8, borrowed for the call
+- `py.Bytes` (`bytes`): `.data`, borrowed
+- `py.Path` (`str`, `bytes`, `os.PathLike`): `.path` is `[:0]const u8` (`os.fsencode`); released after the call
+- `py.Buffer` / `py.WritableBuffer` (bytes-like / writable bytes-like): `.data`; locked for the call, then released
+- `py.OwnedBuffer` / `py.OwnedWritableBuffer` (the same): yours: `defer data.deinit()` or store it
+- `py.Sequence(T)` (any sequence (`list`, `tuple`, `range`, ...)): `.items: []T`, each converted like a `T`; released
+  after
+- `*T`, `*const T`, `?*T` (an instance of `setu.Class(T)` or a subclass): `TypeError` otherwise; `XType.object(d)` is
+  the object
+- `*Object`, `?*Object` (anything): raw, borrowed; `None` is passed through as a value
+- `rest: py.Rest` (`*args`): first (after `self`); `.items`, `try rest.tuple()`; parameters before it: positional-only
+- `_: py.KwOnly` (`*`): the parameters after it are keyword-only
+- `extra: py.Kwargs` (`**kwargs`): last parameter; `.dict` is `null` when none; functions and methods only
+- `a: struct { x: i64 = 0, _: py.KwOnly = .{}, fd: i32 = AT_FDCWD }` (named arguments): an argument struct, see below
+
+An argument struct's field defaults are the Python defaults, shown as written (`null` -> `None`, `a.b.NAME` ->
+`NAME`, so the module must export `NAME`); a field without a default is required.
+
+Return types: `void` (`None`), `bool`, ints, floats, `?T` (`null` -> `None`), `Error!T`, `[]const u8` /
+a literal (`str`), `py.Bytes` (`bytes`), `*Object` (a new reference, taken), tuples `.{ a, b }` (`tuple`),
+other slices (`list`). `py.toPython(value)` does this conversion by hand (`null` with an exception set on
+failure); `try py.new(value)` the same as `Error!*Object`.
+
+```zig
+/// Reads up to `n` bytes (default: all of `buf`) from `fd` into `buf` at `offset`; returns how many.
+///
+/// Example
+///     >>> b = bytearray(8)
+///     >>> read(fd, b, 4, offset=0)
+///     4
+pub fn read(fd: i32, buf: py.WritableBuffer, n: ?usize, _: py.KwOnly, offset: u64) Error!usize {
+    const want = @min(n orelse buf.data.len, buf.data.len);
+    const res: isize = @bitCast(std.os.linux.pread(fd, buf.data.ptr, want, offset)); // cast: a signed word
+    return @intCast(try py.checkErrno(res)); // cast: `checkErrno` gave >= 0
+}
+```
+
+Stub: `def read(fd: int, buf: Buffer, n: int | None = None, *, offset: int) -> int:`. Python:
+`read(fd, b, 4, offset=0)`; `read(fd, b, 4, 0)` is `TypeError: read() takes at most 3 positional arguments`.
+
+## 4. Raising
+
+Every helper sets the exception and returns `error.PythonError`, so a binding writes `return py.raise...`. Below: the
+call: what it raises.
+
+- `py.raiseTypeError(fmt, args)`, `raiseValueError`, `raiseIndexError`, `raiseRuntimeError`: that built-in, with a
+  formatted message
+- `raiseOverflowError`, `raiseNotImplementedError`, `raiseAttributeError` (the same): (up to 511 bytes, cut after that)
+- `py.raise(c.PyExc_ZeroDivisionError, fmt, args)`: any `c.PyExc_*`
+- `py.raiseErrno(errno)`: `OSError(errno, strerror)`; CPython picks the subclass (`FileNotFoundError`, ...)
+- `try py.checkErrno(res)`: `res` when `>= 0`, else `OSError` for the errno `-res`; `res` is any signed int
+- `py.raiseOSError(errno, fmt, args)`: `OSError(errno, msg)` with your message
+- `py.raiseWith(exc, .{ errno, "msg" })`: `exc(*args)`, each item converted like a result
+- `py.raiseNoMemory()`: `MemoryError` (a failed Zig allocation)
+- `MyError.raise(fmt, args)`, `MyError.raiseWith(.{...})`: an exception class of the extension (below)
+- `py.setError(err)`: any Zig error as a Python exception (what the trampolines do for you)
+
+An exception class of the extension, found by the scan under the `pub const`'s name, `__module__` the
+extension's:
+
+```zig
+/// The kernel does not support the operation.
+pub const UnsupportedError = setu.Exception(.{
+    .doc = "The kernel does not support the operation.",
+    .base = .OSError, // a `c.PyExc_*` name; default `.Exception`
+});
+
+return UnsupportedError.raiseWith(.{ -res, "IORING_OP_FUTEX_WAIT" }); // `.errno` set, like `OSError`
+if (UnsupportedError.matches(exc)) ... // an instance or class, subclasses included
+```
+
+Two `setu.Exception`s with the same `doc` and `base` are one Zig type: give each its own `doc`.
+
+## 5. Classes
+
+```zig
+/// A point in the plane.
+pub const Point = struct {
+    x: i64 = 0, // instance data: every field has a default
+    y: i64 = 0,
+    label: ?*Object = null, // owned reference: traversed, cleared, dropped by Setu
+
+    pub const basetype = true; // Python may subclass it
+
+    /// Sets the coordinates.
+    pub fn __init__(self: *Point, a: struct { x: i64 = 0, y: i64 = 0 }) void {
+        self.x = a.x;
+        self.y = a.y;
+    }
+
+    /// The `x` coordinate (a property: `get_x`; add `set_x` for a setter).
+    pub fn get_x(self: *const Point) i64 {
+        return self.x;
+    }
+
+    /// Distance from the origin, squared.
+    pub fn norm2(self: *const Point) i64 {
+        return self.x * self.x + self.y * self.y;
+    }
+};
+pub const PointType = setu.Class(Point, @embedFile("point.zig")); // declare once, use this name
+```
+
+Stub: `@disjoint_base\nclass Point:` with `def __init__(self, x: int = ..., y: int = ...) -> None:`, the
+property `x: int`, `def norm2(self) -> int:`. Python: `Point(1, y=2).norm2()` is `5`.
+
+Settings (`pub const` in the struct): `name` (`"pkg.Name"`; default `<module>.<struct name>`), `base`
+(another `Class`, created first), `basetype`, `instantiable = false` (only Zig creates instances, with
+`new`), `getset` / `slots` (extra `c.GetSetDef`s / `c.Slot`s, with `stub` lines for them), `weakref`,
+`dict` (a `__dict__`), `pickle` (generated `__getstate__` / `__setstate__` over ints, floats, `bool`s and
+`?*Object`s of the type and its bases), `plain_methods` (`.{"get_nowait"}`: methods named like accessors),
+`type_params` (`"T"`: `Name[int]` works, the stub says `class Name[T]:`), `hidden` (created, not added to
+the module, `Any` in the stub), and UPPER_CASE consts as class attributes.
+
+Methods: a lowercase `pub fn` whose first parameter is named `self` (an instance method), `cls: *c.TypeObject`
+(a class method, `@classmethod`), anything else (a static method, `@staticmethod`). `self` is `*T`,
+`*const T` or `*Object`. `get_x` / `set_x(self, value: U)` are the property `x`. Parameters and results as in
+section 3; a `py.Rest` right after `self` is `*args`.
+
+What the `Class` gives Zig: `PointType.tp` (the type object, after creation), `PointType.data(obj)` (the
+`*Point` of an instance or subclass instance), `PointType.object(d)` (the object back from its data),
+`PointType.check(obj)`, `try PointType.new(.{ .x = 1 })` (a new instance, also of a type Python can not
+instantiate), `setu.Instance(Point).from(obj)` (`*Point` or `TypeError`).
+
+Hooks, by name (the full list is at the top of `src/class.zig`; `R` is the hook's Zig result, `Error!R` is
+fine everywhere; a hook parameter is converted like a method argument, `*Object` keeps it raw, and a
+`Path` / buffer / `Sequence` parameter is a compile error since nothing would release it). Below: the hook (its slot):
+behaviour.
+
+- `__new__(self, ...)` (`tp_new`): after allocation and the field defaults; named parameters or one `setu.CallArgs`
+- `__init__(self, ...)` (`tp_init`): the same; gives the type's `__text_signature__`
+- `__call__(self, ...)` (`tp_call`): arguments parsed like a method's
+- `__traverse__(self, v: *setu.Visit) setu.Visit.Error!void` (`tp_traverse`): `try v.add(obj)` beyond the `?*Object`
+  fields
+- `__clear__(self)`, `__del__(self)` (`tp_clear`, `tp_dealloc`): extra GC / dealloc work, after Setu's
+- `__finalize__(self)` (`tp_finalize`): once, fields still set; may call Python; must not raise
+  (`PyErr_WriteUnraisable`)
+- `__send__(self, arg: *Object) setu.Send` (`am_send`, `tp_iternext`, `tp_iter`): `.{ .next = v }` yields, `.{ .done = v
+  }` ends (new refs)
+- `__poll__(self, sent: ?*Object) setu.Poll` (generated `__await__` / `__send__`): `.pending` yields `self`; `.{ .ready
+  = v }` ends; see below
+- `__await__(self) *Object` (`am_await`): the iterator `await obj` drives
+- `__iter__(self) R`, `__next__(self) ?R` (`tp_iter`, `tp_iternext`): `null` ends it; without `__iter__` the iterator is
+  its own
+- `__len__(self) usize` (`mp_length`)
+- `__getitem__(self, key: K) R` (`mp_subscript`): `key` converted like an argument
+- `__setitem__(self, key: K, value: V)`, `__delitem__(self, key: K)` (`mp_ass_subscript`): a missing one raises
+  `TypeError`
+- `__contains__(self, item: I) bool` (`sq_contains`): an `item` of another type is not contained
+- `__bool__(self) bool`, `__repr__(self) R`, `__str__(self) R`, `__hash__(self) <int>` (`nb_bool`, `tp_repr`, `tp_str`,
+  `tp_hash`): -1 hashes as -2
+- `__eq__`, `__ne__`, `__lt__`, `__le__`, `__gt__`, `__ge__` `(self, other: O) bool` (`tp_richcompare`): another type:
+  `NotImplemented`; see below
+- `__add__`, `__sub__`, `__mul__`, `__truediv__`, `__floordiv__`, `__mod__`, `__divmod__` `(self, other: O) R` (`nb_*`):
+  see below
+- `__pow__`, `__lshift__`, `__rshift__`, `__and__`, `__or__`, `__xor__`, `__matmul__` `(self, other: O) R` (`nb_*`): see
+  below
+- `__r<op>__(self, other: O) R`, `__i<op>__(self, other: O) R` for each of those (`nb_*`): reflected, in place; see
+  below
+- `__neg__`, `__pos__`, `__abs__`, `__invert__` `(self) R` (`nb_*`)
+- `__int__`, `__index__` `(self) <int>`; `__float__(self) <float>` (`nb_*`): an int / a float result, checked at compile
+  time
+- `__getattr__(self, name: []const u8) R` (`tp_getattro`): after normal lookup raised `AttributeError`
+- `__setattr__(self, name, value: V)`, `__delattr__(self, name)` (`tp_setattro`): every assignment / deletion; a missing
+  one: the default
+- `__get__(self, instance: ?*Object, owner: ?*Object) R` (`tp_descr_get`): `instance` is `null` when read on the class
+- `__set__(self, instance: *Object, value: V)`, `__delete__(self, instance: *Object)` (`tp_descr_set`)
+
+Comparisons: `!=` is `not __eq__` without `__ne__`; `__eq__` without `__hash__` makes the type unhashable, as in Python.
+Number operators: `__r<op>__` runs when the instance is on the right, `__i<op>__` in place (a `void` result returns
+`self`); `pow` with a modulus raises `TypeError`. A `__poll__`'s `sent` is `null` on the first send, then what the loop
+sent in. The reflected and in-place names in full, for searching: `__radd__`, `__rsub__`, `__rmul__`, `__rtruediv__`,
+`__rfloordiv__`, `__rmod__`, `__rdivmod__`, `__rpow__`, `__rlshift__`, `__rrshift__`, `__rand__`, `__ror__`, `__rxor__`,
+`__rmatmul__`; `__iadd__`, `__isub__`, `__imul__`, `__itruediv__`, `__ifloordiv__`, `__imod__`, `__ipow__`,
+`__ilshift__`, `__irshift__`, `__iand__`, `__ior__`, `__ixor__`, `__imatmul__` (`__idivmod__` is a compile error: Python
+has no in-place `divmod`).
+
+A `__send__` / `__poll__` type may not also declare `__iter__` / `__next__` (generated); `__poll__` and
+`__send__` exclude each other. After `.ready` or an error, awaiting a `__poll__` object again raises
+`RuntimeError`.
+
+## 6. Buffers and ownership
+
+Type (locked; released by): use.
+
+- `py.Buffer`, `py.WritableBuffer` (for the call; Setu, after the call): use during the call; `try b.take()` for a view
+  of your own
+- `py.OwnedBuffer`, `py.OwnedWritableBuffer` (until your `deinit`; you (store it, `defer deinit`)): memory the kernel
+  uses later; one `GetBuffer`
+- `py.Sequence(T)` (for the call; Setu, after the call): `try s.take()` copies the items (each `take`n), keeps the tuple
+- `py.Path` (n/a (a `bytes` it holds); Setu, after the call): `try p.take()` keeps it
+
+```zig
+pub fn recv(ring: *Ring, buf: py.OwnedWritableBuffer) void {
+    ring.buf = buf; // `ring.buf.deinit()` at the completion; until then `bytearray.append` is `BufferError`
+}
+```
+
+Rules: when a later argument fails to convert, the function is not called and Setu releases everything,
+owned buffers included; once the function runs, an owned buffer is its own, on error paths too. A
+`Sequence` of an owned buffer type is a compile error (use `Sequence(Buffer)` and `take`), `take` of an owned
+buffer too. A buffer whose view has no object (`PyBuffer_FillInfo(NULL)`) raises `BufferError` on `take`.
+On 3.14t / 3.15t a `bytearray` argument costs 10-15 ns more: CPython's own critical section.
+
+## 7. Docs and the stub
+
+`///` above a declaration (the `//!` block at the top of the first `from` file with a `source` is the module
+docstring). Format: a description, a blank `///` line, then sections, each a header on its own line with
+its content indented 4 spaces:
+
+```zig
+/// Opens `path` relative to `dir_fd`.
+///
+/// Type
+///     path: str | bytes | os.PathLike
+///     return: int - the file descriptor
+///
+/// Example
+///     >>> open('a.txt', O_RDONLY)
+///     3
+///
+/// Note
+///     - `dir_fd` defaults to `AT_FDCWD`.
+```
+
+`Type` entries (`name: type  # note` or `name: type - note`; `return:` for the result) replace the Zig-derived
+type in the stub; bare generics get their arguments (`os.PathLike` -> `os.PathLike[str] | os.PathLike[bytes]`,
+`list` -> `list[Any]`, `Coroutine` -> `Coroutine[Any, Any, Any]`). Without one, the stub maps the Zig type:
+ints -> `int`, floats -> `float`, `[]const u8` -> `str`, `py.Bytes` -> `bytes`, `py.Path` -> `str | bytes |
+os.PathLike[...]`, buffers -> `Buffer`, `py.Sequence(T)` -> `Sequence[T]`, slices -> `list[T]`, tuples ->
+`tuple[T, U]`, `void` -> `None`, `?T` -> `T | None = None`, `*T` -> the class name (`Any` if hidden),
+`*Object` -> `Any`. A method parameter that would stub as `Any` without a `Type` entry is a compile error
+(rename a Zig helper camelCase, or add the entry). The stub imports only the names it uses, is laid out as
+`ruff format` would, and passes `mypy --strict` and `stubtest` in Setu's checks. `tools/setu_docs.py` turns
+the same docstrings into a static HTML site (and `llms.txt` / `llms-full.txt` for AI readers), and runs every
+`Example` to check that its output is what the doc says (`setu_docs.py check`).
+
+## 8. Ints and casts
+
+`fromPython` reads any int (`__index__` too) and raises `OverflowError` with the parameter's name and the
+type's range, also past 64 bits. So the parameter type is the check: `fd: i32`, `len: u32`, `offset: u64`.
+When one value is read as two types or checked against state, `const index = try py.narrow(u32, fd,
+"`close(fd)` with `direct=True`");`. `@intCast` / `@truncate` are for values the code itself bounds, each
+with a `// cast: <why it fits>` comment (`tools/check.sh` rejects one without). Constants wider than
+`c_long` are fine (`pub const ALL_ONES: u64 = maxInt(u64)`).
+
+## 9. Performance
+
+Measured facts from Setu's notes (ns per call, `tools/bench.py`, A/B interleaved, best of several runs, on
+all four interpreters):
+
+- Most per-call cost was store-forwarding stalls: a value written in small parts (CPython filling a
+  `Py_buffer`, an inlined `Error!T`, an optional's tag) then read with one wider load. So arguments are
+  filled in place in the arguments tuple (`BufferArg.fill`), big argument structs are not copied, and slow
+  paths stay out of line (`intArg`, `outOfRange`, `notWritable`: `@branchHint(.cold)`).
+- Whether a copy happens depends on LLVM's inlining, so identical source can run 2x apart between builds:
+  compare A/B builds with `objdump -d`, interleaved, best of several runs.
+- `inline` changes nothing in ReleaseFast (`-Doptimize=fast`): LLVM inlines the call path anyway. A moved
+  trampoline can read ~1 ns slower with identical code (placement).
+- A flag on an argument (marking a `take`n copy) cost 6-8 ns per buffer argument; `take` takes a second view
+  instead. `OwnedBuffer` saves that view (24-43 ns in Liburing's buffer preps).
+- Reference points: Shakti's `loop_bench` nop serial ~204 ns, batch ~129 ns, `SQE()` ~48 ns; Liburing's
+  `prep_recv(sqe, -1, bytearray)` ~22 ns.
+
+When touching `src/class.zig` / `src/export.zig` / `src/convert.zig` / `src/args.zig`: `python3 tools/bench.py
+--ref HEAD` before claiming a change is neutral.
+
+## 10. Compile errors Setu raises
+
+What the message says: the cause.
+
+- `anytype` parameters are not supported: a `pub fn` with an `anytype` parameter is exported
+- only plain required parameters can come before `py.Rest`: a default / `?T` / struct / `KwOnly` before `*args`
+- `py.Kwargs` must be the last parameter
+- more than one `py.KwOnly`
+- the required parameter `b` comes after `a`, which has a default: section 1, rule 4
+- `py.KwOnly` after `py.Rest` is redundant: after `*args` everything is keyword-only already
+- `py.Rest` / `py.Kwargs` are not supported here; take one `setu.CallArgs` parameter: `__new__` / `__init__` /
+  `__call__`
+- no default for `x` in the source: the argument struct's default is not in the file (`structBody`)
+- the argument struct `Opts` must be declared in the same file
+- can't show the default `...` in Python; use a literal, `null` or a constant: a default the stub can not render
+- no `pub fn name(` in source / no `const Name = struct {` in source: the `@embedFile` is not the declaration's file
+- `pub fn x` needs the entry's `.source = @embedFile(...)`: a function in a `from` entry without `source`
+- `.only` and `.exclude` together / `.only` names `x`, which it does not declare
+- `x` is in the module twice: `a.x` and `b.x`: one Python name from two declarations
+- `A.T` and `B.T` are the same type: one `setu.Class` / `setu.Exception` type under two names
+- its base `pkg.Base` is in no `Module.from` entry
+- `Module.methods` must end with `py.method_end` (or set `from`, `version` or `init`): a table without its terminator
+- unsupported parameter type / result type `T`: an int over 64 bits, a non-slice pointer, a plain struct result, ...
+- `checkErrno` takes a signed int
+- `Sequence(OwnedBuffer)`: the items are released with the sequence: use `Sequence(Buffer)` and `take`
+- `take` of an owned buffer: it is the function's already
+- a `py.Buffer` hook parameter is never released; take `*Object` and convert it in the hook: a buffer / `Path` /
+  `Sequence` hook parameter
+- `__poll__` generates `__send__`; give one / `__send__` / `__poll__` generate `__iter__` and `__next__`
+- `pickle` needs an instantiable type / `T.f`: a `U` can not be pickled: `pickle = true` with `instantiable = false` or
+  a bad field
+- `cls` must be `*c.TypeObject`: a class method's first parameter
+- `__hash__` must return an int / `__len__` an unsigned int / `__next__` `?R` / `__int__` an int / `__float__` a float:
+  result types
+- `__get__` takes `instance: ?*Object, owner: ?*Object`
+- needs `pub const module: setu.Module` in the root file, for the module name: a `setu.Class` with no `module` in the
+  root
+- method `m`: parameter `p` stubs as `Any`; if it is a Zig-only helper rename it camelCase, else add a `Type` entry: 7
+- not in the 3.15 stable ABI (abi3t), which Setu builds for: a `c.*` tombstone; use the replacement it names
+
+## 11. Checks
+
+    zig build test                          # type-check every declaration + comptime unit tests
+    zig build develop                       # test/setu_classes.so (every interpreter) + setu_classes.pyi
+    /opt/python/3.15t/bin/python3 -m pytest # then 3.15, 3.14t, 3.14: the same .so
+    tools/check.sh                          # everything, offline, on all four interpreters
+    python3 tools/bench.py --ref HEAD       # per-call cost A/B against a commit
+
+A project using Setu runs its own `tools/check.sh`, which includes `zig build setu-build-check`,
+`setu-docs-check` and `setu-guide-check` (its copies of Setu's script, docs helpers and this guide match the
+Setu it pins). After a Setu bump: `zig build setu-build-sync setu-docs-sync setu-guide-sync`.

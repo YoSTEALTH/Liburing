@@ -44,6 +44,7 @@ interleaved, `-Drelease`. `--defer` (C only here): the ring is set up with
 
 ### Summary: req/s, median, best first
 
+<!-- chart group="^(C \w+|\w+)" -->
 | server | req/s | |
 |:--|--:|:--|
 | C liburing | 627,427 | `███████████████████████████████████████` |

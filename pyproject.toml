@@ -1,6 +1,6 @@
 [project]
 name = "liburing"
-description = "Liburing is Python + Zig wrapper around C Liburing, which is a helper to setup and tear-down io_uring instances."
+description = "Fast, asynchronous Linux I/O for Python: a Zig-built wrapper around C liburing and the kernel's io_uring interface."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.14"
 license = "CC0-1.0"
@@ -58,7 +58,7 @@ testpaths = ["test"]
 
 [tool.ruff]
 line-length = 120
-extend-exclude = ["tools/setu_build.py"]  # Setu's copy, kept unchanged
+extend-exclude = ["tools/setu_build.py"]  # Setu's copy, kept unchanged (its `setu_docs.py` passes ruff as is)
 
 [tool.ruff.format]
 quote-style = "preserve"
@@ -70,3 +70,211 @@ no-lines-before = ["third-party", "first-party", "local-folder"]  # std, third-p
 targets = ["x86_64-linux-gnu.2.28", "aarch64-linux-gnu.2.28"]
 # `--all`: one `cp314.cp315-abi3.abi3t.cp314t.cp315t` wheel (3.14, 3.14t, 3.15, 3.15t and later) for glibc 2.28+
 # on x86_64 and aarch64 (plan.md decision 7).
+
+# The docs site, built by Setu's `tools/setu_docs.py` (`zig build setu-docs-sync`; the settings are documented at its
+# top): `python3 docs/gen_guide.py && python3 tools/setu_docs.py` writes site/.
+[tool.setu_docs]
+stub = "src/liburing/liburing.pyi"
+module = "liburing.liburing"
+summary = "io_uring for Python: a thin wrapper around C liburing"
+path = ["src"]
+name = "Liburing"
+home = "docs/index.md"
+edit = "https://github.com/YoSTEALTH/Liburing/edit/dev/"
+hooks = "tools/docs_hooks.py"  # fixtures for the docstring examples (`ring`, `sqe`, `cqe`, `fd`, ...)
+
+# The hand-written pages, in nav order.
+[[tool.setu_docs.markdown]]
+file = "docs/install.md"
+title = "Install"
+
+[[tool.setu_docs.markdown]]
+file = "docs/concepts.md"
+title = "How it works"
+section = "Guide"
+
+[[tool.setu_docs.markdown]]
+file = "docs/guide.md"  # written by docs/gen_guide.py
+title = "Examples"
+section = "Guide"
+
+[[tool.setu_docs.markdown]]
+file = "docs/from_c.md"
+title = "Coming from C liburing"
+section = "Guide"
+
+[[tool.setu_docs.markdown]]
+file = "docs/bench.md"
+title = "Benchmarks"
+
+# The API pages: which page lists which name. First match wins, in this order; the prep functions are matched by
+# their operation name.
+
+[[tool.setu_docs.pages]]
+slug = "ring"
+title = "Ring and setup"
+text = "Create, configure and tear down a `Ring`; probe what the kernel supports."
+classes = [
+    "Param",
+    "Probe",
+    "Ring",
+]
+patterns = [
+    "^io_uring_(queue_|setup(?!_buf_ring)|enter|ring_dontfork|resize_rings|enable_rings|close_ring_fd|set_iowait)",
+    "^io_uring_(memory_|mlock_|clone_|get_probe|free_probe|opcode_supported)",
+    "^(liburing_version_|probe$)",
+]
+
+[[tool.setu_docs.pages]]
+slug = "submission"
+title = "Submission queue"
+text = "Get a submission entry (`SQE` / `Sqe`), set its fields and submit it."
+classes = [
+    "SQE",
+    "Sqe",
+]
+patterns = ["^(io_uring_(get_sqe|sqe_|submit|sq_|sqring_|get_events)|put_sqe$)"]
+
+[[tool.setu_docs.pages]]
+slug = "completion"
+title = "Completion queue"
+text = "Wait for, peek at and consume completion entries (`CQE` / `Cqe`)."
+classes = [
+    "CQE",
+    "Cqe",
+    "CqeBatch",
+    "CqeBatchIter",
+    "CqeIter",
+]
+patterns = ["^io_uring_(cqe_|cq_|wait_|peek_)"]
+
+[[tool.setu_docs.pages]]
+slug = "prep-file"
+title = "Prep: files"
+text = "Read, write, open, close, stat, rename and the other file-system operations."
+functions = [
+    "io_uring_prep_close",
+    "io_uring_prep_close_direct",
+    "io_uring_prep_cmd_discard",
+    "io_uring_prep_fadvise",
+    "io_uring_prep_fadvise64",
+    "io_uring_prep_fallocate",
+    "io_uring_prep_fgetxattr",
+    "io_uring_prep_files_update",
+    "io_uring_prep_fixed_fd_install",
+    "io_uring_prep_fsetxattr",
+    "io_uring_prep_fsync",
+    "io_uring_prep_ftruncate",
+    "io_uring_prep_getxattr",
+    "io_uring_prep_link",
+    "io_uring_prep_madvise",
+    "io_uring_prep_madvise64",
+    "io_uring_prep_mkdir",
+    "io_uring_prep_open",
+    "io_uring_prep_open_direct",
+    "io_uring_prep_openat2",
+    "io_uring_prep_openat2_direct",
+    "io_uring_prep_pipe",
+    "io_uring_prep_pipe_direct",
+    "io_uring_prep_read",
+    "io_uring_prep_read_fixed",
+    "io_uring_prep_read_multishot",
+    "io_uring_prep_readv",
+    "io_uring_prep_readv_fixed",
+    "io_uring_prep_rename",
+    "io_uring_prep_setxattr",
+    "io_uring_prep_splice",
+    "io_uring_prep_statx",
+    "io_uring_prep_symlink",
+    "io_uring_prep_sync_file_range",
+    "io_uring_prep_tee",
+    "io_uring_prep_unlink",
+    "io_uring_prep_write",
+    "io_uring_prep_write_fixed",
+    "io_uring_prep_writev",
+    "io_uring_prep_writev_fixed",
+]
+
+[[tool.setu_docs.pages]]
+slug = "prep-net"
+title = "Prep: sockets"
+text = "Accept, connect, send, receive, bind, listen and the other socket operations."
+functions = [
+    "io_uring_prep_accept",
+    "io_uring_prep_accept_direct",
+    "io_uring_prep_bind",
+    "io_uring_prep_cmd_getsockname",
+    "io_uring_prep_cmd_sock",
+    "io_uring_prep_connect",
+    "io_uring_prep_listen",
+    "io_uring_prep_multishot_accept",
+    "io_uring_prep_multishot_accept_direct",
+    "io_uring_prep_recv",
+    "io_uring_prep_recv_multishot",
+    "io_uring_prep_recvmsg",
+    "io_uring_prep_recvmsg_multishot",
+    "io_uring_prep_send",
+    "io_uring_prep_send_bundle",
+    "io_uring_prep_send_set_addr",
+    "io_uring_prep_send_zc",
+    "io_uring_prep_send_zc_fixed",
+    "io_uring_prep_sendmsg",
+    "io_uring_prep_sendmsg_zc",
+    "io_uring_prep_sendmsg_zc_fixed",
+    "io_uring_prep_sendto",
+    "io_uring_prep_shutdown",
+    "io_uring_prep_socket",
+    "io_uring_prep_socket_direct",
+]
+
+[[tool.setu_docs.pages]]
+slug = "prep-other"
+title = "Prep: other"
+text = "Poll, timeout, cancel, futex, `msg_ring`, `nop`, `uring_cmd`, epoll, ..."
+patterns = ["^io_uring_prep_"]
+
+[[tool.setu_docs.pages]]
+slug = "register"
+title = "Register and buffers"
+text = "Register files, buffers, rings and restrictions; provided buffer rings."
+classes = [
+    "Bpf",
+    "BufReg",
+    "BufRing",
+    "ClockRegister",
+    "FileIndex",
+    "FileIndexIter",
+    "MemRegionReg",
+    "Napi",
+    "Query",
+    "RegWait",
+    "Restriction",
+    "SyncCancelReg",
+    "ZcrxCtrl",
+    "ZcrxIfqReg",
+]
+patterns = ["^io_uring_(register|unregister|buf_|setup_buf_ring|free_buf_ring)"]
+
+[[tool.setu_docs.pages]]
+slug = "network"
+title = "Network helpers"
+text = "Socket addresses, message headers and socket options."
+classes = [
+    "Cmsghdr",
+    "Msghdr",
+    "RecvmsgOut",
+    "Sockaddr",
+]
+patterns = ["^(io_uring_recvmsg_|setsockopt$|getsockopt$|getsockname$)"]
+
+[[tool.setu_docs.pages]]
+slug = "types"
+title = "Types, enums and errors"
+text = "Structures, enums and exceptions the functions take and return."
+default = true
+
+[[tool.setu_docs.pages]]
+slug = "constants"
+title = "Constants"
+text = "`IORING_*`, `IOSQE_*`, `O_*`, `SO_*`, ... grouped by prefix."
+constants = true
