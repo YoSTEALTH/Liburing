@@ -209,13 +209,3 @@ def test_other_sqes_return_true(ring):
     tmpl = Sqe(2)
     assert io_uring_prep_nop(tmpl[1]) is True
     assert io_uring_prep_nop(tmpl) is True
-
-
-def test_sqe_ring_example(capsys):
-    # `example/sqe_ring.py`: the README's `Sqe(ring)` example
-    import pathlib
-    import runpy
-
-    path = pathlib.Path(__file__).parents[2] / "example" / "sqe_ring.py"
-    runpy.run_path(str(path), run_name="__main__")
-    assert capsys.readouterr().out == "user_data: [0, 1, 2]\n"

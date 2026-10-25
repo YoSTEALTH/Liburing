@@ -1,67 +1,52 @@
+"""Open, write, read and close a file: every step a request on the ring, one at a time."""
+
+import os
+import tempfile
 from liburing import *
 
 
-def open(ring, cqe, path, flags):
-    sqe = io_uring_get_sqe(ring)  # sqe(submission queue entry)
-    io_uring_prep_open(sqe, path, flags)
-    # set submit entry identifier as `1` which is returned back in `cqe.user_data`
-    # so you can keep track of submit/completed entries.
-    sqe.user_data = 1
-    return _submit_and_wait(ring, cqe)  # returns fd
-
-
-def write(ring, cqe, fd, data):
-    sqe = io_uring_get_sqe(ring)
-    io_uring_prep_write(sqe, fd, data)
-    sqe.user_data = 2
-    return _submit_and_wait(ring, cqe)  # returns length(s) of bytes written
-
-
-def read(ring, cqe, fd, length):
-    buffer = bytearray(length)  # where read data will be stored
-    sqe = io_uring_get_sqe(ring)
-    io_uring_prep_read(sqe, fd, buffer)
-    sqe.user_data = 3
-    _submit_and_wait(ring, cqe)  # get actual length of file read.
-    return buffer
-
-
-def close(ring, cqe, fd):
-    sqe = io_uring_get_sqe(ring)
-    io_uring_prep_close(sqe, fd)
-    sqe.user_data = 4
-    _submit_and_wait(ring, cqe)  # no error means success!
-
-
-def _submit_and_wait(ring, cqe):
-    io_uring_submit(ring)  # submit entry
-    io_uring_wait_cqe(ring, cqe)  # wait for entry to finish
+def submit_and_wait(ring, cqe):
+    io_uring_submit(ring)  # hand the queued request to the kernel
+    io_uring_wait_cqe(ring, cqe)  # wait for its completion
     entry = cqe[0]
     result = entry.res  # raises the matching `OSError` if the operation failed
-    # done with current entry so clear it from completion queue.
-    io_uring_cqe_seen(ring, entry)
-    return result  # type: int
+    io_uring_cqe_seen(ring, entry)  # done with this entry
+    return result
 
 
 def main():
+    path = os.path.join(tempfile.mkdtemp(), "example.txt")
     ring = Ring()
-    cqe = Cqe()  # completion queue entry
+    cqe = Cqe()  # a completion queue entry
+    io_uring_queue_init(8, ring)  # a ring with room for 8 requests
     try:
-        io_uring_queue_init(8, ring)
-
-        fd = open(ring, cqe, "/tmp/liburing-test-file.txt", O_CREAT | O_RDWR)
+        sqe = io_uring_get_sqe(ring)  # a submission queue entry
+        io_uring_prep_open(sqe, path, O_CREAT | O_RDWR)
+        sqe.user_data = 1  # comes back in `cqe.user_data`, to tell completions apart
+        fd = submit_and_wait(ring, cqe)
         print("fd:", fd)
 
-        length = write(ring, cqe, fd, b"hi... bye!")
-        print("wrote:", length)
+        data = b"Hello, io_uring!"
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_write(sqe, fd, data)
+        sqe.user_data = 2
+        print("wrote:", submit_and_wait(ring, cqe))  # bytes written
 
-        content = read(ring, cqe, fd, length)
-        print("read:", content)
+        buffer = bytearray(len(data))  # held by the request until the read completes
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_read(sqe, fd, buffer, 0)  # from the start of the file
+        sqe.user_data = 3
+        print("read:", submit_and_wait(ring, cqe), buffer)  # bytes read
 
-        close(ring, cqe, fd)
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_close(sqe, fd)
+        sqe.user_data = 4
+        submit_and_wait(ring, cqe)  # no error means closed
         print("closed.")
     finally:
         io_uring_queue_exit(ring)
+        os.unlink(path)
+        os.rmdir(os.path.dirname(path))
 
 
 if __name__ == "__main__":
