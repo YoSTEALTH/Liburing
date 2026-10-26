@@ -30,6 +30,7 @@ The settings, in `pyproject.toml` (paths relative to it):
     home = 'docs/index.md'          # optional: the home page's text (default: the module docstring)
     css = 'docs/extra.css'          # optional: appended to `style.css` (colors: `--accent`, ...)
     edit = 'https://github.com/me/pkg/edit/dev/'  # optional: an Edit link on Markdown pages (+ the file)
+    repo = 'https://github.com/me/pkg'  # optional: the header's repository link (default: from `[project.urls]`)
     scripts = 'example'             # optional: runnable example scripts, a page of their own
     scripts_skip = ['server.py']    # optional: scripts shown but not run
     featured = 'example/hi.py'      # optional: a script on the home page, with a Run box
@@ -68,7 +69,9 @@ The settings, in `pyproject.toml` (paths relative to it):
                                     # a group of one goes under `Other`)
 
 The footer also reads `[project]`: `urls.Homepage` (the name links to it) and `requires-python` (`>=3.14` shows as
-`CPython 3.14+`); each is left out when missing.
+`CPython 3.14+`); each is left out when missing. The header's top right links the repository: `repo = 'https://
+github.com/me/pkg'` in `[tool.setu_docs]`, else the first GitHub URL of `urls.Repository`, `.Source`, `.Homepage`;
+a GitHub one shows `me/pkg` with its latest release, stars and forks (the page asks GitHub's API, once a session).
 
 The default theme is Tokyo Night: Day for light, Night for dark (the ◐ button, else the system's choice). A `css`
 file can override any color: page `--bg`, `--panel`, `--line`, `--text`, `--muted`, `--accent`, ...; code `--kw`
@@ -206,6 +209,13 @@ class Project:
         # `[project]`: the footer links the name to `Homepage` and gives `requires-python` (`>=3.14` -> `3.14+`)
         meta = tomllib.loads(self.pyproject.read_text()).get('project', {})
         self.homepage = meta.get('urls', {}).get('Homepage', '')
+        # the header's repository link: `repo`, else the first GitHub one of `[project.urls]`
+        urls = meta.get('urls', {})
+        repo = self.config.get('repo') or next(
+            (u for k in ('Repository', 'Source', 'Homepage') if GITHUB.fullmatch(u := urls.get(k, ''))), ''
+        )
+        self.repo = repo.rstrip('/').removesuffix('.git')
+        self.repo_name = m.group(1) if (m := GITHUB.fullmatch(repo)) else ''
         requires = meta.get('requires-python', '').replace(' ', '')
         self.requires = f'{requires[2:]}+' if re.fullmatch(r'>=[\d.]+', requires) else requires
         self.timeout = self.config.get('timeout', 20)
@@ -595,6 +605,66 @@ TOKEN = re.compile(
     r'''|(?P<op>[-+*/%=<>!&|^~@:.,;]+)'''
 )
 CONSTANTS = {'None', 'True', 'False', 'Ellipsis', 'NotImplemented'}
+# A link off the site (`http(s)://`, no `target` yet): it opens in a new tab
+EXTERNAL_LINK = re.compile(r'<a\b(?![^>]*\btarget=)[^>]*\bhref="https?://[^"]*"')
+GITHUB = re.compile(r'https://github\.com/([\w.-]+/[\w.-]+?)(?:\.git)?/?')
+# The header's repository link: the GitHub mark, then the latest release, stars and forks (filled in by `app.js`).
+ICON_GITHUB = (
+    '<svg class="gh" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 '
+    '3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-'
+    '.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-'
+    '3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 '
+    '1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95'
+    '.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>'
+)
+# The header's light / dark (◐) and menu (☰) buttons: SVG, so every header icon has the same height (`--icon`).
+ICON_THEME = (
+    '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor"'
+    ' stroke-width="1.5"/><path fill="currentColor" d="M8 1a7 7 0 0 0 0 14z"/></svg>'
+)
+ICON_MENU = (
+    '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 2h14v2H1zM1 7h14v2H1zM1 12h14v2H1z"/>'
+    '</svg>'
+)
+ICON_FACT = {  # 16px line icons, `stroke: currentColor` (CSS)
+    'tag': '<path d="M1.5 2.5v5l7 7 6-6-7-7z"/><circle cx="4.75" cy="5.25" r="1"/>',
+    'stars': '<path d="M8 1.5l1.9 4.1 4.4.4-3.3 3 1 4.4L8 11.1l-4 2.3 1-4.4-3.3-3 4.4-.4z"/>',
+    'forks': '<circle cx="4" cy="3" r="1.5"/><circle cx="12" cy="3" r="1.5"/><circle cx="8" cy="13" r="1.5"/>'
+    '<path d="M4 4.5V6a2 2 0 002 2h4a2 2 0 002-2V4.5M8 8v3.5"/>',
+}
+SH_KEYWORDS = {
+    'if', 'then', 'elif', 'else', 'fi', 'for', 'while', 'until', 'do', 'done', 'case', 'esac', 'in', 'function',
+}  # fmt: skip
+SH_TOKEN = re.compile(
+    r'''(?P<comment>(?<!\S)\#.*)'''
+    r'''|(?P<string>'[^']*'|"(?:\\.|[^"\\])*")'''
+    r'''|(?P<variable>\$\{[^}]*\}|\$\w+|\$[@*#?$!])'''
+    r'''|(?P<placeholder><[\w.-]+>)'''
+    r'''|(?P<option>(?<!\S)--?[A-Za-z][\w-]*)'''
+    r'''|(?P<op>&&|\|\||\d?>>?(?:&\d)?|&>|[|;&<])'''
+    r'''|(?P<word>[^\s|;&<>'"$]+)'''
+)
+SH_CLASS = {'comment': 'com', 'string': 'str', 'variable': 'bi', 'placeholder': 'arg', 'option': 'arg', 'op': 'op'}
+C_KEYWORDS = {
+    'auto', 'break', 'case', 'const', 'continue', 'default', 'do', 'else', 'enum', 'extern', 'for', 'goto', 'if',
+    'inline', 'register', 'restrict', 'return', 'sizeof', 'static', 'struct', 'switch', 'typedef', 'union',
+    'volatile', 'while',
+}  # fmt: skip
+C_TYPES = {
+    'bool', 'char', 'double', 'float', 'int', 'long', 'short', 'signed', 'unsigned', 'void', 'size_t', 'ssize_t',
+    'off_t', 'mode_t', 'pid_t', 'socklen_t', 'int8_t', 'int16_t', 'int32_t', 'int64_t', 'uint8_t', 'uint16_t',
+    'uint32_t', 'uint64_t', 'intptr_t', 'uintptr_t', '__u8', '__u16', '__u32', '__u64', '__s32', '__s64',
+}  # fmt: skip
+C_CONSTANTS = {'NULL', 'true', 'false'}
+C_TOKEN = re.compile(
+    r'''(?P<comment>//.*|/\*[\s\S]*?\*/)'''
+    r'''|(?P<decorator>^[ \t]*\#[ \t]*\w+)'''  # a preprocessor directive
+    r'''|(?P<string>"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|(?<=\#include)\s*<[^>\n]*>)'''
+    r'''|(?P<number>\b(?:0[xX][\da-fA-F]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)[uUlLfF]*\b)'''
+    r'''|(?P<name>[A-Za-z_]\w*)'''
+    r'''|(?P<op>[-+*/%=<>!&|^~?:.,;]+)''',
+    re.MULTILINE,
+)
 FENCE = re.compile(r'( *)(`{3,}|~{3,})\s*([\w+-]*)')
 HEADING = re.compile(r'(#{1,6})\s+(.*?)\s*#*\s*$')
 LIST_ITEM = re.compile(r'( *)([-*+]|\d+[.)])\s+(.*)')
@@ -731,12 +801,62 @@ class Site:
         return '<pre class="code session">' + '\n'.join(lines) + '</pre>'
 
     def shell(self, code):
-        '''A shell block: `# comments` dimmed.'''
-        return '\n'.join(
-            f'<span class="com">{html.escape(line)}</span>' if line.lstrip().startswith('#')
-            else re.sub(r'(\s)(#.*)$', r'\1<span class="com">\2</span>', html.escape(line))
-            for line in code.splitlines()
-        )  # fmt: skip
+        '''A shell block as HTML: `fn` a command, `kw` a keyword, `arg` an option or a `<placeholder>`, `str` a
+        string, `bi` a variable, `op` a pipe / `&&` / `;` / redirection, `com` a comment. When a line starts with a
+        `$ ` prompt (a `console` session), the prompt is `pr` and the other lines are output.
+        '''
+        session = any(line.startswith('$ ') for line in code.splitlines())
+        lines = []
+        for line in code.splitlines():
+            if session and not line.startswith('$ '):
+                lines.append(f'<span class="out">{html.escape(line)}</span>' if line else '')
+                continue
+            out, pos, command = [], 0, True
+            if session:
+                out.append('<span class="pr">$ </span>')
+                pos = 2
+            for m in SH_TOKEN.finditer(line, pos):
+                out.append(html.escape(line[pos : m.start()]))
+                kind, text = m.lastgroup, m.group(0)
+                if kind == 'word':
+                    if text in SH_KEYWORDS:
+                        cls, command = 'kw', True
+                    elif command and not re.match(r'\w+=', text):
+                        cls, command = 'fn', False
+                    else:
+                        cls = ''
+                    out.append(f'<span class="{cls}">{html.escape(text)}</span>' if cls else html.escape(text))
+                else:
+                    out.append(f'<span class="{SH_CLASS[kind]}">{html.escape(text)}</span>')
+                    command = command or text in ('|', '||', '&&', ';', '&')
+                pos = m.end()
+            out.append(html.escape(line[pos:]))
+            lines.append(''.join(out))
+        return '\n'.join(lines)
+
+    def highlight_c(self, code):
+        '''C `code` as HTML, with `highlight`'s classes (`dec` a preprocessor directive, `ty` a type).'''
+        out, pos = [], 0
+        for m in C_TOKEN.finditer(code):
+            out.append(html.escape(code[pos : m.start()]))
+            kind, text = m.lastgroup, m.group(0)
+            if kind == 'name':
+                if text in C_CONSTANTS or (text.isupper() and len(text) > 1):
+                    cls = 'con'
+                elif text in C_KEYWORDS:
+                    cls = 'kw'
+                elif text in C_TYPES or text.endswith('_t'):
+                    cls = 'ty'
+                elif code[m.end() :].lstrip(' ').startswith('('):
+                    cls = 'fn'
+                else:
+                    cls = ''
+                out.append(f'<span class="{cls}">{text}</span>' if cls else text)
+            else:
+                out.append(f'<span class="{kind[:3]}">{html.escape(text)}</span>')
+            pos = m.end()
+        out.append(html.escape(code[pos:]))
+        return ''.join(out)
 
     def code_block(self, code, lang):
         lang = lang.lower()
@@ -746,6 +866,8 @@ class Site:
             body = self.highlight(code)
         elif lang in ('sh', 'bash', 'shell', 'console'):
             body = self.shell(code)
+        elif lang in ('c', 'h'):
+            body = self.highlight_c(code)
         else:
             body = html.escape(code)
         attr = f' data-lang="{html.escape(lang)}"' if lang else ''
@@ -914,8 +1036,13 @@ class Site:
         tag = 'ol' if ordered else 'ul'
         return f'<{tag}>{"".join(out)}</{tag}>', j
 
-    def blocks(self, lines, base, toc):
-        '''Markdown block text (a list of lines) as HTML; level 2 and 3 headings go into `toc`.'''
+    def blocks(self, lines, base, toc, parts=None):
+        '''Markdown block text (a list of lines) as HTML; level 2 and 3 headings go into `toc`.
+
+        With `parts` (the open levels; a page's top level only), a level 2 or 3 heading opens a `<section
+        class="part">` that carries its id and holds everything up to the next heading of its level or higher, so a
+        selected heading gets the side bars of a selected entry.
+        '''
         out, i = [], 0
         while i < len(lines):
             line = lines[i]
@@ -935,8 +1062,16 @@ class Site:
                 anchor = self.anchor(plain)
                 if level in (2, 3):
                     toc.append((anchor, plain))
-                out.append(f'<h{level} id="{anchor}">{self.inline_md(title, base)}'
-                           f'<a class="anchor" href="#{anchor}">#</a></h{level}>')  # fmt: skip
+                while parts and parts[-1] >= level:
+                    out.append('</section>')
+                    parts.pop()
+                if parts is not None and level in (2, 3):
+                    out.append(f'<section class="part" id="{anchor}">')
+                    parts.append(level)
+                    head = f'<h{level}>'
+                else:
+                    head = f'<h{level} id="{anchor}">'
+                out.append(f'{head}{self.inline_md(title, base)}<a class="anchor" href="#{anchor}">#</a></h{level}>')
                 i += 1
             elif RULE.fullmatch(line):
                 out.append('<hr>')
@@ -978,12 +1113,13 @@ class Site:
                     j += 1
                 out.append(f'<p>{self.inline_md(" ".join(p.strip() for p in lines[i:j]), base)}</p>')
                 i = j
+        out.extend('</section>' for _ in parts or ())
         return ''.join(out)
 
     def markdown(self, text, base=None):
         '''Markdown `text` (from a file in `base`) as `(html, toc)`.'''
         toc = []
-        return self.blocks(text.splitlines(), base, toc), toc
+        return self.blocks(text.splitlines(), base, toc, []), toc
 
     # -- docstring sections
 
@@ -1014,6 +1150,18 @@ class Site:
                 items.append(line.strip())
         return '<ul>' + ''.join(f'<li>{self.inline(i)}</li>' for i in items) + '</ul>'
 
+    def flags(self, text):
+        '''A `Flags` section: one entry per line, a name (as code, linked when it is an export) and an optional
+        `# comment` after it, shown as text (`IORING_TIMEOUT_ABS  # ts is a point in time`). With comments the
+        entries stack, else they wrap as a row.
+        '''
+        entries = [re.split(r'\s+#\s*', line.strip(), maxsplit=1) for line in text.splitlines() if line.strip()]
+        items = ''.join(
+            f'<li>{self.code(e[0])}' + (f' {self.inline(e[1])}' if len(e) > 1 else '') + '</li>' for e in entries
+        )
+        described = ' described' if any(len(e) > 1 for e in entries) else ''
+        return f'<ul class="flags{described}">{items}</ul>'
+
     def doc(self, name, obj):
         '''A docstring as HTML: description, Type, Example (+ fixture and Run), Note, others.'''
         parts = sections(obj.__doc__)
@@ -1038,9 +1186,7 @@ class Site:
             elif header in ('Note', 'Warning'):
                 out.append(self.bullets(text))
             elif header == 'Flags':
-                out.append('<ul class="flags">' + ''.join(
-                    f'<li><code>{self.link(f.strip())}</code></li>' for f in text.splitlines() if f.strip()
-                ) + '</ul>')  # fmt: skip
+                out.append(self.flags(text))
             else:
                 out.append(f'<pre class="plain">{html.escape(text)}</pre>')
         return ''.join(out)
@@ -1128,7 +1274,20 @@ class Site:
         url = project.homepage
         footer_name = f'<a href="{html.escape(url)}">{name}</a>' if url else name
         python = f' (CPython {html.escape(project.requires)})' if project.requires else ''
-        return f'''<!doctype html>
+        repo = ''
+        if project.repo:
+            facts = ''.join(
+                f'<span class="fact"><svg viewBox="0 0 16 16" aria-hidden="true">{svg}</svg><span data-fact="{k}">'
+                f'</span></span>'
+                for k, svg in ICON_FACT.items()
+            )
+            label = html.escape(project.repo_name or project.repo.split('//', 1)[-1])
+            repo = (
+                f'\n  <a class="repo" href="{html.escape(project.repo)}" title="Source on GitHub"'
+                f' data-repo="{html.escape(project.repo_name)}">{ICON_GITHUB}<span class="repo-in">'
+                f'<span class="repo-name">{label}</span><span class="facts" hidden>{facts}</span></span></a>'
+            )
+        page = f'''<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -1145,9 +1304,9 @@ catch (e) {{}}</script>
   <div class="search"><input id="q" type="search" placeholder="Search the API…" autocomplete="off">
   <div id="hits" hidden></div></div>
   <div class="tools">
-  <button id="theme" class="theme" type="button" aria-label="Light / dark">◐</button>
   <span id="live" class="live" title="Run buttons need `setu_docs.py serve`">static</span>
-  <button class="menu" aria-label="Menu" onclick="document.body.classList.toggle('nav-open')">☰</button>
+  <button id="theme" class="theme" type="button" aria-label="Light / dark">{ICON_THEME}</button>{repo}
+  <button class="menu" aria-label="Menu" onclick="document.body.classList.toggle('nav-open')">{ICON_MENU}</button>
   </div>
 </div></header>
 <div class="wrap">
@@ -1164,6 +1323,7 @@ catch (e) {{}}</script>
 </body>
 </html>
 '''
+        return EXTERNAL_LINK.sub(r'\g<0> target="_blank" rel="noopener"', page)
 
     def api_page(self, page, names):
         self.ids = set()
@@ -1513,7 +1673,7 @@ body { margin: 0; background: var(--bg); color: var(--text);
   font: 17px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
 a { color: var(--ref); text-decoration: none; }
 a:hover { text-decoration: underline; }
-code, pre { font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo, monospace; font-size: 13px; }
+code, pre { font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo, monospace; font-size: 15px; }
 :not(pre) > code { background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 .top { position: sticky; top: 0; z-index: 10; height: 52px; background: var(--panel);
   border-bottom: 1px solid var(--line); }
@@ -1522,11 +1682,12 @@ code, pre { font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo,
 .top-in { display: grid; grid-template-columns: 1fr minmax(0, 420px) 1fr; align-items: center; gap: 16px;
   max-width: 1280px; height: 100%; margin: 0 auto; padding: 0 24px 0 40px; }
 .brand { justify-self: start; font-weight: 700; font-size: 21px; color: var(--text); white-space: nowrap; }
-.tools { justify-self: end; display: flex; align-items: center; gap: 12px; }
+.tools { justify-self: end; display: flex; align-items: center; gap: 12px;
+  --icon: 20px; }  /* the height of every header icon (◐, the GitHub mark, ☰) */
 .ver { font-weight: 400; color: var(--muted); font-size: 13px; }
-.menu { display: none; background: none; border: 0; color: var(--text); font-size: 20px; cursor: pointer; }
-.theme { background: none; border: 1px solid var(--line); border-radius: 99px; color: var(--text); cursor: pointer;
-  font-size: 14px; padding: 0 8px; }
+.menu, .theme { display: flex; background: none; border: 0; padding: 0; color: var(--text); cursor: pointer; }
+.menu { display: none; }
+.menu svg, .theme svg { height: var(--icon); width: auto; }
 .search { position: relative; }
 .search input { width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px;
   background: var(--bg); color: var(--text); font: inherit; }
@@ -1538,6 +1699,16 @@ code, pre { font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo,
 .live { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px;
   padding: 1px 8px; white-space: nowrap; }
 .live.on { color: var(--ok); border-color: var(--ok); }
+.repo { display: flex; align-items: center; gap: 8px; color: var(--text); line-height: 1.25; white-space: nowrap; }
+.repo:hover { text-decoration: none; opacity: .8; }
+.repo .gh { height: var(--icon); width: auto; flex: none; }
+.repo-in { display: flex; flex-direction: column; align-items: flex-start; }
+.repo-name { font-size: 14px; font-weight: 600; }
+.facts { display: flex; gap: 10px; font-size: 12px; color: var(--muted); }
+.facts[hidden] { display: none; }
+.fact { display: inline-flex; align-items: center; gap: 3px; }
+.fact svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linejoin: round; }
+.fact:has(> span:empty) { display: none; }
 .wrap { display: flex; max-width: 1280px; margin: 0 auto; }
 .side { position: sticky; top: 52px; align-self: flex-start; width: 240px; flex: none; height: calc(100vh - 52px);
   overflow: auto; padding: 16px 16px 32px 8px; border-left: 1px solid var(--line); }
@@ -1600,14 +1771,15 @@ table.md th { text-transform: none; font-size: 14px; color: var(--text); }
    A border, not a 1px wide background: borders snap to whole device pixels, so a bar on a half pixel (`.wrap` is
    centered) is not drawn 2px. The dashes (8px, 6px gap; `dashed` can not set a length) are a `border-image`, which
    snaps the same way. */
-:is(.entry, .member, .group):target { position: relative; }
-:is(.entry, .member, .group):target::before, :is(.entry, .member, .group):target::after { content: "";
+:is(.entry, .member, .group, .part):target { position: relative; }
+:is(.entry, .member, .group, .part):target::before, :is(.entry, .member, .group, .part):target::after { content: "";
   position: absolute; top: 11px; bottom: 11px; width: 0; border-left: 1px solid var(--accent);
   border-image: repeating-linear-gradient(to bottom, var(--accent) 0 8px, transparent 8px 14px) 1; }
-:is(.entry, .member, .group):target::before { left: -20px; }
-:is(.entry, .member, .group):target::after { right: -20px; }
+:is(.entry, .member, .group, .part):target::before { left: -20px; }
+:is(.entry, .member, .group, .part):target::after { right: -20px; }
 ul, ol { padding-left: 20px; } li { margin: 2px 0; }
 ul.flags { list-style: none; padding: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+ul.flags.described { display: block; }
 blockquote { margin: 12px 0; padding: 2px 14px; border-left: 3px solid var(--accent); background: var(--panel); }
 hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
 img { max-width: 100%; }
@@ -1637,15 +1809,16 @@ body.can-run .needs { display: block; }
 .chart figcaption { margin-top: 4px; color: var(--muted); font-size: 12px; text-align: right; }
 footer { margin-top: 48px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 12px; }
 @media (max-width: 860px) {
-  .menu { display: block; }
+  .menu { display: flex; }
   .side { position: fixed; right: 0; top: 52px; z-index: 9; background: var(--panel); transform: translateX(100%);
     transition: transform .15s; width: 260px; }
   body.nav-open .side { transform: none; }
   main { padding: 16px 16px 48px; }
   .top-in { padding: 0 16px; }
-  :is(.entry, .member, .group):target::before { left: -8px; }
-  :is(.entry, .member, .group):target::after { right: -8px; }
+  :is(.entry, .member, .group, .part):target::before { left: -8px; }
+  :is(.entry, .member, .group, .part):target::after { right: -8px; }
   .live { display: none; }
+  .repo-in { display: none; }
 }
 '''
 
@@ -1686,6 +1859,33 @@ JS = r'''
       });
     });
   });
+
+  // The repository link: the latest release, stars and forks from GitHub's API, kept for the browser session
+  // (the API allows 60 requests an hour per address without a token). Left out when GitHub does not answer.
+  const repo = document.querySelector('.repo[data-repo]:not([data-repo=""])');
+  if (repo) {
+    const key = 'repo:' + repo.dataset.repo, api = 'https://api.github.com/repos/' + repo.dataset.repo;
+    const short = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k' : String(n);
+    const show = facts => {
+      for (const [k, v] of Object.entries(facts)) {
+        const el = repo.querySelector(`[data-fact="${k}"]`);
+        if (el && v !== '') el.textContent = v;
+      }
+      repo.querySelector('.facts').hidden = false;
+    };
+    let cached = null;
+    try { cached = JSON.parse(sessionStorage.getItem(key)); } catch (e) {}
+    if (cached) show(cached);
+    else Promise.all([
+      fetch(api).then(r => r.ok ? r.json() : Promise.reject()),
+      fetch(api + '/releases/latest').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+    ]).then(([info, release]) => {
+      const facts = { tag: release.tag_name || '', stars: short(info.stargazers_count),
+        forks: short(info.forks_count) };
+      try { sessionStorage.setItem(key, JSON.stringify(facts)); } catch (e) {}
+      show(facts);
+    }).catch(() => {});
+  }
 
   const q = document.getElementById('q'), hits = document.getElementById('hits');
   const live = document.getElementById('live');
@@ -1731,8 +1931,10 @@ JS = r'''
     if (ev.key === '/' && document.activeElement !== q) { ev.preventDefault(); q.focus(); }
   });
 
-  // Run buttons: only when served by `setu_docs.py serve` (it answers /api/ping).
-  fetch('/api/ping').then(r => r.ok ? r.text() : '').then(text => {
+  // Run buttons: only when served by `setu_docs.py serve` (it answers /api/ping). It listens on 127.0.0.1 only,
+  // so a published site (GitHub Pages) does not ask (a 404 in every page load's network log).
+  const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+  (local ? fetch('/api/ping') : Promise.reject()).then(r => r.ok ? r.text() : '').then(text => {
     if (!text || !call(w.ping, text)) return;
     document.body.classList.add('can-run');
     live.textContent = out();

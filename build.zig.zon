@@ -1,12 +1,12 @@
 .{
     .name = .liburing,
-    .version = "2026.10.25",
+    .version = "2026.10.26",
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
-        // Setu v2026.10.25-5 (commit 6de185b).
+        // Setu v2026.10.26 (commit b898849).
         .setu = .{
-            .url = "git+https://github.com/YoSTEALTH/Setu?ref=v2026.10.25-5#6de185ba21d13c51c069056b842535c535adf022",
-            .hash = "setu-2026.10.25-5-f1cYJ6IoBwDMdhTza0ap3JyLDCrjkTC28tW9Oy1BaSK7",
+            .url = "git+https://github.com/YoSTEALTH/Setu?ref=v2026.10.26#b898849f4e9add9485408ff324637b8f8638e422",
+            .hash = "setu-2026.10.26-f1cYJw5VBwCxgMEbKvzMBZYEeqJF6Xf81zCdek1yh4M3",
         },
         // .setu = .{ .path = "../../../Setu/Setu/Code" }, // local debug
     },
