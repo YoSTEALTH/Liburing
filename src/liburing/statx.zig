@@ -25,6 +25,12 @@ pub const StatxType = setu.Class(Statx, @embedFile("statx.zig"));
 ///     - Properties are the `statx` fields (`size`, `mode`, `uid`, `mask`, `mnt_id`, ...). `atime`, `btime`,
 ///       `ctime` and `mtime` are seconds as `float`. `isfile`, `isreg`, `isdir`, `islink`, `ischr`, `isblk`,
 ///       `isfifo` and `issock` test the file type in `mode`.
+///     - `io_uring_prep_statx(sqe, statx, path, flags, mask)`: `mask` is the `STATX_*` fields wanted
+///       (`STATX_BASIC_STATS` is what `stat` gives, `| STATX_BTIME` for the birth time; `STATX_ALL` is deprecated),
+///       `flags` the `AT_*` lookup flags and `AT_STATX_SYNC_AS_STAT` / `AT_STATX_FORCE_SYNC` / `AT_STATX_DONT_SYNC`
+///       for how fresh a network file system's answer must be. Only read a field whose bit is in `mask` after
+///       the completion: the kernel may fill more or fewer fields than asked. `cqe.res` is `0` on success.
+///     - Needs Linux 5.6+ (`IORING_OP_STATX`).
 ///     - For more information visit:
 ///         https://man7.org/linux/man-pages/man2/statx.2.html
 ///         https://man7.org/linux/man-pages/man7/inode.7.html
@@ -35,70 +41,91 @@ pub const Statx = struct {
 
     pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
 
+    /// `STATX_*` bits of the fields the kernel filled in (what was asked for, less what the file system does not
+    /// have, plus what came for free).
     pub fn get_mask(self: *const Self) u32 {
         return self._statx.stx_mask;
     }
 
+    /// Preferred I/O block size, in bytes.
     pub fn get_blksize(self: *const Self) u32 {
         return self._statx.stx_blksize;
     }
 
+    /// `STATX_ATTR_*` attributes of the file (`STATX_ATTR_IMMUTABLE`, `STATX_ATTR_ENCRYPTED`, ...): only the bits
+    /// set in `attributes_mask` mean anything.
     pub fn get_attributes(self: *const Self) u64 {
         return self._statx.stx_attributes;
     }
 
+    /// Number of hard links (`STATX_NLINK`).
     pub fn get_nlink(self: *const Self) u32 {
         return self._statx.stx_nlink;
     }
 
+    /// Owner's user id (`STATX_UID`).
     pub fn get_uid(self: *const Self) u32 {
         return self._statx.stx_uid;
     }
 
+    /// Owner's group id (`STATX_GID`).
     pub fn get_gid(self: *const Self) u32 {
         return self._statx.stx_gid;
     }
 
+    /// File type (`mode & S_IFMT`, `STATX_TYPE`) and permission bits (`mode & ~S_IFMT`: `S_IRUSR`, `S_ISUID`, ...,
+    /// `STATX_MODE`).
     pub fn get_mode(self: *const Self) u32 {
         return self._statx.stx_mode;
     }
 
+    /// Inode number (`STATX_INO`).
     pub fn get_ino(self: *const Self) u64 {
         return self._statx.stx_ino;
     }
 
+    /// Size in bytes (`STATX_SIZE`); for a symbolic link the length of its target.
     pub fn get_size(self: *const Self) u64 {
         return self._statx.stx_size;
     }
 
+    /// Number of 512-byte blocks allocated (`STATX_BLOCKS`).
     pub fn get_blocks(self: *const Self) u64 {
         return self._statx.stx_blocks;
     }
 
+    /// Which `STATX_ATTR_*` bits of `attributes` the file system supports.
     pub fn get_attributes_mask(self: *const Self) u64 {
         return self._statx.stx_attributes_mask;
     }
 
+    /// Major number of the device a character or block device file (`ischr` / `isblk`) stands for.
     pub fn get_rdev_major(self: *const Self) u32 {
         return self._statx.stx_rdev_major;
     }
 
+    /// Minor number of the device a character or block device file stands for.
     pub fn get_rdev_minor(self: *const Self) u32 {
         return self._statx.stx_rdev_minor;
     }
 
+    /// Major number of the device the file lives on.
     pub fn get_dev_major(self: *const Self) u32 {
         return self._statx.stx_dev_major;
     }
 
+    /// Minor number of the device the file lives on.
     pub fn get_dev_minor(self: *const Self) u32 {
         return self._statx.stx_dev_minor;
     }
 
+    /// Id of the mount the file is on (`STATX_MNT_ID`, Linux 5.8+), as in `/proc/self/mountinfo`.
     pub fn get_mnt_id(self: *const Self) u64 {
         return self._statx.stx_mnt_id;
     }
 
+    /// Memory alignment `O_DIRECT` I/O on the file needs, in bytes (`STATX_DIOALIGN`, Linux 6.1+); `0` when the
+    /// file does not support direct I/O.
     pub fn get_dio_mem_align(self: *const Self) u32 {
         return self._statx.stx_dio_mem_align;
     }
@@ -112,24 +139,29 @@ pub const Statx = struct {
         return sec + nsec * 0.000_000_001;
     }
 
+    /// Last access, seconds since the epoch as `float` (`STATX_ATIME`).
     pub fn get_atime(self: *const Self) f64 {
         return timestamp(self._statx.stx_atime);
     }
 
+    /// Creation (birth) time as `float` (`STATX_BTIME`; `0.0` where the file system does not keep it).
     pub fn get_btime(self: *const Self) f64 {
         return timestamp(self._statx.stx_btime);
     }
 
+    /// Last status (inode) change as `float` (`STATX_CTIME`).
     pub fn get_ctime(self: *const Self) f64 {
         return timestamp(self._statx.stx_ctime);
     }
 
+    /// Last modification of the contents as `float` (`STATX_MTIME`).
     pub fn get_mtime(self: *const Self) f64 {
         return timestamp(self._statx.stx_mtime);
     }
 
     // Inode
     // -----
+    /// A symbolic link.
     pub fn get_islink(self: *const Self) bool {
         return (self._statx.stx_mode & c.S_IFMT) == c.S_IFLNK;
     }
@@ -144,22 +176,27 @@ pub const Statx = struct {
         return (self._statx.stx_mode & c.S_IFMT) == c.S_IFREG;
     }
 
+    /// A directory.
     pub fn get_isdir(self: *const Self) bool {
         return (self._statx.stx_mode & c.S_IFMT) == c.S_IFDIR;
     }
 
+    /// A character device (`rdev_major` / `rdev_minor` name it).
     pub fn get_ischr(self: *const Self) bool {
         return (self._statx.stx_mode & c.S_IFMT) == c.S_IFCHR;
     }
 
+    /// A block device (`rdev_major` / `rdev_minor` name it).
     pub fn get_isblk(self: *const Self) bool {
         return (self._statx.stx_mode & c.S_IFMT) == c.S_IFBLK;
     }
 
+    /// A FIFO (named pipe).
     pub fn get_isfifo(self: *const Self) bool {
         return (self._statx.stx_mode & c.S_IFMT) == c.S_IFIFO;
     }
 
+    /// A socket.
     pub fn get_issock(self: *const Self) bool {
         return (self._statx.stx_mode & c.S_IFMT) == c.S_IFSOCK;
     }

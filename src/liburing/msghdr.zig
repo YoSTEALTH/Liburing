@@ -104,7 +104,9 @@ pub const Msghdr = struct {
         }
     }
 
-    /// The `msg_flags`: set by the kernel at a completion (`MSG_*`).
+    /// The `msg_flags`: set by the kernel at a receive's completion (`MSG_TRUNC`: the data did not fit the `iov`
+    /// buffers, `MSG_CTRUNC`: the ancillary data did not fit `control`, `MSG_EOR`, `MSG_OOB`). A send's flags
+    /// are the prep's `flags` argument, not this field.
     pub fn get_flags(self: *const Self) i32 {
         return self._msghdr.msg_flags;
     }
@@ -214,7 +216,10 @@ pub const Cmsghdr = struct {
 };
 
 /// The result of `io_uring_recvmsg_validate`: the header the kernel put in front of a message received with
-/// `io_uring_prep_recvmsg_multishot` into a provided buffer: `[header][name][control][payload]`.
+/// `io_uring_prep_recvmsg_multishot` into a provided buffer: `[header][name][control][payload]`. The header is
+/// 16 bytes (four `u32`), then `msg.namelen` bytes of address and `msg.controllen` bytes of control data (the
+/// sizes given in the `Msghdr`, whatever the message had), then the payload; `io_uring_recvmsg_name`,
+/// `io_uring_recvmsg_cmsg_firsthdr` / `_nexthdr` and `io_uring_recvmsg_payload` find each part.
 ///
 /// Example
 ///     # `buf`: the provided buffer a multishot receive (`msg = Msghdr(namelen=16, controllen=0)`) filled
@@ -232,22 +237,26 @@ pub const RecvmsgOut = struct {
 
     const Self = @This();
 
-    /// The length of the address the kernel put in the buffer.
+    /// The length of the sender's address, as `recvmsg` would report it in `msg_namelen` (the buffer holds at
+    /// most `msg.namelen` bytes of it).
     pub fn get_namelen(self: *const Self) u32 {
         return self._recvmsg_out.?.namelen;
     }
 
-    /// The length of the control data the kernel put in the buffer.
+    /// The length of the control (ancillary) data, as `recvmsg` would report it in `msg_controllen` (at most
+    /// `msg.controllen` bytes are in the buffer).
     pub fn get_controllen(self: *const Self) u32 {
         return self._recvmsg_out.?.controllen;
     }
 
-    /// The length of the message data (it can be more than fit in the buffer).
+    /// The length of the message data, as `recvmsg` would return it: it can be more than fit in the buffer
+    /// (`flags` then has `MSG_TRUNC`); `io_uring_recvmsg_payload_length` is what is really there.
     pub fn get_payloadlen(self: *const Self) u32 {
         return self._recvmsg_out.?.payloadlen;
     }
 
-    /// The `msg_flags` of the received message (`MSG_*`).
+    /// The `msg_flags` of the received message (`MSG_TRUNC`, `MSG_CTRUNC`, `MSG_EOR`, `MSG_OOB`), as `recvmsg`
+    /// would set them.
     pub fn get_flags(self: *const Self) u32 {
         return self._recvmsg_out.?.flags;
     }

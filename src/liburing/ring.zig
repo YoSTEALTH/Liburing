@@ -926,7 +926,30 @@ pub const Ring = struct {
         return self._io_uring.ring_fd;
     }
 
-    /// `IORING_FEAT_*` flags the kernel reported at setup.
+    /// `IORING_FEAT_*` flags the kernel reported at setup: what this kernel can do (the version each came in).
+    ///
+    /// Flags
+    ///     IORING_FEAT_SINGLE_MMAP      # 5.4: the SQ and CQ rings share one mapping.
+    ///     IORING_FEAT_NODROP           # 5.5: a full CQ overflows into the kernel instead of dropping completions.
+    ///     IORING_FEAT_SUBMIT_STABLE    # 5.5: what a request points at may change once the SQE was submitted.
+    ///     IORING_FEAT_RW_CUR_POS       # 5.6: offset -1 on reads and writes uses (and moves) the file position.
+    ///     IORING_FEAT_CUR_PERSONALITY  # 5.6: requests run with the credentials of the submitting thread.
+    ///     IORING_FEAT_FAST_POLL        # 5.7: a request waiting for data or space polls, no worker thread blocks.
+    ///     IORING_FEAT_POLL_32BITS      # 5.9: io_uring_prep_poll_add takes the full epoll mask (EPOLLEXCLUSIVE).
+    ///     IORING_FEAT_SQPOLL_NONFIXED  # 5.11: IORING_SETUP_SQPOLL works with unregistered files.
+    ///     IORING_FEAT_EXT_ARG          # 5.11: io_uring_enter takes a timeout with the signal mask.
+    ///     IORING_FEAT_NATIVE_WORKERS   # 5.12: the async workers are threads of the process.
+    ///     IORING_FEAT_RSRC_TAGS        # 5.13: registered files and buffers update in place, with tags.
+    ///     IORING_FEAT_CQE_SKIP         # 5.17: IOSQE_CQE_SKIP_SUCCESS.
+    ///     IORING_FEAT_LINKED_FILE      # 5.17: a linked request picks its file when it starts (direct descriptors).
+    ///     IORING_FEAT_REG_REG_RING     # 6.3: io_uring_register through a registered ring fd.
+    ///     IORING_FEAT_RECVSEND_BUNDLE  # 6.10: IORING_RECVSEND_BUNDLE, provided buffers for sends.
+    ///     IORING_FEAT_MIN_TIMEOUT      # 6.12: the *_min_timeout waits.
+    ///     IORING_FEAT_RW_ATTR          # Read / write attributes in the SQE (IORING_RW_ATTR_FLAG_PI); no prep yet.
+    ///     IORING_FEAT_NO_IOWAIT        # 6.15: io_uring_set_iowait.
+    ///
+    /// Note
+    ///     - A call that needs a feature the ring lacks raises `UnsupportedError`.
     pub fn get_features(self: *const Ring) u32 {
         return self._io_uring.features;
     }

@@ -41,6 +41,9 @@ pub const FileIndexIterType = setu.Class(FileIndexIter, @embedFile("helper.zig")
 /// Note
 ///     - Makes copy of the list provided & shares it with `io_uring`,
 ///     so modifying python list will not effect `FileIndex` already submitting.
+///     - For `io_uring_register_files` / `_files_update`: each slot is a file descriptor to register, `-1` an
+///       empty (sparse) slot a later update or a `*_direct` request (`IORING_FILE_INDEX_ALLOC`) may fill. A
+///       request uses a registered file by its slot index as `fd` with `IOSQE_FIXED_FILE` in `sqe.flags`.
 pub const FileIndex = struct {
     _fds: ?[*]i32 = null,
     _len: usize = 0,
@@ -125,6 +128,11 @@ pub const FileIndexIter = struct {
 ///     # or
 ///     >>> probe()['IORING_OP_READ']
 ///     True
+///
+/// Note
+///     - Needs Linux 5.6+ (`IORING_REGISTER_PROBE`), else `RuntimeError`. Opcodes after the kernel's
+///       `Probe.last_op` are `False`. Submitting an unsupported opcode is not refused: its completion fails with
+///       `OSError: EINVAL`.
 pub fn probe() py.Error!*Object {
     const last: usize = @backingInt(n.io_uring_op.IORING_OP_LAST);
     const items = @typeInfo(n.io_uring_op).@"enum".field_names;

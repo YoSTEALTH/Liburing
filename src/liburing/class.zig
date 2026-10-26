@@ -82,6 +82,9 @@ pub const Timespec = struct {
 /// Note
 ///     - Can not be created directly (`NotImplementedError`), the `io_uring_get_probe*` functions make it.
 ///     - Reading `last_op` / `ops_len` after `io_uring_free_probe` raises `MemoryError`.
+///     - Needs Linux 5.6+ (`IORING_REGISTER_PROBE`): `io_uring_get_probe*` give `None` before. An unsupported
+///       opcode is not refused at the submit, its completion fails with `OSError: EINVAL`; `probe()` gives the whole
+///       table as a `dict`.
 pub const Probe = struct {
     _io_uring_probe: ?*c.io_uring_probe = null,
 
@@ -95,13 +98,14 @@ pub const Probe = struct {
         if (self._io_uring_probe) |p| c.io_uring_free_probe(p); // clean up in case user forgot to do so!
     }
 
-    /// The last `IORING_OP_*` the kernel knows.
+    /// The highest `IORING_OP_*` number the kernel knows (not every one below it need be supported: ask
+    /// `io_uring_opcode_supported`).
     pub fn get_last_op(self: *const Self) py.Error!u8 {
         if (self._io_uring_probe) |p| return p.last_op;
         return e.raiseMemoryError("`Probe()` is null!");
     }
 
-    /// How many opcodes the probe reports on.
+    /// How many opcodes the probe reports on (`last_op + 1`: `0` to `last_op`).
     pub fn get_ops_len(self: *const Self) py.Error!u8 {
         if (self._io_uring_probe) |p| return p.ops_len;
         return e.raiseMemoryError("`Probe()` is null!");
@@ -124,13 +128,20 @@ pub const Probe = struct {
 ///
 /// Note
 ///     - Takes no arguments (`TypeError` for any). `features` is read only.
+///     - Sizes: the ring gets at least `entries` submission entries, rounded up to a power of two (at most
+///       `IORING_MAX_ENTRIES`, 32768), and twice as many completion entries; `IORING_SETUP_CQSIZE` uses
+///       `cq_entries` instead (more than `entries`, rounded up to a power of two, at most 65536). Larger values
+///       fail with `OSError: EINVAL`, or are clamped with `IORING_SETUP_CLAMP`. The kernel writes the final sizes
+///       back.
+///     - `sq_thread_cpu`, `sq_thread_idle` and `wq_fd` only matter with `IORING_SETUP_SQPOLL` / `IORING_SETUP_SQ_AFF`
+///       / `IORING_SETUP_ATTACH_WQ` in `flags`.
 pub const Param = struct {
     _io_uring_params: c.io_uring_params = std.mem.zeroes(c.io_uring_params), // lives inside the Python object
 
     pub fn __new__(_: *Self) void {} // no arguments: `TypeError` for any
     const Self = @This();
 
-    /// Submission queue entries (filled in by the kernel).
+    /// Submission queue entries (filled in by the kernel: `entries` rounded up to a power of two).
     pub fn get_sq_entries(self: *const Self) u32 {
         return self._io_uring_params.sq_entries;
     }
@@ -139,7 +150,8 @@ pub const Param = struct {
         self._io_uring_params.sq_entries = value;
     }
 
-    /// Completion queue entries (set it with `IORING_SETUP_CQSIZE`, else the kernel fills it in).
+    /// Completion queue entries (set it with `IORING_SETUP_CQSIZE`, else the kernel fills it in: twice
+    /// `sq_entries`). More room here lets many requests complete before you reap them without an overflow.
     pub fn get_cq_entries(self: *const Self) u32 {
         return self._io_uring_params.cq_entries;
     }
@@ -148,7 +160,8 @@ pub const Param = struct {
         self._io_uring_params.cq_entries = value;
     }
 
-    /// `IORING_SETUP_*` flags.
+    /// `IORING_SETUP_*` flags: yours before the setup; after it also what liburing added (`IORING_SETUP_NO_SQARRAY`),
+    /// as `Ring.flags`. A flag this kernel lacks: `UnsupportedError` (`EINVAL`).
     pub fn get_flags(self: *const Self) u32 {
         return self._io_uring_params.flags;
     }
@@ -157,7 +170,8 @@ pub const Param = struct {
         self._io_uring_params.flags = value;
     }
 
-    /// CPU the `IORING_SETUP_SQPOLL` thread is bound to (with `IORING_SETUP_SQ_AFF`).
+    /// CPU the `IORING_SETUP_SQPOLL` thread is bound to (with `IORING_SETUP_SQ_AFF`; `IORING_SETUP_SQ_AFF` without
+    /// `IORING_SETUP_SQPOLL` is `OSError: EINVAL`). A cgroup `cpuset` change may move it.
     pub fn get_sq_thread_cpu(self: *const Self) u32 {
         return self._io_uring_params.sq_thread_cpu;
     }
@@ -166,7 +180,9 @@ pub const Param = struct {
         self._io_uring_params.sq_thread_cpu = value;
     }
 
-    /// Milliseconds the `IORING_SETUP_SQPOLL` thread idles before it sleeps.
+    /// Milliseconds the `IORING_SETUP_SQPOLL` thread polls an empty queue before it sleeps (`0`: never sleeps,
+    /// one CPU busy). Asleep, it sets `IORING_SQ_NEED_WAKEUP` and the next `io_uring_submit` wakes it with a
+    /// system call; kept busy, it never sleeps and submits cost no system call.
     pub fn get_sq_thread_idle(self: *const Self) u32 {
         return self._io_uring_params.sq_thread_idle;
     }
@@ -175,12 +191,15 @@ pub const Param = struct {
         self._io_uring_params.sq_thread_idle = value;
     }
 
-    /// `IORING_FEAT_*` flags the kernel reports (read only).
+    /// `IORING_FEAT_*` flags the kernel reports (read only), the same as `Ring.features` after the setup (its doc
+    /// lists them).
     pub fn get_features(self: *const Self) u32 {
         return self._io_uring_params.features;
     }
 
-    /// Ring file descriptor whose worker pool to share (with `IORING_SETUP_ATTACH_WQ`).
+    /// `ring_fd` of an existing ring whose async worker pool this ring shares instead of making its own (with
+    /// `IORING_SETUP_ATTACH_WQ`; both with `IORING_SETUP_SQPOLL`: its polling thread too). Not a live ring:
+    /// `OSError: ENXIO`.
     pub fn get_wq_fd(self: *const Self) u32 {
         return self._io_uring_params.wq_fd;
     }
@@ -279,7 +298,9 @@ pub fn writableView(o: *Object, view: *setu.c.Buffer) py.Error!bool {
     return false;
 }
 
-/// How to Open a Path
+/// How to Open a Path (`struct open_how` of `openat2`, for `io_uring_prep_openat2`): `flags` are the `O_*` of
+/// `open`, `mode` the permission bits of a file `O_CREAT` / `O_TMPFILE` makes, `resolve` restricts how the path is
+/// looked up (`RESOLVE_*`).
 ///
 /// Example
 ///     >>> how = OpenHow(O_CREAT | O_RDWR, 0o777, RESOLVE_CACHED)
@@ -304,16 +325,18 @@ pub fn writableView(o: *Object, view: *setu.c.Buffer) py.Error!bool {
 ///     ...
 ///
 /// Resolve
-///     RESOLVE_BENEATH
-///     RESOLVE_IN_ROOT
-///     RESOLVE_NO_MAGICLINKS
-///     RESOLVE_NO_SYMLINKS
-///     RESOLVE_NO_XDEV
-///     RESOLVE_CACHED
+///     RESOLVE_BENEATH        # The path may not escape the directory of dfd (no .. past it, no absolute path).
+///     RESOLVE_IN_ROOT        # The directory of dfd acts as / for the lookup (as a chroot would).
+///     RESOLVE_NO_MAGICLINKS  # No magic links (/proc/*/fd/*): OSError: ELOOP.
+///     RESOLVE_NO_SYMLINKS    # No symbolic links at all: OSError: ELOOP.
+///     RESOLVE_NO_XDEV        # Stay on the mount dfd is on: OSError: EXDEV.
+///     RESOLVE_CACHED         # Only what is cached: OSError: EAGAIN when the kernel would have to block (5.12+).
 ///
 /// Note
-///     - `mode` is only to set when creating new or temp file.
+///     - `mode` is only to set when creating new or temp file (`O_CREAT` / `O_TMPFILE`): `openat2` is strict,
+///       any other `mode` (and any unknown bit in `flags` or `resolve`) fails the request with `OSError: EINVAL`.
 ///     - You can use same `OpenHow()` reference if opening multiple files with same settings.
+///     - The result of the request is the new file descriptor in `cqe.res`.
 pub const OpenHow = struct {
     _open_how: c.open_how = std.mem.zeroes(c.open_how), // lives inside the Python object
 
@@ -339,14 +362,17 @@ pub const OpenHow = struct {
     // Get
     // ---
 
+    /// The `O_*` open flags (`O_RDONLY`, `O_CREAT | O_RDWR`, `O_TMPFILE`, ...).
     pub fn get_flags(self: *const Self) u64 {
         return self._open_how.flags;
     }
 
+    /// Permission bits (`0o644`) of a file `O_CREAT` / `O_TMPFILE` makes; `0` otherwise.
     pub fn get_mode(self: *const Self) u64 {
         return self._open_how.mode;
     }
 
+    /// `RESOLVE_*` flags restricting the path lookup (`0`: none).
     pub fn get_resolve(self: *const Self) u64 {
         return self._open_how.resolve;
     }

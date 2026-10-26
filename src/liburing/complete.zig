@@ -32,6 +32,7 @@ const SigsetT = class.SigsetT;
 ///
 /// Note
 ///     - Does not consume them, call `io_uring_cq_advance(ring, n)` after reading.
+///     - Enters the kernel only to flush overflowed completions (`io_uring_cq_has_overflow`).
 pub fn io_uring_peek_batch_cqe(ring: *Ring, batch: *CqeBatch, count: ?u32) py.Error!u32 {
     const n = count orelse batch._len;
     if (n > batch._len) return py.raiseValueError("`io_uring_peek_batch_cqe` - `count` larger than `CqeBatch`", .{});
@@ -58,6 +59,10 @@ pub fn io_uring_peek_batch_cqe(ring: *Ring, batch: *CqeBatch, count: ?u32) py.Er
 ///     - Other Python threads run while it sleeps in the kernel.
 ///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
 ///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
+///     - No waiting when `wait_nr` are ready already; `0` says the wait worked, nothing about the `res` of the
+///       completions. The rest after `cqe[0]` is read with `CqeIter` or `io_uring_peek_batch_cqe`.
+///     - Before Linux 5.11 (no `IORING_FEAT_EXT_ARG`) a `ts` is an internal `IORING_OP_TIMEOUT` request: it takes
+///       a submission queue slot and submits what is queued. From 5.11 on nothing is submitted.
 pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, sigmask: ?*SigsetT) py.Error!i32 {
     const _sigmask = if (sigmask) |s| s._sigset_t else null;
     const _ts = if (ts) |t| t._timespec else null;
@@ -67,7 +72,8 @@ pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, 
 }
 
 /// Wait for `wait_nr` completions like `io_uring_wait_cqes`, with two timeouts: `ts` is the overall limit and
-/// `min_ts_usec` (microseconds) the time to wait for the whole batch once the first completion has arrived.
+/// `min_ts_usec` (microseconds) a budget for the whole batch: once it is spent the call returns with whatever has
+/// completed, or when nothing has, keeps waiting (up to `ts`) and returns at the first completion.
 /// Returns `0`; `OSError` (`errno.ETIME`) when `ts` ran out first.
 ///
 /// Example
@@ -77,6 +83,8 @@ pub fn io_uring_wait_cqes(ring: *Ring, cqe: *Cqe, wait_nr: u32, ts: ?*Timespec, 
 ///
 /// Note
 ///     - Needs Linux 6.12+ (`IORING_FEAT_MIN_TIMEOUT`), else `UnsupportedError`.
+///     - `min_ts_usec=0` is a plain `io_uring_wait_cqes`. The point: batch several completions per wake-up without
+///       sleeping the whole `ts` when few come, and without extra kernel round trips when none come.
 ///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
 ///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
 pub fn io_uring_wait_cqes_min_timeout(
@@ -107,6 +115,11 @@ pub fn io_uring_wait_cqes_min_timeout(
 ///     >>> ts = timespec(1.5)  # timeout
 ///     >>> io_uring_wait_cqe_timeout(ring, cqe, ts)
 ///     0
+///
+/// Note
+///     - Other Python threads run while it sleeps in the kernel.
+///     - Before Linux 5.11 (no `IORING_FEAT_EXT_ARG`) `ts` is an internal `IORING_OP_TIMEOUT` request: it takes a
+///       submission queue slot and submits what is queued. From 5.11 on nothing is submitted.
 pub fn io_uring_wait_cqe_timeout(ring: *Ring, cqe: *Cqe, ts: *Timespec) py.Error!i32 {
     const out = try cqe.outFor(ring);
     const r = try ring.checkedPtr();
@@ -118,6 +131,13 @@ pub fn io_uring_wait_cqe_timeout(ring: *Ring, cqe: *Cqe, ts: *Timespec) py.Error
 /// Example
 ///     >>> io_uring_submit(ring)  # two entries queued
 ///     2
+///
+/// Note
+///     - `IORING_SETUP_SQPOLL`: it wakes the idle kernel thread instead of entering, and the count can be more
+///       than what was really submitted (submit one entry at a time for an exact count).
+///     - `OSError`: `EBUSY`, the completion queue overflowed and could not be flushed (reap, then retry);
+///       `EAGAIN` (`BlockingIOError`), the kernel is out of resources (same cure). A failed entry is reported
+///       in its completion's `res`, and stops the batch unless the ring has `IORING_SETUP_SUBMIT_ALL`.
 pub fn io_uring_submit(ring: *Ring) py.Error!i32 {
     return py.checkErrno(c.io_uring_submit(try ring.submitPtr()));
 }
@@ -127,6 +147,11 @@ pub fn io_uring_submit(ring: *Ring) py.Error!i32 {
 /// Example
 ///     >>> io_uring_submit_and_wait(ring, 2)  # two entries queued
 ///     2
+///
+/// Note
+///     - Other Python threads run while it sleeps in the kernel. Submit errors as `io_uring_submit`.
+///     - Cheapest on a `IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN` ring: far fewer context switches
+///       when waiting for several requests.
 pub fn io_uring_submit_and_wait(ring: *Ring, wait_nr: u32) py.Error!i32 {
     const r = try ring.submitPtr();
     return py.checkErrno(wait(r, wait_nr, c.io_uring_submit_and_wait, .{ r, wait_nr }));
@@ -151,6 +176,9 @@ pub fn io_uring_submit_and_wait(ring: *Ring, wait_nr: u32) py.Error!i32 {
 /// Note
 ///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
 ///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
+///     - Other Python threads run while it sleeps in the kernel. Submit errors as `io_uring_submit`.
+///     - Before Linux 5.11 (no `IORING_FEAT_EXT_ARG`) a `ts` is an internal `IORING_OP_TIMEOUT` request that takes
+///       a submission queue slot (the call submits first when the queue is full).
 pub fn io_uring_submit_and_wait_timeout(
     ring: *Ring,
     cqe: *Cqe,
@@ -172,9 +200,10 @@ pub fn io_uring_submit_and_wait_timeout(
 }
 
 /// Submit the queued entries and wait for `wait_nr` completions like `io_uring_submit_and_wait_timeout`, with two
-/// timeouts: `ts` is the overall limit and `min_wait` (microseconds) the time to wait for the whole batch once
-/// the first completion has arrived. Returns how many entries were submitted; `OSError` (`errno.ETIME`) when `ts`
-/// ran out first.
+/// timeouts: `ts` is the overall limit and `min_wait` (microseconds) a budget for the whole batch: once it is
+/// spent the call returns with whatever has completed, or when nothing has, keeps waiting (up to `ts`) and returns
+/// at the first completion (see `io_uring_wait_cqes_min_timeout`). Returns how many entries were submitted;
+/// `OSError` (`errno.ETIME`) when `ts` ran out first.
 ///
 /// Example
 ///     >>> ts = timespec(1)  # overall timeout
@@ -183,6 +212,7 @@ pub fn io_uring_submit_and_wait_timeout(
 ///
 /// Note
 ///     - Needs Linux 6.12+ (`IORING_FEAT_MIN_TIMEOUT`), else `UnsupportedError`.
+///     - Other Python threads run while it sleeps in the kernel. Submit errors as `io_uring_submit`.
 ///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can
 ///       interrupt the wait with `InterruptedError`. `None` keeps the current mask.
 pub fn io_uring_submit_and_wait_min_timeout(
@@ -214,6 +244,10 @@ pub fn io_uring_submit_and_wait_min_timeout(
 /// Example
 ///     >>> io_uring_submit_and_wait_reg(ring, cqe, 1, 0)  # one entry queued; wait argument 0 of the region
 ///     1
+///
+/// Note
+///     - Linux 6.13+ (`IORING_REGISTER_MEM_REGION`), else `OSError` (`EINVAL`).
+///     - Fine with nothing queued: a plain wait (returns `0`). Other Python threads run while it sleeps.
 pub fn io_uring_submit_and_wait_reg(ring: *Ring, cqe: *Cqe, wait_nr: u32, reg_index: i32) py.Error!i32 {
     const out = try cqe.outFor(ring); // first: a refused `Cqe` must stop the call before the submit
     const r = try ring.submitPtr();
@@ -226,12 +260,16 @@ pub fn io_uring_submit_and_wait_reg(ring: *Ring, cqe: *Cqe, wait_nr: u32, reg_in
 /// Example
 ///     >>> io_uring_get_events(ring)
 ///     0
+///
+/// Note
+///     - An `IORING_SETUP_DEFER_TASKRUN` ring runs completion work only when the kernel is entered: a loop that
+///       only peeks (`io_uring_peek_cqe`, `CqeIter`) needs this call now and then, or completions stall.
 pub fn io_uring_get_events(ring: *Ring) py.Error!i32 {
     return py.checkErrno(c.io_uring_get_events(try ring.checkedPtr()));
 }
 
-/// `io_uring_submit` that also flushes waiting completions into the completion queue (`io_uring_get_events`).
-/// Returns how many entries were submitted.
+/// `io_uring_submit` that also flushes waiting completions into the completion queue (`io_uring_get_events`), in
+/// one system call. Returns how many entries were submitted.
 ///
 /// Example
 ///     >>> io_uring_submit_and_get_events(ring)  # two entries queued
@@ -301,6 +339,9 @@ pub fn io_uring_cqe_iter_next(iter: *CqeIter, cqe: *Cqe) py.Error!bool {
 ///
 /// Note
 ///     - Consumes the completions: their `user_data` (and `cqe[i]` entries) are not valid after it.
+///     - Completions not marked seen come back on the next wait or peek. One call for a batch is cheaper than
+///       `io_uring_cqe_seen` per entry: the head is one ordered write the kernel sees.
+///     - `nr` counts slots: a 32 byte completion (`IORING_SETUP_CQE_MIXED`) is `io_uring_cqe_nr(cqe) == 2`.
 pub fn io_uring_cq_advance(ring: *Ring, nr: u32) py.Error!void {
     const r = try ring.checkedPtr();
     ring.releaseCompleted(r, nr);
@@ -314,6 +355,8 @@ pub fn io_uring_cq_advance(ring: *Ring, nr: u32) py.Error!void {
 ///
 /// Note
 ///     - Consumes the completion: its `user_data` is not valid after it.
+///     - It advances the queue's head, so completions are consumed in queue order whichever `cqe` is passed; `cqe`
+///       only decides whether `1` or `2` slots (`IORING_CQE_F_32`) are freed.
 pub fn io_uring_cqe_seen(ring: *Ring, cqe: *CQE) py.Error!void {
     const r = try ring.checkedPtr();
     const entry = try cqe.cqePtr();
@@ -340,11 +383,16 @@ pub fn io_uring_cqe_get_data(cqe: *CQE) py.Error!usize {
 /// Example
 ///     >>> io_uring_cqe_get_data64(cqe[0])
 ///     1
+///
+/// Note
+///     - Only meaningful when the request's `user_data` was set: an entry's left-over value comes back otherwise
+///       (see `io_uring_get_sqe`).
 pub fn io_uring_cqe_get_data64(cqe: *CQE) py.Error!u64 {
     return cqe.get_user_data();
 }
 
-/// How many completion queue slots `cqe` takes: `1`, or `2` for a big (`IORING_CQE_F_32`) entry.
+/// How many completion queue slots `cqe` takes: `1`, or `2` for a big (`IORING_CQE_F_32`) entry on an
+/// `IORING_SETUP_CQE_MIXED` ring (Linux 6.18+).
 ///
 /// Example
 ///     >>> io_uring_cq_advance(ring, io_uring_cqe_nr(cqe[0]))
@@ -352,7 +400,8 @@ pub fn io_uring_cqe_nr(cqe: *CQE) py.Error!u32 {
     return c.io_uring_cqe_nr(try cqe.cqePtr());
 }
 
-/// How many completions are ready in the completion queue.
+/// How many completions are ready in the completion queue (posted, not yet marked seen with `io_uring_cqe_seen` /
+/// `io_uring_cq_advance`).
 ///
 /// Example
 ///     >>> io_uring_cq_ready(ring)
@@ -366,6 +415,12 @@ pub fn io_uring_cq_ready(ring: *Ring) py.Error!u32 {
 /// Example
 ///     >>> io_uring_cq_has_overflow(ring)
 ///     False
+///
+/// Note
+///     - `io_uring_get_events` flushes them. Overflow is a slow path: size the completion queue for the load
+///       (`IORING_SETUP_CQSIZE`, `io_uring_resize_rings`).
+///     - Linux 5.5+ (`IORING_FEAT_NODROP`): older kernels drop overflowed completions instead (the ring's
+///       `cq.koverflow` counts them) and this is always `False`.
 pub fn io_uring_cq_has_overflow(ring: *Ring) py.Error!bool {
     return c.io_uring_cq_has_overflow(try ring.checkedPtr());
 }
@@ -379,7 +434,8 @@ pub fn io_uring_cq_eventfd_enabled(ring: *Ring) py.Error!bool {
     return c.io_uring_cq_eventfd_enabled(try ring.checkedPtr());
 }
 
-/// Turn the registered eventfd's notifications on or off. Returns `0`; `OSError` if the kernel has no flag for it.
+/// Turn the registered eventfd's notifications on or off. Returns `0`; `OSError` (`EOPNOTSUPP`) if the kernel has
+/// no flag for it or no eventfd is registered (`io_uring_register_eventfd`).
 ///
 /// Example
 ///     >>> io_uring_cq_eventfd_toggle(ring, False)
@@ -393,6 +449,11 @@ pub fn io_uring_cq_eventfd_toggle(ring: *Ring, enabled: bool) py.Error!i32 {
 /// Example
 ///     >>> io_uring_wait_cqe_nr(ring, cqe, 2)
 ///     0
+///
+/// Note
+///     - Other Python threads run while it sleeps in the kernel; no waiting when `wait_nr` are ready already.
+///       `InterruptedError` (`EINTR`) when a signal comes first.
+///     - Cheapest on a `IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN` ring (fewer context switches).
 pub fn io_uring_wait_cqe_nr(ring: *Ring, cqe: *Cqe, wait_nr: u32) py.Error!i32 {
     const out = try cqe.outFor(ring);
     const r = try ring.checkedPtr();
@@ -405,6 +466,10 @@ pub fn io_uring_wait_cqe_nr(ring: *Ring, cqe: *Cqe, wait_nr: u32) py.Error!i32 {
 /// Example
 ///     >>> io_uring_peek_cqe(ring, cqe)
 ///     0
+///
+/// Note
+///     - Enters the kernel only when it has something to flush: overflowed completions, pending task work
+///       (`IORING_SETUP_TASKRUN_FLAG`), or completions to reap on an `IORING_SETUP_IOPOLL` ring.
 pub fn io_uring_peek_cqe(ring: *Ring, cqe_ptr: *Cqe) py.Error!i32 {
     const out = try cqe_ptr.outFor(ring);
     return py.checkErrno(c.io_uring_peek_cqe(try ring.checkedPtr(), out));
@@ -415,6 +480,11 @@ pub fn io_uring_peek_cqe(ring: *Ring, cqe_ptr: *Cqe) py.Error!i32 {
 /// Example
 ///     >>> io_uring_wait_cqe(ring, cqe)
 ///     0
+///
+/// Note
+///     - Other Python threads run while it sleeps in the kernel; no waiting when one is ready already.
+///       `InterruptedError` (`EINTR`) when a signal comes first.
+///     - `0` says the wait worked, nothing about the request: that is `cqe[0].res`.
 pub fn io_uring_wait_cqe(ring: *Ring, cqe: *Cqe) py.Error!i32 {
     const out = try cqe.outFor(ring);
     const r = try ring.checkedPtr();

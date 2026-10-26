@@ -49,13 +49,16 @@ pub const CQE = struct {
         return self._cqe.?;
     }
 
-    /// The `user_data` set on the request's `sqe` (an `int`).
+    /// The `user_data` set on the request's `sqe` (an `int`): the kernel copies it into every completion of
+    /// the request; a `io_uring_prep_msg_ring*` message carries the sender's `data` here.
     pub fn get_user_data(self: *const Self) py.Error!u64 {
         const kernel = (try self.cqePtr()).user_data;
         return if (self._ring) |r| ringOf(r).userData(kernel) else kernel;
     }
 
-    /// The request's result (e.g. bytes read); raises `OSError` for a negative one (`-errno`).
+    /// The request's result: what the matching system call returns (bytes read or sent, a new file descriptor,
+    /// `0`), or `-errno` for a failure (io_uring never sets `errno`); a negative one raises the `OSError` of that
+    /// errno. `OSError: ECANCELED`: the request was cancelled, or an earlier request of its link chain failed.
     pub fn get_res(self: *const Self) py.Error!i32 {
         const res = (try self.cqePtr()).res;
         if (res >= 0) return res; // inline fast path: `checkErrno` is a call
@@ -63,6 +66,25 @@ pub const CQE = struct {
     }
 
     /// The completion's `IORING_CQE_F_*` flags.
+    ///
+    /// Flags
+    ///     IORING_CQE_F_BUFFER         # A provided buffer was used: its id is flags >> IORING_CQE_BUFFER_SHIFT.
+    ///     IORING_CQE_F_MORE           # More completions of this request follow (multishot, zero-copy send).
+    ///     IORING_CQE_F_SOCK_NONEMPTY  # The socket still had data after this receive. 5.19+
+    ///     IORING_CQE_F_NOTIF          # A zero-copy send's notification: its buffer may be reused now.
+    ///     IORING_CQE_F_BUF_MORE       # The buffer is partly used, later completions continue in it.
+    ///     IORING_CQE_F_SKIP           # A filler entry of an IORING_SETUP_CQE_MIXED ring: nothing to read.
+    ///     IORING_CQE_F_32             # A 32-byte entry of an IORING_SETUP_CQE_MIXED ring (see big_cqe).
+    ///
+    /// Note
+    ///     - A multishot request (accept, receive, read, poll, timeout) posts one completion per event with
+    ///       `IORING_CQE_F_MORE`; the one without it is the last (an error, a cancel: `res` raises
+    ///       `OSError: ECANCELED`, or no buffer left): re-arm it if wanted. The ring keeps the request's
+    ///       `user_data` until that last one.
+    ///     - A zero-copy send posts its result first (with `IORING_CQE_F_MORE`), then a notification with
+    ///       `IORING_CQE_F_NOTIF` and the same `user_data` once the kernel is done with the buffer.
+    ///     - `IORING_CQE_F_BUF_MORE` only comes from a buffer ring set up with `IOU_PBUF_RING_INC`: the buffer
+    ///       returns to you when fully used, or on an error.
     pub fn get_flags(self: *const Self) py.Error!u32 {
         return (try self.cqePtr()).flags;
     }

@@ -39,13 +39,15 @@ pub const FUTEX = struct {
         return @as(*u32, @ptrFromInt(self._state)).*;
     }
 
-    /// The value the `futex_waitv` entry waits for.
+    /// The value the `futex_waitv` entry expects: the wait sleeps only while the futex still holds it (a
+    /// different value when the request starts completes it with `OSError: EAGAIN` at once).
     pub fn get_val(self: *const Self) py.Error!u64 {
         if (self._vector) |v| return v.val;
         return e.raiseMemoryError("Futex(vector) Memory not set!");
     }
 
-    /// The `futex_waitv` entry's `FUTEX2_*` flags.
+    /// The `futex_waitv` entry's `FUTEX2_*` flags (`FUTEX2_SIZE_U32`, `| FUTEX2_PRIVATE` for a futex shared by
+    /// threads of one process only).
     pub fn get_flags(self: *const Self) py.Error!u32 {
         if (self._vector) |v| return v.flags;
         return e.raiseMemoryError("Futex(vector) Memory not set!");
@@ -116,6 +118,12 @@ pub const FUTEX = struct {
 ///     - `no` is `1` to `FUTEX_WAITV_MAX` (`ValueError` otherwise); `RuntimeError` when built without `futex2`
 ///       (Linux headers before `6.7`).
 ///     - `len(futex)` is `no`, `futex[i]` the `i`-th futex.
+///     - The requests need Linux 6.7+ (`IORING_OP_FUTEX_WAIT`, `IORING_OP_FUTEX_WAKE`, `IORING_OP_FUTEX_WAITV`).
+///       `io_uring_prep_futex_wait` sleeps while `state == val` and matches wakers by `mask`
+///       (`FUTEX_BITSET_MATCH_ANY`: any); `io_uring_prep_futex_wake` wakes up to `val` waiters, `cqe.res` is how
+///       many; `io_uring_prep_futex_waitv` waits on every entry of a `Futex(no, vector=True)` (each entry's `val`
+///       / `flags`), `cqe.res` is the index of the one woken. The wait and waitv requests take no timeout: link
+///       an `io_uring_prep_link_timeout` after them (the wait then completes with `OSError: ECANCELED`).
 ///     - Wait, wake and waitv are tested, missing real world testing
 pub const Futex = struct {
     _len: u8 = 0,

@@ -960,7 +960,15 @@ pub fn io_uring_register_wait_reg(ring: *Ring, reg: *RegWait, nr: i32) py.Error!
 
 /// Like `io_uring_clone_buffers`, but clones `nr` buffers from `src_off` of `src_ring` to `dst_off` of `dst_ring`.
 ///
+/// Flags
+///     IORING_REGISTER_SRC_REGISTERED  # Find src_ring by its registered ring fd (this thread registered it).
+///     IORING_REGISTER_DST_REPLACE     # Allow a dst_ring with buffers: the slots in range are replaced.
+///
 /// Note
+///     - Linux 6.13+. Returns `0`. `dst_off`, `src_off` and `nr` all `0`: the whole table, as
+///       `io_uring_clone_buffers`.
+///     - `OSError`: `EBUSY` when `dst_ring` has buffers registered and `IORING_REGISTER_DST_REPLACE` is not set,
+///       `ENXIO` when `src_ring` has none.
 ///     - `dst_ring` holds every buffer registered on `src_ring` (not only the cloned ones) until its own
 ///     `io_uring_unregister_buffers` (or its exit), as `io_uring_clone_buffers` does.
 ///     - Linux 7.2+ (kernel bug): cloning some of `src_ring`'s buffers, when one shares a huge page with a buffer
@@ -1002,6 +1010,13 @@ pub fn io_uring_clone_buffers_offset(
 ///     0
 ///
 /// Note
+///     - Linux 6.12+. Returns `0`; afterwards both rings have the same registered buffers (as if
+///       `io_uring_register_buffers` had been called on `dst_ring` with them).
+///     - `OSError`: `EBUSY` when `dst_ring` already has buffers registered (unregister them first, or clone with
+///       `IORING_REGISTER_DST_REPLACE`, see `io_uring_clone_buffers_offset`), `ENXIO` when `src_ring` has none.
+///     - `flags` defaults to `0` (C's `__io_uring_clone_buffers`): the rings are found by their real file
+///       descriptors, so these must still be open; `IORING_REGISTER_SRC_REGISTERED` uses `src_ring`'s registered
+///       ring fd instead, which only the thread that registered it can.
 ///     - Both rings must belong to the calling thread.
 ///     - `dst_ring` holds `src_ring`'s registered buffers until its own `io_uring_unregister_buffers` (or
 ///     its exit): each ring keeps them locked (no resize) while the kernel can use them through it.
@@ -1032,9 +1047,18 @@ pub fn io_uring_clone_buffers(dst_ring: *Ring, src_ring: *Ring, flags: ?u32) py.
 ///
 /// Note
 ///     - `io_uring_register_buffers` includes `io_uring_register_buffers_tags`
+///     - Linux 5.13+ (`IORING_REGISTER_BUFFERS2`). Returns `0`. Use the buffers with the `*_fixed` requests
+///       (`io_uring_prep_read_fixed`, ...) by their index in `bufs`; a request may cover any part of its buffer.
 ///     - `bufs`: writable buffers; the kernel pins them until `io_uring_unregister_buffers` (or the ring's
 ///       exit), so the ring holds them (locked: no resize) until then.
-///     - `tags` needs one item for each buffer in `bufs`.
+///     - `bufs` must be anonymous memory (`bytearray`, `mmap.mmap(-1, ...)`; file-backed memory fails with
+///       `EOPNOTSUPP` or `EFAULT`), each at most 1 GiB (`EFAULT`), at most 1024 of them (`EINVAL`). A buffer
+///       on a huge page pins the whole page. Before Linux 5.12 they count against `RLIMIT_MEMLOCK` (`ENOMEM`).
+///     - `OSError: EBUSY` when buffers are already registered: unregister them first (registering again is how
+///       to change the set). Before Linux 5.13 the registration waits for the ring to go idle.
+///     - `tags` needs one item for each buffer in `bufs`. A tag of `0` means none; for any other, once the
+///       buffer is unregistered (or replaced) and no request uses it any more, a CQE is posted with `user_data`
+///       set to the tag and every other field `0`.
 pub fn io_uring_register_buffers(
     ring: *Ring,
     bufs: py.Sequence(py.WritableBuffer),
@@ -1059,6 +1083,10 @@ fn tagsPtr(tags: ?py.Sequence(u64), count: usize, comptime name: []const u8) py.
 }
 
 /// Register `nr` empty buffer slots, to fill with `io_uring_register_buffers_update_tag`.
+///
+/// Note
+///     - Linux 5.19+ (`IORING_RSRC_REGISTER_SPARSE`). Returns `0`; `OSError: EBUSY` when buffers are already
+///       registered.
 pub fn io_uring_register_buffers_sparse(ring: *Ring, nr: u32) py.Error!i32 {
     return support.register("IORING_REGISTER_BUFFERS2", c.io_uring_register_buffers_sparse(try ring.checkedPtr(), nr));
 }
@@ -1067,6 +1095,9 @@ pub fn io_uring_register_buffers_sparse(ring: *Ring, nr: u32) py.Error!i32 {
 ///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
+///     - Linux 5.13+. Returns the number of buffers updated. A slot may be empty (from
+///       `io_uring_register_buffers_sparse`) or already in use: a replaced buffer stays valid until the requests
+///       using it complete, then its tag's CQE (see `io_uring_register_buffers`) is posted.
 ///     - The ring holds `bufs` until `io_uring_unregister_buffers` (or its exit); the buffers they replace too.
 pub fn io_uring_register_buffers_update_tag(
     ring: *Ring,
@@ -1086,6 +1117,9 @@ pub fn io_uring_register_buffers_update_tag(
 /// Unregister all buffers.
 ///
 /// Note
+///     - Returns `0`; `OSError: ENXIO` when none are registered. Not needed before `io_uring_queue_exit`, which
+///       unregisters them too (the pages may be unpinned a little later then).
+///     - A CQE is posted for each tagged buffer (`io_uring_register_buffers`) once no request uses it.
 ///     - Releases the buffers the ring held for the registrations (`io_uring_register_buffers` / `_update_tag`).
 pub fn io_uring_unregister_buffers(ring: *Ring) py.Error!i32 {
     const res = c.io_uring_unregister_buffers(try ring.checkedPtr());
@@ -1103,8 +1137,14 @@ pub fn io_uring_unregister_buffers(ring: *Ring) py.Error!i32 {
 ///     0
 ///
 /// Note
+///     - Returns `0`. Use a registered file with `IOSQE_FIXED_FILE` in the sqe's `flags` and its index in
+///       `files` as the sqe's `fd`. A file table is also what direct descriptors (`*_direct` requests) live in.
 ///     - The kernel copies the descriptors at registration: `ids` can be freed, and the fds closed, afterwards
 ///       (the ring holds its own reference to each file).
+///     - `OSError`: `EBUSY` when files are already registered (unregister first, or use
+///       `io_uring_register_files_update`), `EMFILE` over the fixed file table maximum or, for an unprivileged
+///       user, over `RLIMIT_NOFILE` (a per user limit), `EBADF` for a descriptor that is not open.
+///       Before Linux 5.13 the registration waits for the ring to go idle.
 ///     - "Registered files have less overhead per operation than normal files.
 ///     This is due to the kernel grabbing a reference count on a file when an
 ///     operation begins, and dropping it when it's done. When the process file
@@ -1126,7 +1166,10 @@ pub fn io_uring_register_files(ring: *Ring, files: *const FileIndex) py.Error!i3
 ///     0
 ///
 /// Note
-///     - `tags` needs one item for each file in `files`.
+///     - Linux 5.13+ (`IORING_REGISTER_FILES2`). Returns `0`; the errors of `io_uring_register_files`.
+///     - `tags` needs one item for each file in `files`. A tag of `0` means none; for any other, once the file
+///       is unregistered (or replaced) and no request uses it any more, a CQE is posted with `user_data` set to
+///       the tag and every other field `0`.
 pub fn io_uring_register_files_tags(ring: *Ring, files: *const FileIndex, tags: py.Sequence(u64)) py.Error!i32 {
     const ptr = try ring.checkedPtr();
     const _tags = try tagsPtr(tags, files._len, "io_uring_register_files_tags");
@@ -1137,6 +1180,10 @@ pub fn io_uring_register_files_tags(ring: *Ring, files: *const FileIndex, tags: 
 }
 
 /// Register `nr` empty file slots (`-1`), to fill with `io_uring_register_files_update` or direct descriptors.
+///
+/// Note
+///     - Linux 5.19+. Returns `0`; `OSError: EBUSY` when files are already registered.
+///     - If `nr` is over `RLIMIT_NOFILE`, C liburing raises the limit (`setrlimit`) and retries before failing.
 pub fn io_uring_register_files_sparse(ring: *Ring, nr: u32) py.Error!i32 {
     return support.register("IORING_REGISTER_FILES2", c.io_uring_register_files_sparse(try ring.checkedPtr(), nr));
 }
@@ -1145,6 +1192,9 @@ pub fn io_uring_register_files_sparse(ring: *Ring, nr: u32) py.Error!i32 {
 ///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
+///     - Linux 5.13+. Returns the number of files updated. In `files`, `-1` empties a slot and
+///       `IORING_REGISTER_FILES_SKIP` leaves one as it is; a replaced file stays open for the requests using
+///       it, then its tag's CQE (see `io_uring_register_files_tags`) is posted.
 pub fn io_uring_register_files_update_tag(
     ring: *Ring,
     files: *const FileIndex,
@@ -1167,6 +1217,10 @@ pub fn io_uring_register_files_update_tag(
 ///     0
 ///     >>> io_uring_unregister_files(ring)
 ///     0
+///
+/// Note
+///     - Returns `0`; `OSError: ENXIO` when none are registered. Not needed before `io_uring_queue_exit`, which
+///       unregisters them too; a CQE is posted for each tagged file (`io_uring_register_files_tags`).
 pub fn io_uring_unregister_files(ring: *Ring) py.Error!i32 {
     return support.register("IORING_UNREGISTER_FILES", c.io_uring_unregister_files(try ring.checkedPtr()));
 }
@@ -1175,6 +1229,9 @@ pub fn io_uring_unregister_files(ring: *Ring) py.Error!i32 {
 ///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
+///     - Linux 5.5+. Returns the number of files updated. In `fds`, `-1` empties a slot (closing a direct
+///       descriptor) and `IORING_REGISTER_FILES_SKIP` (Linux 5.12+) leaves one as it is. Unlike a registration,
+///       an update never waits for the ring to go idle (since Linux 5.13).
 pub fn io_uring_register_files_update(ring: *Ring, fds: *const FileIndex, offset: ?u32) py.Error!i32 {
     const _offset = offset orelse 0;
     return support.register(
@@ -1189,11 +1246,19 @@ pub fn io_uring_register_files_update(ring: *Ring, fds: *const FileIndex, offset
 ///     >>> efd = os.eventfd(0)
 ///     >>> io_uring_register_eventfd(ring, efd)
 ///     0
+///
+/// Note
+///     - Returns `0`. A ring has at most one eventfd.
+///     - A signal is only a hint to check the CQ ring: spurious ones happen, and a batch of completions may
+///       signal once.
 pub fn io_uring_register_eventfd(ring: *Ring, fd: i32) py.Error!i32 {
     return support.register("IORING_REGISTER_EVENTFD", c.io_uring_register_eventfd(try ring.checkedPtr(), fd));
 }
 
 /// Like `io_uring_register_eventfd`, but only signalled for requests completed asynchronously.
+///
+/// Note
+///     - Linux 5.6+. A request that completes inline during `io_uring_submit` does not signal.
 pub fn io_uring_register_eventfd_async(ring: *Ring, fd: i32) py.Error!i32 {
     return support.register(
         "IORING_REGISTER_EVENTFD_ASYNC",
@@ -1217,6 +1282,10 @@ pub fn io_uring_unregister_eventfd(ring: *Ring) py.Error!i32 {
 /// Example
 ///     >>> io_uring_register_personality(ring)
 ///     1
+///
+/// Note
+///     - Linux 5.6+. Returns a positive id. An sqe with it in `personality` runs with these credentials: a
+///       ring shared between users or processes keeps them separate this way.
 pub fn io_uring_register_personality(ring: *Ring) py.Error!i32 {
     return support.register("IORING_REGISTER_PERSONALITY", c.io_uring_register_personality(try ring.checkedPtr()));
 }
@@ -1227,6 +1296,9 @@ pub fn io_uring_register_personality(ring: *Ring) py.Error!i32 {
 ///     >>> id = io_uring_register_personality(ring)
 ///     >>> io_uring_unregister_personality(ring, id)
 ///     0
+///
+/// Note
+///     - Returns `0`; `OSError` for an id not registered. `id` must not be used in an sqe afterwards.
 pub fn io_uring_unregister_personality(ring: *Ring, id: i32) py.Error!i32 {
     return support.register(
         "IORING_UNREGISTER_PERSONALITY",
@@ -1236,6 +1308,13 @@ pub fn io_uring_unregister_personality(ring: *Ring, id: i32) py.Error!i32 {
 
 /// Register the restrictions added to `res` (`ValueError` if it is empty), for a ring set up with
 /// `IORING_SETUP_R_DISABLED`.
+///
+/// Note
+///     - Linux 5.10+. Returns `0`. The restrictions are an allowlist (an opcode or flag not added is denied,
+///       `OSError: EACCES` for the request or register call), registered all in one call before
+///       `io_uring_enable_rings`.
+///     - `OSError`: `EBADFD` when the ring is not disabled, `EBUSY` when restrictions are already registered,
+///       `EINVAL` for an unknown restriction opcode or too many restrictions.
 pub fn io_uring_register_restrictions(ring: *Ring, res: *Restriction) py.Error!i32 {
     var cs: setu.c.CriticalSection = undefined; // free-threaded: a set from another thread waits
     setu.c.PyCriticalSection_Begin(&cs, RestrictionType.object(res));
@@ -1264,6 +1343,11 @@ pub fn io_uring_register_restrictions(ring: *Ring, res: *Restriction) py.Error!i
 ///     >>> io_uring_enable_rings(ring)
 ///     0
 ///     >>> io_uring_queue_exit(ring)
+///
+/// Note
+///     - Linux 5.10+. Returns `0`; `OSError: EBADFD` when the ring is not disabled. Nothing can be submitted
+///       before it; registrations before it are unrestricted, after it they (and submissions) are checked
+///       against the restrictions registered (`io_uring_register_restrictions`).
 pub fn io_uring_enable_rings(ring: *Ring) py.Error!i32 {
     return support.register("IORING_REGISTER_ENABLE_RINGS", c.io_uring_enable_rings(try ring.checkedPtr()));
 }
@@ -1273,6 +1357,13 @@ pub fn io_uring_enable_rings(ring: *Ring) py.Error!i32 {
 /// Example
 ///     >>> io_uring_register_ring_fd(ring)
 ///     1
+///
+/// Note
+///     - Linux 5.18+. Worth it in a threaded process (its file table is shared, so the lookup costs more).
+///     - The registration is per thread: a ring shared between threads (one submits, another reaps) can not
+///       use it, as each thread would have its own index. At most 16 ring fds per thread.
+///     - Not undone when the thread outlives the ring: `io_uring_queue_exit` unregisters it, else
+///       `io_uring_unregister_ring_fd` frees the slot.
 pub fn io_uring_register_ring_fd(ring: *Ring) py.Error!i32 {
     return support.register("IORING_REGISTER_RING_FDS", c.io_uring_register_ring_fd(try ring.checkedPtr()));
 }
@@ -1284,6 +1375,9 @@ pub fn io_uring_register_ring_fd(ring: *Ring) py.Error!i32 {
 ///     1
 ///     >>> io_uring_unregister_ring_fd(ring)
 ///     1
+///
+/// Note
+///     - Linux 5.18+. `io_uring_queue_exit` does it too; call it to free one of the 16 slots earlier.
 pub fn io_uring_unregister_ring_fd(ring: *Ring) py.Error!i32 {
     return support.register("IORING_UNREGISTER_RING_FDS", c.io_uring_unregister_ring_fd(try ring.checkedPtr()));
 }
@@ -1295,6 +1389,11 @@ pub fn io_uring_unregister_ring_fd(ring: *Ring) py.Error!i32 {
 ///     1
 ///     >>> io_uring_close_ring_fd(ring)
 ///     1
+///
+/// Note
+///     - Needs `IORING_FEAT_REG_REG_RING` (Linux 6.3+). Returns `1`. The ring stays open, reachable only through
+///       the registered index: every liburing call keeps working, and nothing (`os.close`, `close_range`) can
+///       close it by mistake. Only the thread that registered the fd can use the ring then.
 pub fn io_uring_close_ring_fd(ring: *Ring) py.Error!i32 {
     return py.checkErrno(c.io_uring_close_ring_fd(try ring.checkedPtr()));
 }
@@ -1302,6 +1401,12 @@ pub fn io_uring_close_ring_fd(ring: *Ring) py.Error!i32 {
 /// Register the buffer ring `reg` (`io_uring_setup_buf_ring` does this for you).
 ///
 /// Note
+///     - Linux 5.19+. Returns `0`. `reg.ring_entries` must be a power of 2, at most 32768; `reg.ring` at least
+///       `ring_entries * 16` bytes, page aligned. `reg.flags`: `IOU_PBUF_RING_INC` (Linux 6.12+) lets a buffer
+///       be consumed over several completions (`IORING_CQE_F_BUF_MORE` while more are to come), `reg.min_left`
+///       the least left for it to be handed out again (`1` byte if `0`).
+///     - A request with `IOSQE_BUFFER_SELECT` and `buf_group = reg.bgid` takes a buffer when its data arrives;
+///       its CQE has `IORING_CQE_F_BUFFER` set and the buffer id in `flags >> IORING_CQE_BUFFER_SHIFT`.
 ///     - The ring keeps `reg.ring` locked until `io_uring_unregister_buf_ring` or its exit.
 pub fn io_uring_register_buf_ring(ring: *Ring, reg: *BufReg, flags: ?u32) py.Error!i32 {
     const _flags: u32 = if (flags) |f| f else 0;
@@ -1319,6 +1424,7 @@ pub fn io_uring_register_buf_ring(ring: *Ring, reg: *BufReg, flags: ?u32) py.Err
 /// Unregister the buffer ring of group `bgid`.
 ///
 /// Note
+///     - Linux 5.19+. Returns `0`; `FileNotFoundError` (`ENOENT`) when `bgid` has no buffer ring.
 ///     - Drops the ring's `BufRing` of `bgid` (from `io_uring_setup_buf_ring`), with the buffers added to it.
 pub fn io_uring_unregister_buf_ring(ring: *Ring, bgid: i32) py.Error!i32 {
     const res = c.io_uring_unregister_buf_ring(try ring.checkedPtr(), bgid);
@@ -1332,6 +1438,11 @@ pub fn io_uring_unregister_buf_ring(ring: *Ring, bgid: i32) py.Error!i32 {
 ///     >>> br = io_uring_setup_buf_ring(ring, 8, 1, 0)  # group 1
 ///     >>> io_uring_buf_ring_head(ring, 1)
 ///     0
+///
+/// Note
+///     - Linux 6.8+ (`IORING_REGISTER_PBUF_STATUS`). `FileNotFoundError` (`ENOENT`) when `buf_group` has no
+///       buffers, `OSError: EINVAL` when it has legacy provided buffers (`io_uring_prep_provide_buffers`) and
+///       not a ring.
 pub fn io_uring_buf_ring_head(ring: *Ring, buf_group: i32) py.Error!u16 {
     var head: u16 = 0;
     _ = try support.register(
@@ -1344,6 +1455,12 @@ pub fn io_uring_buf_ring_head(ring: *Ring, buf_group: i32) py.Error!u16 {
 /// Cancel requests as described by `reg` and wait (up to `reg.timeout`) for it.
 ///
 /// Note
+///     - Linux 6.0+. Like `io_uring_prep_cancel`, but the result comes back here instead of in a CQE: `0` when
+///       the request was found, or with a flag matching several (`IORING_ASYNC_CANCEL_ALL`, ...) how many.
+///       The cancelled requests still post their own CQEs (their `res` raises `OSError: ECANCELED`).
+///     - `OSError`: `ENOENT` (`FileNotFoundError`) when nothing matches (completed already, or a wrong `addr`),
+///       `EALREADY` when the request is too far along to cancel (it completes shortly on its own), `ETIME`
+///       when `reg.timeout` ran out first.
 ///     - `reg.addr` is the `user_data` you gave the request (the kernel's is its in-flight entry, looked up here).
 pub fn io_uring_register_sync_cancel(ring: *Ring, reg: *SyncCancelReg) py.Error!i32 {
     const r = try ring.checkedPtr();
@@ -1354,11 +1471,22 @@ pub fn io_uring_register_sync_cancel(ring: *Ring, reg: *SyncCancelReg) py.Error!
 }
 
 /// Send the `IORING_OP_MSG_RING` request prepared in `sqe` to another ring at once, needs no ring of its own.
+///
+/// Note
+///     - Linux 6.13+. Returns `0` (the result comes back here, not in a CQE); the target ring, which may be any
+///       the caller can reach (even its own), gets the CQE as for a submitted `io_uring_prep_msg_ring`.
+///     - `sqe` must come from `io_uring_prep_msg_ring` or `io_uring_prep_msg_ring_cqe_flags`: data messages
+///       only, not an fd (`io_uring_prep_msg_ring_fd`).
 pub fn io_uring_register_sync_msg(sqe: *Sqe) py.Error!i32 {
     return support.register("IORING_REGISTER_SEND_MSG_RING", c.io_uring_register_sync_msg(&sqe._io_uring_sqe.?[0]));
 }
 
 /// Limit the direct descriptor slots the kernel allocates (`IORING_FILE_INDEX_ALLOC`) to `len` slots from `off`.
+///
+/// Note
+///     - Linux 6.0+. Returns `0`. Needs a registered file table (`io_uring_register_files`,
+///       `io_uring_register_files_sparse`) first; by default the kernel allocates from the whole table. The
+///       slots outside the range stay for explicit indexes.
 pub fn io_uring_register_file_alloc_range(ring: *Ring, off: u32, len: u32) py.Error!i32 {
     return support.register(
         "IORING_REGISTER_FILE_ALLOC_RANGE",
@@ -1367,6 +1495,10 @@ pub fn io_uring_register_file_alloc_range(ring: *Ring, off: u32, len: u32) py.Er
 }
 
 /// Register the busy polling settings `napi`; the old settings are written back into it.
+///
+/// Note
+///     - Linux 6.9+. Returns `0`; `OSError` on a kernel without `CONFIG_NET_RX_BUSY_POLL`. Busy polling the
+///       network device (as the `SO_PREFER_BUSY_POLL` socket option) lowers the round trip time.
 pub fn io_uring_register_napi(ring: *Ring, napi: *Napi) py.Error!i32 {
     return support.register(
         "IORING_REGISTER_NAPI",
@@ -1375,6 +1507,9 @@ pub fn io_uring_register_napi(ring: *Ring, napi: *Napi) py.Error!i32 {
 }
 
 /// Unregister busy polling; the old settings are written back into `napi`.
+///
+/// Note
+///     - Linux 6.9+. Returns `0`.
 pub fn io_uring_unregister_napi(ring: *Ring, napi: *Napi) py.Error!i32 {
     return support.register(
         "IORING_UNREGISTER_NAPI",
@@ -1385,6 +1520,8 @@ pub fn io_uring_unregister_napi(ring: *Ring, napi: *Napi) py.Error!i32 {
 /// Register a zero-copy receive queue as described by `reg`; its `zcrx_id` is set.
 ///
 /// Note
+///     - Linux 6.15+. Returns `0`. The ring must be set up with `IORING_SETUP_DEFER_TASKRUN` and
+///       `IORING_SETUP_CQE32` or `IORING_SETUP_CQE_MIXED`; the caller needs `CAP_NET_ADMIN`.
 ///     - Not tested with a real device. Refer to `help(ZcrxIfqReg)`.
 ///     - The ring keeps `reg.area` and `reg.region` locked until its exit.
 pub fn io_uring_register_ifq(ring: *Ring, reg: *ZcrxIfqReg) py.Error!i32 {
@@ -1406,6 +1543,8 @@ pub fn io_uring_register_ifq(ring: *Ring, reg: *ZcrxIfqReg) py.Error!i32 {
 ///     0
 ///
 /// Note
+///     - Returns `0` (the call worked); `query.result` is the kernel's answer for the query itself.
+///       `UnsupportedError` on a kernel without `IORING_REGISTER_QUERY`.
 ///     - Needs no ring. Refer to `help(Query)`.
 pub fn io_uring_register_query(query: *Query) py.Error!i32 {
     // `query_data` is an address: set it at each call.
@@ -1418,6 +1557,8 @@ pub fn io_uring_register_query(query: *Query) py.Error!i32 {
 /// Control a zero-copy receive instance as described by `ctrl`.
 ///
 /// Note
+///     - Returns `0`. `ZCRX_CTRL_FLUSH_RQ` flushes the buffers pending in the refill queue; `ZCRX_CTRL_EXPORT`
+///       sets `ctrl.zcrx_fd`, a file descriptor another ring can take the instance over with.
 ///     - Not tested with a real device. Refer to `help(ZcrxCtrl)`.
 pub fn io_uring_register_zcrx_ctrl(ring: *Ring, ctrl: *ZcrxCtrl) py.Error!i32 {
     return support.register(
@@ -1427,6 +1568,12 @@ pub fn io_uring_register_zcrx_ctrl(ring: *Ring, ctrl: *ZcrxCtrl) py.Error!i32 {
 }
 
 /// Set the clock the ring uses for waiting with timeouts.
+///
+/// Note
+///     - Linux 6.12+. Returns `0`. `arg.clockid`: `time.CLOCK_MONOTONIC` (the default) or `time.CLOCK_BOOTTIME`
+///       (counts suspend too); `OSError: EINVAL` for any other.
+///     - Only waits with a timeout (`io_uring_wait_cqe_timeout`, ...) use it; with `IORING_ENTER_ABS_TIMER`
+///       the timeout is an absolute time of this clock.
 pub fn io_uring_register_clock(ring: *Ring, arg: *ClockRegister) py.Error!i32 {
     return support.register(
         "IORING_REGISTER_CLOCK",
@@ -1435,6 +1582,16 @@ pub fn io_uring_register_clock(ring: *Ring, arg: *ClockRegister) py.Error!i32 {
 }
 
 /// Add the BPF filter `bpf` to the ring.
+///
+/// Note
+///     - Returns `0`. The filter runs for each request of `bpf.opcode` submitted through this ring: a non-zero
+///       result allows it, `0` denies it (the request fails with `EACCES`). Several filters for one opcode
+///       stack: all must allow. `IO_URING_BPF_FILTER_DENY_REST` in `bpf.flags` denies every opcode without a
+///       filter (an allowlist).
+///     - `OSError`: `EACCES` unless the caller has `CAP_SYS_ADMIN` or `no_new_privs` (`prctl`
+///       `PR_SET_NO_NEW_PRIVS`, as for `seccomp`); `EMSGSIZE` when `bpf.pdu_size` is over the kernel's size for
+///       the opcode, or differs from it with `IO_URING_BPF_FILTER_SZ_STRICT` (the kernel writes its size into
+///       `bpf.pdu_size` then: read it and retry); `EINVAL` for a bad filter, opcode or flags.
 pub fn io_uring_register_bpf_filter(ring: *Ring, bpf: *Bpf) py.Error!i32 {
     var cs: setu.c.CriticalSection = undefined; // free-threaded: a set from another thread waits
     setu.c.PyCriticalSection_Begin(&cs, BpfType.object(bpf));
@@ -1446,6 +1603,11 @@ pub fn io_uring_register_bpf_filter(ring: *Ring, bpf: *Bpf) py.Error!i32 {
 }
 
 /// Add the BPF filter `bpf` to the calling task (and its children) instead of a ring.
+///
+/// Note
+///     - Returns `0`; the filter, errors and privileges of `io_uring_register_bpf_filter`.
+///     - Applies to every ring the task creates afterwards (not to existing ones) and is inherited by
+///       `fork` children, who may add filters but not loosen these; it can not be removed.
 pub fn io_uring_register_bpf_filter_task(bpf: *Bpf) py.Error!i32 {
     var cs: setu.c.CriticalSection = undefined; // free-threaded: a set from another thread waits
     setu.c.PyCriticalSection_Begin(&cs, BpfType.object(bpf));
@@ -1469,6 +1631,11 @@ fn ifqReg(reg: *ZcrxIfqReg) *c.io_uring_zcrx_ifq_reg {
 /// Register the memory region `reg` with the ring.
 ///
 /// Note
+///     - Linux 6.13+. Returns `0`. With `IORING_MEM_REGION_REG_WAIT_ARG` in `reg.flags` (wait arguments for
+///       `io_uring_submit_and_wait_reg`, see `RegWait`) the ring must still be disabled
+///       (`IORING_SETUP_R_DISABLED`, before `io_uring_enable_rings`).
+///     - `reg.region = None`: the kernel allocates the region and sets `reg.region_mmap_offset`, the offset
+///       to `mmap` it from the ring's fd at.
 ///     - The ring keeps `reg.region` locked until its exit.
 pub fn io_uring_register_region(ring: *Ring, reg: *MemRegionReg) py.Error!i32 {
     const r = try ring.checkedPtr();
@@ -1493,7 +1660,17 @@ fn releaseView(view: *?setu.c.Buffer) void {
 /// Type
 ///     return: BufRing
 ///
+/// Flags
+///     IOU_PBUF_RING_INC     # Linux 6.12+: a buffer may be consumed over several completions.
+///
 /// Note
+///     - Linux 5.19+. `nentries` must be a power of 2, at most 32768. The `BufRing` is initialized
+///       (`io_uring_buf_ring_init`) and registered (`io_uring_register_buf_ring`): add buffers with
+///       `io_uring_buf_ring_add` and `io_uring_buf_ring_advance`.
+///     - A request with `IOSQE_BUFFER_SELECT` and `buf_group = bgid` takes a buffer when its data arrives (its
+///       `res` raises `OSError: ENOBUFS` when none is left); its CQE has `IORING_CQE_F_BUFFER` set and the id in
+///       `flags >> IORING_CQE_BUFFER_SHIFT`. With `IOU_PBUF_RING_INC`, `IORING_CQE_F_BUF_MORE` says the buffer
+///       is not used up yet.
 ///     - `OSError` if the kernel refuses (C liburing's `err` out-parameter is the error number).
 ///     - The ring holds the `BufRing` (and the buffers added to it) until `io_uring_free_buf_ring`,
 ///       `io_uring_unregister_buf_ring` or its exit.
@@ -1514,6 +1691,10 @@ pub fn io_uring_setup_buf_ring(ring: *Ring, nentries: u32, bgid: i32, flags: u32
 }
 
 /// Unregister and free the buffer ring `br` (`nentries` and `bgid` as for `io_uring_setup_buf_ring`).
+///
+/// Note
+///     - Returns `0`; `FileNotFoundError` (`ENOENT`) when `bgid` is not registered any more. The ring's exit
+///       does it too.
 pub fn io_uring_free_buf_ring(ring: *Ring, br: *BufRing, nentries: u32, bgid: i32) py.Error!i32 {
     const res = c.io_uring_free_buf_ring(try ring.checkedPtr(), br._io_uring_buf_ring.?, nentries, bgid);
     if (res == 0) ring.dropBufRing(bgid);
@@ -1526,6 +1707,10 @@ pub fn io_uring_free_buf_ring(ring: *Ring, br: *BufRing, nentries: u32, bgid: i3
 /// Example
 ///     >>> io_uring_register_iowq_aff(ring, bytes([0b11]))  # cpus 0 and 1
 ///     0
+///
+/// Note
+///     - Linux 5.14+. Returns `0`; `OSError: EINVAL` for an empty `mask`. By default the workers inherit the
+///       cpu mask of the task that made the ring. A worker already running moves at its next schedule point.
 pub fn io_uring_register_iowq_aff(ring: *Ring, mask: py.Buffer) py.Error!i32 {
     return support.register(
         "IORING_REGISTER_IOWQ_AFF",
@@ -1534,6 +1719,9 @@ pub fn io_uring_register_iowq_aff(ring: *Ring, mask: py.Buffer) py.Error!i32 {
 }
 
 /// Remove the cpu limit set by `io_uring_register_iowq_aff`.
+///
+/// Note
+///     - Linux 5.14+. Returns `0`.
 pub fn io_uring_unregister_iowq_aff(ring: *Ring) py.Error!i32 {
     return support.register("IORING_UNREGISTER_IOWQ_AFF", c.io_uring_unregister_iowq_aff(try ring.checkedPtr()));
 }
@@ -1544,6 +1732,11 @@ pub fn io_uring_unregister_iowq_aff(ring: *Ring) py.Error!i32 {
 /// Example
 ///     >>> io_uring_register_iowq_max_workers(ring, 0, 0)  # (bounded, unbounded)
 ///     (96, 1048576)
+///
+/// Note
+///     - Linux 5.15+. Defaults: `bounded` the ring's SQ entries or 4 times the online cpus, whichever is less;
+///       `unbounded` the task limit (`RLIMIT_NPROC`). The limits are per NUMA node, and maxima: idle workers
+///       are reaped. `OSError: EINVAL` for a value over the kernel's maximum.
 pub fn io_uring_register_iowq_max_workers(ring: *Ring, bounded: u32, unbounded: u32) py.Error!struct { u32, u32 } {
     var values = [2]c_uint{ bounded, unbounded };
     _ = try support.register(
@@ -1559,6 +1752,9 @@ pub fn io_uring_buf_ring_mask(ring_entries: u32) i32 {
 }
 
 /// Initialize the buffer ring `br` (zero its tail) before the first `io_uring_buf_ring_add`.
+///
+/// Note
+///     - `io_uring_setup_buf_ring` has done this already for the `BufRing` it gives.
 pub fn io_uring_buf_ring_init(br: *BufRing) void {
     c.io_uring_buf_ring_init(br._io_uring_buf_ring.?);
 }
@@ -1567,6 +1763,10 @@ pub fn io_uring_buf_ring_init(br: *BufRing) void {
 /// the kernel until `io_uring_buf_ring_advance`.
 ///
 /// Note
+///     - `mask` is `io_uring_buf_ring_mask(nentries)`. `buf_offset` is `0` for one buffer; adding several
+///       before one `io_uring_buf_ring_advance`, it goes up by `1` for each (`0`, `1`, `2`, ...).
+///     - `bid` comes back in the CQE (`flags >> IORING_CQE_BUFFER_SHIFT`), and may name a different buffer each
+///       time it is added: only you track which. A request writes at most `INT_MAX` bytes into a buffer.
 ///     - `addr` must be writable (the kernel fills it); `br` holds it (locked: no resize) until `bid` is added
 ///       again or the buffer ring is freed (the ring holds `br` until then).
 pub fn io_uring_buf_ring_add(
@@ -1584,16 +1784,29 @@ pub fn io_uring_buf_ring_add(
 }
 
 /// Make `count` added buffers visible to the kernel.
+///
+/// Note
+///     - This hands the buffers over to the ring: do not write into them until a CQE gives them back.
 pub fn io_uring_buf_ring_advance(br: *BufRing, count: i32) void {
     c.io_uring_buf_ring_advance(br._io_uring_buf_ring.?, count);
 }
 
 /// Like `io_uring_buf_ring_advance`, and advance the completion queue by `count` too.
+///
+/// Note
+///     - For handling a batch of CQEs that each give a buffer back: one memory barrier instead of the two of
+///       `io_uring_buf_ring_advance` + `io_uring_cq_advance`.
 pub fn io_uring_buf_ring_cq_advance(ring: *Ring, br: *BufRing, count: i32) py.Error!void {
     c.io_uring_buf_ring_cq_advance(try ring.checkedPtr(), br._io_uring_buf_ring.?, count);
 }
 
 /// The number of buffers in `br` the kernel has not used yet.
+///
+/// Note
+///     - Linux 6.8+ (asks the kernel for its head, `io_uring_buf_ring_head`). The count is of that moment: with
+///       requests in flight that may take buffers, it is already stale.
+///     - Returns a negative error number, not an exception: `-ENOENT` when `bgid` has no buffers, `-EINVAL`
+///       when it is not a buffer ring or the kernel lacks the call.
 pub fn io_uring_buf_ring_available(ring: *Ring, br: *BufRing, bgid: u16) py.Error!i32 {
     return c.io_uring_buf_ring_available(try ring.checkedPtr(), br._io_uring_buf_ring.?, bgid);
 }

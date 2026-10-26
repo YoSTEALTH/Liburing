@@ -109,16 +109,41 @@ pub const SQE = struct {
     }
 
     /// The entry's `IOSQE_*` flags.
+    ///
+    /// Flags
+    ///     IOSQE_FIXED_FILE        # fd is an index into the registered files (a direct descriptor). 5.1+
+    ///     IOSQE_IO_DRAIN          # Starts after every earlier request completed; later ones wait for it. 5.2+
+    ///     IOSQE_IO_LINK           # The next SQE starts only after this one completes (a chain). 5.3+
+    ///     IOSQE_IO_HARDLINK       # IOSQE_IO_LINK that keeps the chain going after a failed result. 5.5+
+    ///     IOSQE_ASYNC             # Hand to a worker thread at once, no non-blocking attempt first. 5.6+
+    ///     IOSQE_BUFFER_SELECT     # Take a provided buffer of buf_group when the data is ready. 5.7+
+    ///     IOSQE_CQE_SKIP_SUCCESS  # No completion when the request succeeds. 5.17+ (IORING_FEAT_CQE_SKIP)
+    ///
+    /// Note
+    ///     - `IOSQE_IO_LINK`: a chain runs one request after the other and ends at the first SQE without the
+    ///       flag; a submit ends it too (even if its last SQE has the flag). Any error or unexpected result (a
+    ///       short read) breaks the chain: the requests not started yet complete with `OSError: ECANCELED`.
+    ///       `IOSQE_IO_HARDLINK` implies `IOSQE_IO_LINK` and runs the rest anyway. Chains and single requests
+    ///       outside them run in parallel.
+    ///     - `IOSQE_BUFFER_SELECT`: the completion has `IORING_CQE_F_BUFFER` set and the buffer id in
+    ///       `cqe.flags >> IORING_CQE_BUFFER_SHIFT`; `OSError: ENOBUFS` when the group is empty. A used buffer is
+    ///       gone from the group until it is provided again.
+    ///     - `IOSQE_CQE_SKIP_SUCCESS`: a failed request posts as usual, and without `IOSQE_IO_HARDLINK` the
+    ///       linked ones after it post nothing. Not to be mixed with `IOSQE_IO_DRAIN` in one ring (the kernel
+    ///       fails later drains). See `Ring` for what Liburing refuses at the submit.
+    ///     - `IOSQE_FIXED_FILE` on an operation without fixed file support: `OSError: EBADF`.
     pub fn get_flags(self: *const Self) py.Error!u8 {
         return (try self.sqePtr()).flags;
     }
 
-    /// The entry's I/O priority.
+    /// The entry's I/O priority (`ioprio_set` values, for reads and writes). Network and accept requests reuse
+    /// the field for their own flags (`IORING_RECVSEND_*`, `IORING_ACCEPT_*`), set by their preps.
     pub fn get_ioprio(self: *const Self) py.Error!u16 {
         return (try self.sqePtr()).ioprio;
     }
 
-    /// The file descriptor (or fixed file index) the entry works on.
+    /// The file descriptor the entry works on; with `IOSQE_FIXED_FILE` in `flags` the index of a registered file
+    /// (a direct descriptor) instead.
     pub fn get_fd(self: *const Self) py.Error!i32 {
         return (try self.sqePtr()).fd;
     }
@@ -128,24 +153,28 @@ pub const SQE = struct {
         return (try self.sqePtr()).len;
     }
 
-    /// The `user_data` of the entry, given back in its completion.
+    /// The `user_data` of the entry, given back as `cqe.user_data` in its completion(s): any 64-bit value, `0` and
+    /// duplicates included (see `Ring`; after the submit this reads as the ring's index for it).
     pub fn get_user_data(self: *const Self) py.Error!u64 {
         return (try self.sqePtr()).user_data;
     }
 
-    /// The registered personality id the request runs with (`0`: none).
+    /// The registered personality id (`io_uring_register_personality`) whose credentials the request runs with
+    /// (`0`: none, the submitting thread's; `IORING_FEAT_CUR_PERSONALITY`).
     pub fn get_personality(self: *const Self) py.Error!u16 {
         return (try self.sqePtr()).personality;
     }
 
     // SET
 
-    /// Set the entry's `IOSQE_*` flags (replaces them, see `io_uring_sqe_set_flags`).
+    /// Set the entry's `IOSQE_*` flags (replaces them, see `io_uring_sqe_set_flags`; the flags are described on
+    /// the `flags` getter).
     pub fn set_flags(self: *Self, flags: u8) py.Error!void {
         (try self.sqePtr()).flags = flags;
     }
 
-    /// Set the entry's `user_data` (an `int`, up to 64 bits).
+    /// Set the entry's `user_data` (an `int`, up to 64 bits). An entry from `io_uring_get_sqe` keeps the slot's
+    /// last value until set; an `Sqe(ring)` prep starts it at `0`.
     pub fn set_user_data(self: *Self, data: u64) py.Error!void {
         (try self.sqePtr()).user_data = data;
     }

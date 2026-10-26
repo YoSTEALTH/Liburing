@@ -27,6 +27,7 @@ const Param = class.Param;
 ///
 /// Note
 ///     - Don't forget to call `io_uring_free_probe(probe)` after you are done with `probe`.
+///     - Linux 5.6+ (`IORING_REGISTER_PROBE`), else `RuntimeError`.
 pub fn io_uring_get_probe_ring(ring: *Ring) py.Error!*Object {
     if (c.io_uring_get_probe_ring(try ring.checkedPtr())) |p| return class.ProbeType.new(.{ ._io_uring_probe = p });
     return py.raiseRuntimeError("Linux kernel version does not support `io_uring_get_probe_ring()`", .{});
@@ -43,6 +44,7 @@ pub fn io_uring_get_probe_ring(ring: *Ring) py.Error!*Object {
 ///
 /// Note
 ///     - Don't forget to call `io_uring_free_probe(probe)` after you are done with `probe`.
+///     - Linux 5.6+ (`IORING_REGISTER_PROBE`), else `RuntimeError`.
 pub fn io_uring_get_probe() py.Error!*Object {
     if (c.io_uring_get_probe()) |p| return class.ProbeType.new(.{ ._io_uring_probe = p });
     return py.raiseRuntimeError("Linux kernel version does not support `io_uring_get_probe()`", .{});
@@ -92,6 +94,8 @@ pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
 ///     (`OSError: EINVAL`). `buf=None` lets liburing allocate the memory.
 ///     - `ring` holds on to `buf` until `io_uring_queue_exit`: it can not be closed or resized
 ///     (`BufferError`) while the kernel uses it.
+///     - Linux 6.5+ (`IORING_SETUP_NO_MMAP`). The size to allot: `io_uring_memory_size_params(entries, p)`.
+///     - Such a ring can not be resized with `io_uring_resize_rings` (a liburing limitation).
 pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.WritableBuffer) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError(
         "`io_uring_queue_init_mem(ring)` already initialized!",
@@ -119,6 +123,12 @@ pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.Wr
 ///     - `entries` is rounded up to a power of `2` and must be `1-32768`, unless
 ///     `IORING_SETUP_CLAMP` is set, which caps it instead of raising `OSError`.
 ///     - `IORING_SETUP_DEFER_TASKRUN` requires `IORING_SETUP_SINGLE_ISSUER`.
+///     - `param.flags`: see `io_uring_queue_init` for the `IORING_SETUP_*` flags and the kernel each needs.
+///     - `IORING_SETUP_CQSIZE` sizes the completion queue by `param.cq_entries` (more than `2x` for networked
+///       workloads): a full one overflows, which is slow (`io_uring_cq_has_overflow`).
+///     - `IORING_SETUP_SQPOLL`: the kernel thread sleeps after `param.sq_thread_idle` ms without work (`0`: never,
+///       `io_uring_submit` wakes it); `IORING_SETUP_SQ_AFF` pins it to CPU `param.sq_thread_cpu`. No privileges
+///       needed since Linux 5.13 (`OSError: EPERM` before).
 ///
 /// Example
 ///     >>> ring = Ring()
@@ -148,6 +158,32 @@ pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.E
 /// Setup `Ring` Submission & Completion Queues. `flags` are `IORING_SETUP_*` (default `None`: none). Returns `0`;
 /// `RuntimeError` if `ring` is already initialized.
 ///
+/// `entries` is the submission queue size (rounded up to a power of `2`, max `32768`): it caps one submit batch, not
+/// the requests in flight. The completion queue gets `2x` as many (`io_uring_queue_init_params` to pick).
+///
+/// Flags
+///     IORING_SETUP_IOPOLL                 # busy-poll completions; O_DIRECT files on a polling capable device
+///     IORING_SETUP_HYBRID_IOPOLL          # with IOPOLL: sleep a little before polling
+///     IORING_SETUP_SQPOLL                 # a kernel thread submits; no syscall per submit
+///     IORING_SETUP_SQ_AFF                 # pin the SQPOLL thread to sq_thread_cpu
+///     IORING_SETUP_CQSIZE                 # completion queue of cq_entries
+///     IORING_SETUP_CLAMP                  # cap too large sizes instead of OSError: EINVAL
+///     IORING_SETUP_ATTACH_WQ              # share the worker (and SQPOLL) threads of ring wq_fd
+///     IORING_SETUP_R_DISABLED             # Linux 5.10+: start disabled, io_uring_enable_rings later
+///     IORING_SETUP_SUBMIT_ALL             # Linux 5.18+: go on submitting a batch after a failed entry
+///     IORING_SETUP_COOP_TASKRUN           # Linux 5.19+: no interrupting the task for completion work
+///     IORING_SETUP_TASKRUN_FLAG           # Linux 5.19+: IORING_SQ_TASKRUN flags pending completion work
+///     IORING_SETUP_SQE128                 # Linux 5.19+: 128 byte entries (IORING_OP_URING_CMD)
+///     IORING_SETUP_CQE32                  # Linux 5.19+: 32 byte completions
+///     IORING_SETUP_SINGLE_ISSUER          # Linux 6.0+: one thread submits (OSError: EEXIST for another)
+///     IORING_SETUP_DEFER_TASKRUN          # Linux 6.1+: completion work only on entering; needs SINGLE_ISSUER
+///     IORING_SETUP_NO_MMAP                # Linux 6.5+: caller's memory (io_uring_queue_init_mem)
+///     IORING_SETUP_REGISTERED_FD_ONLY     # Linux 6.5+: a registered ring fd only; needs NO_MMAP
+///     IORING_SETUP_NO_SQARRAY             # Linux 6.6+: no indirection array (liburing sets it when it can)
+///     IORING_SETUP_CQE_MIXED              # Linux 6.18+: 16 and 32 byte completions (io_uring_cqe_nr)
+///     IORING_SETUP_SQE_MIXED              # 64 and 128 byte entries (io_uring_get_sqe128)
+///     IORING_SETUP_SQ_REWIND              # Linux 7.0+: entries always from index 0; needs NO_SQARRAY
+///
 /// Example
 ///     >>> ring = Ring()
 ///     >>> try:
@@ -157,6 +193,16 @@ pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.E
 ///     ...     io_uring_queue_exit(ring)
 ///     ...
 ///     0
+///
+/// Note
+///     - A flag the kernel lacks raises `UnsupportedError` (on kernels with `IORING_REGISTER_QUERY`, else
+///       `OSError: EINVAL`). `OSError: EPERM`: `io_uring` is disabled (`/proc/sys/kernel/io_uring_disabled`), or
+///       `IORING_SETUP_SQPOLL` without privileges before Linux 5.13; `OSError: ENOMEM`: out of locked memory
+///       (`RLIMIT_MEMLOCK`, kernels before 5.12).
+///     - `IORING_SETUP_IOPOLL` allows few opcodes (`NOP`, `READ*`/`WRITE*`, `URING_CMD`, ...) and needs the device
+///       set up for polling (NVMe: `poll_queues`).
+///     - `IORING_SETUP_DEFER_TASKRUN` rings must enter the kernel regularly (a submit or wait, or
+///       `io_uring_get_events`) or completions stall; `io_uring_resize_rings` needs it.
 pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) py.Error!i32 {
     if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError(
         "`io_uring_queue_init(ring)` already initialized!",
@@ -167,7 +213,8 @@ pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) py.Error!i32 
 }
 
 /// Map the rings of an `io_uring` file descriptor `fd` (from `io_uring_setup`, with the same `param`) into
-/// `ring`. Returns `0`.
+/// `ring`. Returns `0`; `OSError` on failure. `io_uring_queue_init*` does both steps: this is for a ring set up by
+/// hand.
 ///
 /// Example
 ///     >>> param = Param()
@@ -191,6 +238,8 @@ pub fn io_uring_queue_mmap(fd: i32, ring: *Ring, param: *Param) py.Error!i32 {
 ///
 /// Note
 ///     - `ring` must be initialized, else raises `RuntimeError`.
+///     - Call it before the fork (`os.fork`, `subprocess`, `multiprocessing` with the `fork` start method); it
+///       does nothing for children already forked. Returns `0`; `OSError` on failure.
 ///
 /// Example
 ///     >>> io_uring_ring_dontfork(ring)
@@ -204,6 +253,9 @@ pub fn io_uring_ring_dontfork(ring: *Ring) py.Error!i32 {
 /// Note
 ///     - Raises `RuntimeError` if `ring` is not initialized or already exited.
 ///     - Requests still in flight are cancelled and waited for first.
+///     - Some accounting is asynchronous: memory the ring locked can stay locked a few ms after it returns, so
+///       `io_uring_queue_init` + `io_uring_queue_exit` in a tight loop can hit `OSError: ENOMEM` (`RLIMIT_MEMLOCK`,
+///       kernels before 5.12).
 ///
 /// Example
 ///     >>> io_uring_queue_exit(ring)
@@ -225,6 +277,12 @@ pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
 ///
 /// Note
 ///     - `ring` must be set up with `IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_SINGLE_ISSUER`.
+///     - Only `IORING_SETUP_CQSIZE` and `IORING_SETUP_CLAMP` go in `p.flags` (the rest is inherited from the
+///       setup), other fields of `p` stay `0`. Pending entries are copied over.
+///     - `OSError: EINVAL` when the completion queue is in overflow (`io_uring_cq_has_overflow`: drain it first);
+///       `OSError: EEXIST` from a thread other than the issuer; `OSError: EOVERFLOW` for sizes too large without
+///       `CLAMP`. A ring
+///       from `io_uring_queue_init_mem` can not be resized (liburing limitation).
 ///
 /// Example
 ///     >>> p = Param()
@@ -241,7 +299,19 @@ pub fn io_uring_resize_rings(ring: *Ring, p: *Param) py.Error!i32 {
 }
 
 /// The raw `io_uring_enter(2)` system call on `fd`: submit `to_submit` entries and wait for `min_complete`
-/// completions, `flags` are `IORING_ENTER_*`, `sig` an optional `SigsetT`. Returns the number of entries consumed.
+/// completions, `flags` are `IORING_ENTER_*`, `sig` an optional `SigsetT`. Returns the number of entries consumed
+/// (`0` when `to_submit` is `0` or the queue is empty; on an `IORING_SETUP_SQPOLL` ring just `to_submit`, the
+/// kernel thread does the submitting).
+///
+/// Flags
+///     IORING_ENTER_GETEVENTS          # wait for min_complete completions
+///     IORING_ENTER_SQ_WAKEUP          # SQPOLL: wake the idle kernel thread
+///     IORING_ENTER_SQ_WAIT            # SQPOLL: wait for a free submission queue slot (io_uring_sqring_wait)
+///     IORING_ENTER_EXT_ARG            # Linux 5.11+: io_uring_enter2's arg is a struct io_uring_getevents_arg
+///     IORING_ENTER_REGISTERED_RING    # fd is a registered ring index (io_uring_register_ring_fd)
+///     IORING_ENTER_ABS_TIMER          # Linux 6.12+: the timeout is absolute (io_uring_register_clock)
+///     IORING_ENTER_EXT_ARG_REG        # Linux 6.13+: arg is an offset into the registered wait region
+///     IORING_ENTER_NO_IOWAIT          # Linux 6.15+: no iowait accounting while waiting (io_uring_set_iowait)
 ///
 /// Example
 ///     >>> io_uring_enter(ring.ring_fd, 0, 1, IORING_ENTER_GETEVENTS, None)
@@ -249,6 +319,14 @@ pub fn io_uring_resize_rings(ring: *Ring, p: *Param) py.Error!i32 {
 ///
 /// Note
 ///     - Other Python threads run while it waits (`min_complete > 0`).
+///     - Only the call's own errors raise here; a failed request raises when its `cqe.res` is read.
+///       `InterruptedError` (`EINTR`): a signal while waiting; `OSError: EBUSY`: overflowed completions could not
+///       all be flushed, reap and retry; `BlockingIOError` (`EAGAIN`): the kernel is out of resources, reap and
+///       retry; `OSError: EEXIST`: `IORING_ENTER_GETEVENTS` on an `IORING_SETUP_DEFER_TASKRUN` ring from another
+///       thread; `OSError: EBADFD`: the ring is still disabled (`IORING_SETUP_R_DISABLED`).
+///     - `IORING_SETUP_SQPOLL`: when the kernel thread went idle (`IORING_SQ_NEED_WAKEUP` in the submission queue
+///       flags) new entries sit until a call with `IORING_ENTER_SQ_WAKEUP`; `io_uring_submit` does that itself.
+///     - `IORING_SETUP_IOPOLL`: `min_complete > 0` polls until a completion is in or the scheduler time slice ends.
 pub fn io_uring_enter(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sig: ?*SigsetT) py.Error!i32 {
     const args = .{ fd, to_submit, min_complete, flags, if (sig) |s| s._sigset_t else null };
     if (min_complete == 0) return py.checkErrno(@call(.auto, c.io_uring_enter, args));
@@ -265,6 +343,8 @@ pub fn io_uring_enter(fd: u32, to_submit: u32, min_complete: u32, flags: u32, si
 ///
 /// Note
 ///     - `arg` is a raw address: the caller keeps what it points to alive until the call returns.
+///     - `IORING_ENTER_EXT_ARG` needs Linux 5.11+ (`IORING_FEAT_EXT_ARG`), `IORING_ENTER_EXT_ARG_REG` 6.13+;
+///       `OSError: EINVAL` before. Without either, `arg` is read as a `sigset_t` like `io_uring_enter`'s `sig`.
 pub fn io_uring_enter2(fd: u32, to_submit: u32, min_complete: u32, flags: u32, sz: usize, arg: ?usize) py.Error!i32 {
     const args = .{ fd, to_submit, min_complete, flags, if (arg) |a| @as(?*anyopaque, @ptrFromInt(a)) else null, sz };
     if (min_complete == 0) return py.checkErrno(@call(.auto, c.io_uring_enter2, args));
@@ -277,6 +357,13 @@ pub fn io_uring_enter2(fd: u32, to_submit: u32, min_complete: u32, flags: u32, s
 /// Example
 ///     >>> p = Param()
 ///     >>> fd = io_uring_setup(8, p)
+///
+/// Note
+///     - `p.flags` are the `IORING_SETUP_*` of `io_uring_queue_init` (same errors), `p.features` on return the
+///       `IORING_FEAT_*` the kernel supports. `p.resv` must be `0`.
+///     - `IORING_SETUP_SQ_AFF` without `IORING_SETUP_SQPOLL`, `IORING_SETUP_REGISTERED_FD_ONLY` without
+///       `IORING_SETUP_NO_MMAP` and `IORING_SETUP_CQSIZE` with a bad `p.cq_entries` are `OSError: EINVAL`;
+///       `OSError: ENXIO`: `p.wq_fd` of `IORING_SETUP_ATTACH_WQ` is not a live ring.
 pub fn io_uring_setup(entries: u32, p: *Param) py.Error!i32 {
     return support.setup(c.io_uring_setup(entries, &p._io_uring_params), p._io_uring_params.flags);
 }
@@ -302,12 +389,18 @@ pub fn io_uring_register(fd: u32, opcode: u32, nr_args: u32, arg: ?usize) py.Err
 /// Example
 ///     >>> io_uring_set_iowait(ring, False)
 ///     0
+///
+/// Note
+///     - With it on, a wait with requests pending counts as I/O wait (`iowait` in load and CPU statistics) and
+///       keeps the CPU out of deeper sleep states; off is for non-storage work and power. Off, the wait calls
+///       pass `IORING_ENTER_NO_IOWAIT` to `io_uring_enter`.
 pub fn io_uring_set_iowait(ring: *Ring, enable_iowait: bool) py.Error!i32 {
     const r = try ring.checkedPtr();
     return support.feature("IORING_FEAT_NO_IOWAIT", r.features, c.io_uring_set_iowait(r, enable_iowait));
 }
 
-/// How many entries are queued in the submission queue that the kernel has not consumed yet.
+/// How many entries are queued in the submission queue that the kernel has not consumed yet: not submitted yet,
+/// or on an `IORING_SETUP_SQPOLL` ring not picked up by the kernel thread yet.
 ///
 /// Example
 ///     >>> io_uring_sq_ready(ring)
@@ -325,7 +418,8 @@ pub fn io_uring_sq_space_left(ring: *Ring) py.Error!u32 {
     return c.io_uring_sq_space_left(try ring.checkedPtr());
 }
 
-/// Bytes the kernel needs to map a ring of `entries` with `flags`.
+/// Bytes the kernel needs to map a ring of `entries` with `flags`. `OSError` (`EINVAL`) for `entries` `0` or over
+/// the limit without `IORING_SETUP_CLAMP`.
 ///
 /// Example
 ///     >>> io_uring_memory_size(8, 0)
@@ -334,7 +428,8 @@ pub fn io_uring_memory_size(entries: u32, flags: u32) py.Error!isize {
     return py.checkErrno(c.io_uring_memory_size(entries, flags));
 }
 
-/// Bytes the kernel needs to map a ring of `entries` set up as `p` says.
+/// Bytes the kernel needs to map a ring of `entries` set up as `p` says (`p.cq_entries` counts with
+/// `IORING_SETUP_CQSIZE`): what to give `io_uring_queue_init_mem`. Errors like `io_uring_memory_size`.
 ///
 /// Example
 ///     >>> io_uring_memory_size_params(8, Param())
@@ -350,16 +445,20 @@ pub fn io_uring_memory_size_params(entries: u32, p: *Param) py.Error!isize {
 ///     0
 ///
 /// Note
-///     - `0` on kernels that no longer count rings against `RLIMIT_MEMLOCK`.
+///     - `0` on kernels that no longer count rings against `RLIMIT_MEMLOCK` (Linux 5.12+).
 pub fn io_uring_mlock_size(entries: u32, flags: u32) py.Error!isize {
     return py.checkErrno(c.io_uring_mlock_size(entries, flags));
 }
 
-/// Bytes of locked memory (`RLIMIT_MEMLOCK`) a ring of `entries` set up as `p` says needs.
+/// Bytes of locked memory (`RLIMIT_MEMLOCK`) a ring of `entries` set up as `p` says needs (`p.cq_entries` counts
+/// with `IORING_SETUP_CQSIZE`).
 ///
 /// Example
 ///     >>> io_uring_mlock_size_params(8, Param())
 ///     0
+///
+/// Note
+///     - `0` on kernels that no longer count rings against `RLIMIT_MEMLOCK` (Linux 5.12+).
 pub fn io_uring_mlock_size_params(entries: u32, p: *Param) py.Error!isize {
     return py.checkErrno(c.io_uring_mlock_size_params(entries, &p._io_uring_params));
 }
@@ -370,6 +469,11 @@ pub fn io_uring_mlock_size_params(entries: u32, p: *Param) py.Error!isize {
 /// Example
 ///     >>> io_uring_sqring_wait(ring)
 ///     0
+///
+/// Note
+///     - `0` at once on a ring without `IORING_SETUP_SQPOLL` (then `io_uring_submit` frees the slots); `-EINVAL`
+///       on a kernel without `IORING_ENTER_SQ_WAIT`.
+///     - Other Python threads run while it waits.
 pub fn io_uring_sqring_wait(ring: *Ring) py.Error!i32 {
     return callReleased(c.io_uring_sqring_wait, .{try ring.checkedPtr()}); // `SQPOLL`: until the SQ has room
 }
@@ -389,6 +493,8 @@ pub fn io_uring_sqring_wait(ring: *Ring) py.Error!i32 {
 ///     - `None` when the submission queue is full: `io_uring_submit(ring)` and try again, or let the ring do it
 ///       (`Ring(auto_submit=True)`). Set a request's link flags before taking the next entry: the
 ///       ring submits only when the last queued request does not link on.
+///     - Neither this nor the preps set or clear the entry's `user_data`: set it (`io_uring_sqe_set_data64`)
+///       on every request whose completion you tell apart, or it may carry the value of the slot's previous use.
 pub fn io_uring_get_sqe(ring: *Ring) py.Error!?*Object {
     const r = try ring.checkedPtr();
     if (c.io_uring_get_sqe(r) orelse if (try ring.autoSubmit()) c.io_uring_get_sqe(r) else null) |sqe| {
@@ -408,6 +514,13 @@ pub fn io_uring_get_sqe(ring: *Ring) py.Error!?*Object {
 ///     ...     io_uring_prep_nop128(sqe)
 ///     ...
 ///     True
+///
+/// Note
+///     - `None` when the queue is full (`io_uring_submit(ring)` first, like `io_uring_get_sqe`), and always on a
+///       ring with neither `IORING_SETUP_SQE128` (Linux 5.19+) nor `IORING_SETUP_SQE_MIXED`.
+///     - On a `SQE_MIXED` ring an entry can not wrap around the queue's end: when the next slot is the last one a
+///       filler `NOP` (no completion) goes there first, so the call can take three slots and `io_uring_submit`
+///       counts one entry more.
 pub fn io_uring_get_sqe128(ring: *Ring) py.Error!?*Object {
     const r = try ring.checkedPtr();
     if (c.io_uring_get_sqe128(r) orelse if (try ring.autoSubmit()) c.io_uring_get_sqe128(r) else null) |sqe| {

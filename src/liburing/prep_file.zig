@@ -17,6 +17,13 @@ const OpenHow = class.OpenHow;
 
 /// Moves `nbytes` from `fd_in` at `off_in` to `fd_out` at `off_out` (`splice(2)`), one of them a pipe.
 /// `-1` as an offset means the fd's own position; `splice_flags` are `SPLICE_F_*`.
+///
+/// Note
+///     - Linux 5.7+.
+///     - `cqe.res`: bytes spliced.
+///     - A pipe's offset must be `-1`; the other fd's `-1` reads/writes at its file position and advances it.
+///     - `SPLICE_F_FD_IN_FIXED` in `splice_flags` makes `fd_in` a registered file index; for a registered
+///       `fd_out` set `IOSQE_FIXED_FILE` in `sqe.flags`.
 pub fn io_uring_prep_splice(
     sqe: *SQE,
     fd_in: i32,
@@ -33,6 +40,13 @@ pub fn io_uring_prep_splice(
 }
 
 /// Copies `nbytes` between two pipes (`tee(2)`) without consuming the input; `splice_flags` are `SPLICE_F_*`.
+///
+/// Note
+///     - Linux 5.8+.
+///     - `cqe.res`: bytes duplicated, at most `INT_MAX` per request (limits as low as 65536 have been seen, as
+///       with `tee(2)`).
+///     - `SPLICE_F_FD_IN_FIXED` in `splice_flags` makes `fd_in` a registered file index; for a registered
+///       `fd_out` set `IOSQE_FIXED_FILE` in `sqe.flags`.
 pub fn io_uring_prep_tee(sqe: *SQE, fd_in: i32, fd_out: i32, nbytes: u32, splice_flags: u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -55,6 +69,10 @@ pub fn io_uring_prep_tee(sqe: *SQE, fd_in: i32, fd_out: i32, nbytes: u32, splice
 ///     - `bufs`: 1 to `IOV_MAX` writable buffers (`bytearray`, `memoryview`, `array.array`, ...); the request
 ///       holds them (locked: no resize) and their `struct iovec` array until its completion.
 ///     - `io_uring_prep_readv` includes `io_uring_prep_readv2` feature as well.
+///     - `cqe.res`: bytes read (`0` at end of file).
+///     - `offset` defaults to `0`; a non-seekable file (pipe, socket, ...) needs `0`.
+///     - `flags` are `RWF_*` (`preadv2(2)`), default `0`.
+///     - For a single buffer `io_uring_prep_read` is cheaper: no `iovec` state to keep.
 pub fn io_uring_prep_readv(
     sqe: *SQE,
     fd: i32,
@@ -84,6 +102,11 @@ pub fn io_uring_prep_readv(
 ///     1
 ///     >>> buffer
 ///     bytearray(b'hi...')
+///
+/// Note
+///     - `cqe.res`: bytes read.
+///     - `buff` must lie inside the registered buffer `buf_index` (`OSError: EFAULT` otherwise); it need not
+///       start at its beginning (a `memoryview` slice of it works).
 pub fn io_uring_prep_read_fixed(
     sqe: *SQE,
     fd: i32,
@@ -122,7 +145,11 @@ pub fn io_uring_prep_read_fixed(
 ///     bytearray(b'hi... bye!')
 ///
 /// Note
-///     - `bufs`: as `io_uring_prep_readv`, held until the completion.
+///     - Linux 6.15+.
+///     - `cqe.res`: bytes read.
+///     - `bufs`: as `io_uring_prep_readv`, held until the completion; every buffer must lie inside the
+///       registered buffer `buf_index`.
+///     - `flags` are `RWF_*` (`preadv2(2)`), default `0`.
 pub fn io_uring_prep_readv_fixed(
     sqe: *SQE,
     fd: i32,
@@ -156,6 +183,9 @@ pub fn io_uring_prep_readv_fixed(
 ///     - `bufs`: 1 to `IOV_MAX` buffers (`bytes` too); the request holds them and their `struct iovec` array
 ///       until its completion.
 ///     - `io_uring_prep_writev` includes `io_uring_prep_writev2` feature as well.
+///     - `offset` defaults to `0`; a non-seekable file (pipe, socket, ...) needs `0`.
+///     - `flags` are `RWF_*` (`pwritev2(2)`), default `0`.
+///     - At most `INT_MAX` bytes per request. For a single buffer `io_uring_prep_write` is cheaper.
 pub fn io_uring_prep_writev(sqe: *SQE, fd: i32, bufs: py.Sequence(py.Buffer), offset: ?u64, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -183,7 +213,9 @@ pub fn io_uring_prep_writev(sqe: *SQE, fd: i32, bufs: py.Sequence(py.Buffer), of
 ///     5
 ///
 /// Note
-///     - `buff` must lie inside the registered buffer (`OSError: EFAULT` otherwise): a `bytes` object can not.
+///     - `cqe.res`: bytes written, at most `INT_MAX` per request.
+///     - `buff` must lie inside the registered buffer `buf_index` (`OSError: EFAULT` otherwise): a `bytes` object
+///       can not. It need not start at its beginning (a `memoryview` slice of it works).
 pub fn io_uring_prep_write_fixed(sqe: *SQE, fd: i32, buff: py.OwnedBuffer, buf_index: i32, offset: ?u64) py.Error!bool {
     const s = try h.prepSlot(sqe, &buff) orelse return false;
     errdefer sqe.undoSlot();
@@ -217,7 +249,11 @@ pub fn io_uring_prep_write_fixed(sqe: *SQE, fd: i32, buff: py.OwnedBuffer, buf_i
 ///     10
 ///
 /// Note
-///     - `bufs`: as `io_uring_prep_writev`, held until the completion.
+///     - Linux 6.15+.
+///     - `cqe.res`: bytes written, at most `INT_MAX` per request.
+///     - `bufs`: as `io_uring_prep_writev`, held until the completion; every buffer must lie inside the
+///       registered buffer `buf_index` (so no `bytes`).
+///     - `flags` are `RWF_*` (`pwritev2(2)`), default `0`.
 pub fn io_uring_prep_writev_fixed(
     sqe: *SQE,
     fd: i32,
@@ -235,7 +271,14 @@ pub fn io_uring_prep_writev_fixed(
     return true;
 }
 
-/// Syncs the file `fd` to disk (`fsync(2)`); `fsync_flags` is `0` (default) or `IORING_FSYNC_DATASYNC`.
+/// Syncs the file `fd` to disk (`fsync(2)`); `fsync_flags` is `0` (default) or `IORING_FSYNC_DATASYNC`
+/// (`fdatasync(2)`).
+///
+/// Note
+///     - `cqe.res`: `0`.
+///     - Requests run in parallel: an fsync submitted after a write does not cover that write unless they are
+///       linked (`IOSQE_IO_LINK` on the write), `IOSQE_IO_DRAIN` is set, or the write's CQE arrived first.
+///     - Syncs the whole file: the C range fields (`sqe.off`, `sqe.len`) are not settable from Python.
 pub fn io_uring_prep_fsync(sqe: *SQE, fd: i32, fsync_flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -246,6 +289,14 @@ pub fn io_uring_prep_fsync(sqe: *SQE, fd: i32, fsync_flags: ?u32) py.Error!bool 
 
 /// Updates the registered files table from `fds`, starting at slot `offset` (default `0`).
 /// The request holds `fds` until its completion.
+///
+/// Note
+///     - Linux 5.6+.
+///     - `cqe.res`: the number of slots updated.
+///     - A slot that already holds a file is closed and replaced (as unregister then register, in one step);
+///       `-1` in `fds` empties the slot.
+///     - `IORING_FILE_INDEX_ALLOC` as `offset` lets the kernel pick free slots, written back into `fds`, with
+///       `cqe.res` the number allocated.
 pub fn io_uring_prep_files_update(sqe: *SQE, fds: *FileIndex, offset: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -256,6 +307,11 @@ pub fn io_uring_prep_files_update(sqe: *SQE, fds: *FileIndex, offset: ?i32) py.E
 }
 
 /// Preallocates or deallocates the file range `offset` to `offset + len` (`fallocate(2)`).
+///
+/// Note
+///     - Linux 5.6+.
+///     - `cqe.res`: `0`.
+///     - `mode` `0` allocates the range, growing the file if it ends past the current size.
 ///
 /// Mode
 ///     FALLOC_FL_KEEP_SIZE       # default is extend size
@@ -291,8 +347,11 @@ pub fn io_uring_prep_fallocate(sqe: *SQE, fd: i32, mode: i32, offset: u64, len: 
 ///     b'hi...'
 ///
 /// Note
+///     - Linux 5.6+.
 ///     - Function argument `dfd` has been moved to end from how it is in C function.
 ///     - `io_uring_prep_open` includes `io_uring_prep_openat` as well.
+///     - `flags` defaults to `0` (`O_RDONLY`), `mode` to `0o777` (used with `O_CREAT`, masked by the umask),
+///       `dfd` to `AT_FDCWD`; `dfd` is always a normal fd, never a registered one.
 pub fn io_uring_prep_open(sqe: *SQE, path: *Object, flags: ?i32, mode: ?c.mode_t, dfd: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -336,10 +395,14 @@ pub fn io_uring_prep_open(sqe: *SQE, path: *Object, flags: ?i32, mode: ?c.mode_t
 ///     0
 ///
 /// Note
+///     - Linux 5.15+.
 ///     - Open direct does not use `fd` but `index`
 ///     - `file_index` defaults to `IORING_FILE_INDEX_ALLOC`: a free direct descriptor is auto assigned.
-///       The allocated descriptor is returned in the `cqe.res`.
-///     - `flags` defaults to `O_RDONLY`, `mode` to `0o777`.
+///       The allocated descriptor is returned in the `cqe.res`; `OSError: ENFILE` when the table has no free slot.
+///       With an explicit slot `cqe.res` is `0`; a slot that already holds a file is closed and replaced.
+///     - Needs a registered files table (`io_uring_register_files`, sparse `-1` entries are fine); the slot is
+///       then used as `fd` with `IOSQE_FIXED_FILE` in `sqe.flags`, only by io_uring requests.
+///     - `flags` defaults to `O_RDONLY`, `mode` to `0o777`, `dfd` to `AT_FDCWD` (always a normal fd).
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_open_direct` includes `io_uring_prep_openat_direct` as well.
 pub fn io_uring_prep_open_direct(
@@ -368,6 +431,10 @@ pub fn io_uring_prep_open_direct(
 /// Example
 ///     >>> io_uring_prep_close(sqe, fd)
 ///     True
+///
+/// Note
+///     - Linux 5.6+.
+///     - `cqe.res`: `0`.
 pub fn io_uring_prep_close(sqe: *SQE, fd: i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -380,6 +447,11 @@ pub fn io_uring_prep_close(sqe: *SQE, fd: i32) py.Error!bool {
 /// Example
 ///     >>> io_uring_prep_close_direct(sqe, 0)  # slot 0 of the registered files
 ///     True
+///
+/// Note
+///     - Linux 5.15+.
+///     - `cqe.res`: `0`. Same as unregistering the slot; fails only on an invalid slot or out of memory.
+///     - Do not set `IOSQE_FIXED_FILE` in `sqe.flags` here: the request would raise `OSError: EBADF`.
 pub fn io_uring_prep_close_direct(sqe: *SQE, file_index: u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -402,6 +474,10 @@ pub fn io_uring_prep_close_direct(sqe: *SQE, file_index: u32) py.Error!bool {
 ///     5
 ///     >>> buf
 ///     bytearray(b'hi...')
+///
+/// Note
+///     - Linux 5.6+.
+///     - `cqe.res`: bytes read (`0` at end of file); a non-seekable file (pipe, socket, ...) needs `offset` `0`.
 pub fn io_uring_prep_read(sqe: *SQE, fd: i32, buf: py.OwnedWritableBuffer, offset: ?u64) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
     errdefer sqe.undoSlot();
@@ -421,7 +497,12 @@ pub fn io_uring_prep_read(sqe: *SQE, fd: i32, buf: py.OwnedWritableBuffer, offse
 /// `buf_group`; `nbytes` of `0` (default) reads up to the buffer's size.
 ///
 /// Note
+///     - Linux 6.7+.
 ///     - Function arguments position has changed for C origin for better usability.
+///     - Pollable files only (pipes, tun devices, ...): a regular file raises `OSError: EBADFD`.
+///     - Each CQE: `cqe.res` the bytes read, `IORING_CQE_F_BUFFER` in `cqe.flags` with the buffer id, and
+///       `IORING_CQE_F_MORE` while the request stays armed; a CQE without it (or an error) ends the request.
+///     - `nbytes` larger than the group's buffers is clamped to the buffer size.
 pub fn io_uring_prep_read_multishot(sqe: *SQE, fd: i32, buf_group: i32, nbytes: ?u32, offset: ?u64) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -443,6 +524,10 @@ pub fn io_uring_prep_read_multishot(sqe: *SQE, fd: i32, buf_group: i32, nbytes: 
 ///     0
 ///     >>> cqe[0].res  # bytes written
 ///     5
+///
+/// Note
+///     - Linux 5.6+.
+///     - At most `INT_MAX` bytes per request; a non-seekable file (pipe, socket, ...) needs `offset` `0`.
 pub fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: py.OwnedBuffer, offset: ?u64) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
     errdefer sqe.undoSlot();
@@ -509,8 +594,12 @@ pub fn io_uring_prep_write(sqe: *SQE, fd: i32, buf: py.OwnedBuffer, offset: ?u64
 ///     # STATX_DIOALIGN      # Want/got direct I/O alignment info
 ///
 /// Note
+///     - Linux 5.6+.
+///     - `cqe.res`: `0`; the fields are in `statxbuf` after the completion.
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `STATX_ALL` is deprecated, use `STATX_BASIC_STATS | STATX_BTIME` which is set by default.
+///     - `dfd` defaults to `AT_FDCWD`; to stat an open fd pass it as `dfd` with `path` `''` and
+///       `AT_EMPTY_PATH` in `flags`.
 pub fn io_uring_prep_statx(
     sqe: *SQE,
     statxbuf: *Statx,
@@ -535,6 +624,8 @@ pub fn io_uring_prep_statx(
 /// `advice` is `POSIX_FADV_*`. Up to `4 GiB - 1`; `io_uring_prep_fadvise64` for more.
 ///
 /// Note
+///     - Linux 5.6+.
+///     - `cqe.res`: `0`.
 ///     - Function arguments position has changed for C origin for better usability.
 pub fn io_uring_prep_fadvise(sqe: *SQE, fd: i32, len: u32, advice: i32, offset: ?u64) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
@@ -553,8 +644,10 @@ pub fn io_uring_prep_fadvise(sqe: *SQE, fd: i32, len: u32, advice: i32, offset: 
 ///
 /// Note
 ///     - `buf`: writable (an `mmap.mmap`, or a `memoryview` slice of one): advice like `MADV_DONTNEED` changes
-///     its contents. It must start on a page boundary (`OSError: EINVAL` otherwise), as `madvise(2)` asks.
+///       its contents. It must start on a page boundary (`OSError: EINVAL` otherwise), as `madvise(2)` asks.
 ///     - Up to `4 GiB - 1`; `io_uring_prep_madvise64` for more.
+///     - Linux 5.6+.
+///     - `cqe.res`: `0`.
 pub fn io_uring_prep_madvise(sqe: *SQE, buf: py.OwnedWritableBuffer, advice: i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
     errdefer sqe.undoSlot();
@@ -572,6 +665,7 @@ pub fn io_uring_prep_madvise(sqe: *SQE, buf: py.OwnedWritableBuffer, advice: i32
 ///
 /// Note
 ///     - Function arguments position has changed for C origin for better usability.
+///     - A `len` over `4 GiB - 1` raises `OSError: EINVAL` on older kernels without 64-bit length support.
 pub fn io_uring_prep_fadvise64(sqe: *SQE, fd: i32, len: c.off_t, advice: i32, offset: ?u64) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -586,6 +680,9 @@ pub fn io_uring_prep_fadvise64(sqe: *SQE, fd: i32, len: c.off_t, advice: i32, of
 ///     >>> m = mmap.mmap(-1, 4096)
 ///     >>> io_uring_prep_madvise64(sqe, m, mmap.MADV_WILLNEED)
 ///     True
+///
+/// Note
+///     - A `buf` over `4 GiB - 1` raises `OSError: EINVAL` on older kernels without 64-bit length support.
 pub fn io_uring_prep_madvise64(sqe: *SQE, buf: py.OwnedWritableBuffer, advice: i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
     errdefer sqe.undoSlot();
@@ -594,10 +691,13 @@ pub fn io_uring_prep_madvise64(sqe: *SQE, buf: py.OwnedWritableBuffer, advice: i
     return true;
 }
 
-/// Opens `path` as described by `how` (`openat2(2)`).
+/// Opens `path` as described by `how` (`openat2(2)`); the new fd is returned in `cqe.res`.
 ///
 /// Note
+///     - Linux 5.6+.
 ///     - Function arguments position has changed for C origin for better usability.
+///     - `how` (an `OpenHow`) carries the `O_*` flags, the `mode` and the `RESOLVE_*` path rules; `dfd` defaults
+///       to `AT_FDCWD` and is always a normal fd.
 ///
 /// Type
 ///     path: str | os.PathLike[str]
@@ -616,8 +716,11 @@ pub fn io_uring_prep_openat2(sqe: *SQE, path: *Object, how: *OpenHow, dfd: ?i32)
 /// (default `IORING_FILE_INDEX_ALLOC`) instead of becoming an fd.
 ///
 /// Note
+///     - Linux 5.15+.
 ///     - `file_index` defaults to `IORING_FILE_INDEX_ALLOC`: a free direct descriptor is auto assigned.
-///       The allocated descriptor is returned in the `cqe.res`.
+///       The allocated descriptor is returned in the `cqe.res`; `OSError: ENFILE` when the table has no free slot.
+///       With an explicit slot `cqe.res` is `0`; a slot that already holds a file is closed and replaced.
+///     - Needs a registered files table (`io_uring_register_files`); see `io_uring_prep_open_direct`.
 ///
 /// Type
 ///     path: str | os.PathLike[str]
@@ -642,9 +745,10 @@ pub fn io_uring_prep_openat2_direct(
 /// Removes the file `path` (`unlinkat(2)`); `flags` is `0` (default) or `AT_REMOVEDIR`.
 ///
 /// Note
+///     - Linux 5.11+.
+///     - `cqe.res`: `0`.
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_unlink` includes `io_uring_prep_unlinkat` feature.
-///
 ///
 /// Type
 ///     path: str | os.PathLike[str]
@@ -658,11 +762,18 @@ pub fn io_uring_prep_unlink(sqe: *SQE, path: *Object, flags: ?i32, dfd: ?i32) py
     return true;
 }
 
-/// Renames `oldpath` to `newpath` (`renameat2(2)`); `flags` are `RENAME_*` (default `0`).
+/// Renames `oldpath` to `newpath` (`renameat2(2)`); `flags` are `RENAME_*` (default `0`: plain `renameat(2)`).
 ///
 /// Note
+///     - Linux 5.11+.
+///     - `cqe.res`: `0`.
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_rename` includes `io_uring_prep_renameat` feature.
+///
+/// Flags
+///     RENAME_NOREPLACE    # OSError: EEXIST instead of replacing newpath
+///     RENAME_EXCHANGE     # swap the two paths atomically
+///     RENAME_WHITEOUT     # leave a whiteout at oldpath (overlay filesystems)
 ///
 /// Type
 ///     oldpath: str | os.PathLike[str]
@@ -693,7 +804,15 @@ pub fn io_uring_prep_rename(
 /// `flags` are `SYNC_FILE_RANGE_*` (default `0`).
 ///
 /// Note
+///     - Linux 5.2+.
+///     - `cqe.res`: `0`.
 ///     - Function arguments position has changed for C origin for better usability.
+///     - `len` `0` means to the end of the file.
+///
+/// Flags
+///     SYNC_FILE_RANGE_WAIT_BEFORE   # wait for pending writeback of the range first
+///     SYNC_FILE_RANGE_WRITE         # start writeback of dirty pages in the range
+///     SYNC_FILE_RANGE_WAIT_AFTER    # wait for the writeback to finish
 pub fn io_uring_prep_sync_file_range(sqe: *SQE, fd: i32, len: u32, offset: ?u64, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -703,9 +822,11 @@ pub fn io_uring_prep_sync_file_range(sqe: *SQE, fd: i32, len: u32, offset: ?u64,
     return true;
 }
 
-/// Creates the directory `path` with `mode` (`mkdirat(2)`).
+/// Creates the directory `path` with `mode` (`mkdirat(2)`, masked by the umask).
 ///
 /// Note
+///     - Linux 5.15+.
+///     - `cqe.res`: `0`.
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_mkdir` includes `io_uring_prep_mkdirat` feature.
 ///
@@ -725,6 +846,8 @@ pub fn io_uring_prep_mkdir(sqe: *SQE, path: *Object, mode: c.mode_t, dfd: ?i32) 
 /// Creates the symbolic link `linkpath` (relative to `newdirfd`) pointing to `target` (`symlinkat(2)`).
 ///
 /// Note
+///     - Linux 5.15+.
+///     - `cqe.res`: `0`.
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_symlink` includes `io_uring_prep_symlinkat` feature.
 ///
@@ -747,6 +870,8 @@ pub fn io_uring_prep_symlink(sqe: *SQE, target: *Object, linkpath: *Object, newd
 /// Creates the hard link `newpath` to `oldpath` (`linkat(2)`); `flags` are `AT_SYMLINK_FOLLOW` or `0` (default).
 ///
 /// Note
+///     - Linux 5.15+.
+///     - `cqe.res`: `0`.
 ///     - Function arguments position has changed for C origin for better usability.
 ///     - `io_uring_prep_link` includes `io_uring_prep_linkat` feature.
 ///
@@ -778,6 +903,9 @@ pub fn io_uring_prep_link(
 /// Reads the extended attribute `name` of `path` into `value`, `len` bytes at most (`getxattr(2)`).
 ///
 /// Note
+///     - Linux 5.19+.
+///     - `cqe.res`: the attribute value's length (bytes written into `value`); `OSError: ERANGE` if `len` is
+///       too small.
 ///     - `ValueError` if `len` is larger than `value`.
 ///
 /// Type
@@ -806,9 +934,12 @@ pub fn io_uring_prep_getxattr(
 }
 
 /// Sets the extended attribute `name` of `path` to `value`, `len` bytes (`setxattr(2)`);
-/// `flags` is `0`, `XATTR_CREATE` or `XATTR_REPLACE`.
+/// `flags` is `0` (create or replace), `XATTR_CREATE` (`OSError: EEXIST` if it exists) or `XATTR_REPLACE`
+/// (`OSError: ENODATA` if it does not).
 ///
 /// Note
+///     - Linux 5.19+.
+///     - `cqe.res`: `0`.
 ///     - `ValueError` if `len` is larger than `value`.
 ///
 /// Type
@@ -844,7 +975,11 @@ pub fn io_uring_prep_setxattr(
     return true;
 }
 
-/// `io_uring_prep_getxattr` for the open file `fd`.
+/// `io_uring_prep_getxattr` for the open file `fd` (`fgetxattr(2)`).
+///
+/// Note
+///     - Linux 5.19+.
+///     - `cqe.res`: the attribute value's length; `OSError: ERANGE` if `len` is too small.
 ///
 /// Type
 ///     name: str
@@ -868,7 +1003,11 @@ pub fn io_uring_prep_fgetxattr(
     return true;
 }
 
-/// `io_uring_prep_setxattr` for the open file `fd`.
+/// `io_uring_prep_setxattr` for the open file `fd` (`fsetxattr(2)`).
+///
+/// Note
+///     - Linux 5.19+.
+///     - `cqe.res`: `0`.
 ///
 /// Type
 ///     name: str
@@ -895,6 +1034,14 @@ pub fn io_uring_prep_fsetxattr(
 
 /// Installs the registered (direct) file `fd` as a normal fd; the new fd is returned in `cqe.res`.
 /// `flags` is `0` (default) or `IORING_FIXED_FD_NO_CLOEXEC`.
+///
+/// Note
+///     - Linux 6.8+.
+///     - `fd` is the slot in the registered files table, so set `IOSQE_FIXED_FILE` in `sqe.flags`.
+///     - The new fd gets `O_CLOEXEC` unless `IORING_FIXED_FD_NO_CLOEXEC`; any other `flags` value raises
+///       `OSError: EINVAL`.
+///     - Afterwards the slot and the new fd both refer to the file; either can be closed without affecting the
+///       other.
 pub fn io_uring_prep_fixed_fd_install(sqe: *SQE, fd: i32, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -903,6 +1050,10 @@ pub fn io_uring_prep_fixed_fd_install(sqe: *SQE, fd: i32, flags: ?u32) py.Error!
 }
 
 /// Truncates the file `fd` to `len` bytes (default `0`) (`ftruncate(2)`).
+///
+/// Note
+///     - Linux 6.9+.
+///     - `cqe.res`: `0`. A `len` past the current size extends the file with a hole.
 pub fn io_uring_prep_ftruncate(sqe: *SQE, fd: i32, len: ?c.loff_t) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
@@ -923,7 +1074,10 @@ pub fn io_uring_prep_ftruncate(sqe: *SQE, fd: i32, len: ?c.loff_t) py.Error!bool
 ///     (2, b'hi')
 ///
 /// Note
+///     - Linux 6.16+.
+///     - `cqe.res`: `0`; the fds are valid only after the completion.
 ///     - The request holds `fds` until its completion.
+///     - `pipe_flags` (`pipe2(2)`): `O_CLOEXEC`, `O_NONBLOCK`, `O_DIRECT`, `O_NOTIFICATION_PIPE`.
 pub fn io_uring_prep_pipe(sqe: *SQE, fds: py.OwnedWritableBuffer, pipe_flags: i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &fds) orelse return false;
     errdefer sqe.undoSlot();
@@ -935,6 +1089,12 @@ pub fn io_uring_prep_pipe(sqe: *SQE, fds: py.OwnedWritableBuffer, pipe_flags: i3
 /// Like `io_uring_prep_pipe`, but the pipe's fds go into the registered file table: `fds` gets the two
 /// slots (`file_index` for the read end and the next slot for the write end; `IORING_FILE_INDEX_ALLOC` lets the
 /// kernel pick both).
+///
+/// Note
+///     - Linux 6.16+.
+///     - Needs a registered files table (`io_uring_register_files`); with an explicit `file_index` both slots
+///       must be free or the request fails.
+///     - `cqe.res`: `0`; `fds` holds the two slots after the completion, used as `fd` with `IOSQE_FIXED_FILE`.
 pub fn io_uring_prep_pipe_direct(
     sqe: *SQE,
     fds: py.OwnedWritableBuffer,

@@ -240,6 +240,8 @@ fn scopeId(text: []const u8) py.Error!u32 {
 /// Note
 ///     - the kernel checks `len(val)` for the option (an `int` option needs 4 bytes, else `cqe.res` is `-EINVAL`).
 ///     - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
+///     - Needs Linux 6.7+ (`SOCKET_URING_OP_SETSOCKOPT`). `cqe.res` is `0` on success; `optval` is held until
+///       the completion.
 pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.OwnedBuffer) py.Error!bool {
     const s = try h.prepSlot(sqe, &optval) orelse return false;
     errdefer sqe.undoSlot();
@@ -271,9 +273,11 @@ pub fn setsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.O
 ///     1
 ///
 /// Note
-///     - `cqe.res` will return `len()` of populating data(`buf`).
+///     - `cqe.res` will return `len()` of populating data(`buf`) (the updated `optlen`, unlike `getsockopt(2)`).
 ///     - the kernel checks `len(buf)` for the option (an `int` option needs 4 bytes, else `cqe.res` is `-EINVAL`).
 ///     - watch out for "big" or "little" endian, keep it same or it will switch to systems default.
+///     - Needs Linux 6.7+ (`SOCKET_URING_OP_GETSOCKOPT`), and only `level` `SOL_SOCKET` is supported. `buf` is
+///       held until the completion.
 pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.OwnedWritableBuffer) py.Error!bool {
     const s = try h.prepSlot(sqe, &optval) orelse return false;
     errdefer sqe.undoSlot();
@@ -302,6 +306,8 @@ pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.O
 ///
 /// Note
 ///     - This function is an alias of `io_uring_prep_cmd_getsockname`
+///     - Needs Linux 6.19+ (`SOCKET_URING_OP_GETSOCKNAME`). `cqe.res` is the real size of the address (more than
+///       a `Sockaddr` holds: truncated); `sockaddr.family`, `.ip`, `.port` / `.path` then read it.
 pub fn getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
