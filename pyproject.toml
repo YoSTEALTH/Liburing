@@ -55,6 +55,10 @@ backend-path = ["tools"]
 addopts = "-rs"  # list each skip with its reason (`UnsupportedError`, `skip_linux`, ...)
 pythonpath = ["src"]  # after `zig build develop`, tests run straight from the checkout
 testpaths = ["test"]
+# A test over 30 s (the slowest takes ~1 s) is a hang: print every thread's stack and exit, instead of holding a CI
+# runner until the job's `timeout-minutes`.
+faulthandler_timeout = 30
+faulthandler_exit_on_timeout = true
 
 [tool.ruff]
 line-length = 120

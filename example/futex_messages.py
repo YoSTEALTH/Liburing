@@ -5,6 +5,10 @@ The receiver arms an `io_uring_prep_futex_wait` on its own ring: an ordinary req
 futex and wakes it from its own ring. The receiver's wait completes, it takes every message queued (several
 sends may give one wake-up) and arms the wait again.
 
+The receiver reads the futex before it looks in the `deque`: a message sent after that read changes the
+futex, so the wait armed on the old value returns at once. Read it after, and a message sent between the
+empty `deque` and the read is never seen (the wait sleeps on the new value).
+
 `io_uring_prep_msg_ring` also posts on another ring, but carries only `data` (below 2**63) and `len`: use it
 for a small value or to pass a registered file (`io_uring_prep_msg_ring_fd`).
 
@@ -27,7 +31,12 @@ def receiver(got):
     io_uring_queue_init(8, ring)
     try:
         while True:
-            seen = futex.state  # waits only while the futex still holds this value
+            seen = futex.state  # before the `deque`: waits only while the futex still holds this value
+            while messages:  # one wake-up may stand for several messages
+                message = messages.popleft()
+                if message is None:
+                    return
+                got.append(message)
             sqe = io_uring_get_sqe(ring)
             io_uring_prep_futex_wait(sqe, futex, seen, FUTEX_BITSET_MATCH_ANY, FLAGS)
             sqe.user_data = WAIT
@@ -40,11 +49,6 @@ def receiver(got):
             except BlockingIOError:
                 pass  # `EAGAIN`: a message came between reading `seen` and arming the wait
             io_uring_cqe_seen(ring, entry)
-            while messages:  # one wake-up may stand for several messages
-                message = messages.popleft()
-                if message is None:
-                    return
-                got.append(message)
     finally:
         io_uring_queue_exit(ring)
 

@@ -13,6 +13,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20  # a run takes ~12 min; a hang would hold the runner 6 h (GitHub's default)
     steps:
       - uses: actions/checkout@v7
         with:
@@ -67,6 +68,7 @@ jobs:
     # Every release wheel ([tool.setu_build] in pyproject.toml); `wheel-test` installs and tests them.
     needs: check
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -103,6 +105,7 @@ jobs:
       matrix:
         runner: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7  # test/ only: no submodules, no zig
 
@@ -148,5 +151,7 @@ jobs:
             "$py" -m venv "$venv"
             "$venv/bin/pip" install -U pip
             "$venv/bin/pip" install pytest "$wheel"
-            (cd "$RUNNER_TEMP/wheeltest" && "$venv/bin/python" -m pytest test -rs -p no:cacheprovider)
+            # No pyproject.toml here (its `pythonpath = ["src"]` would test the checkout), so its timeout comes as `-o`.
+            (cd "$RUNNER_TEMP/wheeltest" && "$venv/bin/python" -m pytest test -rs -p no:cacheprovider \
+              -o faulthandler_timeout=30 -o faulthandler_exit_on_timeout=true)
           done
