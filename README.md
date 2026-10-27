@@ -1,10 +1,14 @@
 # Liburing
 
 [![PyPI](https://img.shields.io/pypi/v/liburing)](https://pypi.org/project/liburing/)
-[![Python](https://img.shields.io/badge/python-3.14%20%7C%203.14t%20%7C%203.15%20%7C%203.15t-blue)](https://www.python.org/)
-[![Zig](https://img.shields.io/badge/zig-0.17.0-orange)](https://ziglang.org/)
 [![Downloads](https://img.shields.io/pypi/dm/liburing)](https://pypi.org/project/liburing/)
+[![Python](https://img.shields.io/badge/python-3.14%20%7C%203.14t%20%7C%203.15%20%7C%203.15t-blue)](https://www.python.org/)
+[![Linux](https://img.shields.io/badge/linux-6.17%2B-yellow)](https://kernel.org/)
+[![liburing](https://img.shields.io/badge/liburing-2.15-lightgrey)](https://github.com/axboe/liburing/releases/tag/liburing-2.15)
+[![Zig](https://img.shields.io/badge/zig-0.17.0-orange)](https://ziglang.org/)
+[![License](https://img.shields.io/badge/license-CC0--1.0-green)](https://github.com/YoSTEALTH/Liburing/blob/main/LICENSE.txt)
 [![Test status](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml)
+[![Docs](https://github.com/YoSTEALTH/Liburing/actions/workflows/docs.yml/badge.svg)](https://yostealth.github.io/Liburing/)
 
 Fast, asynchronous Linux I/O for Python: a Zig-built wrapper around C liburing and the kernel's io_uring interface.
 
