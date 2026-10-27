@@ -11,12 +11,14 @@
 //!   zig build setu-guide-sync    copy the pinned Setu's docs/setu-guide.md into docs/ (never edit it)
 //!   zig build setu-guide-check   check that docs/setu-guide.md is the pinned Setu's copy
 //!   zig build docs-web           the docs site's search (zig-out/web/docs.wasm; tools/setu_docs.py runs it)
+//!   zig build coverage           kcov line coverage under pytest (zig-out/coverage.json; `-- --missed`)
 //!
 //! Options:
 //!   -Drelease               ReleaseSafe (wheels use it, as PyOZ did); without it, Debug. (A preferred release
 //!                           mode leaves no `-Doptimize`.)
 //!   -Dstrip                 drop debug info from the extension (wheels use it)
 //!   -Dext-suffix=...        Python extension suffix (default: Setu's `.so`: one stable-ABI binary for 3.14+)
+//!   -Dpython=...            the interpreter `coverage` runs pytest with (default `python3`)
 //!
 //! Wheels are built by `tools/setu_build.py` (the PEP 517 backend), not by a step here.
 const std = @import("std");
@@ -129,6 +131,16 @@ pub fn build(b: *std.Build) void {
 
     // And for `docs/setu-guide.md` (Setu's guide to writing bindings): `setu-guide-sync` / `setu-guide-check`.
     @import("setu").addSetuGuideSteps(b, setu_dep);
+
+    // `zig build coverage [-- pytest args]`: kcov line coverage of `src/liburing` (and Setu's code as used here)
+    // under pytest, merged over every `--python`, in zig-out/coverage.json (`docs/gen_coverage.py` reads it; kcov's
+    // HTML with `-- --html DIR`). Needs a Debug, unstripped build (the default).
+    @import("setu").addCoverageSteps(b, setu_dep, ext, .{
+        .module_name = "liburing.liburing",
+        .include = &.{ b.path("src/liburing"), setu_dep.path("src") },
+        .stub = pyi,
+        .python = b.option([]const u8, "python", "Python that runs pytest for `coverage`") orelse "python3",
+    });
 
     const develop = b.step("develop", "Copy the extension and its stubs into src/liburing/");
     develop.dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .{ .custom = "../src/liburing" }, ext_name).step);
