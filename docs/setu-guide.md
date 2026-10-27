@@ -50,7 +50,7 @@ const setu = @import("setu");
 const py = setu.py;
 
 pub const module: setu.Module = .{
-    .name = "liburing", // the extension's file name: `liburing.so`
+    .name = "liburing", // the import name: `liburing/__init__.so` (or `liburing.so`)
     .version = build_options.version, // `__version__`
     .from = &.{
         .{ .ns = @import("ring.zig") }, // classes only: no `source` needed
@@ -95,13 +95,21 @@ const pyi = @import("setu").addStubs(b, setu_dep, .{
     .root_source_file = b.path("src/liburing/root.zig"),
     .imports = &.{.{ .name = "build_options", .module = options.createModule() }}, // what the root imports
 });
-b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "liburing.pyi").step);
+b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "__init__.pyi").step); // next to __init__.so
 @import("setu").addSetuBuildSteps(b, setu_dep); // tools/setu_build.py: setu-build-sync / -check
 @import("setu").addSetuDocsSteps(b, setu_dep); // tools/setu_docs.py: setu-docs-sync / -check, docs-web
 @import("setu").addSetuGuideSteps(b, setu_dep); // docs/setu-guide.md: setu-guide-sync / -check
+@import("setu").addCoverageSteps(b, setu_dep, ext, .{ // zig build coverage: kcov over pytest (see 11.)
+    .module_name = "liburing", // the name the tests import the extension by
+    .package = true, // it is `liburing/__init__.so`
+    .include = &.{ b.path("src/liburing"), setu_dep.path("src") }, // the sources to report
+    .stub = pyi, // for tests that read the .pyi next to the extension
+    .python = b.option([]const u8, "python", "Python for `coverage`") orelse "python3",
+});
 ```
 
-The extension is `<name>.so` (`@import("setu").ext_suffix`), the wheel `cp314.cp315-abi3.abi3t.cp314t.cp315t`
+The extension is the package itself, `<name>/__init__.so` next to `__init__.pyi` and `py.typed` (section 7), or a
+plain `<name>.so` (`@import("setu").ext_suffix`); the wheel `cp314.cp315-abi3.abi3t.cp314t.cp315t`
 (`tools/setu_build.py`, a PEP 517 backend each project keeps a byte-identical copy of).
 
 ## 3. Functions
@@ -314,7 +322,8 @@ pub fn recv(ring: *Ring, buf: py.OwnedWritableBuffer) void {
 Rules: when a later argument fails to convert, the function is not called and Setu releases everything,
 owned buffers included; once the function runs, an owned buffer is its own, on error paths too. A
 `Sequence` of an owned buffer type is a compile error (use `Sequence(Buffer)` and `take`), `take` of an owned
-buffer too. A buffer whose view has no object (`PyBuffer_FillInfo(NULL)`) raises `BufferError` on `take`.
+buffer too. `take` asks the argument itself for the second view, so an object with a Python `__buffer__` can be
+kept too. A buffer whose view has no object (`PyBuffer_FillInfo(NULL)`) raises `BufferError` on `take`.
 On 3.14t / 3.15t a `bytearray` argument costs 10-15 ns more: CPython's own critical section.
 
 ## 7. Docs and the stub
@@ -358,6 +367,33 @@ note (`IORING_TIMEOUT_ABS  # ts is a point in time`): the site links the name an
 `https://` URL anywhere in a docstring (outside backticks) becomes a link that opens in a new tab; a trailing `.`,
 `,` or `)` stays text unless the `)` closes a `(` in the URL.
 
+Ship the extension as its package's `__init__.so`, with the stub as `__init__.pyi` and a `py.typed` (PEP 561 marks
+packages only, so a bare top-level `liburing.so` gets no typing): `import liburing` loads the extension itself, a
+package (`__path__`), on every supported interpreter; `from liburing import *` gives its public names, and its
+classes' `__module__` is the import name. No `__init__.py`: next to an `__init__.so` it never runs (extensions are
+found first), and `tools/setu_build.py` refuses to ship one. Python code goes in submodules (`liburing/util.py`).
+The stub must be `__init__.pyi`: a `liburing.pyi` next to `__init__.so` types a `liburing.liburing` that is not
+there, and `liburing` itself gets no types. Moving from the
+submodule layout below: `liburing.liburing` no longer exists (use `liburing`), delete the old `liburing.so` /
+`liburing.pyi` copies in `src/liburing/` (`setu_build.py` refuses them: `import liburing.liburing` would load a stale
+extension), and pass `.package = true` to `addCoverageSteps`.
+
+Only a package with Python code at its top level needs the extension as a submodule (`pkg/ext.so` next to `ext.pyi`,
+`.name = "ext"`) re-exported from `__init__.py`. To keep the submodule out of `from pkg import *`, give the package
+an `__all__`, not a `del ext` (that breaks `import pkg.ext; pkg.ext.Ring`). Hide the computed `__all__` from type
+checkers: they cannot evaluate it and would then see none of the stub's names (`mypy --strict` reports every one
+`name-defined`):
+
+```python
+from . import ext
+from .ext import *
+
+TYPE_CHECKING = False
+if not TYPE_CHECKING:
+    __all__ = [name for name in dir(ext) if not name.startswith("_")]
+del TYPE_CHECKING
+```
+
 ## 8. Ints and casts
 
 `fromPython` reads any int (`__index__` too) and raises `OverflowError` with the parameter's name and the
@@ -378,8 +414,9 @@ all four interpreters):
   paths stay out of line (`intArg`, `outOfRange`, `notWritable`: `@branchHint(.cold)`).
 - Whether a copy happens depends on LLVM's inlining, so identical source can run 2x apart between builds:
   compare A/B builds with `objdump -d`, interleaved, best of several runs.
-- `inline` changes nothing in ReleaseFast (`-Doptimize=fast`): LLVM inlines the call path anyway. A moved
-  trampoline can read ~1 ns slower with identical code (placement).
+- `inline` changes nothing in `fast` builds (`-Doptimize=fast`): LLVM inlines the call path anyway. A moved
+  trampoline can read ~1 ns slower with identical code (placement). `tools/bench.py --so a --so b` can read the
+  second build 1-1.5 ns slower on the cheapest call (`bench_nop`): swap the order before believing such a gap.
 - A flag on an argument (marking a `take`n copy) cost 6-8 ns per buffer argument; `take` takes a second view
   instead. `OwnedBuffer` saves that view (24-43 ns in Liburing's buffer preps).
 - Reference points: Shakti's `loop_bench` nop serial ~204 ns, batch ~129 ns, `SQE()` ~48 ns; Liburing's
@@ -439,3 +476,56 @@ What the message says: the cause.
 A project using Setu runs its own `tools/check.sh`, which includes `zig build setu-build-check`,
 `setu-docs-check` and `setu-guide-check` (its copies of Setu's script, docs helpers and this guide match the
 Setu it pins). After a Setu bump: `zig build setu-build-sync setu-docs-sync setu-guide-sync`.
+
+Line coverage: `zig build coverage [-Dpython=...] [-- --missed --partial pytest args]` (`addCoverageSteps`; kcov 43
+and readelf) prints a per-file table, with `--missed` the lines that never ran, with `--partial` the yellow ones,
+and writes the numbers to `zig-out/coverage.json` (totals, per interpreter, per file and line; the format is in
+`tools/check_coverage.py`). Files are named relative to the project, a dependency's as `<package>/<path>`
+(`setu/src/args.zig`), wherever it lives. kcov's own output (an HTML report, XML, JSON: some 70 files per
+interpreter) goes to a temporary directory, removed after the run; `-- --html DIR` keeps its HTML report. A local
+tool, not for CI:
+
+- It builds the extension's (Debug) module again through LLVM: the default Debug backend's `.debug_info` is
+  unreadable to kcov (readelf: "Bogus end-of-siblings marker"), which would record no Zig line.
+- kcov records nothing from a shared library loaded once about 24 are mapped, and `import pytest` maps more, so
+  `tools/check_coverage.py` loads the extension first, as `.module_name`; a test importing another copy fails.
+- Zig compiles only referenced code: a function nothing calls is not counted as missed.
+- kcov's colours (`--html`; the runner's terms too): green ran, red never ran, yellow ran at some of its addresses
+  only (counted as covered). In Zig, yellow is mostly a generic line (`fromPython(T)`, a trampoline) whose instance
+  for some type never ran: `hits` of `possible` addresses, e.g. 48 of 56 int conversions.
+- Code the tests are not meant to run (benchmark helpers, out-of-memory branches) goes between `// coverage-off`
+  and `// coverage-on` comments and is not counted, so every red line is a gap, but for LLVM's line-table slips: a
+  red comment or `fn` line is an instruction LLVM gave that line (a jump nothing takes), nothing to test.
+- `coverage` needs pytest in the interpreter it runs (and in each `--python`), else it stops with that error.
+- The tests' child processes (a test running `python3 example.py`) are not measured: they import the normal build,
+  and kcov parsing its self-hosted-backend DWARF grew to 25 GB in one of Liburing's runs, so the runner keeps kcov's
+  preload out of them. A run is stopped once kcov and the tests use more than `-- --max-memory GB` (default 8).
+- `-- --python /opt/python/3.14/bin/python3` (repeatable) runs the tests under that interpreter too; the table
+  merges the runs (a line ran if it ran in any), so code only one interpreter reaches (3.14's `PyInit_` entry)
+  counts. `--html DIR` then keeps one report per interpreter, `DIR/<3.15t, 3.14, ...>/index.html`; there is no
+  merged HTML report (`kcov --merge` counts the `coverage-off` lines again).
+
+Zig unit tests (code that does not call libpython) get the same through `addZigTestCoverage`: kcov over a
+`b.addTest` executable, built again through LLVM, the same table, options after `--` (`--missed`, `--html DIR`, the
+rest to the executable) and JSON format, in `zig-out/coverage-zig.json`:
+
+```zig
+const tests = b.addTest(.{ .root_module = core });
+@import("setu").addZigTestCoverage(b, setu_dep, tests, .{ // zig build coverage-zig
+    .include = &.{b.path("src/core")}, // the sources to report
+    .step_name = "coverage-zig", // the default; the result is zig-out/<step_name>.json
+});
+```
+
+Memory errors and leaks: valgrind memcheck over the project's pytest, by hand (no build step):
+
+    zig build develop -Dcpu=x86_64_v3       # valgrind can not run AVX-512 (SIGILL, exit 132)
+    PYTHONMALLOC=malloc valgrind --leak-check=full --errors-for-leak-kinds=definite --error-exitcode=99 \
+        python3 -m pytest -q
+    zig build develop                       # the native build back
+
+- Clean is "0 errors" and "definitely lost: 0 bytes". "Possibly lost" 56-byte blocks from module init
+  (`PyType_FromMetaclass`, one per class and exception) are the type objects kept for the process: valgrind sees
+  them only through a pointer past CPython's GC header.
+- The default Debug backend's line table is partly unreadable to valgrind ("Badly formed extended line op"): build
+  through LLVM (`.use_llvm = true` on the extension's library) for full source lines in its stacks.

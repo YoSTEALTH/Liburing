@@ -39,7 +39,9 @@ Note
     - Metadata comes from `pyproject.toml`; the version from `build.zig.zon`, `<year>.<month>.<day>[-<n>]`
       (Zig takes only SemVer): the wheel gets the PEP 440 form, a same-day `-<n>` as `.post<n>`
       (`2026.10.20-3` -> `2026.10.20.post3`, which sorts after `2026.10.20`).
-    - `zig build` also writes `<name>.pyi` (type stubs); the wheel ships it with `py.typed`.
+    - `zig build` also writes `<name>.pyi` (type stubs); the wheel ships it with `py.typed`. An extension
+      that is the package itself is `__init__.so` with `__init__.pyi`; then `src/<name>/` holds no
+      `__init__.py` (it would never run) and no `<name>.so` / `<name>.pyi` left from the old layout.
     - A file in `src/<name>/` that `zig build` also installs (`py.typed`, ...) is shipped once, the
       built copy; the wheel never holds a name twice.
 '''
@@ -59,7 +61,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Files in `src/<name>/` that are not shipped as they are: sources, caches, and what
-# `zig build develop` copies there (the extension and `<name>.pyi` come from the build).
+# `zig build develop` copies there (the extension and its `.pyi` come from the build).
 SKIP = re.compile(r'.*\.(zig|h|so|pyi|py[cod])$|__pycache__')
 # The wheel's Python and ABI tags: CPython 3.14+ with and without the GIL, from one extension.
 # `abi3t` (PEP 803) covers 3.15t and later for pip 26.2+; `cp314t` / `cp315t` are for older pips.
@@ -262,6 +264,15 @@ def build(wheel_directory, target=None, debug=False):
         wheel = Wheel(os.path.join(wheel_directory, filename))
         package = os.path.join(ROOT, 'src', name)
         made = {os.path.basename(file) for file in built}  # what the build makes wins (`py.typed`, ...)
+        if '__init__.so' in made:  # the extension is the package: no `__init__.py`, no copy from the old layout
+            old = ('__init__.py', f'{name}.so', f'{name}.pyi')
+            stale = [f for f in old if os.path.exists(os.path.join(package, f))]
+            if stale:
+                raise SystemExit(
+                    f'src/{name}/ has {", ".join(stale)} next to the built __init__.so: remove '
+                    f'{"it" if len(stale) == 1 else "them"} (`__init__.py` never runs; `import {name}.{name}` would '
+                    'load a stale copy of the extension)'
+                )
         for file in sorted(os.listdir(package)):
             if not SKIP.match(file) and file not in made and os.path.isfile(os.path.join(package, file)):
                 with open(os.path.join(package, file), 'rb') as f:

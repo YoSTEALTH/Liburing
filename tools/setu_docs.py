@@ -507,6 +507,11 @@ def _call(project, source, ns, mode):
     return out.getvalue()
 
 
+def _shown(e):
+    '''The exception `e` as the REPL's last line shows it: `ValueError: bad`, a bare `MemoryError`.'''
+    return f'{type(e).__name__}: {e}' if str(e) else type(e).__name__
+
+
 def _open_fds():
     return set(map(int, os.listdir('/proc/self/fd')))
 
@@ -541,7 +546,7 @@ def run_example(project, name, example=None):
             try:
                 _call(project, '_setup(ns)', {'_setup': setup, 'ns': ns}, 'eval')
             except Exception as e:  # noqa: BLE001  (any setup error fails the example)
-                failed = Step(f'# setup: {setup.__name__}(ns)', '', f'{type(e).__name__}: {e}', 'fail')
+                failed = Step(f'# setup: {setup.__name__}(ns)', '', _shown(e), 'fail')
                 return [failed] + [dataclasses.replace(s, status='skip', got='(not run: setup failed)') for s in todo]
         for step in todo:
             if reason := project.skip.get((name, step.source)):
@@ -552,7 +557,7 @@ def run_example(project, name, example=None):
             except BaseException as e:  # shown like the REPL shows it
                 if isinstance(e, (KeyboardInterrupt, SystemExit)):
                     raise
-                step.got = f'{type(e).__name__}: {e}'
+                step.got = _shown(e)
             step.got = step.got.rstrip('\n')
             loose = (name, step.source) in project.loose
             if [line.rstrip() for line in step.got.splitlines()] == step.expected.splitlines():
@@ -575,8 +580,9 @@ def run_example(project, name, example=None):
 
 
 def _raised(got):
-    '''Does `got` read like a raised exception (`NameError: ...`)? A loose step must still not raise.'''
-    return re.match(r'[A-Z]\w*(?:Error|Exception|Interrupt): ', got) is not None
+    '''Does `got` read like a raised exception (`NameError: ...`, a bare `MemoryError`)? A loose step must still
+    not raise.'''
+    return re.match(r'[A-Z]\w*(?:Error|Exception|Interrupt)(?:: |$)', got) is not None
 
 
 def run_script(project, path, timeout=30):
