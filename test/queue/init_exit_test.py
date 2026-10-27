@@ -6,9 +6,9 @@ from liburing import *
 def test_io_uring_init_exit():
     ring = Ring()
     assert ring.flags == 0
-    assert ring.ring_fd == 0
+    assert ring.ring_fd == -1
     assert ring.features == 0
-    assert ring.enter_ring_fd == 0
+    assert ring.enter_ring_fd == -1
     assert ring.int_flags == 0
 
     with pytest.raises(OverflowError):

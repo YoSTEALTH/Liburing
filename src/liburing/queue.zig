@@ -97,7 +97,7 @@ pub fn io_uring_opcode_supported(probe: *Probe, op: i32) bool {
 ///     - Linux 6.5+ (`IORING_SETUP_NO_MMAP`). The size to allot: `io_uring_memory_size_params(entries, p)`.
 ///     - Such a ring can not be resized with `io_uring_resize_rings` (a liburing limitation).
 pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.WritableBuffer) py.Error!i32 {
-    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError(
+    if (ring._ready) return py.raiseRuntimeError(
         "`io_uring_queue_init_mem(ring)` already initialized!",
         .{},
     );
@@ -111,6 +111,7 @@ pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.Wr
         p._io_uring_params.flags,
     );
     ring._mem = mem;
+    ring._ready = true;
     return used;
 }
 
@@ -144,15 +145,17 @@ pub fn io_uring_queue_init_mem(entries: u32, ring: *Ring, p: *Param, buf: ?py.Wr
 ///     0
 ///     1024
 pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.Error!i32 {
-    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError(
+    if (ring._ready) return py.raiseRuntimeError(
         "`io_uring_queue_init_params(ring)` already initialized!",
         .{},
     );
     ring.ownByCaller();
-    return support.setup(
+    const res = try support.setup(
         c.io_uring_queue_init_params(entries, &ring._io_uring, &param._io_uring_params),
         param._io_uring_params.flags,
     );
+    ring._ready = true;
+    return res;
 }
 
 /// Setup `Ring` Submission & Completion Queues. `flags` are `IORING_SETUP_*` (default `None`: none). Returns `0`;
@@ -204,12 +207,14 @@ pub fn io_uring_queue_init_params(entries: u32, ring: *Ring, param: *Param) py.E
 ///     - `IORING_SETUP_DEFER_TASKRUN` rings must enter the kernel regularly (a submit or wait, or
 ///       `io_uring_get_events`) or completions stall; `io_uring_resize_rings` needs it.
 pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) py.Error!i32 {
-    if (ring._io_uring.ring_fd > 0) return py.raiseRuntimeError(
+    if (ring._ready) return py.raiseRuntimeError(
         "`io_uring_queue_init(ring)` already initialized!",
         .{},
     );
     ring.ownByCaller();
-    return support.setup(c.io_uring_queue_init(entries, &ring._io_uring, flags orelse 0), flags orelse 0);
+    const res = try support.setup(c.io_uring_queue_init(entries, &ring._io_uring, flags orelse 0), flags orelse 0);
+    ring._ready = true;
+    return res;
 }
 
 /// Map the rings of an `io_uring` file descriptor `fd` (from `io_uring_setup`, with the same `param`) into
@@ -223,9 +228,12 @@ pub fn io_uring_queue_init(entries: u32, ring: *Ring, flags: ?u32) py.Error!i32 
 ///     >>> io_uring_queue_mmap(fd, ring, param)
 ///     0
 pub fn io_uring_queue_mmap(fd: i32, ring: *Ring, param: *Param) py.Error!i32 {
-    if (ring._io_uring.ring_fd > 0) try ring.checkThread();
+    // liburing clears `ring` first: a set-up one would be lost, with its mappings
+    if (ring._ready) return py.raiseRuntimeError("`io_uring_queue_mmap(ring)` already initialized!", .{});
     ring.ownByCaller();
-    return py.checkErrno(c.io_uring_queue_mmap(fd, &param._io_uring_params, &ring._io_uring));
+    const res = try py.checkErrno(c.io_uring_queue_mmap(fd, &param._io_uring_params, &ring._io_uring));
+    ring._ready = true;
+    return res;
 }
 
 /// Apply `madvise(MADV_DONTFORK)` to `ring`'s SQE array, SQ ring and CQ ring, so they are
@@ -253,18 +261,19 @@ pub fn io_uring_ring_dontfork(ring: *Ring) py.Error!i32 {
 /// Note
 ///     - Raises `RuntimeError` if `ring` is not initialized or already exited.
 ///     - Requests still in flight are cancelled and waited for first.
-///     - Some accounting is asynchronous: memory the ring locked can stay locked a few ms after it returns, so
-///       `io_uring_queue_init` + `io_uring_queue_exit` in a tight loop can hit `OSError: ENOMEM` (`RLIMIT_MEMLOCK`,
-///       kernels before 5.12).
+///     - The kernel frees the ring later, from a workqueue: what it locked stays locked a few ms after this
+///       returns. Registered buffers count against `RLIMIT_MEMLOCK` (a buffer inside a huge page pins all of it,
+///       2 MiB), as the rings did before Linux 5.12, so setting up rings with them in a tight loop can hit
+///       `OSError: ENOMEM`.
 ///
 /// Example
 ///     >>> io_uring_queue_exit(ring)
 pub fn io_uring_queue_exit(ring: *Ring) py.Error!void {
-    if (ring._io_uring.ring_fd > 0) {
+    if (ring._ready) {
         try ring.checkThread(); // not under the owner while it waits in the kernel
         ring.drainRequests(); // requests in flight: cancelled and completed before what they hold is released
         c.io_uring_queue_exit(&ring._io_uring);
-        ring._io_uring.ring_fd = 0;
+        ring._ready = false;
         if (ring._mem) |m| m.deinit(); // the kernel is done with it
         ring._mem = null;
         ring.clearTable(); // nothing in flight any more

@@ -47,6 +47,9 @@ pub const RingType = setu.Class(Ring, @embedFile("ring.zig"));
 pub const Ring = struct {
     _io_uring: c.io_uring = std.mem.zeroes(c.io_uring), // lives inside the Python object
     _thread: usize = 0, // `pthread_self()` of the thread that initialized it: the only one that may use it
+    /// Set up (`io_uring_queue_init*` / `io_uring_queue_mmap` worked) until `io_uring_queue_exit`. `ring_fd` can
+    /// not tell: `0` is a valid fd (stdin closed), `-1` a ring reachable only through its registered fd.
+    _ready: bool = false,
     /// `Ring(auto_submit=True)`: a full submission queue is submitted to make room (`autoSubmit`).
     _auto_submit: bool = false,
     /// Bumped by every `io_uring_queue_init*` (`ownByCaller`): an entry (`SQE`, `CQE`, `Cqe`, ...) records it when
@@ -326,10 +329,10 @@ pub const Ring = struct {
 
     /// Exits the ring (if it is initialized) and releases everything it holds; again: nothing to do.
     fn shutdown(self: *Ring) void {
-        if (self._io_uring.ring_fd > 0) {
+        if (self._ready) {
             self.drainRequests();
             c.io_uring_queue_exit(&self._io_uring);
-            self._io_uring.ring_fd = 0;
+            self._ready = false;
         }
         if (self._mem) |m| m.deinit();
         self._mem = null;
@@ -343,7 +346,7 @@ pub const Ring = struct {
     /// kernel. Requests prepared but not submitted release theirs.
     pub fn drainRequests(self: *Ring) void {
         if (self._pending) |pending| for (pending[0..self._pending_len]) |*hold| hold.release();
-        if (self._live == 0 or self._io_uring.ring_fd <= 0) return;
+        if (self._live == 0 or !self._ready) return;
         const ring = &self._io_uring;
         var reg = std.mem.zeroes(c.io_uring_sync_cancel_reg);
         reg.flags = c.IORING_ASYNC_CANCEL_ANY | c.IORING_ASYNC_CANCEL_ALL;
@@ -867,8 +870,8 @@ pub const Ring = struct {
     /// `ring` (inside a `Ring`), or `RuntimeError` as `checkedPtr` does: for entries, which keep
     /// the pointer next to their owner to skip the `Ring` lookup.
     pub inline fn checkRing(ring: *c.io_uring) py.Error!*c.io_uring {
-        if (ring.ring_fd <= 0) return raiseNotInitialized();
         const self: *Ring = @fieldParentPtr("_io_uring", ring);
+        if (!self._ready) return raiseNotInitialized();
         if (self._thread != pthread_self()) return raiseOtherThread();
         return ring;
     }
@@ -921,9 +924,11 @@ pub const Ring = struct {
         return self._io_uring.flags;
     }
 
-    /// The ring's file descriptor (`0` before `io_uring_queue_init*` and after `io_uring_queue_exit`).
+    /// The ring's file descriptor; `-1` when it has none: not set up (before `io_uring_queue_init*`, after a
+    /// failed one, after `io_uring_queue_exit`) or after `io_uring_close_ring_fd`, which leaves only the
+    /// registered one (`enter_ring_fd`).
     pub fn get_ring_fd(self: *const Ring) i32 {
-        return self._io_uring.ring_fd;
+        return if (self._ready) self._io_uring.ring_fd else -1;
     }
 
     /// `IORING_FEAT_*` flags the kernel reported at setup: what this kernel can do (the version each came in).
@@ -959,9 +964,10 @@ pub const Ring = struct {
         return self._io_uring.int_flags;
     }
 
-    /// The file descriptor used for `io_uring_enter` (differs from `ring_fd` with a registered ring fd).
+    /// The file descriptor used for `io_uring_enter` (differs from `ring_fd` with a registered ring fd); `-1` when
+    /// the ring is not set up.
     pub fn get_enter_ring_fd(self: *const Ring) i32 {
-        return self._io_uring.enter_ring_fd;
+        return if (self._ready) self._io_uring.enter_ring_fd else -1;
     }
 };
 

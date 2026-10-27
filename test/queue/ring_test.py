@@ -2,6 +2,8 @@
 
 import mmap
 import os
+import subprocess
+import sys
 import pytest
 from liburing import *
 
@@ -283,6 +285,24 @@ def test_close_ring_fd_needs_registered_fd(ring):
         io_uring_close_ring_fd(ring)
 
 
+def test_close_ring_fd_keeps_ring():
+    ring, cqe = Ring(), Cqe()
+    io_uring_queue_init(8, ring)
+    try:
+        assert io_uring_register_ring_fd(ring) == 1
+        assert io_uring_close_ring_fd(ring) == 1
+        assert ring.ring_fd == -1
+        assert nop(ring, 7) == 1  # still usable through the registered fd
+        io_uring_wait_cqe(ring, cqe)
+        assert cqe[0].user_data == 7
+        io_uring_cqe_seen(ring, cqe[0])
+    finally:
+        io_uring_queue_exit(ring)  # exits it too: its mappings go
+    assert ring.ring_fd == -1  # no fd once exited
+    with pytest.raises(RuntimeError):
+        io_uring_get_sqe(ring)
+
+
 # buffer ring
 
 
@@ -395,7 +415,7 @@ def test_queue_init_mem_buffer():
         io_uring_queue_init_mem(8, Ring(), Param(), b"read only")
     with pytest.raises(OSError):  # too small for the rings: ENOMEM
         io_uring_queue_init_mem(8, ring, Param(), mmap.mmap(-1, 4096))
-    assert ring.ring_fd <= 0
+    assert ring.ring_fd == -1
 
 
 def test_queue_mmap():
@@ -407,6 +427,36 @@ def test_queue_mmap():
         assert io_uring_sq_space_left(ring) == 8
     finally:
         io_uring_queue_exit(ring)  # closes the fd
+
+
+def test_queue_mmap_set_up_ring(ring):
+    p = Param()
+    fd = io_uring_setup(8, p)
+    try:
+        with pytest.raises(RuntimeError):  # liburing would clear `ring`: lost, with its mappings
+            io_uring_queue_mmap(fd, ring, p)
+    finally:
+        os.close(fd)
+    assert nop(ring, 1) == 1  # untouched
+
+
+def test_ring_fd_0():
+    code = """if 1:
+        import os
+        from liburing import *
+        os.close(0)  # stdin closed: the ring gets fd 0
+        ring, cqe = Ring(), Cqe()
+        io_uring_queue_init(8, ring)
+        assert ring.ring_fd == 0
+        io_uring_prep_nop(io_uring_get_sqe(ring))
+        assert io_uring_submit_and_wait(ring, 1) == 1
+        io_uring_queue_exit(ring)
+        assert not any("io_uring" in line for line in open("/proc/self/maps"))
+        print("ok")
+    """
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)}
+    out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=60, check=False)
+    assert (out.returncode, out.stdout, out.stderr) == (0, "ok\n", "")
 
 
 def test_clone_buffers_offset(ring):
