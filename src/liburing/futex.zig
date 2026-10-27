@@ -36,7 +36,9 @@ pub const FUTEX = struct {
 
     /// The futex's value (a `u32`).
     pub fn get_state(self: *const Self) u32 {
-        return @as(*u32, @ptrFromInt(self._state)).*;
+        // `.seq_cst`: a cross-thread protocol keeps its order on aarch64 too (a store after a `deque` append is
+        // seen after it; a load before a `deque` check stays before it)
+        return @atomicLoad(u32, @as(*u32, @ptrFromInt(self._state)), .seq_cst);
     }
 
     /// The value the `futex_waitv` entry expects: the wait sleeps only while the futex still holds it (a
@@ -57,7 +59,7 @@ pub const FUTEX = struct {
 
     /// Set the futex's value (a `u32`).
     pub fn set_state(self: *Self, value: u32) void {
-        @as(*u32, @ptrFromInt(self._state)).* = value;
+        @atomicStore(u32, @as(*u32, @ptrFromInt(self._state)), value, .seq_cst); // see `get_state`
     }
 
     /// Set the value the `futex_waitv` entry waits for.
