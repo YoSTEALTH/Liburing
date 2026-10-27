@@ -55,7 +55,7 @@ python3 -m pip install .        # builds the wheel with `zig build` (tools/setu_
 ### Development
 
 ```bash
-zig build develop                       # `liburing.so` + `liburing.pyi` into src/liburing/ (one binary, 3.14+)
+zig build develop                       # `__init__.so` + `__init__.pyi` into src/liburing/ (one binary, 3.14+)
 python3.15t -m pytest                   # tests run from the checkout (`pythonpath = ["src"]`)
 tools/check.sh                          # zig fmt, pytest on all four, docstring examples, mypy --strict, stubtest
 

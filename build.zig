@@ -1,8 +1,9 @@
 //! Build script for Liburing (Zig 0.17)
 //!
-//!   zig build          the `liburing` extension, its stubs (`liburing.pyi`) and `py.typed` into zig-out/lib/
+//!   zig build          the `liburing` extension, its stubs and `py.typed` into zig-out/lib/ (`__init__.so`,
+//!                      `__init__.pyi`: the extension is the `liburing` package)
 //!   zig build develop  also copy the extension and stubs into src/liburing/ (for `pytest` from a checkout)
-//!   zig build stubs    write the type stubs to src/liburing/liburing.pyi
+//!   zig build stubs    write the type stubs to src/liburing/__init__.pyi
 //!   zig build load     the HTTP load generator for example/bench/liburing_bench.{py,c} into zig-out/bin/
 //!   zig build setu-build-sync    copy the pinned Setu's tools/setu_build.py into tools/ (never edit it)
 //!   zig build setu-build-check   check that tools/setu_build.py is the pinned Setu's copy
@@ -102,7 +103,7 @@ pub fn build(b: *std.Build) void {
     });
     ext.root_module.linkLibrary(liburing_c);
     ext.linker_allow_shlib_undefined = true; // the CPython C API comes from the interpreter
-    const ext_name = b.fmt("liburing{s}", .{ext_suffix});
+    const ext_name = b.fmt("__init__{s}", .{ext_suffix}); // the extension is the package
     b.getInstallStep().dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .lib, ext_name).step);
 
     // Type stubs, generated on the build machine by Setu's stub generator from `root.zig`'s `module`.
@@ -113,13 +114,13 @@ pub fn build(b: *std.Build) void {
             .{ .name = "build_options", .module = options.createModule() },
         },
     });
-    b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "liburing.pyi").step);
-    // PEP 561 marker: type checkers read `liburing.pyi` only next to it. Installed with the stubs (not
+    b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "__init__.pyi").step);
+    // PEP 561 marker: type checkers read `__init__.pyi` only next to it. Installed with the stubs (not
     // copied by `develop`: `tools/setu_build.py` also packs src/liburing/, which would ship it twice).
     const py_typed = b.addWriteFiles().add("py.typed", "");
     b.getInstallStep().dependOn(&b.addInstallFileWithDir(py_typed, .lib, "py.typed").step);
-    const pyi_copy = b.addInstallFileWithDir(pyi, .{ .custom = "../src/liburing" }, "liburing.pyi");
-    b.step("stubs", "Write the type stubs to src/liburing/liburing.pyi").dependOn(&pyi_copy.step);
+    const pyi_copy = b.addInstallFileWithDir(pyi, .{ .custom = "../src/liburing" }, "__init__.pyi");
+    b.step("stubs", "Write the type stubs to src/liburing/__init__.pyi").dependOn(&pyi_copy.step);
 
     // `zig build setu-build-sync` (copy the pinned Setu's `tools/setu_build.py` into tools/) and
     // `zig build setu-build-check` (compare with it, offline).
@@ -136,7 +137,8 @@ pub fn build(b: *std.Build) void {
     // under pytest, merged over every `--python`, in zig-out/coverage.json (`docs/gen_coverage.py` reads it; kcov's
     // HTML with `-- --html DIR`). Needs a Debug, unstripped build (the default).
     @import("setu").addCoverageSteps(b, setu_dep, ext, .{
-        .module_name = "liburing.liburing",
+        .module_name = "liburing",
+        .package = true, // run as `liburing/__init__.so`, like the real package
         .include = &.{ b.path("src/liburing"), setu_dep.path("src") },
         .stub = pyi,
         .python = b.option([]const u8, "python", "Python that runs pytest for `coverage`") orelse "python3",

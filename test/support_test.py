@@ -8,12 +8,12 @@ import sys
 import textwrap
 import kernel
 import pytest
-import liburing
 from liburing import *
 
 KERNEL = f"Kernel `{kernel.LINUX_VERSION}`"
 ROOT = pathlib.Path(__file__).parent.parent
-PACKAGE_DIR = str(pathlib.Path(liburing.__file__).parent.parent)  # where this `liburing` was imported from
+# where this `liburing` was imported from (`<dir>/liburing/__init__.so`: the star import does not bind the name)
+PACKAGE_DIR = str(pathlib.Path(sys.modules["liburing"].__file__).parent.parent)
 
 # Runs in a child process: a seccomp filter makes `io_uring_register` fail with `EINVAL` for opcodes from
 # `IORING_REGISTER_QUERY` (35) on, which is what a kernel without `QUERY` does. Irreversible, hence the child.

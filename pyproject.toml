@@ -78,8 +78,8 @@ targets = ["x86_64-linux-gnu.2.28", "aarch64-linux-gnu.2.28"]
 # The docs site, built by Setu's `tools/setu_docs.py` (`zig build setu-docs-sync`; the settings are documented at its
 # top): `python3 docs/gen_guide.py && python3 tools/setu_docs.py` writes site/.
 [tool.setu_docs]
-stub = "src/liburing/liburing.pyi"
-module = "liburing.liburing"
+stub = "src/liburing/__init__.pyi"
+module = "liburing"
 summary = "io_uring for Python: a thin wrapper around C liburing"
 path = ["src"]
 name = "Liburing"

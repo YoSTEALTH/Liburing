@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Runs every Liburing check: zig fmt, Zig line width, ruff (lint + format), `tools/setu_build.py`,
 # `tools/setu_docs.py` and `docs/setu-guide.md` against the pinned Setu, `zig build develop` (the one stable-ABI
-# `liburing.so`), then with each interpreter (3.15t, 3.15, 3.14t, 3.14) Setu's `check_symbols.py` and pytest, the
-# same with the pre-release 3.16t / 3.16 when installed (`/opt/python/3.16{t,}-dev`), then the docstring examples
-# (`setu_docs.py check`), then `mypy --strict` (as 3.14 and 3.15) + `stubtest` on `liburing.pyi`.
+# `liburing/__init__.so`), then with each interpreter (3.15t, 3.15, 3.14t, 3.14) Setu's `check_symbols.py` and
+# pytest, the same with the pre-release 3.16t / 3.16 when installed (`/opt/python/3.16{t,}-dev`), then the docstring
+# examples (`setu_docs.py check`), then `mypy --strict` (as 3.14 and 3.15) + `stubtest` on the `liburing` package.
 # Interpreters: PY_FT=... / PY_GIL=... (3.15), PY314_FT=... / PY314_GIL=..., PY316_FT=... / PY316_GIL=...;
 # compiler: ZIG=...; Setu checkout: SETU=... (default: the `setu` path in build.zig.zon); ruff: RUFF=... (default:
 # `ruff` on PATH, else `$PY_FT -m ruff`); extra pytest arguments after `--`.
@@ -87,12 +87,12 @@ step "docs/setu-guide.md is the pinned Setu's copy"
 "$ZIG" build setu-guide-check
 
 step "zig build develop"
-"$ZIG" build develop # src/liburing/liburing.so: one binary for every interpreter below
+"$ZIG" build develop # src/liburing/__init__.so: one binary for every interpreter below
 
 for py in "$PY_FT" "$PY_GIL" "$PY314_FT" "$PY314_GIL"; do
     step "$py"
     if [[ -f $SETU/tools/check_symbols.py ]]; then
-        "$py" "$SETU/tools/check_symbols.py" src/liburing/liburing.so # exported by $py, and in abi3t (3.15+)
+        "$py" "$SETU/tools/check_symbols.py" src/liburing/__init__.so # exported by $py, and in abi3t (3.15+)
     else
         echo "skipped check_symbols.py: no Setu checkout at $SETU"
     fi
@@ -106,7 +106,7 @@ for py in "$PY316_FT" "$PY316_GIL"; do # pre-release CPython, only where install
         continue
     fi
     if [[ -f $SETU/tools/check_symbols.py ]]; then
-        "$py" "$SETU/tools/check_symbols.py" src/liburing/liburing.so
+        "$py" "$SETU/tools/check_symbols.py" src/liburing/__init__.so
     else
         echo "skipped check_symbols.py: no Setu checkout at $SETU"
     fi
@@ -118,9 +118,9 @@ step "docstring examples ($PY_FT tools/setu_docs.py check)"
 
 step "mypy --strict + stubtest ($PY_FT)"
 if "$PY_FT" -c 'import mypy' 2>/dev/null; then
-    (cd src && "$PY_FT" -m mypy --strict --python-version 3.14 liburing/liburing.pyi)
-    (cd src && "$PY_FT" -m mypy --strict liburing/liburing.pyi)
-    (cd src && PYTHONPATH=. "$PY_FT" -m mypy.stubtest liburing.liburing)
+    (cd src && "$PY_FT" -m mypy --strict --python-version 3.14 -p liburing)
+    (cd src && "$PY_FT" -m mypy --strict -p liburing)
+    (cd src && PYTHONPATH=. "$PY_FT" -m mypy.stubtest liburing)
 else
     echo "skipped: mypy is not installed for $PY_FT"
 fi

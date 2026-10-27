@@ -7,7 +7,7 @@ const Object = setu.c.Object;
 
 /// Setu finds the functions (lowercase `pub fn`, needs `.source`), `setu.Class`es, `UnsupportedError`, UPPER_CASE
 /// constants and `enum.zig`'s `IntEnum`s in `from`, creates them (bases first) in its `exec`, adds `__version__`,
-/// then runs `init`. `zig build stubs` writes `liburing.pyi` from this declaration too.
+/// then runs `init`. `zig build stubs` writes `__init__.pyi` from this declaration too.
 pub const module: setu.Module = .{
     .name = "liburing",
     .doc = "Python + Zig wrapper around C liburing.",
