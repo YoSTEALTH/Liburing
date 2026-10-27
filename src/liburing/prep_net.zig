@@ -588,7 +588,8 @@ pub fn io_uring_prep_socket_direct(
 ///     ... )
 ///     True
 ///
-///     # or
+/// Example
+///     # or: a bytes option
 ///     >>> buf = bytearray(b'eth1')
 ///     >>> io_uring_prep_cmd_sock(
 ///     ...     sqe, io_uring_socket_op.SOCKET_URING_OP_SETSOCKOPT, sockfd, SOL_SOCKET, SO_BINDTODEVICE, buf,

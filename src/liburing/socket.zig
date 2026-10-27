@@ -232,6 +232,8 @@ fn scopeId(text: []const u8) py.Error!u32 {
 ///     >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_KEEPALIVE, val)
 ///     True
 ///
+/// Example
+///     # a bytes option
 ///     >>> val = b"eth1"
 ///     >>> sqe = io_uring_get_sqe(ring)
 ///     >>> setsockopt(sqe, sockfd, SOL_SOCKET, SO_BINDTODEVICE, val)

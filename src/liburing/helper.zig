@@ -125,7 +125,8 @@ pub const FileIndexIter = struct {
 ///     >>> probe()
 ///     {'IORING_OP_NOP': True, 'IORING_OP_READV': True, 'IORING_OP_WRITEV': True, ...}
 ///
-///     # or
+/// Example
+///     # or: one operation
 ///     >>> probe()['IORING_OP_READ']
 ///     True
 ///
@@ -195,26 +196,35 @@ pub fn timespec(second: f64) py.Error!*Object {
 ///     return: bool
 ///
 /// Example
-///     # single
+///     # single: `Sqe()`
 ///     >>> sqe = Sqe()
 ///     >>> io_uring_prep_nop(sqe)
 ///     True
+///     >>> if put_sqe(ring, sqe):
+///     ...     io_uring_submit(ring)  # do stuff
+///     ...
+///     1
 ///
-///     # multiple
+/// Example
+///     # multiple: `Sqe(2)`, both entries put with one call
 ///     >>> buf = bytearray(5)
 ///     >>> sqe = Sqe(2)
 ///     >>> io_uring_prep_read(sqe[0], fd, buf)
 ///     True
 ///     >>> io_uring_prep_write(sqe[1], fd, b'hi...')
 ///     True
-///
-///     # back-end single | multiple
 ///     >>> if put_sqe(ring, sqe):
 ///     ...     io_uring_submit(ring)  # do stuff
 ///     ...
 ///     2
 ///
+/// Example
 ///     # failed: `ring` was full (2 entries here), submit and try again.
+///     >>> sqe = Sqe(2)
+///     >>> io_uring_prep_nop(sqe[0])
+///     True
+///     >>> io_uring_prep_nop(sqe[1])
+///     True
 ///     >>> put_sqe(ring, sqe)
 ///     True
 ///     >>> put_sqe(ring, sqe)

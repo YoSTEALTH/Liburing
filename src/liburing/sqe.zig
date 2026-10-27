@@ -186,14 +186,20 @@ pub const SQE = struct {
 ///     no: int | Ring | None
 ///
 /// Example
-///     # single
+///     # `Sqe()` (`None`): one entry, a template `put_sqe` copies into the ring
 ///     >>> buf = bytearray(5)
-///     >>> sqe = Sqe()  # defaults to `Sqe(1)`
+///     >>> sqe = Sqe()                         # same as `Sqe(1)`
 ///     >>> io_uring_prep_read(sqe, fd, buf)
 ///     True
 ///     >>> sqe.user_data = 1
+///     >>> put_sqe(ring, sqe)                  # *** MUST DO ***
+///     True
+///     >>> io_uring_submit(ring)
+///     1
 ///
-///     # multiple
+/// Example
+///     # `Sqe(2)` (`int`): a block of entries, `sqe[0]` ... `sqe[1]`, put with one `put_sqe`
+///     >>> buf = bytearray(5)
 ///     >>> sqe = Sqe(2)
 ///     >>> io_uring_prep_write(sqe[0], fd, b'hi...')
 ///     True
@@ -201,32 +207,32 @@ pub const SQE = struct {
 ///     >>> io_uring_prep_read(sqe[1], fd, buf)
 ///     True
 ///     >>> sqe[1].user_data = 2
-///
-///     # *** MUST DO ***
-///     >>> if put_sqe(ring, sqe):
-///     ...     io_uring_submit(ring)
-///     ...
+///     >>> put_sqe(ring, sqe)                  # *** MUST DO ***
+///     True
+///     >>> io_uring_submit(ring)
 ///     2
 ///
-///     # bound to a ring: each prep takes the ring's next free entry
+/// Example
+///     # `Sqe(ring)` (`Ring`): bound to a ring, each prep takes the ring's next free entry
+///     >>> buf = bytearray(5)
 ///     >>> sqe = Sqe(ring)
 ///     >>> io_uring_prep_read(sqe, fd, buf)    # entry 1
 ///     True
-///     >>> sqe.user_data = 1               # entry 1
+///     >>> sqe.user_data = 1                   # entry 1
 ///     >>> io_uring_prep_read(sqe, fd, buf)    # entry 2
 ///     True
-///     >>> sqe.user_data = 2               # entry 2
-///     >>> io_uring_submit(ring)           # both
+///     >>> sqe.user_data = 2                   # entry 2
+///     >>> io_uring_submit(ring)               # both, no `put_sqe`
 ///     2
 ///
 /// Note
-///     - This class has three usages:
-///         1. It works as a base class for `io_uring_get_sqe()` return.
-///         2. It can also be used as `sqe = Sqe(<int>)`, rather than "get" sqe(s)
-///         you are going to "put" pre-made sqe(s) into the ring later (templates). Refer to
-///         `help(put_sqe)` to see more detail.
-///         3. `sqe = Sqe(ring)`: one object for the ring's lifetime, written straight into the ring's
+///     - This class has two usages:
+///         1. `sqe = Sqe(<int>)`: rather than "get" sqe(s) you are going to "put" pre-made sqe(s)
+///         into the ring later (templates). Refer to `help(put_sqe)` to see more detail.
+///         2. `sqe = Sqe(ring)`: one object for the ring's lifetime, written straight into the ring's
 ///         submission queue: no `io_uring_get_sqe()`, no `put_sqe()`, no object per request.
+///     - `io_uring_get_sqe()` returns an `SQE` (the ring's own entry), not an `Sqe`: the preps and
+///     properties take either.
 ///     - `Sqe(no)`: `no` must be `> 0` (`RuntimeError`).
 ///     - `Sqe(ring)`: every prep takes the next free entry and returns `False` if the queue is full
 ///     (`io_uring_submit()` and prep again; `Ring(auto_submit=True)` does that for you);

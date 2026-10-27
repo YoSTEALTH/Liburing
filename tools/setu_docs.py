@@ -13,6 +13,7 @@ Usage (after `zig build develop`, from the project root)
     python3 tools/setu_docs.py build --out DIR    # ... somewhere else
     python3 tools/setu_docs.py serve              # serve it on http://127.0.0.1:8000, Run buttons enabled
     python3 tools/setu_docs.py run read           # run the `read` example, print the session
+    python3 tools/setu_docs.py run read:2         # ... only its second `Example` block
     python3 tools/setu_docs.py run --json File.read
     python3 tools/setu_docs.py run example/hi.py  # run an example script
     python3 tools/setu_docs.py check              # run every example, report mismatches
@@ -29,6 +30,7 @@ The settings, in `pyproject.toml` (paths relative to it):
     out = 'site'                    # optional: where the site goes (the default)
     home = 'docs/index.md'          # optional: the home page's text (default: the module docstring)
     css = 'docs/extra.css'          # optional: appended to `style.css` (colors: `--accent`, ...)
+    favicon = 'docs/icon.svg'       # optional: the tab icon (`.svg`, `.png`, `.ico`; default: the name's letter)
     edit = 'https://github.com/me/pkg/edit/dev/'  # optional: an Edit link on Markdown pages (+ the file)
     repo = 'https://github.com/me/pkg'  # optional: the header's repository link (default: from `[project.urls]`)
     scripts = 'example'             # optional: runnable example scripts, a page of their own
@@ -102,6 +104,12 @@ in a new temporary directory; fds it leaves open are closed after. An example wi
 nothing defines (`ring`: not the module's, a builtin, in `NAMESPACE` or assigned in the example) gets no Run button
 and is not run by `check`, which lists those names instead.
 
+A repeated `Example` header starts another block (`Sqe()`, then `Sqe(2)`, ...; a first `# comment` line labels
+it): each block is shown with its own Run and runs on its own, in a new namespace with the name's fixture run
+again. Setu numbers the headers in the docstring (`help()` shows `Example #1`, `Example #2`, ...; one block stays
+`Example`); the page and the Markdown show them as written. `run Sqe` runs every block, `run Sqe:2` the one headed
+`Example #2`.
+
 The site also gets `llms.txt` (an index of the pages, for AI readers) and, with `stub`, `llms-full.txt` (every
 class, function and constant with its signature and docstring, one Markdown page).
 
@@ -139,12 +147,14 @@ import tomllib
 import urllib.parse
 
 SETU_DOCS = pathlib.Path(__file__).resolve()
-HEADER = re.compile(r'[A-Z][A-Za-z ]*')
+HEADER = re.compile(r'Example #\d+|[A-Z][A-Za-z ]*')  # Setu numbers repeated `Example` headers
+EXAMPLE = re.compile(r'Example(?: #\d+)?')
 
 # --- settings ---------------------------------------------------------------------------------
 
-KEYS = {'module', 'path', 'stub', 'name', 'summary', 'out', 'home', 'css', 'edit', 'scripts', 'scripts_skip',
-        'featured', 'runner', 'hooks', 'serial', 'timeout', 'markdown', 'pages'}  # fmt: skip
+KEYS = {'module', 'path', 'stub', 'name', 'summary', 'out', 'home', 'css', 'favicon', 'edit', 'scripts',
+        'scripts_skip', 'featured', 'runner', 'hooks', 'serial', 'timeout', 'markdown', 'pages'}  # fmt: skip
+FAVICON_TYPES = ('.svg', '.png', '.ico')
 PAGE_KEYS = {'slug', 'title', 'text', 'classes', 'functions', 'patterns', 'sources', 'default', 'constants', 'groups'}
 MARKDOWN_KEYS = {'file', 'title', 'section', 'slug'}
 
@@ -164,6 +174,8 @@ def load_config(pyproject='pyproject.toml'):
     for key in ('module', 'pages'):
         if key not in config:
             fail(f'[tool.setu_docs] needs `{key}`')
+    if 'favicon' in config and pathlib.Path(config['favicon']).suffix not in FAVICON_TYPES:
+        fail(f'`favicon` is not one of {", ".join(FAVICON_TYPES)}: {config["favicon"]}')
     pages = config['pages']
     for page in pages:
         for key in ('slug', 'title', 'text'):
@@ -190,6 +202,18 @@ def load_config(pyproject='pyproject.toml'):
 
 def md_slug(page):
     return page.get('slug') or pathlib.Path(page['file']).stem
+
+
+def letter_icon(name):
+    '''The tab icon without a `favicon`: `name`'s first letter, white on the dark theme's `--accent-soft` (an icon
+    is its own document, so no CSS variables), as a `data:` URL.'''
+    letter = html.escape(next((c for c in name if c.isalnum()), '?').upper())
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6"'
+        ' fill="#283457"/><text x="16" y="17" text-anchor="middle" dominant-baseline="central" fill="#fff"'
+        f' font-family="system-ui, sans-serif" font-size="22" font-weight="700">{letter}</text></svg>'
+    )
+    return 'data:image/svg+xml,' + urllib.parse.quote(svg, safe=' "=/:,')
 
 
 class Project:
@@ -220,6 +244,10 @@ class Project:
         self.requires = f'{requires[2:]}+' if re.fullmatch(r'>=[\d.]+', requires) else requires
         self.timeout = self.config.get('timeout', 20)
         self.stub = (self.root / self.config['stub']).read_text() if 'stub' in self.config else None
+        # the site's copy of `favicon` (`favicon.svg`, ...), else '' (`letter_icon`, inline: no `/favicon.ico` 404)
+        self.favicon = 'favicon' + pathlib.Path(self.config['favicon']).suffix if 'favicon' in self.config else ''
+        if self.favicon and not (self.root / self.config['favicon']).is_file():
+            fail(f'`favicon` not found: {self.config["favicon"]}')
         hooks = self.load_hooks()
         self.fixtures = getattr(hooks, 'FIXTURES', {})
         self.skip = getattr(hooks, 'SKIP', {})
@@ -306,23 +334,27 @@ class Project:
         for _page, names in self.api()[0]:
             for name in names:
                 obj = self.find(name)
-                if 'Example' in sections(obj.__doc__):
+                if example_blocks(obj.__doc__):
                     out.append(name)
                 if isinstance(obj, type) and not issubclass(obj, BaseException):
                     for member, _kind, mobj in members(obj):
-                        if 'Example' in sections(getattr(mobj, '__doc__', None)):
+                        if example_blocks(getattr(mobj, '__doc__', None)):
                             out.append(f'{name}.{member}')
         return out
 
+    def blocks(self, name):
+        '''The `Example` blocks of the documented name `name` (`example_blocks`).'''
+        return example_blocks(self.find(name).__doc__)
+
     def needs(self, name, example=None):
-        '''The names `name`'s example (or `example`) reads that nothing gives it, sorted: not the module's, a
-        builtin, in `NAMESPACE` or assigned at the example's top level (a name a function, lambda, class body or
-        comprehension binds is its own; skipped statements left out). With a fixture: none, the fixture sets them
-        up.'''
+        '''The names `name`'s example block `example` (default: each block, merged) reads that nothing gives it,
+        sorted: not the module's, a builtin, in `NAMESPACE` or assigned at the block's top level (a name a
+        function, lambda, class body or comprehension binds is its own; skipped statements left out). With a
+        fixture: none, the fixture sets them up.'''
         if name in self.fixtures:
             return []
         if example is None:
-            example = sections(self.find(name).__doc__).get('Example', '')
+            return sorted({n for block in self.blocks(name) for n in self.needs(name, block)})
         sources = []
         for step in steps(example):
             if (name, step.source) not in self.skip:
@@ -392,21 +424,39 @@ def members(cls):
 # --- docstring parsing ------------------------------------------------------------------------
 
 
+def parts(doc):
+    '''Split a docstring into its description and `Header` sections (content dedented 4), in order; a header
+    may repeat (one `Example` per block, numbered `Example #1`, `Example #2`, ... by Setu).
+
+    Example
+        >>> parts('Read it.\\n\\nExample #1\\n    >>> 1\\n    1\\nExample #2\\n    >>> 2\\n    2\\n')
+        [('', 'Read it.'), ('Example #1', '>>> 1\\n1'), ('Example #2', '>>> 2\\n2')]
+    '''
+    out = [('', [])]
+    for line in (doc or '').splitlines():
+        if line and not line[0].isspace() and HEADER.fullmatch(line.strip()) and line.strip() != line.strip().upper():
+            out.append((line.strip(), []))
+        else:
+            out[-1][1].append(line[4:] if out[-1][0] and line.startswith('    ') else line)
+    return [(k, '\n'.join(v).strip('\n')) for k, v in out]
+
+
 def sections(doc):
-    '''Split a docstring into its description and `Header` sections (content dedented 4).
+    '''`parts` as a dict: a repeated header keeps its first section (`example_blocks` gives every `Example`).
 
     Example
         >>> sections('Read it.\\n\\nType\\n    return: int\\n')
         {'': 'Read it.', 'Type': 'return: int'}
     '''
-    out, cur = {'': []}, ''
-    for line in (doc or '').splitlines():
-        if line and not line[0].isspace() and HEADER.fullmatch(line.strip()) and line.strip() != line.strip().upper():
-            cur = line.strip()
-            out[cur] = []
-        else:
-            out[cur].append(line[4:] if cur and line.startswith('    ') else line)
-    return {k: '\n'.join(v).strip('\n') for k, v in out.items()}
+    out = {}
+    for header, text in parts(doc):
+        out.setdefault(header, text)
+    return out
+
+
+def example_blocks(doc):
+    '''The docstring's `Example` (`Example #<n>`) sections that are not empty, in order: each runs on its own.'''
+    return [text for header, text in parts(doc) if EXAMPLE.fullmatch(header) and text.strip()]
 
 
 @dataclasses.dataclass
@@ -417,6 +467,7 @@ class Step:
     expected: str
     got: str = ''
     status: str = ''  # ok, fail, loose (output not compared), skip
+    block: int = 0  # which `Example` block of the docstring (1, 2, ...), when `run_example` runs them all
 
 
 def steps(example):
@@ -461,13 +512,18 @@ def _open_fds():
 
 
 def run_example(project, name, example=None):
-    '''Run the `Example` section of `name` (`read`, `File.read`) in a new temporary directory.
+    '''Run the example block `example` of `name` (`read`, `File.read`) in a new temporary directory, with a new
+    namespace (and its fixture); without `example`, each of `name`'s blocks so (`Step.block`: 1, 2, ...).
 
     Note
         - Gives up after the project's `timeout` (`SIGALRM`), so call it from the main thread.
     '''
     if example is None:
-        example = sections(project.find(name).__doc__)['Example']
+        return [
+            dataclasses.replace(s, block=k)
+            for k, block in enumerate(project.blocks(name), 1)
+            for s in run_example(project, name, block)
+        ]
     todo = steps(example)
     ns = {**vars(project.module), **project.namespace, '__name__': '__example__', '_keep': [], '_cleanup': [],
           '_name': name}  # fmt: skip
@@ -542,15 +598,23 @@ def run_script(project, path, timeout=30):
 
 
 def run_target(project, target):
-    '''Run a documented name's example or an example script; JSON-ready result.'''
+    '''Run a documented name's examples (`Sqe`: every block, `Sqe:2`: the second) or an example script;
+    JSON-ready result.'''
     if target.endswith('.py'):
         if target not in {p for p, runnable in project.scripts() if runnable}:
             raise LookupError(f'not a runnable example script: {target!r}')
         code, output = run_script(project, target)
         return {'target': target, 'ok': code == 0, 'returncode': code, 'output': output}
-    if target not in project.examples():
-        raise LookupError(f'no documented example named {target!r}')
-    todo = run_example(project, target)
+    name, colon, k = target.partition(':')
+    if name not in project.examples():
+        raise LookupError(f'no documented example named {name!r}')
+    if colon:
+        blocks = project.blocks(name)
+        if not (k.isascii() and k.isdigit()) or not 1 <= int(k) <= len(blocks):
+            raise LookupError(f'{name!r} has {len(blocks)} example block(s), no {k!r}')
+        todo = run_example(project, name, blocks[int(k) - 1])
+    else:
+        todo = run_example(project, name)
     return {
         'target': target,
         'ok': all(s.status != 'fail' for s in todo),
@@ -684,6 +748,8 @@ INLINE = re.compile(
     r'|(?P<em>(?<![\w*])\*(?P<etext>[^*\s](?:[^*]*[^*\s])?)\*(?![\w*])'
     r'|(?<!\w)_(?P<etext2>[^_\s](?:[^_]*[^_\s])?)_(?!\w))'
 )
+# A bare URL in a docstring; `autolink` leaves trailing punctuation (`see https://x.org/a.`) as text
+BARE_URL = re.compile(r'''https?://[^\s<>`"']+''')
 
 
 class Site:
@@ -727,13 +793,14 @@ class Site:
         return f'<code>{html.escape(code)}</code>'
 
     def inline(self, text):
-        '''Escape docstring `text`, turning `code` spans into `<code>` (linked when it names an export).'''
+        '''Escape docstring `text`, turning `code` spans into `<code>` (linked when it names an export) and bare
+        `http(s)://` URLs into links.'''
         out = []
         for part in re.split(r'(`[^`]+`)', text):
             if part.startswith('`') and part.endswith('`') and len(part) > 2:
                 out.append(self.code(part[1:-1]))
             else:
-                out.append(html.escape(part))
+                out.append(autolink(part))
         return ''.join(out)
 
     def paragraphs(self, text):
@@ -1163,32 +1230,35 @@ class Site:
         return f'<ul class="flags{described}">{items}</ul>'
 
     def doc(self, name, obj):
-        '''A docstring as HTML: description, Type, Example (+ fixture and Run), Note, others.'''
-        parts = sections(obj.__doc__)
-        out = [self.paragraphs(parts.get('', ''))]
-        for header, text in parts.items():
-            if not header or not text.strip():
+        '''A docstring as HTML: description, Type, Example (+ fixture and Run; each block its own), Note,
+        others.'''
+        split = parts(obj.__doc__)
+        blocks = len(example_blocks(obj.__doc__))
+        out, k = [self.paragraphs(split[0][1])], 0
+        for header, text in split[1:]:
+            if not text.strip():
                 continue
             out.append(f'<h4>{html.escape(header)}</h4>')
             if header == 'Type':
                 out.append(self.type_table(text))
-            elif header == 'Example':
+            elif EXAMPLE.fullmatch(header):
+                k += 1
                 out.append(self.session(text))
-                if setup := self.project.fixtures.get(name):
+                if k == 1 and (setup := self.project.fixtures.get(name)):  # the same for every block: shown once
                     with contextlib.suppress(OSError, TypeError):
                         src = re.sub(r'^@.*\n', '', inspect.getsource(setup))  # without the decorator
                         out.append(
                             '<details class="fixture"><summary>Setup used to run this example</summary>'
                             f'<pre class="code">{self.highlight(src.rstrip())}</pre></details>'
                         )
-                needs = self.project.needs(name)
-                out.append(_needs(needs) if needs else _run_box(name))
+                needs = self.project.needs(name, text)
+                out.append(_needs(needs) if needs else _run_box(name if blocks == 1 else f'{name}:{k}'))
             elif header in ('Note', 'Warning'):
                 out.append(self.bullets(text))
             elif header == 'Flags':
                 out.append(self.flags(text))
             else:
-                out.append(f'<pre class="plain">{html.escape(text)}</pre>')
+                out.append(f'<pre class="plain">{autolink(text)}</pre>')
         return ''.join(out)
 
     # -- entries
@@ -1267,7 +1337,9 @@ class Site:
 
     def page(self, current, title, body, toc=(), api=False):
         project = self.project
-        toc_html = ''.join(f'<a href="#{html.escape(a)}">{html.escape(t)}</a>' for a, t in toc)
+        toc_html = ''.join(  # a long name breaks after `_` / `.` instead of being cut off
+            f'<a href="#{html.escape(a)}">{re.sub(r"([_.])", r"\1<wbr>", html.escape(t))}</a>' for a, t in toc
+        )
         name, version = html.escape(project.name), html.escape(project.version)
         # API pages are mostly names, which Chrome takes for some other language and offers to translate
         meta = '\n<meta name="google" content="notranslate">' if api else ''
@@ -1293,7 +1365,7 @@ class Site:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">{meta}
 <title>{html.escape(title)} · {name}</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="{html.escape(project.favicon or letter_icon(project.name))}">
 <link rel="stylesheet" href="style.css">
 <script>try {{ const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; }}
 catch (e) {{}}</script>
@@ -1446,8 +1518,12 @@ catch (e) {{}}</script>
             files['llms-full.txt'] = llms_full(self.project.stub, self.project.config['module'])
         for name, text in files.items():
             (out / name).write_text(pretty_html(text) if name.endswith('.html') else text)
+        copied = ['docs.wasm']
+        if self.project.favicon:
+            shutil.copyfile(self.project.root / self.project.config['favicon'], out / self.project.favicon)
+            copied.append(self.project.favicon)
         build_wasm(self.project.root, out / 'docs.wasm')
-        return sorted([*files, 'docs.wasm'])
+        return sorted([*files, *copied])
 
 
 # `pretty_html`: block tags go on their own line and indent what is inside; in a text block (`TEXT_TAGS`) the text
@@ -1585,6 +1661,27 @@ def inline_only(text, pos, tag):
     return False
 
 
+def autolink(text):
+    '''Escape `text`, turning bare `http(s)://` URLs into links. Trailing `.,;:!?)]` stays text, except a `)` that
+    closes a `(` in the URL (as GFM does).
+
+    Example
+        >>> autolink('(see https://en.wikipedia.org/wiki/Io_(moon).)')
+        '(see <a href="https://en.wikipedia.org/wiki/Io_(moon)">https://en.wikipedia.org/wiki/Io_(moon)</a>.)'
+    '''
+    out, pos = [], 0
+    for m in BARE_URL.finditer(text):
+        url = m.group(0)
+        while url[-1] in '.,;:!?)]' and not (url[-1] == ')' and url.count('(') >= url.count(')')):
+            url = url[:-1]
+        if url.endswith('//'):  # nothing after the scheme
+            continue
+        out.append(f'{html.escape(text[pos : m.start()])}<a href="{html.escape(url)}">{html.escape(url)}</a>')
+        pos = m.start() + len(url)
+    out.append(html.escape(text[pos:]))
+    return ''.join(out)
+
+
 def build_wasm(root, dest):
     '''Build the site's Wasm module (`zig build docs-web` in `root`, from Setu's `tools/setu_docs_web.zig`)
     into `dest`.
@@ -1716,11 +1813,14 @@ code, pre { font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo,
 .side a.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .nav-h { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 14px 8px 2px; }
 .toc { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
-.toc a { font-family: ui-monospace, monospace; font-size: 14.5px; color: var(--muted); }
+.toc a { font-family: ui-monospace, monospace; font-size: 14.5px; color: var(--muted); overflow-wrap: anywhere;
+  padding-left: calc(8px + 2ch); text-indent: -2ch; }  /* a wrapped name lines up after its `- ` */
+.toc a::before { content: '-'; display: inline-block; width: 2ch; text-indent: 0; }  /* inline-block: no underline */
 .toc-h { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 8px 4px; }
 main { flex: 1; min-width: 0; padding: 24px 40px 64px; }
 h1 { margin: 8px 0 4px; font-size: 30px; }
 h2 { margin-top: 36px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+h3 { font-size: 22px; }
 h1:hover .anchor, h2:hover .anchor, h3:hover .anchor { color: var(--muted); }
 .lead { color: var(--muted); font-size: 16px; margin-top: 4px; }
 .edit { float: right; font-size: 13px; margin-top: 14px; }
@@ -1733,7 +1833,7 @@ h1:hover .anchor, h2:hover .anchor, h3:hover .anchor { color: var(--muted); }
   border-radius: 99px; padding: 0 6px; vertical-align: 2px; }
 .anchor { margin-left: 8px; color: var(--line); font-weight: 400; }
 .entry:hover .anchor, .member:hover .anchor { color: var(--muted); }
-h4 { margin: 14px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+h4 { margin: 14px 0 4px; font-size: 15px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 h4.mh { text-transform: none; letter-spacing: 0; font: 600 14px/1.5 ui-monospace, monospace; color: var(--text); }
 .members { margin: 12px 0 0 0; padding-left: 16px; border-left: 3px solid var(--panel); }
 .member { padding: 4px 0 8px; }
@@ -1862,6 +1962,8 @@ JS = r'''
 
   // The repository link: the latest release, stars and forks from GitHub's API, kept for the browser session
   // (the API allows 60 requests an hour per address without a token). Left out when GitHub does not answer.
+  // The latest release is the newest that is not a pre-release (drafts need a token), as `releases/latest`
+  // says, but a repository without releases gets `[]` instead of a 404 in the console.
   const repo = document.querySelector('.repo[data-repo]:not([data-repo=""])');
   if (repo) {
     const key = 'repo:' + repo.dataset.repo, api = 'https://api.github.com/repos/' + repo.dataset.repo;
@@ -1878,8 +1980,9 @@ JS = r'''
     if (cached) show(cached);
     else Promise.all([
       fetch(api).then(r => r.ok ? r.json() : Promise.reject()),
-      fetch(api + '/releases/latest').then(r => r.ok ? r.json() : {}).catch(() => ({})),
-    ]).then(([info, release]) => {
+      fetch(api + '/releases?per_page=10').then(r => r.ok ? r.json() : []).catch(() => []),
+    ]).then(([info, releases]) => {
+      const release = (Array.isArray(releases) && releases.find(r => !r.prerelease)) || {};
       const facts = { tag: release.tag_name || '', stars: short(info.stargazers_count),
         forks: short(info.forks_count) };
       try { sessionStorage.setItem(key, JSON.stringify(facts)); } catch (e) {}
@@ -1995,7 +2098,7 @@ def convert(text):
             if line in ('Note', 'Warning'):
                 out += [f'**{line}**', '', block, '']
             else:
-                out += [f'**{line}**', '', '```pycon' if line == 'Example' else '```text', block, '```', '']
+                out += [f'**{line}**', '', '```pycon' if EXAMPLE.fullmatch(line) else '```text', block, '```', '']
             i = j
         elif line.startswith('>>>'):  # a bare session, no `Example` header: up to the next blank line
             j = i
@@ -2091,6 +2194,7 @@ TYPES = {
     '.wasm': 'application/wasm',
     '.svg': 'image/svg+xml',
     '.png': 'image/png',
+    '.ico': 'image/x-icon',
 }
 FREE_THREADED = not getattr(sys, '_is_gil_enabled', lambda: True)()
 PYTHON = f'{sys.version_info.major}.{sys.version_info.minor}{"t" if FREE_THREADED else ""}'
@@ -2104,13 +2208,19 @@ def serve(project, port):
         - Listens on 127.0.0.1 only, and answers only requests whose `Host` (and, for POST, `Origin`) is this
           server, so other websites can not use it. Run only accepts documented example names and scripts.
         - With `serial` (the default) one example runs at a time; a second Run gets `409 busy`.
+        - A Run may take `timeout` s per example block (`Sqe`: each block, `Sqe:2`: one) plus 15 s to start.
     '''
     site = project.out().resolve()
     hosts = {f'127.0.0.1:{port}', f'localhost:{port}'}
     scripts = re.escape(project.config.get('scripts', 'example'))
-    target_rx = re.compile(rf'[A-Za-z_][\w.]{{0,80}}|{scripts}/[\w-]{{1,80}}\.py')
+    target_rx = re.compile(rf'[A-Za-z_][\w.]{{0,80}}(?::[0-9]{{1,3}})?|{scripts}/[\w-]{{1,80}}\.py')
     lock = threading.Lock() if project.config.get('serial', True) else None
     ping = json.dumps({'module': project.config['module'], 'version': project.version, 'python': PYTHON}).encode()
+    examples = set(project.examples())
+
+    def runs(target):
+        '''How many example blocks `run target` runs: every block of a bare documented name, else one.'''
+        return len(project.blocks(target)) if target in examples else 1
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def reply(self, status, kind, data, head=False):
@@ -2164,8 +2274,9 @@ def serve(project, port):
                 return self.json(409, {'error': 'busy: another example is running'})
             try:
                 cmd = [sys.executable, str(SETU_DOCS), '--config', str(project.pyproject), 'run', '--json', target]
+                limit = project.timeout * runs(target) + 15  # every block of a bare name has its own `timeout`
                 p = subprocess.run(cmd, cwd=project.root, env=project.env(), capture_output=True, text=True,
-                                   stdin=subprocess.DEVNULL, timeout=project.timeout + 15, check=False)  # fmt: skip
+                                   stdin=subprocess.DEVNULL, timeout=limit, check=False)  # fmt: skip
             except subprocess.TimeoutExpired:
                 return self.json(500, {'error': 'the example did not finish'})
             finally:
@@ -2196,7 +2307,10 @@ def _print_session(result):
     if 'steps' not in result:
         print(result['output'], end='')
         return
-    for s in result['steps']:
+    several = result['steps'] and result['steps'][-1]['block'] > 1
+    for i, s in enumerate(result['steps']):
+        if several and (not i or s['block'] != result['steps'][i - 1]['block']):
+            print(('\n' if i else '') + f'# Example #{s["block"]}')  # the header Setu gives the block
         print('>>> ' + s['source'].replace('\n', '\n... '))
         if s['got']:
             print(s['got'])
@@ -2207,21 +2321,25 @@ def _print_session(result):
 
 
 def check(project):
-    '''Run every docstring example that can run (`Project.needs`); print the mismatches and the names the others
-    read; give how many examples failed.'''
-    examples, missing = project.examples(), collections.Counter()
-    names = [n for n in examples if not project.needs(n)]
-    for name in examples:
-        missing.update(project.needs(name))
+    '''Run every docstring example block that can run (`Project.needs`); print the mismatches and the names the
+    others read; give how many blocks failed.'''
+    todo, missing, skipped = [], collections.Counter(), 0
+    for name in project.examples():
+        blocks = project.blocks(name)
+        for k, block in enumerate(blocks, 1):
+            if needs := project.needs(name, block):
+                missing.update(needs)
+                skipped += 1
+            else:
+                todo.append((name if len(blocks) == 1 else f'{name}:{k}', name, block))
     bad = 0
-    for name in names:
-        failed = [s for s in run_example(project, name) if s.status == 'fail']
+    for target, name, block in todo:
+        failed = [s for s in run_example(project, name, block) if s.status == 'fail']
         bad += bool(failed)
         for s in failed:
-            print(f'{name}: {s.source!r}\n    docs: {s.expected!r}\n    got:  {s.got!r}')
-    print(f'{len(names) - bad}/{len(names)} examples match')
+            print(f'{target}: {s.source!r}\n    docs: {s.expected!r}\n    got:  {s.got!r}')
+    print(f'{len(todo) - bad}/{len(todo)} examples match')
     if missing:
-        skipped = len(examples) - len(names)
         print(f'{skipped} not run, no fixture defines: ' + ', '.join(f'{n} ({c})' for n, c in missing.most_common()))
     return bad
 

@@ -94,17 +94,20 @@ pub const FUTEX = struct {
 ///     0
 ///     >>> futex.private
 ///     False
-///
 ///     >>> io_uring_prep_futex_wait(sqe, futex, 0, FUTEX_BITSET_MATCH_ANY, FUTEX2_SIZE_U32)
 ///     True
 ///     >>> futex.state = 1
 ///     >>> io_uring_prep_futex_wake(sqe, futex, 1, FUTEX_BITSET_MATCH_ANY, FUTEX2_SIZE_U32)
 ///     True
 ///
-///     >>> fwv = Futex(1, None, True)  # `vector=True` for `io_uring_prep_futex_waitv`
+/// Example
+///     # a vector of futexes, for `io_uring_prep_futex_waitv`
+///     >>> fwv = Futex(1, None, True)  # `vector=True`
 ///     >>> io_uring_prep_futex_waitv(sqe, fwv)
 ///     True
 ///
+/// Example
+///     # a process-private futex
 ///     >>> futex = Futex(2, FUTEX2_PRIVATE | FUTEX2_SIZE_U32)
 ///     >>> futex.private
 ///     True

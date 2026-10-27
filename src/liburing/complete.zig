@@ -50,8 +50,9 @@ pub fn io_uring_peek_batch_cqe(ring: *Ring, batch: *CqeBatch, count: ?u32) py.Er
 ///     >>> io_uring_wait_cqes(ring, cqe, 2)
 ///     0
 ///
-///     # or
-///     >>> ts = timespec(1.5)  # timeout
+/// Example
+///     # or: with a timeout
+///     >>> ts = timespec(1.5)
 ///     >>> io_uring_wait_cqes(ring, cqe, 2, ts)
 ///     0
 ///
@@ -166,12 +167,12 @@ pub fn io_uring_submit_and_wait(ring: *Ring, wait_nr: u32) py.Error!i32 {
 ///     2
 ///     >>> io_uring_cq_advance(ring, 2)  # done with them
 ///
-///     # or
-///     >>> io_uring_prep_nop(io_uring_get_sqe(ring))
-///     True
+/// Example
+///     # or: with a timeout
 ///     >>> ts = timespec(0.5)
-///     >>> io_uring_submit_and_wait_timeout(ring, cqe, 1, ts)
-///     1
+///     >>> io_uring_submit_and_wait_timeout(ring, cqe, 2, ts)  # two entries queued
+///     2
+///     >>> io_uring_cq_advance(ring, 2)  # done with them
 ///
 /// Note
 ///     - `sigmask`: signal mask (`SigsetT`) used only while waiting, signals not in it can

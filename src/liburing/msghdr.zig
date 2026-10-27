@@ -19,16 +19,19 @@ pub const EpollEventType = setu.Class(EpollEvent, @embedFile("msghdr.zig"));
 /// ancillary data.
 ///
 /// Example
+///     # send: an address and the buffers to send
 ///     >>> msg = Msghdr(Sockaddr(AF_INET, "127.0.0.1", 9000), [b"hello"], flags=0)
 ///     >>> io_uring_prep_sendmsg(sqe, sockfd, msg)
 ///     True
 ///
+/// Example
 ///     # receive: the kernel fills `name`, the `iov` buffers and `control`
 ///     >>> name, buf, control = Sockaddr(), bytearray(1024), bytearray(64)
 ///     >>> msg = Msghdr(name, [buf], control)
 ///     >>> io_uring_prep_recvmsg(sqe, sockfd, msg)
 ///     True
 ///
+/// Example
 ///     # multishot receive with provided buffers: only the lengths are given
 ///     >>> msg = Msghdr(namelen=16, controllen=0)
 ///     >>> io_uring_prep_recvmsg_multishot(sqe, sockfd, msg)

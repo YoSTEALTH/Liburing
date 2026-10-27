@@ -307,8 +307,8 @@ pub fn writableView(o: *Object, view: *setu.c.Buffer) py.Error!bool {
 ///     >>> io_uring_prep_openat2(sqe, 'file.txt', how)
 ///     True
 ///
-///     # or
-///
+/// Example
+///     # or: the fields one by one
 ///     >>> how = OpenHow()
 ///     >>> how.flags   = O_CREAT | O_RDWR
 ///     >>> how.mode    = 0

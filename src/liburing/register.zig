@@ -1041,7 +1041,9 @@ pub fn io_uring_clone_buffers(dst_ring: *Ring, src_ring: *Ring, flags: ?u32) py.
 ///     >>> io_uring_unregister_buffers(ring)
 ///     0
 ///
+/// Example
 ///     # with a tag for each buffer
+///     >>> bufs = [bytearray(4096), bytearray(4096)]
 ///     >>> io_uring_register_buffers(ring, bufs, [1, 2])
 ///     0
 ///
