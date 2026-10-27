@@ -39,9 +39,15 @@ def test_timespec():
     assert ts.sec == 1
     assert ts.nsec == 500_000
 
+    ts = Timespec()  # no memory: `timespec(second)` makes a usable one
     with pytest.raises(MemoryError):
-        ts = Timespec()
-        assert ts.sec == 123
+        _ = ts.sec
+    with pytest.raises(MemoryError):
+        _ = ts.nsec
+    with pytest.raises(MemoryError):
+        ts.sec = 1
+    with pytest.raises(MemoryError):
+        ts.nsec = 1
 
 
 def test_put_sqe():

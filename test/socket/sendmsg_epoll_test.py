@@ -54,6 +54,8 @@ def test_msghdr_fields():
     assert full.controllen == 8
     with pytest.raises(ValueError):
         full.controllen = 64  # longer than `control`
+    with pytest.raises(ValueError, match="longer than a `Sockaddr`"):
+        full.namelen = 129  # past `sockaddr_storage` (128)
     with pytest.raises(ValueError):
         Msghdr(control=control, controllen=64)
     with pytest.raises(TypeError):
@@ -181,6 +183,24 @@ def test_cmsg_walk_over_a_built_buffer():
     assert first.data == struct.pack("=i", 7)
     assert io_uring_recvmsg_cmsg_nexthdr(out, msg, first) is None
     assert io_uring_recvmsg_payload(out, msg) == b"abc"
+    assert out.flags == 0
+
+
+def test_cmsg_walk_two_messages():
+    # [header][name][cmsg 1: level 1, type 2][cmsg 2: level 3, type 4][payload], `MSG_CTRUNC` in the flags
+    name = bytes(16)
+    one = struct.pack("=QII", struct.calcsize("=QII") + 4, 1, 2) + struct.pack("=i", 5) + bytes(4)
+    two = struct.pack("=QII", struct.calcsize("=QII") + 4, 3, 4) + struct.pack("=i", 6) + bytes(4)
+    header = struct.pack("=IIII", len(name), len(one + two), 2, socket.MSG_CTRUNC)
+    buf = bytearray(header + name + one + two + b"hi")
+    msg = Msghdr(namelen=len(name), controllen=len(one + two))
+    out = io_uring_recvmsg_validate(buf, msg)
+    assert out.flags == socket.MSG_CTRUNC
+    first = io_uring_recvmsg_cmsg_firsthdr(out, msg)
+    second = io_uring_recvmsg_cmsg_nexthdr(out, msg, first)
+    assert (second.level, second.type, second.data) == (3, 4, struct.pack("=i", 6))
+    assert io_uring_recvmsg_cmsg_nexthdr(out, msg, second) is None
+    assert io_uring_recvmsg_payload(out, msg) == b"hi"
 
 
 def test_epoll_event_fields():

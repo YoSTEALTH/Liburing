@@ -6,6 +6,10 @@ from liburing import *
 def test_Sockaddr():
     with pytest.raises(ValueError):
         Sockaddr(AF_UNIX, " " * 109)
+    with pytest.raises(ValueError, match="not provided"):
+        Sockaddr(AF_UNIX)  # a path is needed
+    with pytest.raises(NotImplementedError, match="not supported"):
+        Sockaddr(socket.AF_PACKET, "eth0")
     addr = Sockaddr(AF_UNIX, "./path")
     with pytest.raises(NotImplementedError):
         _ = addr.port

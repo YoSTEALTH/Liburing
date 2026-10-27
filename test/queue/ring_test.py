@@ -35,6 +35,12 @@ def test_cqe_get_data(ring, cqe):
     assert io_uring_cqe_get_data64(cqe[0]) == 7
     assert io_uring_cqe_get_data(cqe[0]) == 7
     io_uring_cqe_seen(ring, cqe[0])
+    assert nop(ring, 0) == 1
+    assert io_uring_wait_cqe(ring, cqe) == 0
+    assert io_uring_cqe_get_data64(cqe[0]) == 0
+    with pytest.raises(ValueError, match="null"):  # a pointer: `0` is none
+        io_uring_cqe_get_data(cqe[0])
+    io_uring_cqe_seen(ring, cqe[0])
 
 
 # queue state
@@ -484,6 +490,21 @@ def test_enter2(ring, cqe):
     io_uring_cq_advance(ring, 1)
 
 
+def test_enter(ring, cqe):
+    assert io_uring_enter(ring.ring_fd, 0, 0, 0, None) == 0  # nothing to submit, nothing to wait for
+    nop(ring, 1)
+    assert io_uring_enter(ring.ring_fd, 0, 1, IORING_ENTER_GETEVENTS, None) == 0  # waits (the GIL released)
+    assert io_uring_cq_ready(ring) == 1
+    io_uring_cq_advance(ring, 1)
+    nop(ring, 2)
+    assert io_uring_enter(ring.ring_fd, 0, 1, IORING_ENTER_GETEVENTS, SigsetT()) == 0  # with a signal mask
+    assert io_uring_peek_cqe(ring, cqe) == 0
+    assert cqe[0].user_data == 2
+    io_uring_cqe_seen(ring, cqe[0])
+    with pytest.raises(OSError):  # not a ring
+        io_uring_enter(0, 0, 1, IORING_ENTER_GETEVENTS, None)
+
+
 def test_register_raw(ring):
     assert io_uring_register(ring.ring_fd, 9, 0, None) >= 0  # IORING_REGISTER_PERSONALITY
     with pytest.raises(OSError):  # unknown opcode
@@ -497,6 +518,17 @@ def test_get_sqe128():
         sqe = io_uring_get_sqe128(ring)
         io_uring_prep_nop128(sqe)
         assert sqe.opcode == io_uring_op.IORING_OP_NOP128
+    finally:
+        io_uring_queue_exit(ring)
+
+
+def test_get_sqe128_full_queue():
+    ring = Ring()
+    io_uring_queue_init(2, ring, IORING_SETUP_SQE128)
+    try:
+        assert io_uring_get_sqe128(ring) is not None
+        assert io_uring_get_sqe128(ring) is not None
+        assert io_uring_get_sqe128(ring) is None  # full, and `auto_submit` is off
     finally:
         io_uring_queue_exit(ring)
 

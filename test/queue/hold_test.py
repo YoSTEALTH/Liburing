@@ -143,6 +143,27 @@ def test_template_holds_buffer(ring, cqe, pair):
     assert tref is None or tref() is None
 
 
+def test_template_entry_holds_buffer(ring, cqe, pair):
+    a, b = pair
+    buf = Buf(5)
+    ref = weakref.ref(buf)
+    tmpl = Sqe(2)
+    io_uring_prep_nop(tmpl[0])
+    tmpl[0].user_data = 3
+    io_uring_prep_recv(tmpl[1], a.fileno(), buf)  # an entry (`tmpl[i]`) holds in its template
+    tmpl[1].user_data = 4
+    del buf
+    gc.collect()
+    assert ref() is not None
+    assert put_sqe(ring, tmpl)
+    del tmpl
+    assert io_uring_submit(ring) == 2
+    b.send(b"hello")
+    assert sorted([reap(ring, cqe), reap(ring, cqe)]) == [(3, 0), (4, 5)]
+    gc.collect()
+    assert ref() is None
+
+
 def test_skip_success_with_hold_refused(ring, cqe, pair):
     a, b = pair
     sqe = recv(ring, a.fileno(), bytearray(5), flags=IOSQE_CQE_SKIP_SUCCESS)

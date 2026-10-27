@@ -10,8 +10,11 @@ def test_Sqe():
     assert sqe.fd == 0
     assert sqe.len == 0
     assert sqe.user_data == 0
+    assert (sqe.ioprio, sqe.personality) == (0, 0)
     assert len(sqe) == 1
     assert bool(sqe) is True
+    io_uring_prep_multishot_accept(sqe, 7)
+    assert sqe.ioprio == IORING_ACCEPT_MULTISHOT  # accept and network preps put their own flags there
 
     sqe = Sqe(2)
     assert len(sqe) == 2

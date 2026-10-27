@@ -1,6 +1,7 @@
 """`Sqe(ring)`: one object for the ring's lifetime; each prep takes the ring's next free entry."""
 
 import gc
+import mmap
 import socket
 import sys
 import threading
@@ -120,6 +121,70 @@ def test_failed_prep_releases_hold(ring):
         io_uring_prep_epoll_wait(sqe, -1, events, 2)  # `maxevents` > `EpollEvent(1)`
     assert sys.getrefcount(events) == count
     assert io_uring_sq_ready(ring) == 0
+
+
+class BufferOnce:
+    """A buffer the first time only (the argument check), refused when a prep takes its own view."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def __buffer__(self, flags):
+        self.calls += 1
+        if self.calls > 1:
+            raise BufferError("only once")
+        return memoryview(bytearray(8))
+
+
+@pytest.fixture(scope="module")
+def huge():
+    """4 GiB of address space (no memory used): longer than a 32-bit length."""
+    flags = mmap.MAP_PRIVATE | mmap.MAP_ANONYMOUS | mmap.MAP_NORESERVE
+    return mmap.mmap(-1, 1 << 32, flags=flags)
+
+
+SOCK_OP = io_uring_socket_op.SOCKET_URING_OP_SETSOCKOPT
+# (prep call, the error it raises after taking the entry); `big` is `huge`
+FAILS_AFTER_SLOT = {
+    "read_fixed": (lambda s, big: io_uring_prep_read_fixed(s, 7, big, 0), OverflowError),
+    "write_fixed": (lambda s, big: io_uring_prep_write_fixed(s, 7, big, 0), OverflowError),
+    "write": (lambda s, big: io_uring_prep_write(s, 7, big), OverflowError),
+    "madvise": (lambda s, big: io_uring_prep_madvise(s, big, mmap.MADV_NORMAL), OverflowError),
+    "cmd_sock": (lambda s, big: io_uring_prep_cmd_sock(s, SOCK_OP, 7, SOL_SOCKET, SO_KEEPALIVE, big), OverflowError),
+    "setsockopt": (lambda s, big: setsockopt(s, 7, SOL_SOCKET, SO_KEEPALIVE, big), OverflowError),
+    "getsockopt": (lambda s, big: getsockopt(s, 7, SOL_SOCKET, SO_KEEPALIVE, big), OverflowError),
+    "readv_fixed": (lambda s, big: io_uring_prep_readv_fixed(s, 7, [BufferOnce()], 0), BufferError),
+    "writev_fixed": (lambda s, big: io_uring_prep_writev_fixed(s, 7, [BufferOnce()], 0), BufferError),
+    "open": (lambda s, big: io_uring_prep_open(s, b"/a"), TypeError),  # a path is `str` or `os.PathLike`
+    "open_direct": (lambda s, big: io_uring_prep_open_direct(s, b"/a"), TypeError),
+    "statx": (lambda s, big: io_uring_prep_statx(s, Statx(), b"/a"), TypeError),
+    "openat2": (lambda s, big: io_uring_prep_openat2(s, b"/a", OpenHow()), TypeError),
+    "openat2_direct": (lambda s, big: io_uring_prep_openat2_direct(s, b"/a", OpenHow()), TypeError),
+    "rename": (lambda s, big: io_uring_prep_rename(s, "/a", b"/b"), TypeError),
+    "mkdir": (lambda s, big: io_uring_prep_mkdir(s, b"/a", 0o755), TypeError),
+    "symlink": (lambda s, big: io_uring_prep_symlink(s, "/a", b"/b"), TypeError),
+    "link": (lambda s, big: io_uring_prep_link(s, "/a", b"/b"), TypeError),
+    "getxattr": (lambda s, big: io_uring_prep_getxattr(s, "user.x", bytearray(8), b"/a", 8), TypeError),
+    "setxattr": (lambda s, big: io_uring_prep_setxattr(s, "user.x", b"v", b"/a", 0, 1), TypeError),
+    "fsetxattr": (lambda s, big: io_uring_prep_fsetxattr(s, 7, b"user.x", b"v", 0, 1), TypeError),
+    "pipe_direct": (lambda s, big: io_uring_prep_pipe_direct(s, bytearray(4), 0, 0), ValueError),  # not 2 ints
+    "msg_ring_cqe_flags": (lambda s, big: io_uring_prep_msg_ring_cqe_flags(s, 7, 1, 1 << 63, 0, 0), ValueError),
+    "msg_ring_fd": (lambda s, big: io_uring_prep_msg_ring_fd(s, 7, 8, 9, 1 << 63), ValueError),
+    "msg_ring_fd_alloc": (lambda s, big: io_uring_prep_msg_ring_fd_alloc(s, 7, 8, 1 << 63), ValueError),
+    "futex_waitv": (lambda s, big: io_uring_prep_futex_waitv(s, Futex()), ValueError),  # no vector
+    "recvmsg_multishot": (lambda s, big: io_uring_prep_recvmsg_multishot(s, 7, Msghdr(Sockaddr(), [b"ro"])), TypeError),
+}
+
+
+@pytest.mark.parametrize("name", FAILS_AFTER_SLOT)
+def test_prep_failing_after_slot_gives_entry_back(ring, huge, name):
+    call, error = FAILS_AFTER_SLOT[name]
+    sqe = Sqe(ring)
+    with pytest.raises(error):
+        call(sqe, huge)
+    assert io_uring_sq_ready(ring) == 0
+    with pytest.raises(RuntimeError, match='no entry'):
+        _ = sqe.user_data
 
 
 def test_holds_buffer_until_completion(ring, cqe):

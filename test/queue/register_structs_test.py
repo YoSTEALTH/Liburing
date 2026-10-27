@@ -193,6 +193,8 @@ def test_mem_region_reg_fields():
     reg.region = None  # the kernel allocates it
     assert (reg.region, reg.region_size, reg.region_flags) == (None, 0, 0)
     assert (reg.region_id, reg.region_mmap_offset) == (0, 0)
+    reg.region_flags, reg.region_id, reg.region_mmap_offset = IORING_MEM_REGION_TYPE_USER, 3, 4096
+    assert (reg.region_flags, reg.region_id, reg.region_mmap_offset) == (IORING_MEM_REGION_TYPE_USER, 3, 4096)
     with pytest.raises(TypeError):
         reg.region = b"read-only"
 
@@ -327,13 +329,15 @@ def test_clock_register(ring, cqe):
 
 def test_zcrx_ifq_reg_fields():
     reg = ZcrxIfqReg()
-    reg.if_idx, reg.if_rxq, reg.rq_entries, reg.flags, reg.rx_buf_len = 2, 1, 4096, 0, 0
+    reg.if_idx, reg.if_rxq, reg.rq_entries, reg.flags, reg.rx_buf_len = 2, 1, 4096, 1, 4096
     area, rq = mmap.mmap(-1, 8192), mmap.mmap(-1, 4096)
-    reg.area, reg.area_flags, reg.area_dmabuf_fd = area, 0, 0
+    reg.area, reg.area_flags, reg.area_dmabuf_fd = area, 1, 5
     reg.region = rq
-    assert (reg.if_idx, reg.if_rxq, reg.rq_entries) == (2, 1, 4096)
-    assert (reg.area, reg.area_len) == (area, 8192)
+    assert (reg.if_idx, reg.if_rxq, reg.rq_entries, reg.flags, reg.rx_buf_len) == (2, 1, 4096, 1, 4096)
+    assert (reg.area, reg.area_len, reg.area_flags, reg.area_dmabuf_fd) == (area, 8192, 1, 5)
     assert (reg.region, reg.region_size, reg.region_flags) == (rq, 4096, IORING_MEM_REGION_TYPE_USER)
+    reg.area_len, reg.region_size, reg.region_flags = 4096, 2048, 0  # may be lowered
+    assert (reg.area_len, reg.region_size, reg.region_flags) == (4096, 2048, 0)
     reg.area, reg.region = None, None
     assert (reg.area, reg.area_len, reg.region, reg.region_size, reg.region_flags) == (None, 0, None, 0, 0)
     with pytest.raises(TypeError):
@@ -354,9 +358,24 @@ def test_register_ifq_without_device(ring):
     assert not locked(rq)
 
 
+def test_register_ifq_region_too_short(ring):
+    reg = ZcrxIfqReg()
+    area, rq = mmap.mmap(-1, 4 * 4096), mmap.mmap(-1, 4096)
+    reg.area, reg.region = area, rq
+    reg.region_size = 8192  # more than `rq` has: refused after `area` was locked
+    with pytest.raises(ValueError, match="needs 8192"):
+        io_uring_register_ifq(ring, reg)
+    assert not locked(area)  # released again
+    assert not locked(rq)
+
+
 def test_bpf_fields_and_register(ring):
     bpf = Bpf()
     assert (bpf.cmd_type, bpf.cmd_flags, bpf.opcode, bpf.filter_len, bpf.filter) == (1, 0, 0, 0, None)
+    assert (bpf.flags, bpf.pdu_size) == (0, 0)
+    bpf.cmd_type, bpf.cmd_flags, bpf.flags = 2, 3, 4
+    assert (bpf.cmd_type, bpf.cmd_flags, bpf.flags) == (2, 3, 4)
+    bpf.cmd_type, bpf.cmd_flags, bpf.flags = 1, 0, 0  # back to a filter, for the register below
     program = bytes(16)  # two instructions
     bpf.filter = program
     bpf.opcode = io_uring_op.IORING_OP_NOP

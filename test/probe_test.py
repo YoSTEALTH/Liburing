@@ -17,6 +17,8 @@ def test_probe():
     io_uring_free_probe(p)
     with raises(MemoryError):
         _ = p.ops_len
+    with raises(MemoryError):
+        _ = p.last_op
 
 
 def test_probe_ring():

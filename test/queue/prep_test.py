@@ -72,6 +72,7 @@ CASES = {
     "send_zc": (lambda s: io_uring_prep_send_zc(s, 7, b"hi"), OP.IORING_OP_SEND_ZC, 7),
     "send_zc_fixed": (lambda s: io_uring_prep_send_zc_fixed(s, 7, b"hi", 0), OP.IORING_OP_SEND_ZC, 7),
     "recv": (lambda s: io_uring_prep_recv(s, 7, buf()), OP.IORING_OP_RECV, 7),
+    "recv_select": (lambda s: io_uring_prep_recv(s, 7, None), OP.IORING_OP_RECV, 7),  # a provided buffer's
     "recv_multishot": (lambda s: io_uring_prep_recv_multishot(s, 7, buf()), OP.IORING_OP_RECV, 7),
     "remove_buffers": (lambda s: io_uring_prep_remove_buffers(s, 2, 1), OP.IORING_OP_REMOVE_BUFFERS, None),
     "shutdown": (lambda s: io_uring_prep_shutdown(s, 7, SHUT_RD), OP.IORING_OP_SHUTDOWN, 7),

@@ -17,6 +17,11 @@ def test_futex_state():
     futex.state = 123
     assert futex.state == 123
     assert len(futex) == 1
+    assert futex  # holds a futex
+    with pytest.raises(MemoryError):  # `val` and `flags` are a vector's (`Futex(..., vector=True)`)
+        _ = futex.val
+    with pytest.raises(MemoryError):
+        _ = futex.flags
 
     with pytest.raises(AttributeError):
         futex.private = True
