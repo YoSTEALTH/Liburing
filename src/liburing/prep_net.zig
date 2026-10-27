@@ -420,9 +420,7 @@ pub fn io_uring_recvmsg_validate(buf: *Object, msgh: *Msghdr) py.Error!*Object {
             .{},
         );
     // the view moves into the result, so the buffer stays locked (can not be resized) while it lives
-    return RecvmsgOutType.new(
-        .{ ._recvmsg_out = out, ._len = view.data.len, ._view = .{ .data = view.data, .view = view.view } },
-    );
+    return RecvmsgOutType.new(.{ ._recvmsg_out = out, ._len = view.data.len, ._view = view });
 }
 
 /// The socket address the message came from (`bytes`: the start of a `sockaddr`, `out.namelen` long).
