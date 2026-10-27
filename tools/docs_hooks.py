@@ -31,6 +31,7 @@ SKIP = {
 }
 LOOSE = {  # the kernel's answer: differs between kernels
     ('probe', 'probe()'),
+    ('Probe', 'probe.last_op, probe.ops_len'),
     ('Query', 'query.data["nr_request_opcodes"]  # the kernel\'s count'),
     ('Query', 'query.data'),
     ('io_uring_register_iowq_max_workers', 'io_uring_register_iowq_max_workers(ring, 0, 0)  # (bounded, unbounded)'),
@@ -48,19 +49,38 @@ def fixture(*names):
     return register
 
 
-def _exit(ring):
-    with contextlib.suppress(RuntimeError):  # the example may have exited it already
-        io_uring_queue_exit(ring)
+def pinned():
+    '''The memory the process has pinned, in kB (`VmPin`): what registered buffers lock, counted against
+    `RLIMIT_MEMLOCK`.'''
+    with open('/proc/self/status') as f:
+        return next(int(line.split()[1]) for line in f if line.startswith('VmPin:'))
+
+
+def exit_rings(rings, before):
+    '''Exit `rings`, then wait (up to a second) until the kernel has released what they pinned, back to
+    `before` kB. It frees an exited ring later, from a workqueue; a registered buffer in a huge page pins all
+    2 MiB of it, so a few examples in a row would reach an 8 MiB `RLIMIT_MEMLOCK` (GitHub's runners), and every
+    ring after them would fail with `OSError: ENOMEM`.'''
+    for ring in rings:
+        with contextlib.suppress(RuntimeError):  # the example may have exited it already
+            io_uring_queue_exit(ring)
+    deadline = time.monotonic() + 1
+    while pinned() > before and time.monotonic() < deadline:
+        time.sleep(0.001)
 
 
 def make_ring(ns, name='ring', entries=1024, flags=0):
     '''`ns[name]`: a `Ring` of `entries` set up with `flags`, exited after the example.'''
+    if '_rings' not in ns:  # the first ring of the example: one cleanup exits them all
+        ns['_rings'] = []
+        before = pinned()
+        ns['_cleanup'].append(lambda: exit_rings(ns['_rings'], before))
     ring = Ring()
     param = Param()
     param.flags = flags
     io_uring_queue_init_params(entries, ring, param)
     ns[name] = ring
-    ns['_cleanup'].append(lambda: _exit(ring))
+    ns['_rings'].append(ring)
     return ring
 
 
@@ -305,3 +325,53 @@ def received_fd(ns):
     header = struct.pack('=IIII', len(name), len(cmsg), 3, 0)
     ns['msg'] = msg = Msghdr(namelen=len(name), controllen=len(cmsg))
     ns['out'] = io_uring_recvmsg_validate(bytearray(header + name + cmsg + b'abc'), msg)
+
+
+# What the running kernel lacks (CI runs an older one than the examples show): its examples do not run.
+
+
+def _setup_works(flags):
+    '''Whether the kernel sets up a ring with `flags`.'''
+    ring = Ring()
+    try:
+        io_uring_queue_init(8, ring, flags)
+    except OSError:
+        return False
+    io_uring_queue_exit(ring)
+    return True
+
+
+def _register_works(call):
+    '''Whether the kernel has the `io_uring_register` opcode `call(ring)` uses (`UnsupportedError` if not).'''
+    ring = Ring()
+    io_uring_queue_init(8, ring)
+    try:
+        call(ring)
+    except UnsupportedError:
+        return False
+    except OSError:
+        pass  # it has it: the arguments are what it refused
+    finally:
+        io_uring_queue_exit(ring)
+    return True
+
+
+def _bpf_filter(ring):
+    bpf = Bpf()
+    bpf.opcode = io_uring_op.IORING_OP_OPENAT
+    bpf.filter = struct.pack('HBBI', 0x06, 0, 0, 0)
+    io_uring_register_bpf_filter(ring, bpf)
+
+
+if not _setup_works(IORING_SETUP_SQE_MIXED):  # no fixture: the examples are listed as not run
+    del FIXTURES['io_uring_get_sqe128'], FIXTURES['io_uring_prep_nop128']
+if not _register_works(lambda ring: io_uring_register_query(Query())):
+    for step in (
+        ('Query', 'io_uring_register_query(query)'),
+        ('io_uring_register_query', 'io_uring_register_query(Query(IO_URING_QUERY_SCQ))'),
+    ):
+        SKIP[step] = 'needs `IORING_REGISTER_QUERY`, which this kernel lacks'
+if not _register_works(_bpf_filter):
+    SKIP[('Bpf', 'io_uring_register_bpf_filter(ring, bpf)')] = (
+        'needs `IORING_REGISTER_BPF_FILTER`, which this kernel lacks'
+    )
