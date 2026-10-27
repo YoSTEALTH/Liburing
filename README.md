@@ -17,7 +17,7 @@ Fast, asynchronous Linux I/O for Python: a Zig-built wrapper around C liburing a
 | | |
 |---|---|
 | Documentation | https://yostealth.github.io/Liburing/ |
-| Benchmarks | https://yostealth.github.io/Liburing/bench/ |
+| Benchmarks | https://yostealth.github.io/Liburing/bench.html |
 | Source | https://github.com/YoSTEALTH/Liburing |
 
 ## Requirements
@@ -379,7 +379,7 @@ if __name__ == "__main__":
 
 More under [`example/`](https://github.com/YoSTEALTH/Liburing/tree/main/example): the four ways to fill the
 submission queue (`sqe_styles.py`), vectored reads and writes, messages between threads' rings through a futex,
-and the HTTP servers of the [benchmark](https://yostealth.github.io/Liburing/bench/) (`bench/`).
+and the HTTP servers of the [benchmark](https://yostealth.github.io/Liburing/bench.html) (`bench/`).
 
 ## Note
 
