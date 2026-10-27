@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Runs every Liburing check: zig fmt, Zig line width, ruff (lint + format), `tools/setu_build.py`,
 # `tools/setu_docs.py` and `docs/setu-guide.md` against the pinned Setu, `zig build develop` (the one stable-ABI
-# `liburing.so`), then with each interpreter (3.15t, 3.15, 3.14t, 3.14) Setu's `check_symbols.py` and pytest, then
-# `mypy --strict` (as 3.14 and 3.15) + `stubtest` on `liburing.pyi`.
-# Interpreters: PY_FT=... / PY_GIL=... (3.15), PY314_FT=... / PY314_GIL=...; compiler: ZIG=...; Setu checkout:
-# SETU=... (default: the `setu` path in build.zig.zon); ruff: RUFF=... (default: `ruff` on PATH, else `$PY_FT -m
-# ruff`); extra pytest arguments after `--`.
+# `liburing.so`), then with each interpreter (3.15t, 3.15, 3.14t, 3.14) Setu's `check_symbols.py` and pytest, the
+# same with the pre-release 3.16t / 3.16 when installed (`/opt/python/3.16{t,}-dev`), then the docstring examples
+# (`setu_docs.py check`), then `mypy --strict` (as 3.14 and 3.15) + `stubtest` on `liburing.pyi`.
+# Interpreters: PY_FT=... / PY_GIL=... (3.15), PY314_FT=... / PY314_GIL=..., PY316_FT=... / PY316_GIL=...;
+# compiler: ZIG=...; Setu checkout: SETU=... (default: the `setu` path in build.zig.zon); ruff: RUFF=... (default:
+# `ruff` on PATH, else `$PY_FT -m ruff`); extra pytest arguments after `--`.
 set -euo pipefail
 
 [[ -n ${SETU:-} ]] && SETU=$(realpath -m -- "$SETU") # relative to the caller's cwd, not the repo root
@@ -14,6 +15,8 @@ PY_FT=${PY_FT:-/opt/python/3.15t/bin/python3}
 PY_GIL=${PY_GIL:-/opt/python/3.15/bin/python3}
 PY314_FT=${PY314_FT:-/opt/python/3.14t/bin/python3}
 PY314_GIL=${PY314_GIL:-/opt/python/3.14/bin/python3}
+PY316_FT=${PY316_FT:-/opt/python/3.16t-dev/bin/python3}
+PY316_GIL=${PY316_GIL:-/opt/python/3.16-dev/bin/python3}
 SETU=${SETU:-../../../Setu/Setu/Code}
 ZIG=${ZIG:-zig}
 [[ ${1:-} == -- ]] && shift
@@ -95,6 +98,23 @@ for py in "$PY_FT" "$PY_GIL" "$PY314_FT" "$PY314_GIL"; do
     fi
     "$py" -m pytest "${PYTEST_ARGS[@]}"
 done
+
+for py in "$PY316_FT" "$PY316_GIL"; do # pre-release CPython, only where installed (not CI)
+    step "$py (pre-release)"
+    if [[ ! -x $py ]]; then
+        echo "skipped: not installed"
+        continue
+    fi
+    if [[ -f $SETU/tools/check_symbols.py ]]; then
+        "$py" "$SETU/tools/check_symbols.py" src/liburing/liburing.so
+    else
+        echo "skipped check_symbols.py: no Setu checkout at $SETU"
+    fi
+    "$py" -m pytest "${PYTEST_ARGS[@]}"
+done
+
+step "docstring examples ($PY_FT tools/setu_docs.py check)"
+"$PY_FT" tools/setu_docs.py check # every `>>>` example in a docstring still prints what it shows
 
 step "mypy --strict + stubtest ($PY_FT)"
 if "$PY_FT" -c 'import mypy' 2>/dev/null; then

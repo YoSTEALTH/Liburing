@@ -53,7 +53,7 @@ python3 -m pip install .        # builds the wheel with `zig build` (tools/setu_
 ```bash
 zig build develop                       # `liburing.so` + `liburing.pyi` into src/liburing/ (one binary, 3.14+)
 python3.15t -m pytest                   # tests run from the checkout (`pythonpath = ["src"]`)
-tools/check.sh                          # every check: zig fmt, 3.15t / 3.15 / 3.14t / 3.14, mypy --strict, stubtest
+tools/check.sh                          # zig fmt, pytest on all four, docstring examples, mypy --strict, stubtest
 
 python3.15t tools/setu_build.py --all   # release wheels into dist/ (x86_64 + aarch64)
 ```
