@@ -1,19 +1,18 @@
 # Liburing Benchmarks
 
-The latest benchmark run, with each run's raw numbers.
+The latest benchmark runs, with each run's raw numbers: one server thread (Liburing against C, `select.epoll` and asyncio), then several (Liburing against `select.epoll`, with and without the GIL).
 
 ## Setup
 
 - AMD Ryzen 9 9900X (12 cores / 24 threads, 2 CCDs: CPUs 0-5 + 12-17 and 6-11 + 18-23), Linux 7.3.0
 - Zig 0.17.0, Python 3.15.0 / 3.15t, 3.14.8 / 3.14t, C liburing 2.15 (the `lib/liburing` submodule)
 - Liburing built with `zig build develop -Drelease`; C with `zig cc -O2`; Zig servers `-OReleaseFast`
-- HTTP load: `tools/load.zig`, `zig-out/bin/load PORT 64 5 100`: 64 threads, each one connection
-  after another, 100 keep-alive requests per connection, for 5 seconds
-- HTTP server: one thread, pinned to CPU 2 (`taskset -c 2`); load on the same CCD:
-  `taskset -c 0,1,3,4,5,12,13,15,16,17` (CCD0 without CPU 2 and its SMT sibling 14)
+- HTTP load: `tools/load.zig`, `zig-out/bin/load PORT CONNECTIONS 5 100`: a thread per connection, each one connection after another, 100 keep-alive requests per connection, for 5 seconds
 - `net.netfilter.nf_conntrack_max = 262144` (back-to-back runs fill it up: see the note under "Every run" below)
 
-## HTTP keep-alive server, 2026-10-24
+## Single-threaded, 2026-10-24
+
+One server thread, pinned to CPU 2 (`taskset -c 2`); the load, 64 connections, on the same CCD: `taskset -c 0,1,3,4,5,12,13,15,16,17` (CCD0 without CPU 2 and its SMT sibling 14).
 
 The same server (accept, recv, send the 214-byte response, recv again; close on 0 or error) written several ways:
 `liburing_bench.c` (C liburing), `epoll_bench.c` (C epoll), `liburing_bench.py` (Liburing), `epoll_bench.py`
@@ -155,6 +154,89 @@ with the GIL and ~0.16-0.18 free-threaded (`Sqe(ring)`). In C, io_uring costs ~1
 - Left to try: `--at` (`cqe.user_data_at(i)` / `res_at(i)`, no `CQE` objects: ~0.01-0.05 µs/req),
   multishot recv with a provided buffer ring (one SQE for many recvs), and the free-threaded extra cost.
 
+## Multi-threaded, 2026-10-28
+
+The same Liburing and `select.epoll` servers, run by N threads in one process (`--threads=N`): each thread is the single-threaded server, with its own ring or epoll and its own listening socket on the port (`SO_REUSEPORT`: the kernel spreads the connections), pinned to one CPU. Liburing arms with `Sqe(ring)` and reads each completion with `cqe.user_data_res(i)` (`--ring --at`). With the GIL (3.15, 3.14) the threads take turns in Python; free-threaded (3.15t, 3.14t) they run at once.
+
+- Server threads on CPUs 2, 2-3 or 2-5 (`taskset -c`, one thread each); the load, 256 connections, on the rest of CCD0 without their SMT siblings, and on CCD1: `taskset -c 0,1,12,13,6-11,18-23`
+- 5 runs each, all servers interleaved; the runner waited while the conntrack table held more than 200,000 entries
+- Server CPU: every server thread's run time (`/proc/PID/task/*/schedstat`) over 4 s of each run, per request
+
+### Summary: req/s with 4 threads, median, best first
+
+<!-- chart group="^(\w+)" -->
+| server | req/s | |
+|:--|--:|:--|
+| epoll, 3.15t | 1,153,363 | `███████████████████████████████████████` |
+| Liburing `--ring --at`, 3.15t | 1,132,961 | `██████████████████████████████████████▎` |
+| epoll, 3.14t | 1,124,762 | `██████████████████████████████████████` |
+| Liburing `--ring --at`, 3.14t | 1,107,196 | `█████████████████████████████████████▍` |
+| Liburing `--ring --at`, 3.15 | 1,055,800 | `███████████████████████████████████▋` |
+| Liburing `--ring --at`, 3.14 | 1,053,398 | `███████████████████████████████████▌` |
+| epoll, 3.15 | 685,031 | `███████████████████████▏` |
+| epoll, 3.14 | 665,726 | `██████████████████████▌` |
+
+### Scaling: req/s by server threads, median
+
+| server | 1 thread | 2 threads | 4 threads | 4 vs 1 |
+|:--|--:|--:|--:|--:|
+| Liburing `--ring --at`, 3.15 | 262,252 | 510,754 | 1,055,800 | 4.03x |
+| epoll, 3.15 | 269,053 | 482,785 | 685,031 | 2.55x |
+| Liburing `--ring --at`, 3.15t | 257,451 | 509,294 | 1,132,961 | 4.40x |
+| epoll, 3.15t | 263,594 | 519,942 | 1,153,363 | 4.38x |
+| Liburing `--ring --at`, 3.14 | 262,336 | 508,401 | 1,053,398 | 4.02x |
+| epoll, 3.14 | 261,658 | 476,091 | 665,726 | 2.54x |
+| Liburing `--ring --at`, 3.14t | 253,185 | 502,415 | 1,107,196 | 4.37x |
+| epoll, 3.14t | 259,212 | 501,762 | 1,124,762 | 4.34x |
+
+### Server CPU per request, µs, median
+
+| server | 1 thread | 2 threads | 4 threads |
+|:--|--:|--:|--:|
+| Liburing `--ring --at`, 3.15 | 2.08 | 2.09 | 1.91 |
+| epoll, 3.15 | 2.09 | 2.36 | 3.39 |
+| Liburing `--ring --at`, 3.15t | 2.17 | 2.17 | 2.03 |
+| epoll, 3.15t | 2.14 | 2.16 | 1.97 |
+| Liburing `--ring --at`, 3.14 | 2.08 | 2.10 | 1.91 |
+| epoll, 3.14 | 2.19 | 2.41 | 3.48 |
+| Liburing `--ring --at`, 3.14t | 2.19 | 2.21 | 2.10 |
+| epoll, 3.14t | 2.20 | 2.26 | 2.02 |
+
+### Every run, req/s
+
+| server | threads | run 1 | run 2 | run 3 | run 4 | run 5 | low - max |
+|:--|--:|--:|--:|--:|--:|--:|--:|
+| Liburing `--ring --at`, 3.15 | 1 | 254,797 | 263,088 | 260,746 | 262,252 | 263,774 | 254,797 - 263,774 |
+| Liburing `--ring --at`, 3.15 | 2 | 489,474 | 517,307 | 514,403 | 510,754 | 508,315 | 489,474 - 517,307 |
+| Liburing `--ring --at`, 3.15 | 4 | 996,446 | 1,073,692 | 1,074,873 | 1,055,800 | 1,022,754 | 996,446 - 1,074,873 |
+| epoll, 3.15 | 1 | 254,028 | 269,685 | 263,622 | 269,053 | 270,458 | 254,028 - 270,458 |
+| epoll, 3.15 | 2 | 471,524 | 486,527 | 490,072 | 482,030 | 482,785 | 471,524 - 490,072 |
+| epoll, 3.15 | 4 | 679,189 | 685,031 | 693,220 | 679,589 | 686,898 | 679,189 - 693,220 |
+| Liburing `--ring --at`, 3.15t | 1 | 258,194 | 254,256 | 254,129 | 257,451 | 257,718 | 254,129 - 258,194 |
+| Liburing `--ring --at`, 3.15t | 2 | 502,550 | 510,335 | 515,414 | 503,071 | 509,294 | 502,550 - 515,414 |
+| Liburing `--ring --at`, 3.15t | 4 | 1,070,807 | 1,151,227 | 1,159,011 | 1,116,232 | 1,132,961 | 1,070,807 - 1,159,011 |
+| epoll, 3.15t | 1 | 256,491 | 262,876 | 263,594 | 267,461 | 269,380 | 256,491 - 269,380 |
+| epoll, 3.15t | 2 | 509,183 | 604,732 | 519,942 | 514,944 | 557,981 | 509,183 - 604,732 |
+| epoll, 3.15t | 4 | 1,123,675 | 1,185,414 | 1,125,787 | 1,167,434 | 1,153,363 | 1,123,675 - 1,185,414 |
+| Liburing `--ring --at`, 3.14 | 1 | 262,372 | 263,829 | 254,720 | 262,336 | 261,572 | 254,720 - 263,829 |
+| Liburing `--ring --at`, 3.14 | 2 | 507,212 | 522,091 | 506,991 | 508,401 | 513,591 | 506,991 - 522,091 |
+| Liburing `--ring --at`, 3.14 | 4 | 1,033,852 | 1,070,356 | 1,053,398 | 1,035,112 | 1,061,035 | 1,033,852 - 1,070,356 |
+| epoll, 3.14 | 1 | 262,356 | 255,919 | 254,611 | 261,658 | 262,172 | 254,611 - 262,356 |
+| epoll, 3.14 | 2 | 472,611 | 478,790 | 453,822 | 476,091 | 479,799 | 453,822 - 479,799 |
+| epoll, 3.14 | 4 | 665,251 | 665,726 | 678,963 | 650,402 | 677,859 | 650,402 - 678,963 |
+| Liburing `--ring --at`, 3.14t | 1 | 255,773 | 253,185 | 252,854 | 251,871 | 254,430 | 251,871 - 255,773 |
+| Liburing `--ring --at`, 3.14t | 2 | 491,455 | 513,045 | 507,645 | 491,624 | 502,415 | 491,455 - 513,045 |
+| Liburing `--ring --at`, 3.14t | 4 | 1,125,434 | 1,108,750 | 1,107,196 | 1,083,673 | 1,060,345 | 1,060,345 - 1,125,434 |
+| epoll, 3.14t | 1 | 259,886 | 259,236 | 258,580 | 257,477 | 259,212 | 257,477 - 259,886 |
+| epoll, 3.14t | 2 | 500,274 | 511,455 | 501,762 | 506,883 | 498,053 | 498,053 - 511,455 |
+| epoll, 3.14t | 4 | 1,124,762 | 1,161,509 | 1,127,654 | 1,122,555 | 1,095,239 | 1,095,239 - 1,161,509 |
+
+120 runs, no failed request. The server threads are only ~50% busy at any thread count (about 250k req/s each): the load generator, a blocking thread per connection on another CCD, sets the pace, so req/s here shows how the servers scale, and CPU per request what each request costs them.
+
+- With the GIL Liburing scales and epoll does not: 4 threads give Liburing 1.06M req/s (4.0x one thread), epoll 685k (2.5x). A Liburing thread does its kernel work (the sends and receives) inside `io_uring_submit_and_wait`, with the GIL released, once per batch of completions; an epoll thread releases and retakes the GIL around every `recv_into` and `send`, and the threads queue for it: epoll's CPU per request rises from 2.09 µs (one thread) to 3.39 (four), Liburing's stays at ~2.
+- Free-threaded both scale (4.4x), and epoll is ~2% ahead (1.15M vs 1.13M req/s on 3.15t; 1.97 vs 2.03 µs per request): the free-threaded extra cost of the single-threaded Liburing server, not a threading one.
+- One thread: Liburing and epoll within ~3% of each other on every Python, as in the single-threaded results (this load is lighter per server thread, so the numbers differ from those).
+
 ## How to run
 
 ```sh
@@ -168,6 +250,12 @@ PYTHONPATH=src taskset -c 2 python3.15 example/bench/liburing_bench.py 12345   #
 taskset -c 2 python3.15 example/bench/epoll_bench.py 12345
 taskset -c 2 python3.15 example/bench/asyncio_bench.py 12345
 taskset -c 0,1,3,4,5,12,13,15,16,17 zig-out/bin/load 12345 64 5 100
+
+# Multi-threaded: N server threads on CPUs 2.. (one each), the load on the rest of CCD0 (not their SMT siblings)
+# and on CCD1
+PYTHONPATH=src taskset -c 2-5 python3.15t example/bench/liburing_bench.py 12345 --ring --at --threads=4
+taskset -c 2-5 python3.15t example/bench/epoll_bench.py 12345 --threads=4
+taskset -c 0,1,12,13,6-11,18-23 zig-out/bin/load 12345 256 5 100
 
 # C servers
 zig cc -O2 -D_GNU_SOURCE -Ilib/liburing/src/include -o zig-out/bin/liburing_bench_c \

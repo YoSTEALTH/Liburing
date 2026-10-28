@@ -5,13 +5,16 @@ connection), so the only difference is epoll + `recv` / `send` calls instead of 
     python3.15t example/bench/epoll_bench.py [port=12345]
     zig-out/bin/load 12345 64 5 100     # `zig build load`: port, connections, seconds, requests/connection
 
-One thread, level-triggered epoll. Each connection: recv, send the response, recv again. Closes
+One thread, level-triggered epoll. `--threads=N`: N threads, each this server with its own epoll and listening
+socket (`SO_REUSEPORT`), pinned to the process's CPUs in order, as `liburing_bench.py --threads=N`. Each connection: recv, send the response, recv again. Closes
 the connection when recv or send returns 0 or an error. A partial send waits for `EPOLLOUT`.
 '''
 
+import os
 import select
 import socket
 import sys
+import threading
 
 LISTEN = 1024
 MAXEVENTS = 4096
@@ -61,6 +64,7 @@ def main(port):
 
     listen = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listen.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listen.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)  # `--threads`: one listening socket per thread
     listen.bind(('127.0.0.1', port))
     listen.listen(LISTEN)
     listen.setblocking(False)
@@ -98,5 +102,26 @@ def main(port):
                 send(fd, c, RESPONSE)
 
 
+def run(main, port, threads, *args):
+    '''`main(port, *args)` on `threads` threads, each with its own listening socket on `port` (`SO_REUSEPORT`: the
+    kernel spreads the connections) and pinned to one CPU of this process (`taskset -c ...`, in order); one thread:
+    in this one, not pinned.'''
+    if threads == 1:
+        return main(port, *args)
+    cpus = sorted(os.sched_getaffinity(0))
+
+    def serve(i):
+        os.sched_setaffinity(0, {cpus[i % len(cpus)]})  # `0`: the calling thread
+        main(port, *args)
+
+    pool = [threading.Thread(target=serve, args=(i,), daemon=True) for i in range(threads)]
+    for t in pool:
+        t.start()
+    for t in pool:
+        t.join()
+
+
 if __name__ == '__main__':
-    main(int(sys.argv[1]) if len(sys.argv) > 1 else 12345)
+    threads = next((int(a[len('--threads=') :]) for a in sys.argv[1:] if a.startswith('--threads=')), 1)
+    args = [a for a in sys.argv[1:] if not a.startswith('--threads=')]
+    run(main, int(args[0]) if args else 12345, threads)
