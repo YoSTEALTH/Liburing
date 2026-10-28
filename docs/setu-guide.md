@@ -371,10 +371,12 @@ a hand-written `Example #<n>` is a compile error. A `Flags` section lists one na
 note (`IORING_TIMEOUT_ABS  # ts is a point in time`): the site links the name and shows the note as text. A bare
 `https://` URL anywhere in a docstring (outside backticks) becomes a link that opens in a new tab; a trailing `.`,
 `,` or `)` stays text unless the `)` closes a `(` in the URL.
-In the site's Markdown pages an `@@path@@` line includes a project file as a code block (an example script, as
-tested); the header's dropdown picks the theme (Tokyo Night, Nord); `coverage = 'zig-out/coverage.json'` and
-`profile = 'zig-out/profile.json'` in `[tool.setu_docs]` add the Coverage and Profile pages (section 11). The site
-builds from `setu_docs.py` alone: no wrapper script, no copied CSS (a `css` file only for the project's own colors).
+In the site's Markdown pages an `@@path@@` line includes a project file as a code block (an example script, as tested);
+the header's ◐ button opens the theme menu (Nord Day, Nord Night, Tokyo Day, Tokyo Night); `coverage =
+'zig-out/coverage.json'` and `profile = 'zig-out/profile.json'` in `[tool.setu_docs]` add the Coverage and Profile pages
+(section 11); the Profile page is local only: `setu_docs.py serve` makes it from the file as it is, `build` (CI, the
+published site) leaves it out, so nothing outside your machine needs `zig build profile`. The site builds from
+`setu_docs.py` alone: no wrapper script, no copied CSS (a `css` file only for the project's own colors).
 
 Ship the extension as its package's `__init__.so`, with the stub as `__init__.pyi` and a `py.typed` (PEP 561 marks
 packages only, so a bare top-level `liburing.so` gets no typing): `import liburing` loads the extension itself, a
@@ -498,7 +500,12 @@ numbers to `zig-out/coverage.json` (totals, per interpreter, per file and line, 
 goes to a temporary directory, removed after the run; `-- --html DIR` keeps its HTML report. On the docs site (`coverage
 = 'zig-out/coverage.json'`) the Coverage page has a section per owner (the project, then each dependency), and a click
 on a file shows its source, Zig highlighted, the missed lines red; a source changed since the run (its CRC-32) is
-flagged `changed`. A local tool, not for CI:
+flagged `changed`. `.badge = "docs/coverage-badge.json"` also writes the total as a shields.io endpoint file; committed,
+it is a README badge: the image `https://img.shields.io/endpoint?url=<URL>`, `<URL>` the file's
+`raw.githubusercontent.com` address, percent-encoded (run with every `--python` first: the badge shows the merged
+total). In CI it needs kcov, packaged for Ubuntu 25.04+: on GitHub's `ubuntu-26.04` runner the apt package `kcov`, then
+the step with every `--python`; Setu's `.github/workflows/ci.yml` also fails when the committed badge differs from the
+run's (`git diff --exit-code docs/coverage-badge.json`). Notes:
 
 - It measures the extension as built, in Debug. The default Debug backend (self-hosted x86_64) pads its line
   tables with ops kcov (elfutils) misreads, so kcov runs a copy with the padding rewritten (the build is not
@@ -551,8 +558,9 @@ inlined there); `--lines K` lists each case's K costliest lines with their sourc
 - `.cases` is a Python file with `CASES`, a list of `(label, statement)`, and `namespace(module)`, which returns
   the names the statements use; Setu's `tools/bench.py` is one, so `bench.py` times the cases `profile` counts.
 - A line `0` is code the compiler added (no source line).
-- `profile = 'zig-out/profile.json'` in `[tool.setu_docs]` adds a Profile page to the docs site: a bar per case and
-  interpreter (the extension's part dark), and per case its files and costly lines with their source, shaded by cost.
+- `profile = 'zig-out/profile.json'` in `[tool.setu_docs]` adds a Profile page to the docs site: a row per case with
+  a bar per interpreter (the extension's part dark); a click on a case shows its files' sources, each costly line
+  with its instructions per call, shaded by them.
 
 Memory errors and leaks: valgrind memcheck over the project's pytest, by hand (no build step):
 
