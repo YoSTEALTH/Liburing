@@ -86,7 +86,9 @@ name = "Liburing"
 home = "docs/index.md"
 edit = "https://github.com/YoSTEALTH/Liburing/edit/dev/"
 hooks = "tools/docs_hooks.py"  # fixtures for the docstring examples (`ring`, `sqe`, `cqe`, `fd`, ...)
-coverage = "zig-out/coverage.json"  # the Coverage page, from `zig build coverage` (skipped without it)
+# The Coverage page: a committed snapshot, so the published site has it too; `tools/check.sh` rewrites it (kcov)
+coverage = "docs/coverage.json"
+profile = "zig-out/profile.json"  # the Profile page: live only (`setu_docs.py serve`), from `zig build profile`
 
 # The hand-written pages, in nav order.
 [[tool.setu_docs.markdown]]

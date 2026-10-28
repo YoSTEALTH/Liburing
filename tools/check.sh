@@ -2,8 +2,10 @@
 # Runs every Liburing check: zig fmt, Zig line width, ruff (lint + format), `tools/setu_build.py`,
 # `tools/setu_docs.py` and `docs/setu-guide.md` against the pinned Setu, `zig build develop` (the one stable-ABI
 # `liburing/__init__.so`), then with each interpreter (3.15t, 3.15, 3.14t, 3.14) Setu's `check_symbols.py` and
-# pytest, the same with the pre-release 3.16t / 3.16 when installed (`/opt/python/3.16{t,}-dev`), then the docstring
-# examples (`setu_docs.py check`), then `mypy --strict` (as 3.14 and 3.15) + `stubtest` on the `liburing` package.
+# pytest, the same with the pre-release 3.16t / 3.16 when installed (`/opt/python/3.16{t,}-dev`), then with kcov
+# installed line coverage over the four (into docs/coverage.json; fails below 100% for Liburing's own code), then
+# the docstring examples (`setu_docs.py check`), then `mypy --strict` (as 3.14 and 3.15) + `stubtest` on the
+# `liburing` package.
 # Interpreters: PY_FT=... / PY_GIL=... (3.15), PY314_FT=... / PY314_GIL=..., PY316_FT=... / PY316_GIL=...;
 # compiler: ZIG=...; Setu checkout: SETU=... (default: the `setu` path in build.zig.zon); ruff: RUFF=... (default:
 # `ruff` on PATH, else `$PY_FT -m ruff`); extra pytest arguments after `--`.
@@ -112,6 +114,29 @@ for py in "$PY316_FT" "$PY316_GIL"; do # pre-release CPython, only where install
     fi
     "$py" -m pytest "${PYTEST_ARGS[@]}"
 done
+
+step "coverage: Liburing's own Zig code at 100% (zig build coverage, kcov)"
+# Every supported interpreter, merged, into docs/coverage.json (the committed snapshot the docs' Coverage page
+# reads); fails when a line of src/liburing never ran. Setu's lines count on the page, not here.
+if command -v kcov >/dev/null; then
+    "$ZIG" build coverage -Dpython="$PY_FT" -- --json docs/coverage.json \
+        --python "$PY_GIL" --python "$PY314_FT" --python "$PY314_GIL" "${PYTEST_ARGS[@]}"
+    "$PY_FT" - docs/coverage.json <<'PY'
+import json
+import sys
+
+files = json.load(open(sys.argv[1], encoding="utf-8"))["files"]
+own = {path: f for path, f in files.items() if not path.startswith("setu/")}
+covered, lines = sum(f["covered"] for f in own.values()), sum(f["lines"] for f in own.values())
+for path, f in sorted(own.items()):
+    if f["covered"] < f["lines"]:
+        print(f"{path}: {f['covered']}/{f['lines']} lines")
+print(f"Liburing: {covered}/{lines} lines")
+sys.exit(0 if covered == lines else 1)
+PY
+else
+    echo "skipped: no kcov"
+fi
 
 step "docstring examples ($PY_FT tools/setu_docs.py check)"
 "$PY_FT" tools/setu_docs.py check # every `>>>` example in a docstring still prints what it shows

@@ -13,13 +13,15 @@
 //!   zig build setu-guide-check   check that docs/setu-guide.md is the pinned Setu's copy
 //!   zig build docs-web           the docs site's search (zig-out/web/docs.wasm; tools/setu_docs.py runs it)
 //!   zig build coverage           kcov line coverage under pytest (zig-out/coverage.json; `-- --missed`)
+//!   zig build profile -Drelease -Dcpu=x86_64_v3
+//!                                callgrind instructions per call of tools/profile_cases.py (zig-out/profile.json)
 //!
 //! Options:
 //!   -Drelease               ReleaseSafe (wheels use it, as PyOZ did); without it, Debug. (A preferred release
 //!                           mode leaves no `-Doptimize`.)
 //!   -Dstrip                 drop debug info from the extension (wheels use it)
 //!   -Dext-suffix=...        Python extension suffix (default: Setu's `.so`: one stable-ABI binary for 3.14+)
-//!   -Dpython=...            the interpreter `coverage` runs pytest with (default `python3`)
+//!   -Dpython=...            the interpreter `coverage` runs pytest with, `profile` the cases (default `python3`)
 //!
 //! Wheels are built by `tools/setu_build.py` (the PEP 517 backend), not by a step here.
 const std = @import("std");
@@ -136,12 +138,23 @@ pub fn build(b: *std.Build) void {
     // `zig build coverage [-- pytest args]`: kcov line coverage of `src/liburing` (and Setu's code as used here)
     // under pytest, merged over every `--python`, in zig-out/coverage.json (the docs' Coverage page reads it; kcov's
     // HTML with `-- --html DIR`). Needs a Debug, unstripped build (the default).
+    const python = b.option([]const u8, "python", "Python for `coverage` and `profile`") orelse "python3";
     @import("setu").addCoverageSteps(b, setu_dep, ext, .{
         .module_name = "liburing",
         .package = true, // run as `liburing/__init__.so`, like the real package
         .include = &.{ b.path("src/liburing"), setu_dep.path("src") },
         .stub = pyi,
-        .python = b.option([]const u8, "python", "Python that runs pytest for `coverage`") orelse "python3",
+        .python = python,
+    });
+
+    // `zig build profile -Drelease -Dcpu=x86_64_v3 [-- runner args]`: instructions per call of
+    // `tools/profile_cases.py` by callgrind, in zig-out/profile.json (the docs' Profile page reads it). Needs an
+    // optimized build with debug info, for a CPU without AVX-512 (valgrind runs none).
+    @import("setu").addProfileSteps(b, setu_dep, ext, .{
+        .module_name = "liburing",
+        .package = true,
+        .cases = b.path("tools/profile_cases.py"),
+        .python = python,
     });
 
     const develop = b.step("develop", "Copy the extension and its stubs into src/liburing/");
