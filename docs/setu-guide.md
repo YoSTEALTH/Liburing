@@ -106,6 +106,11 @@ b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "__init__.pyi").
     .stub = pyi, // for tests that read the .pyi next to the extension
     .python = b.option([]const u8, "python", "Python for `coverage`") orelse "python3",
 });
+@import("setu").addProfileSteps(b, setu_dep, ext, .{ // zig build profile: callgrind over the cases (see 11.)
+    .module_name = "liburing",
+    .package = true,
+    .cases = b.path("tools/bench_cases.py"), // `CASES` + `namespace(module)`, as Setu's tools/bench.py
+});
 ```
 
 The extension is the package itself, `<name>/__init__.so` next to `__init__.pyi` and `py.typed` (section 7), or a
@@ -366,6 +371,10 @@ a hand-written `Example #<n>` is a compile error. A `Flags` section lists one na
 note (`IORING_TIMEOUT_ABS  # ts is a point in time`): the site links the name and shows the note as text. A bare
 `https://` URL anywhere in a docstring (outside backticks) becomes a link that opens in a new tab; a trailing `.`,
 `,` or `)` stays text unless the `)` closes a `(` in the URL.
+In the site's Markdown pages an `@@path@@` line includes a project file as a code block (an example script, as
+tested); the header's dropdown picks the theme (Tokyo Night, Nord); `coverage = 'zig-out/coverage.json'` and
+`profile = 'zig-out/profile.json'` in `[tool.setu_docs]` add the Coverage and Profile pages (section 11). The site
+builds from `setu_docs.py` alone: no wrapper script, no copied CSS (a `css` file only for the project's own colors).
 
 Ship the extension as its package's `__init__.so`, with the stub as `__init__.pyi` and a `py.typed` (PEP 561 marks
 packages only, so a bare top-level `liburing.so` gets no typing): `import liburing` loads the extension itself, a
@@ -423,7 +432,10 @@ all four interpreters):
   `prep_recv(sqe, -1, bytearray)` ~22 ns.
 
 When touching `src/class.zig` / `src/export.zig` / `src/convert.zig` / `src/args.zig`: `python3 tools/bench.py
---ref HEAD` before claiming a change is neutral.
+--ref HEAD` before claiming a change is neutral, and `zig build profile` (section 11) before and after: instructions
+per call are exact on every run, so a change of one instruction shows, and `--lines` says which line it is on. Time
+and instructions together tell a change that saves work from one that only moves it (a stall costs time, not
+instructions).
 
 ## 10. Compile errors Setu raises
 
@@ -472,21 +484,27 @@ What the message says: the cause.
     /opt/python/3.15t/bin/python3 -m pytest # then 3.15, 3.14t, 3.14: the same .so
     tools/check.sh                          # everything, offline, on all four interpreters
     python3 tools/bench.py --ref HEAD       # per-call cost A/B against a commit
+    zig build profile -Doptimize=fast -Dcpu=x86_64_v3   # instructions per call, per line (callgrind)
 
 A project using Setu runs its own `tools/check.sh`, which includes `zig build setu-build-check`,
 `setu-docs-check` and `setu-guide-check` (its copies of Setu's script, docs helpers and this guide match the
 Setu it pins). After a Setu bump: `zig build setu-build-sync setu-docs-sync setu-guide-sync`.
 
-Line coverage: `zig build coverage [-Dpython=...] [-- --missed --partial pytest args]` (`addCoverageSteps`; kcov 43
-and readelf) prints a per-file table, with `--missed` the lines that never ran, with `--partial` the yellow ones,
-and writes the numbers to `zig-out/coverage.json` (totals, per interpreter, per file and line; the format is in
+Line coverage: `zig build coverage [-Dpython=...] [-- --missed --partial pytest args]` (`addCoverageSteps`; kcov 43)
+prints a per-file table, with `--missed` the lines that never ran, with `--partial` the yellow ones, and writes the
+numbers to `zig-out/coverage.json` (totals, per interpreter, per file and line, each file's CRC-32; the format is in
 `tools/check_coverage.py`). Files are named relative to the project, a dependency's as `<package>/<path>`
-(`setu/src/args.zig`), wherever it lives. kcov's own output (an HTML report, XML, JSON: some 70 files per
-interpreter) goes to a temporary directory, removed after the run; `-- --html DIR` keeps its HTML report. A local
-tool, not for CI:
+(`setu/src/args.zig`), wherever it lives. kcov's own output (an HTML report, XML, JSON: some 70 files per interpreter)
+goes to a temporary directory, removed after the run; `-- --html DIR` keeps its HTML report. On the docs site (`coverage
+= 'zig-out/coverage.json'`) the Coverage page has a section per owner (the project, then each dependency), and a click
+on a file shows its source, Zig highlighted, the missed lines red; a source changed since the run (its CRC-32) is
+flagged `changed`. A local tool, not for CI:
 
-- It builds the extension's (Debug) module again through LLVM: the default Debug backend's `.debug_info` is
-  unreadable to kcov (readelf: "Bogus end-of-siblings marker"), which would record no Zig line.
+- It measures the extension as built, in Debug. The default Debug backend (self-hosted x86_64) pads its line
+  tables with ops kcov (elfutils) misreads, so kcov runs a copy with the padding rewritten (the build is not
+  changed). That backend gives each line its own code, so every red line is code that never ran; an LLVM build
+  (`.use_llvm = true`, aarch64) folds a line like `orelse return ...` into the one above (its error path shows as
+  run) and marks some comment and `fn` lines red (a jump nothing takes).
 - kcov records nothing from a shared library loaded once about 24 are mapped, and `import pytest` maps more, so
   `tools/check_coverage.py` loads the extension first, as `.module_name`; a test importing another copy fails.
 - Zig compiles only referenced code: a function nothing calls is not counted as missed.
@@ -494,8 +512,7 @@ tool, not for CI:
   only (counted as covered). In Zig, yellow is mostly a generic line (`fromPython(T)`, a trampoline) whose instance
   for some type never ran: `hits` of `possible` addresses, e.g. 48 of 56 int conversions.
 - Code the tests are not meant to run (benchmark helpers, out-of-memory branches) goes between `// coverage-off`
-  and `// coverage-on` comments and is not counted, so every red line is a gap, but for LLVM's line-table slips: a
-  red comment or `fn` line is an instruction LLVM gave that line (a jump nothing takes), nothing to test.
+  and `// coverage-on` comments and is not counted, so every red line is a gap.
 - `coverage` needs pytest in the interpreter it runs (and in each `--python`), else it stops with that error.
 - The tests' child processes (a test running `python3 example.py`) are not measured: they import the normal build,
   and kcov parsing its self-hosted-backend DWARF grew to 25 GB in one of Liburing's runs, so the runner keeps kcov's
@@ -506,7 +523,7 @@ tool, not for CI:
   merged HTML report (`kcov --merge` counts the `coverage-off` lines again).
 
 Zig unit tests (code that does not call libpython) get the same through `addZigTestCoverage`: kcov over a
-`b.addTest` executable, built again through LLVM, the same table, options after `--` (`--missed`, `--html DIR`, the
+`b.addTest` executable as built, the same table, options after `--` (`--missed`, `--html DIR`, the
 rest to the executable) and JSON format, in `zig-out/coverage-zig.json`:
 
 ```zig
@@ -516,6 +533,26 @@ const tests = b.addTest(.{ .root_module = core });
     .step_name = "coverage-zig", // the default; the result is zig-out/<step_name>.json
 });
 ```
+
+Instructions per call: `zig build profile -Doptimize=fast -Dcpu=x86_64_v3 [-- -k TEXT --lines K --python PATH
+--baseline FILE]` (`addProfileSteps`; valgrind 3.25) runs each case of `.cases` under callgrind, N and 2N times
+(the difference over N is one call, Python's startup and the loop taken out), and prints a table per interpreter:
+`total` (everything one call costs) and `ext` (the part in the extension's `.so`: its code, Setu's and std's,
+inlined there); `--lines K` lists each case's K costliest lines with their source. The numbers go to
+`zig-out/profile.json` (per case, file and line; the format is in `tools/check_profile.py`).
+
+    zig build profile -Doptimize=fast -Dcpu=x86_64_v3 -- --lines 8 -k recv
+    cp zig-out/profile.json /tmp/before.json      # then change the code
+    zig build profile -Doptimize=fast -Dcpu=x86_64_v3 -- --baseline /tmp/before.json   # Δ per case
+
+- `ext` is the same on every run, `total` within about 0.3 per call: `--baseline` fails when either grew by more
+  than `--tolerance` (default 2).
+- The build must be optimized, with debug info, for a CPU valgrind runs (no AVX-512): the step fails otherwise.
+- `.cases` is a Python file with `CASES`, a list of `(label, statement)`, and `namespace(module)`, which returns
+  the names the statements use; Setu's `tools/bench.py` is one, so `bench.py` times the cases `profile` counts.
+- A line `0` is code the compiler added (no source line).
+- `profile = 'zig-out/profile.json'` in `[tool.setu_docs]` adds a Profile page to the docs site: a bar per case and
+  interpreter (the extension's part dark), and per case its files and costly lines with their source, shaded by cost.
 
 Memory errors and leaks: valgrind memcheck over the project's pytest, by hand (no build step):
 

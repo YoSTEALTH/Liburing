@@ -134,7 +134,7 @@ pub fn build(b: *std.Build) void {
     @import("setu").addSetuGuideSteps(b, setu_dep);
 
     // `zig build coverage [-- pytest args]`: kcov line coverage of `src/liburing` (and Setu's code as used here)
-    // under pytest, merged over every `--python`, in zig-out/coverage.json (`docs/gen_coverage.py` reads it; kcov's
+    // under pytest, merged over every `--python`, in zig-out/coverage.json (the docs' Coverage page reads it; kcov's
     // HTML with `-- --html DIR`). Needs a Debug, unstripped build (the default).
     @import("setu").addCoverageSteps(b, setu_dep, ext, .{
         .module_name = "liburing",

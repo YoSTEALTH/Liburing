@@ -86,6 +86,7 @@ name = "Liburing"
 home = "docs/index.md"
 edit = "https://github.com/YoSTEALTH/Liburing/edit/dev/"
 hooks = "tools/docs_hooks.py"  # fixtures for the docstring examples (`ring`, `sqe`, `cqe`, `fd`, ...)
+coverage = "zig-out/coverage.json"  # the Coverage page, from `zig build coverage` (skipped without it)
 
 # The hand-written pages, in nav order.
 [[tool.setu_docs.markdown]]
@@ -110,10 +111,6 @@ section = "Guide"
 [[tool.setu_docs.markdown]]
 file = "docs/bench.md"
 title = "Benchmarks"
-
-[[tool.setu_docs.markdown]]
-file = "docs/coverage.md"  # written by docs/gen_coverage.py
-title = "Coverage"
 
 # The API pages: which page lists which name. First match wins, in this order; the prep functions are matched by
 # their operation name.

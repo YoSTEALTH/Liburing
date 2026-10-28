@@ -40,6 +40,8 @@ The settings, in `pyproject.toml` (paths relative to it):
     hooks = 'tools/docs_hooks.py'   # optional: fixtures and tables for the examples (below)
     serial = true                   # optional: the server runs one example at a time (the default)
     timeout = 20                    # optional: seconds an example may take
+    coverage = 'zig-out/coverage.json'  # optional: a Coverage page from `zig build coverage`'s result (below)
+    profile = 'zig-out/profile.json'    # optional: a Profile page from `zig build profile`'s result (below)
 
     [[tool.setu_docs.markdown]]     # Markdown pages, in nav order
     file = 'docs/install.md'
@@ -75,16 +77,20 @@ The footer also reads `[project]`: `urls.Homepage` (the name links to it) and `r
 github.com/me/pkg'` in `[tool.setu_docs]`, else the first GitHub URL of `urls.Repository`, `.Source`, `.Homepage`;
 a GitHub one shows `me/pkg` with its latest release, stars and forks (the page asks GitHub's API, once a session).
 
-The default theme is Tokyo Night: Day for light, Night for dark (the ◐ button, else the system's choice). A `css`
-file can override any color: page `--bg`, `--panel`, `--line`, `--text`, `--muted`, `--accent`, ...; code `--kw`
-(keywords), `--bi` (builtins), `--str`, `--num`, `--com` (comments), `--ref` (API names, linked), `--code-fg` (code
-text; else `--text`), `--con` (`None` / `True` / ...; else `--num`), `--ty` (a `class` name; else `--bi`), `--dec`
-(decorators; else `--kw`), `--fn` (a `def` name, a call, an API name in code), `--slf` (`self` / `cls` / a dunder),
-`--attr` (attributes), `--arg` (`name=` in brackets), `--op` (operators; these last five else the text's).
+The default theme is Tokyo Night: Day for light, Night for dark (the ◐ button, else the system's choice). The header's
+dropdown picks another, Nord (Snow Storm light, Polar Night dark), remembered by the browser (`<html
+data-palette="nord">`). A `css` file can override any color: page `--bg`, `--panel`, `--line`, `--text`, `--muted`,
+`--accent`, ...; code `--kw` (keywords), `--bi` (builtins), `--str`, `--num`, `--com` (comments), `--ref` (API names,
+linked), `--code-fg` (code text; else `--text`), `--con` (`None` / `True` / ...; else `--num`), `--ty` (a `class` name;
+else `--bi`), `--dec` (decorators; else `--kw`), `--fn` (a `def` name, a call, an API name in code), `--slf` (`self` /
+`cls` / a dunder), `--attr` (attributes), `--arg` (`name=` in brackets), `--op` (operators; these last five else the
+text's).
 
 Markdown: headings (with anchors), paragraphs, `-` / `1.` lists, `>` quotes, GFM tables, fenced code (python,
 pycon and sh highlighted, every block with a Copy button), inline code, links (`page.md` -> its page), images,
-`**bold**`, `*em*`, raw HTML blocks. An inline code span naming an export links to its entry.
+`**bold**`, `*em*`, raw HTML blocks. An inline code span naming an export links to its entry. A line `@@path@@`
+is replaced by that file (from the project's root) as a fenced code block, the language from its suffix: a page
+shows a tested example script as it is, with no generated copy.
 
 A table right after a `<!-- chart -->` line is drawn as a bar chart (GitHub still shows the table): a bar per row,
 labeled by the first column, its length the first column of numbers (`627,427`, `**627k**`, `48 ns`), its color the
@@ -110,8 +116,26 @@ again. Setu numbers the headers in the docstring (`help()` shows `Example #1`, `
 `Example`); the page and the Markdown show them as written. `run Sqe` runs every block, `run Sqe:2` the one headed
 `Example #2`.
 
+The Coverage page (`coverage`: the JSON of Setu's `tools/check_coverage.py`, merged over the interpreters it ran)
+shows the line coverage of the project's Zig code under its tests, a section per owner: the project's files (a
+donut, a row per file, lowest first, with its missed lines), then each dependency's (a file whose path does not
+start with a directory of the project, Setu's `setu/src/args.zig`): how much of it the project's tests run, the
+total with the project's code, each interpreter's run, its files. A dependency shows as the `name` in the
+`[tool.setu_docs]` of its own `pyproject.toml` (Setu's: `Setu`), else as its package name. A click on a file's row
+shows its source under it, Zig highlighted, covered lines green and missed red (`docs.wasm` renders it; static, on
+any HTTP server, not from `file://`): the site copies each source to `source/<path>`, a dependency's found through
+the project's `build.zig.zon` (`.path`, else `zig-pkg/<.hash>`). A source whose CRC-32 is not the one measured
+(`crc32` in the JSON) is flagged `changed`. Without the file (no kcov in CI) the page is left out.
+
+The Profile page (`profile`: the JSON of Setu's `tools/check_profile.py`) shows the instructions one call of each
+case costs (callgrind): a bar per case and interpreter, its dark part the extension's own code; then, per case, the
+extension's files and the lines that cost, with their source (where the file is still there), shaded by cost.
+Without the file the page is left out.
+
 The site also gets `llms.txt` (an index of the pages, for AI readers) and, with `stub`, `llms-full.txt` (every
-class, function and constant with its signature and docstring, one Markdown page).
+class, function and constant with its signature and docstring, one Markdown page). A build records what it wrote
+in `.setu-docs-files` in the site's folder; the next one removes what it no longer writes (a page or source gone),
+so an old file is not served or deployed. Files it never wrote stay.
 
 Example
     >>> sections('Read it.\\n\\nType\\n    return: int\\n')
@@ -124,6 +148,7 @@ import builtins
 import collections
 import contextlib
 import dataclasses
+import datetime
 import html
 import http.server
 import importlib
@@ -145,6 +170,7 @@ import textwrap
 import threading
 import tomllib
 import urllib.parse
+import zlib
 
 SETU_DOCS = pathlib.Path(__file__).resolve()
 HEADER = re.compile(r'Example #\d+|[A-Z][A-Za-z ]*')  # Setu numbers repeated `Example` headers
@@ -152,8 +178,9 @@ EXAMPLE = re.compile(r'Example(?: #\d+)?')
 
 # --- settings ---------------------------------------------------------------------------------
 
-KEYS = {'module', 'path', 'stub', 'name', 'summary', 'out', 'home', 'css', 'favicon', 'edit', 'scripts',
-        'scripts_skip', 'featured', 'runner', 'hooks', 'serial', 'timeout', 'markdown', 'pages'}  # fmt: skip
+KEYS = {'module', 'path', 'stub', 'name', 'summary', 'out', 'home', 'css', 'favicon', 'edit', 'repo', 'scripts',
+        'scripts_skip', 'featured', 'runner', 'hooks', 'serial', 'timeout', 'coverage', 'profile',
+        'markdown', 'pages'}  # fmt: skip
 FAVICON_TYPES = ('.svg', '.png', '.ico')
 PAGE_KEYS = {'slug', 'title', 'text', 'classes', 'functions', 'patterns', 'sources', 'default', 'constants', 'groups'}
 MARKDOWN_KEYS = {'file', 'title', 'section', 'slug'}
@@ -191,13 +218,39 @@ def load_config(pyproject='pyproject.toml'):
     slugs = [p['slug'] for p in pages] + [md_slug(p) for p in config.get('markdown', ())]
     if len(set(slugs)) != len(slugs):
         fail('a page slug twice')
-    if {'index', 'examples'} & set(slugs):
-        fail('`index` and `examples` are taken (the home page, the example scripts)')
+    if {'index', 'examples', 'coverage', 'profile'} & set(slugs):
+        fail('`index`, `examples`, `coverage` and `profile` are taken (the home page, the example scripts, ...)')
     if sum(bool(p.get('default')) for p in pages) != 1:
         fail('exactly one page needs `default = true`')
     if sum(bool(p.get('constants')) for p in pages) > 1:
         fail('at most one page can have `constants = true`')
     return config
+
+
+INCLUDE = re.compile(r'^@@(.+)@@$', re.MULTILINE)
+FENCE_LANGUAGES = {'.py': 'python', '.sh': 'sh', '.c': 'c', '.h': 'c', '.zig': 'zig', '.toml': 'toml'}
+
+
+def include_files(text, root):
+    '''Each `@@path@@` line of the Markdown `text` as a fenced code block of that file (`path` from the project's
+    root `root`, the language from its suffix), so a page shows a tested file as it is.
+
+    Example
+        >>> include_files('Run:\n@@example/hi.py@@\n', pathlib.Path('test/docs')).splitlines()[:2]
+        ['Run:', '```python']
+    '''
+
+    def block(m):
+        path = root / m[1].strip()
+        try:
+            code = path.read_text().rstrip('\n')
+        except OSError as e:
+            fail(f'`@@{m[1]}@@`: {e.strerror}: {path}')
+        if '```' in code:
+            fail(f'`@@{m[1]}@@`: the file has a ``` line, which would end the code block')
+        return f'```{FENCE_LANGUAGES.get(path.suffix, "")}\n{code}\n```'
+
+    return INCLUDE.sub(block, text)
 
 
 def md_slug(page):
@@ -781,6 +834,18 @@ class Site:
         if self.constants_page:
             for name in self.constants:
                 self.where[name] = f'{self.constants_page["slug"]}.html#{name}'
+        self.coverage = None  # `coverage`'s JSON, if there is one
+        if 'coverage' in project.config and (path := project.root / project.config['coverage']).is_file():
+            self.coverage = json.loads(path.read_text())
+            if not isinstance(self.coverage, dict) or self.coverage.keys() != {'total', 'interpreters', 'files'}:
+                fail(f'`coverage`: {path} is not a result of `tools/check_coverage.py`')
+            self.coverage_date = datetime.datetime.fromtimestamp(path.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
+        self.profile = None  # `profile`'s JSON, if there is one
+        if 'profile' in project.config and (path := project.root / project.config['profile']).is_file():
+            self.profile = json.loads(path.read_text())
+            if not isinstance(self.profile, dict) or self.profile.keys() != {'number', 'interpreters', 'sources'}:
+                fail(f'`profile`: {path} is not a result of `tools/check_profile.py`')
+            self.profile_date = datetime.datetime.fromtimestamp(path.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
         self.ids = set()  # the heading ids of the page being written
 
     # -- inline text
@@ -1339,6 +1404,10 @@ class Site:
             items.append(item(self.constants_page['slug'], self.constants_page['title']))
         if self.project.scripts():
             items.append(item('examples', 'Example scripts'))
+        if self.coverage:
+            items.append(item('coverage', 'Coverage'))
+        if self.profile:
+            items.append(item('profile', 'Profile'))
         return '\n'.join(items)
 
     def page(self, current, title, body, toc=(), api=False):
@@ -1373,8 +1442,9 @@ class Site:
 <title>{html.escape(title)} · {name}</title>
 <link rel="icon" href="{html.escape(project.favicon or letter_icon(project.name))}">
 <link rel="stylesheet" href="style.css">
-<script>try {{ const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; }}
-catch (e) {{}}</script>
+<script>try {{ const r = document.documentElement, t = localStorage.getItem('theme');
+const p = localStorage.getItem('palette'); if (t) r.dataset.theme = t;
+if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</script>
 </head>
 <body>
 <header class="top"><div class="top-in">
@@ -1383,6 +1453,7 @@ catch (e) {{}}</script>
   <div id="hits" hidden></div></div>
   <div class="tools">
   <span id="live" class="live" title="Run buttons need `setu_docs.py serve`">static</span>
+  {THEME_SELECT}
   <button id="theme" class="theme" type="button" aria-label="Light / dark">{ICON_THEME}</button>{repo}
   <button class="menu" aria-label="Menu" onclick="document.body.classList.toggle('nav-open')">{ICON_MENU}</button>
   </div>
@@ -1457,10 +1528,166 @@ catch (e) {{}}</script>
                         f'{_run_box(path) if runnable else _not_runnable()}</section>')  # fmt: skip
         return self.page('examples', 'Example scripts', ''.join(body), toc)
 
+    def coverage_page(self):
+        '''A section per owner: the project's files (its donut and table), then each dependency's (how much of it the
+        project's tests run, the total with the project's code, each interpreter's run, its files).'''
+        report = self.coverage
+        root = self.project.root
+        self.sources = {}  # the site's `source/<path>` -> the file, for the viewer (copied by `write`)
+        groups = {}  # '' (the project's own files), else a dependency's name -> [(path, covered, lines, missed, hit)]
+        for path, counts in report['files'].items():
+            top = path.split('/', 1)[0]
+            owner = '' if '/' not in path or (root / top).is_dir() else top
+            missed = sorted(int(n) for n, (hits, _possible) in counts['hits'].items() if hits == 0)
+            hit = sorted(int(n) for n, (hits, _possible) in counts['hits'].items() if hits)
+            groups.setdefault(owner, []).append((path, counts['covered'], counts['lines'], missed, hit))
+        for files in groups.values():
+            files.sort(key=lambda f: (f[1] / f[2], f[0]))
+        own = groups.pop('', [])
+        own_covered, own_lines = sum(f[1] for f in own), sum(f[2] for f in own)
+        runs = report['interpreters']
+        names = [f'CPython {n}' if 'python' in r else n for n, r in runs.items()]
+        runs_text = names[0] if len(names) == 1 else f'{", ".join(names[:-1])} and {names[-1]}'
+        lead = (
+            f'<p class="lead">The lines of Zig code that ran while the tests ran (<code>zig build coverage</code>, '
+            f'kcov) on {html.escape(runs_text)}, merged: a line ran if it ran on any. {self.coverage_date}.</p>'
+            '<p class="src-hint">Click a file to see its source, the missed lines marked.</p>'
+        )
+        body = ['<h1>Coverage</h1>', lead]
+        toc = []
+        name = self.project.name
+        own_name = html.escape(name)
+        if own:
+            anchor = slug(name)
+            toc.append((anchor, name))
+            body += [
+                section_heading(anchor, name),
+                f'<div class="cov-pies">{coverage_donut(name, own_covered, own_lines)}</div>',
+                self.coverage_table(own, root),
+            ]
+        for owner, files in groups.items():
+            dep_root = dependency_root(root, owner)
+            shown = display_name(dep_root, owner)
+            covered, lines = sum(f[1] for f in files), sum(f[2] for f in files)
+            mine = coverage_donut(f"{shown} run by {name}'s tests", covered, lines)
+            both = coverage_donut(f'{name} + {shown}', own_covered + covered, own_lines + lines)
+            dep = html.escape(shown)
+            note = (
+                f"<p>Not {dep}'s own coverage: how much of {dep} {own_name}'s tests run. The lines missed here are "
+                f'parts of {dep} that {own_name} does not use; only the files of {dep} that {own_name} compiles in '
+                'are counted.</p>'
+            )
+            anchor = f'dep-{slug(owner)}'
+            toc.append((anchor, shown))
+            body += [section_heading(anchor, shown), note, f'<div class="cov-pies">{mine}{both}</div>']
+            if len(runs) > 1:  # every file of the run: the project's and each dependency's
+                items = ''.join(
+                    f'<li>{html.escape(n)}: {coverage_total(run["covered"], run["lines"])}</li>'
+                    for n, run in zip(names, runs.values())
+                )
+                body.append(f'<p>Each run on its own, {own_name} + {dep}:</p><ul>{items}</ul>')
+            body.append(self.coverage_table(files, dep_root, f'{owner}/'))
+        return self.page('coverage', 'Coverage', ''.join(body), toc)
+
+    def coverage_table(self, files, root, prefix=''):
+        '''`coverage_table` of `files`, each row whose source (`root / path` without `prefix`) is there with what the
+        viewer needs; a source whose CRC-32 is not the one `coverage`'s JSON has (changed since the run) is marked
+        `changed`: its line marks can be off.'''
+        table = coverage_table([f[:4] for f in files])
+        for path, _covered, _lines, missed, hit in files:
+            source = root / path.removeprefix(prefix) if root else None
+            if not source or not source.is_file():
+                continue
+            self.sources[path] = source
+            crc = self.coverage['files'][path].get('crc32')
+            stale = crc is not None and zlib.crc32(source.read_bytes()) != crc
+            flag = ' data-stale="1"' if stale else ''
+            data = (
+                f'<tr class="src-row" data-src="{SOURCE_DIR}/{html.escape(path)}" data-hit="{line_ranges(hit)}" '
+                f'data-miss="{line_ranges(missed)}"{flag} title="Show the source">'
+            )
+            cell = f'<td><code>{html.escape(path)}</code>'
+            mark = ' <small class="stale" title="Changed since `zig build coverage`">changed</small>' if stale else ''
+            table = table.replace(f'<tr>{cell}', data + cell + mark)
+        return table
+
+    def profile_page(self):
+        report = self.profile
+        runs = report['interpreters']
+        names = list(runs)
+        cases = list(dict.fromkeys(case for run in runs.values() for case in run['cases']))
+        top = max((r['total'] for run in runs.values() for r in run['cases'].values()), default=0) or 1
+        runs_text = ', '.join(f'CPython {n}' for n in names)
+        lead = (
+            f'<p class="lead">The instructions one call of each case costs (<code>zig build profile</code>, '
+            f'callgrind; each case run {report["number"]} and {2 * report["number"]} times, the difference taken, '
+            f'the loop around the call taken out) on {html.escape(runs_text)}. Instructions, not time: the count is '
+            f'the same on every run, so a change of one shows. {self.profile_date}.</p>'
+        )
+        key = (
+            '<p class="prof-key"><i class="ext"></i>the extension (its Zig code, Setu\'s and std\'s inlined there)'
+            '<i class="py"></i>the interpreter (the call, the arguments, the objects)</p>'
+        )
+        head = ''.join(f'<th>CPython {html.escape(n)}</th>' for n in names)
+        rows = []
+        for case in cases:
+            cells = ''.join(
+                profile_bar(runs[n]['cases'][case], top) if case in runs[n]['cases'] else '<td>-</td>' for n in names
+            )
+            link = f'<a href="#case-{cases.index(case) + 1}"><code>{html.escape(case)}</code></a>'
+            rows.append(f'<tr><td>{link}</td>{cells}</tr>')
+        body = [
+            '<h1>Profile</h1>', lead,
+            '<h2 id="cases">Cases<a class="anchor" href="#cases">#</a></h2>', key,
+            f'<table class="prof"><thead><tr><th>Case</th>{head}</tr></thead>',
+            f'<tbody>{"".join(rows)}</tbody></table>',
+        ]  # fmt: skip
+        first = names[0] if names else ''
+        body.append(
+            '<h2 id="lines">Lines<a class="anchor" href="#lines">#</a></h2>'
+            f'<p>Where the extension\'s instructions go, on CPython {html.escape(first)}: per case, its files and the '
+            'lines that cost, with two lines around each. A line\'s number is the instructions per call counted at '
+            'it, an inlined function\'s at its own source line; the shade is relative to the case\'s costliest '
+            'line. Line 0 is code the compiler added.</p>'
+        )
+        sources = {}
+        for case, r in runs.get(first, {'cases': {}})['cases'].items():
+            body.append(self.profile_case(cases.index(case) + 1, case, r, report['sources'], sources))
+        return self.page('profile', 'Profile', ''.join(body), [('cases', 'Cases'), ('lines', 'Lines')])
+
+    def profile_case(self, number, case, result, paths, sources):
+        '''A case's folded section: its files (instructions per call, share of the extension's) and their lines.'''
+        files = result['files']
+        ext = result['ext'] or 1
+        top = max((c for f in files.values() for c in f['lines'].values()), default=0) or 1
+        table = ''.join(
+            f'<tr><td><code>{html.escape(path)}</code></td><td class="num">{f["total"]:.1f}</td>'
+            f'<td><span class="bar"><span class="ok" style="width:{min(100, 100 * f["total"] / ext):.1f}%"></span>'
+            '</span></td></tr>'
+            for path, f in files.items()
+        )
+        summary = (
+            f'<details class="prof-case" id="case-{number}"><summary><code>{html.escape(case)}</code>: '
+            f'<b>{result["ext"]:.0f}</b> instructions in the extension, of {result["total"]:.0f} per call</summary>'
+        )
+        head = '<table class="cov"><thead><tr><th>File</th><th>Per call</th><th>Share</th></tr></thead>'
+        parts = [summary, f'{head}<tbody>{table}</tbody></table>']
+        for path, f in files.items():
+            if path not in sources:
+                where = paths.get(path)  # absolute (`check_profile.py`), else relative to the project
+                sources[path] = read_lines(self.project.root / where if where else None)
+            lines = {int(n): c for n, c in f['lines'].items()}
+            parts.append(
+                f'<div class="prof-file"><code>{html.escape(path)}</code> {f["total"]:.1f} per call</div>'
+                f'<pre class="prof-src">{profile_excerpt(lines, sources[path], top)}</pre>'
+            )
+        parts.append('</details>')
+        return ''.join(parts)
+
     def markdown_page(self, page):
         self.ids = set()
         path = self.project.root / page['file']
-        body, toc = self.markdown(path.read_text(), path.parent)
+        body, toc = self.markdown(include_files(path.read_text(), self.project.root), path.parent)
         if not body.startswith('<h1'):
             body = f'<h1>{html.escape(page["title"])}</h1>' + body
         if edit := self.project.config.get('edit'):
@@ -1473,7 +1700,7 @@ catch (e) {{}}</script>
         toc = []
         if 'home' in project.config:
             path = project.root / project.config['home']
-            text, toc = self.markdown(path.read_text(), path.parent)
+            text, toc = self.markdown(include_files(path.read_text(), self.project.root), path.parent)
         else:
             text = f'<h1>{html.escape(project.name)}</h1>'
             if summary := project.config.get('summary'):
@@ -1520,6 +1747,11 @@ catch (e) {{}}</script>
             files[f'{self.constants_page["slug"]}.html'] = self.constant_page()
         if self.project.scripts():
             files['examples.html'] = self.examples_page()
+        self.sources = {}
+        if self.coverage:
+            files['coverage.html'] = self.coverage_page()
+        if self.profile:
+            files['profile.html'] = self.profile_page()
         if self.project.stub:
             files['llms-full.txt'] = llms_full(self.project.stub, self.project.config['module'])
         for name, text in files.items():
@@ -1529,7 +1761,38 @@ catch (e) {{}}</script>
             shutil.copyfile(self.project.root / self.project.config['favicon'], out / self.project.favicon)
             copied.append(self.project.favicon)
         build_wasm(self.project.root, out / 'docs.wasm')
-        return sorted([*files, *copied])
+        # the Coverage page's sources, as they are, for its viewer (`source/<path>`); old ones go in `forget_old_files`
+        for path, source in self.sources.items():
+            dest = out / SOURCE_DIR / path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, dest)
+            copied.append(f'{SOURCE_DIR}/{path}')
+        written = sorted([*files, *copied])
+        forget_old_files(out, written)
+        return written
+
+
+MANIFEST = '.setu-docs-files'  # in the site's folder: the files the last build wrote, one per line
+
+
+def forget_old_files(out, written):
+    '''Remove the files the previous build of `out` wrote (its `MANIFEST`) that this one did not (a page or source
+    gone), and folders left empty by that; then record `written`. Files the builder never wrote stay.'''
+    manifest = out / MANIFEST
+    try:
+        before = manifest.read_text().splitlines()
+    except OSError:
+        before = []
+    for name in sorted(set(before) - set(written)):
+        path = out / name
+        if '..' in pathlib.PurePosixPath(name).parts or not path.is_file():
+            continue  # never outside `out`
+        path.unlink()
+        for folder in path.parents:
+            if folder == out or any(folder.iterdir()):
+                break
+            folder.rmdir()
+    manifest.write_text(''.join(f'{name}\n' for name in written))
 
 
 # `pretty_html`: block tags go on their own line and indent what is inside; in a text block (`TEXT_TAGS`) the text
@@ -1688,6 +1951,177 @@ def autolink(text):
     return ''.join(out)
 
 
+SOURCE_DIR = 'source'  # the site's folder of the Coverage page's sources
+
+
+def slug(text):
+    '''`text` as an anchor id: lower case, a run of anything but letters, digits, `_` and `.` as `-`.
+
+    Example
+        >>> slug('Liburing + Setu')
+        'liburing-setu'
+    '''
+    return re.sub(r'[^\w.]+', '-', text.lower()).strip('-')
+
+
+def section_heading(anchor, title):
+    '''An `<h2>` with its anchor link.'''
+    anchor = html.escape(anchor)
+    return f'<h2 id="{anchor}">{html.escape(title)}<a class="anchor" href="#{anchor}">#</a></h2>'
+
+
+def dependency_root(root, name):
+    '''Where the dependency `name` of `root/build.zig.zon` is: its `.path`, else `zig-pkg/<.hash>` (where `zig
+    build` puts a fetched package), else None.'''
+    try:
+        zon = re.sub(r'//.*', '', (root / 'build.zig.zon').read_text())
+    except OSError:
+        return None
+    entry = re.search(rf'\.{re.escape(name)}\s*=\s*\.\{{(.*?)\}}', zon, re.DOTALL)
+    if not entry:
+        return None
+    if path := re.search(r'\.path\s*=\s*"([^"]+)"', entry[1]):
+        return (root / path[1]).resolve()
+    if digest := re.search(r'\.hash\s*=\s*"([^"]+)"', entry[1]):
+        return root / 'zig-pkg' / digest[1]
+    return None
+
+
+def display_name(root, name):
+    '''A dependency's name as shown: `name` in the `[tool.setu_docs]` of its own `pyproject.toml` (Setu's: `Setu`),
+    else its package name `name`.'''
+    if root is None:
+        return name
+    try:
+        with open(root / 'pyproject.toml', 'rb') as f:
+            shown = tomllib.load(f).get('tool', {}).get('setu_docs', {}).get('name')
+    except OSError:
+        return name
+    except tomllib.TOMLDecodeError:
+        return name
+    return shown if isinstance(shown, str) and shown else name
+
+
+def coverage_level(percent):
+    '''kcov's high / medium / low color for `percent` (`ok` / `warn` / `bad`), at 95 / 90 % (kcov's 75 / 25 would
+    make every file green).'''
+    return 'ok' if percent >= 95 else 'warn' if percent >= 90 else 'bad'
+
+
+def coverage_total(covered, lines):
+    percent = 100 * covered / lines if lines else 100
+    return f'<b>{percent:.1f}%</b>, {covered} / {lines} lines'
+
+
+def coverage_donut(name, covered, lines):
+    '''A donut of `covered` / `lines` in the level's color, the percent inside; hovering a part names its lines.'''
+    percent = 100 * covered / lines if lines else 100
+    ring = 'cx="50" cy="50" r="40" fill="none" stroke-width="12"'
+    name = html.escape(name)
+    return (
+        f'<figure><svg viewBox="0 0 100 100" role="img" aria-label="{name}: {percent:.1f}% covered">'
+        f'<circle {ring} stroke="var(--line)"><title>missed: {lines - covered} lines</title></circle>'
+        f'<circle {ring} stroke="var(--{coverage_level(percent)})" pathLength="100" stroke-dasharray="{percent:.2f} '
+        f'100" transform="rotate(-90 50 50)"><title>covered: {covered} of {lines} lines</title></circle>'
+        f'<text x="50" y="50" text-anchor="middle" dominant-baseline="central">{percent:.1f}%</text></svg>'
+        f'<figcaption><strong>{name}</strong><br>{covered} / {lines} lines, {lines - covered} missed</figcaption>'
+        '</figure>'
+    )
+
+
+def line_ranges(numbers):
+    '''Sorted line numbers as ranges.
+
+    Example
+        >>> line_ranges([3, 4, 5, 9, 11, 12])
+        '3-5, 9, 11-12'
+    '''
+    out = []
+    for n in numbers:
+        if out and out[-1][1] == n - 1:
+            out[-1][1] = n
+        else:
+            out.append([n, n])
+    return ', '.join(f'{a}' if a == b else f'{a}-{b}' for a, b in out)
+
+
+def coverage_table(files):
+    '''A row per `(path, covered, lines, missed)`: the percent in its level's color, a bar, the counts and the missed
+    lines.'''
+    rows = []
+    for path, covered, lines, missed in files:
+        percent = 100 * covered / lines if lines else 100
+        level = coverage_level(percent)
+        rows.append(
+            f'<tr><td><code>{html.escape(path)}</code></td><td class="pct {level}">{percent:.1f}%</td>'
+            f'<td><span class="bar"><span class="{level}" style="width:{percent:.1f}%"></span></span></td>'
+            f'<td class="num">{covered} / {lines}</td><td class="missed">{line_ranges(missed)}</td></tr>'
+        )
+    return (
+        '<table class="cov"><thead><tr><th>File</th><th>Coverage</th><th></th><th>Lines</th><th>Missed lines</th>'
+        f'</tr></thead><tbody>{"".join(rows)}</tbody></table>'
+    )
+
+
+def profile_bar(result, top):
+    '''A table cell: the case's instructions per call as a bar (scaled to `top`), the extension's part dark.'''
+    total, ext = result['total'], result['ext']
+    share = 100 * ext / total if total > 0 else 0
+    tip = f'{total:.1f} per call: {ext:.1f} in the extension ({share:.0f}%), {total - ext:.1f} in the interpreter'
+    return (
+        f'<td class="prof-cell" title="{html.escape(tip)}"><span class="ptrack"><span class="pbar" '
+        f'style="width:{max(0, 100 * total / top):.1f}%"><i style="width:{min(100, share):.1f}%"></i></span></span>'
+        f'<span class="pnum"><b>{total:.0f}</b> / {ext:.0f}</span></td>'
+    )
+
+
+def read_lines(path):
+    '''The lines of the file `path`, or None when it is not there.'''
+    try:
+        return pathlib.Path(path).read_text().splitlines() if path else None
+    except OSError:
+        return None
+    except UnicodeDecodeError:
+        return None
+
+
+def profile_excerpt(lines, text, top, context=2):
+    '''The lines of `lines` (number -> cost) of a file (`text`, its lines, or None), each with `context` lines
+    around, as HTML rows: number, cost, source, the cost shaded relative to `top`; `...` between the runs.
+
+    Example
+        >>> profile_excerpt({2: 4.0}, ['a', 'b', 'c', 'd', 'e', 'f'], 4.0, context=1).count('class="pl')
+        3
+    '''
+    rows = []
+    if 0 in lines:
+        rows.append(profile_row('0', lines[0], '(code the compiler added: no source line)', top))
+    wanted = sorted(n for n in lines if n > 0)
+    shown = set()
+    for n in wanted:
+        last = len(text) if text else n
+        shown.update(range(max(1, n - context), min(last, n + context) + 1) if text else (n,))
+    previous = None
+    for n in sorted(shown):
+        if previous is not None and n > previous + 1:
+            rows.append('<span class="gap">   ⋮</span>')
+        source = text[n - 1] if text and n <= len(text) else ''
+        rows.append(profile_row(str(n), lines.get(n), source, top))
+        previous = n
+    return ''.join(rows)
+
+
+def profile_row(number, cost, source, top):
+    '''One line of `profile_excerpt`.'''
+    if cost is None:
+        return f'<span class="pl"><span class="pn">{number}</span><span class="pc"></span>{html.escape(source)}</span>'
+    shade = 10 + 55 * min(1.0, max(0.0, cost / top))
+    return (
+        f'<span class="pl hot" style="background:color-mix(in srgb, var(--bad) {shade:.0f}%, transparent)">'
+        f'<span class="pn">{number}</span><span class="pc">{cost:.1f}</span>{html.escape(source)}</span>'
+    )
+
+
 def build_wasm(root, dest):
     '''Build the site's Wasm module (`zig build docs-web` in `root`, from Setu's `tools/setu_docs_web.zig`)
     into `dest`.
@@ -1770,6 +2204,45 @@ CSS = '''
   --s8: #f7768e; --s-other: #565f89;
 }
 :root[data-theme="dark"] .run button { color: #1a1b26; }
+/* The other themes, picked by the header's dropdown (`<html data-palette="...">`, kept in localStorage); no
+   `data-palette` is Tokyo Night. Each has a light and a dark set, switched by the ◐ button as above; the dark sets
+   add `[data-palette]` to the dark selectors, so they win over the light set in dark mode. */
+/* Nord (nordtheme.com): light = Snow Storm with Polar Night text (Aurora darkened to read on it), dark = Polar
+   Night with Snow Storm text. */
+:root[data-palette="nord"] {
+  --bg: #eceff4; --panel: #e5e9f0; --line: #d8dee9; --text: #2e3440; --muted: #4c566a;
+  --accent: #5e81ac; --accent-soft: #c9d4e5; --code-bg: #e5e9f0; --ok: #5a7a3a; --bad: #b0444e; --warn: #8a6d1f;
+  --kw: #5e81ac; --str: #5a7a3a; --num: #8f5f88; --com: #7b88a1; --bi: #3f7f8a; --ref: #3e6a99;
+  --code-fg: #2e3440; --fn: #3b7b8c;
+  --con: #5e81ac; --slf: #b0573a; --ty: #3f7f7e; --attr: #3b4252; --dec: #b0573a; --op: #5e81ac;
+  --arg: #8a6d1f;
+  --s1: #5e81ac; --s2: #b0573a; --s3: #5a7a3a; --s4: #8a6d1f; --s5: #8f5f88; --s6: #3f7f7e; --s7: #3e6a99;
+  --s8: #b0444e; --s-other: #c0c8d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="nord"]:not([data-theme="light"]) {
+    --bg: #2e3440; --panel: #3b4252; --line: #434c5e; --text: #e5e9f0; --muted: #a0a8b7;
+    --accent: #88c0d0; --accent-soft: #434c5e; --code-bg: #3b4252; --ok: #a3be8c; --bad: #bf616a; --warn: #ebcb8b;
+    --kw: #81a1c1; --str: #a3be8c; --num: #b48ead; --com: #616e88; --bi: #88c0d0; --ref: #88c0d0;
+    --code-fg: #d8dee9; --fn: #88c0d0;
+    --con: #81a1c1; --slf: #d08770; --ty: #8fbcbb; --attr: #d8dee9; --dec: #d08770; --op: #81a1c1;
+    --arg: #ebcb8b;
+    --s1: #88c0d0; --s2: #d08770; --s3: #a3be8c; --s4: #ebcb8b; --s5: #b48ead; --s6: #8fbcbb; --s7: #5e81ac;
+    --s8: #bf616a; --s-other: #4c566a;
+  }
+  :root[data-palette="nord"]:not([data-theme="light"]) .run button { color: #2e3440; }
+}
+:root[data-palette="nord"][data-theme="dark"] {
+  --bg: #2e3440; --panel: #3b4252; --line: #434c5e; --text: #e5e9f0; --muted: #a0a8b7;
+  --accent: #88c0d0; --accent-soft: #434c5e; --code-bg: #3b4252; --ok: #a3be8c; --bad: #bf616a; --warn: #ebcb8b;
+  --kw: #81a1c1; --str: #a3be8c; --num: #b48ead; --com: #616e88; --bi: #88c0d0; --ref: #88c0d0;
+  --code-fg: #d8dee9; --fn: #88c0d0;
+  --con: #81a1c1; --slf: #d08770; --ty: #8fbcbb; --attr: #d8dee9; --dec: #d08770; --op: #81a1c1;
+  --arg: #ebcb8b;
+  --s1: #88c0d0; --s2: #d08770; --s3: #a3be8c; --s4: #ebcb8b; --s5: #b48ead; --s6: #8fbcbb; --s7: #5e81ac;
+  --s8: #bf616a; --s-other: #4c566a;
+}
+:root[data-palette="nord"][data-theme="dark"] .run button { color: #2e3440; }
 * { box-sizing: border-box; }
 html { scroll-padding-top: 64px; }
 body { margin: 0; background: var(--bg); color: var(--text);
@@ -1802,6 +2275,10 @@ code, pre { font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo,
 .live { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px;
   padding: 1px 8px; white-space: nowrap; }
 .live.on { color: var(--ok); border-color: var(--ok); }
+/* The theme dropdown, styled like the `static` / `live` pill next to it. */
+.palette { font: 13px system-ui, sans-serif; color: var(--text); background: var(--bg); cursor: pointer;
+  border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+.palette:hover, .palette:focus { border-color: var(--accent); outline: none; }
 .repo { display: flex; align-items: center; gap: 8px; color: var(--text); line-height: 1.25; white-space: nowrap; }
 .repo:hover { text-decoration: none; opacity: .8; }
 .repo .gh { height: var(--icon); width: auto; flex: none; }
@@ -1913,6 +2390,51 @@ body.can-run .needs { display: block; }
 .chart .track i { display: block; height: 100%; min-width: 2px; border-radius: 0 4px 4px 0; }
 .chart .val { text-align: right; font-variant-numeric: tabular-nums; }
 .chart figcaption { margin-top: 4px; color: var(--muted); font-size: 12px; text-align: right; }
+.cov-pies { display: flex; flex-wrap: wrap; gap: 40px; margin: 16px 0; }
+.cov-pies figure { margin: 0; text-align: center; }
+.cov-pies svg { width: 144px; height: 144px; }
+.cov-pies text { font: bold 16px system-ui, sans-serif; fill: var(--text); }
+.cov-pies figcaption { color: var(--muted); font-size: 13px; } .cov-pies strong { color: var(--text); }
+table.cov td.pct { text-align: right; font-weight: bold; } table.cov td.num { text-align: right; white-space: nowrap; }
+table.cov td.pct.ok { color: var(--ok); } table.cov td.pct.warn { color: var(--warn); }
+table.cov td.pct.bad { color: var(--bad); } table.cov td.missed { color: var(--muted); font-size: 13px; }
+table.cov .bar { display: inline-block; width: 160px; height: 9px; border-radius: 3px; background: var(--line);
+  overflow: hidden; vertical-align: middle; }
+table.cov .bar > span { display: block; height: 100%; } table.cov .bar > .ok { background: var(--ok); }
+table.cov .bar > .warn { background: var(--warn); } table.cov .bar > .bad { background: var(--bad); }
+table.cov { width: 100%; } table.cov td:first-child > code { white-space: nowrap; }
+table.cov td.num { color: inherit; } table.cov th:nth-child(2), table.cov th:nth-child(4) { text-align: right; }
+/* The Coverage page's source viewer: a click on a file's row shows its source in a row under it, covered lines with a
+   green bar, missed ones red; a file changed since the coverage run is flagged in the warning color. */
+.src-hint { color: var(--muted); font-size: 13px; }
+table.cov tr.src-row { cursor: pointer; } table.cov tr.src-row:hover td { background: var(--panel); }
+table.cov tr.src-row code { color: var(--ref); } table.cov tr.src-view > td { padding: 0; }
+pre.cov-src { margin: 0; max-height: 70vh; overflow: auto; padding: 6px 0; background: var(--code-bg);
+  color: var(--code-fg, var(--text)); font-size: 13px; line-height: 1.45; position: relative; }
+pre.cov-src > span { display: block; padding-right: 12px; border-left: 3px solid transparent; white-space: pre; }
+pre.cov-src > span::before { content: attr(data-n); display: inline-block; width: 5ch; margin-right: 12px;
+  padding-right: 6px; text-align: right; color: var(--muted); user-select: none; }
+pre.cov-src > span.hit { border-left-color: var(--ok); }
+table.cov small.stale, pre.cov-src > span.stale { color: var(--warn); }
+pre.cov-src > span.miss { border-left-color: var(--bad); background: color-mix(in srgb, var(--bad) 16%, transparent); }
+table.prof { width: 100%; } table.prof td { vertical-align: middle; } .prof-cell { white-space: nowrap; }
+.ptrack { display: inline-block; width: 150px; height: 11px; margin-right: 8px; vertical-align: middle; }
+.pbar { display: block; height: 100%; min-width: 2px; border-radius: 3px; background: var(--accent-soft);
+  overflow: hidden; } .pbar > i { display: block; height: 100%; background: var(--accent); }
+.pnum { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); } .pnum b { color: var(--text); }
+.prof-key { font-size: 13px; color: var(--muted); }
+.prof-key i { display: inline-block; width: 12px; height: 10px; margin: 0 6px 0 14px; border-radius: 2px; }
+.prof-key i:first-child { margin-left: 0; } .prof-key .ext { background: var(--accent); }
+.prof-key .py { background: var(--accent-soft); }
+details.prof-case { border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; margin: 10px 0; }
+details.prof-case summary { cursor: pointer; } details.prof-case[open] summary { margin-bottom: 8px; }
+.prof-file { margin: 14px 0 4px; font-size: 13.5px; color: var(--muted); } .prof-file code { color: var(--text); }
+pre.prof-src { font-size: 12.5px; line-height: 1.5; overflow-x: auto; background: var(--code-bg); padding: 4px 0;
+  border: 1px solid var(--line); border-radius: 6px; margin: 0; }
+pre.prof-src .pl, pre.prof-src .gap { display: block; padding: 0 10px; white-space: pre; }
+pre.prof-src .gap { color: var(--muted); }
+.pn { display: inline-block; width: 4em; margin-right: 10px; text-align: right; color: var(--muted); }
+.pc { display: inline-block; width: 3.5em; margin-right: 14px; text-align: right; font-weight: bold; }
 footer { margin-top: 48px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 12px; }
 @media (max-width: 860px) {
   .menu { display: flex; }
@@ -1927,12 +2449,19 @@ footer { margin-top: 48px; color: var(--muted); font-size: 13px; border-top: 1px
   .repo-in { display: none; }
 }
 '''
+THEMES = {'': 'Tokyo Night', 'nord': 'Nord'}  # `data-palette` -> the dropdown's name; '' (no attribute): Tokyo Night
+THEME_NAMES = [k for k in THEMES if k]  # what the head's script accepts from localStorage
+THEME_SELECT = (
+    '<select id="palette" class="palette" aria-label="Theme" title="Theme">'
+    + ''.join(f'<option value="{k}">{html.escape(v)}</option>' for k, v in THEMES.items())
+    + '</select>'
+)
 
 JS = r'''
 // The binding for docs.wasm (Setu's tools/setu_docs_web.zig, `zig build docs-web`), where the logic lives:
-// search ranking, the Run transcript, the server check, all HTML escaping. This file only copies strings in
-// and out of the module's memory and does what Wasm can not: events, fetch, the clipboard, and putting the
-// HTML on the page.
+// search ranking, the Run transcript, the server check, the Coverage page's source view, all HTML escaping.
+// This file only copies strings in and out of the module's memory and does what Wasm can not: events, fetch,
+// the clipboard, and putting the HTML on the page.
 (async function () {
   // Light / dark: the button flips the theme and remembers it; with no choice the system's holds.
   const root = document.documentElement;
@@ -1941,6 +2470,13 @@ JS = r'''
       : matchMedia('(prefers-color-scheme: dark)').matches;
     root.dataset.theme = dark ? 'light' : 'dark';
     try { localStorage.setItem('theme', root.dataset.theme); } catch (e) {}
+  });
+  // The theme dropdown: Tokyo Night (no `data-palette`) or another; remembered, set in <head> before the first paint.
+  const pick = document.getElementById('palette');
+  pick.value = root.dataset.palette || '';
+  pick.addEventListener('change', () => {
+    if (pick.value) root.dataset.palette = pick.value; else delete root.dataset.palette;
+    try { localStorage.setItem('palette', pick.value); } catch (e) {}
   });
 
   // Copy buttons; a session copies its statements only (no prompts, no output).
@@ -2004,17 +2540,28 @@ JS = r'''
   } catch (e) {  // opened from disk (file://): browsers do not fetch .wasm there
     q.disabled = true;
     q.placeholder = 'Search needs a server';
+    document.querySelectorAll('.src-hint').forEach(p => {
+      p.textContent = 'The sources need a server: python3 -m http.server in the site, or setu_docs.py serve.';
+    });
     return;
   }
   const enc = new TextEncoder(), dec = new TextDecoder();
-  function call(fn, text, ...args) {  // fn(ptr, len, ...args) with `text` in the module's memory
+  // A zero-length Zig slice's pointer is a sentinel (-1 as a wasm32 i32): never view memory through it.
+  function put(text) {  // `text` in the module's memory: [ptr, len]; `w.free(ptr, len)` after
     const bytes = enc.encode(text);
     const ptr = w.alloc(bytes.length);
     if (!ptr && bytes.length) throw new Error('docs.wasm: out of memory');
-    new Uint8Array(w.memory.buffer, ptr, bytes.length).set(bytes);
-    try { return fn(ptr, bytes.length, ...args); } finally { w.free(ptr, bytes.length); }
+    if (bytes.length) new Uint8Array(w.memory.buffer, ptr, bytes.length).set(bytes);
+    return [ptr, bytes.length];
   }
-  const out = () => dec.decode(new Uint8Array(w.memory.buffer, w.outPtr(), w.outLen()));
+  function call(fn, texts, ...args) {  // fn(ptr, len, [ptr, len, ...] ...args), each of `texts` in the memory
+    const strings = (Array.isArray(texts) ? texts : [texts]).map(put);
+    try { return fn(...strings.flat(), ...args); } finally { strings.forEach(([ptr, len]) => w.free(ptr, len)); }
+  }
+  const out = () => {
+    const len = w.outLen();
+    return len ? dec.decode(new Uint8Array(w.memory.buffer, w.outPtr(), len)) : '';
+  };
 
   // Search
   fetch('search.json').then(r => r.text()).then(text => call(w.loadIndex, text)).catch(() => {});
@@ -2039,6 +2586,35 @@ JS = r'''
   document.addEventListener('keydown', ev => {
     if (ev.key === '/' && document.activeElement !== q) { ev.preventDefault(); q.focus(); }
   });
+
+  // The Coverage page's source viewer: a click on a file's row fetches its source (`data-src`), hands it and the
+  // line ranges (`data-hit` / `data-miss`) to `renderSource` and shows the HTML in a row under it, scrolled so
+  // the first missed line is a third down; a second click hides or shows it.
+  async function showSource(row) {
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains('src-view')) { next.hidden = !next.hidden; return; }
+    const view = document.createElement('tr'), cell = document.createElement('td'), pre = document.createElement('pre');
+    view.className = 'src-view';
+    cell.colSpan = row.children.length;
+    pre.className = 'cov-src';
+    cell.append(pre);
+    view.append(cell);
+    row.after(view);
+    try {
+      const reply = await fetch(row.dataset.src);
+      if (!reply.ok) throw new Error(reply.status + ' ' + reply.statusText);
+      const texts = [await reply.text(), row.dataset.hit, row.dataset.miss];
+      const first = call(w.renderSource, texts, row.dataset.stale === '1' ? 1 : 0);
+      pre.innerHTML = out();
+      const line = first && pre.querySelector('[data-n="' + first + '"]');
+      if (line) pre.scrollTop = line.offsetTop - pre.clientHeight / 3;
+    } catch (e) {
+      pre.textContent = 'Could not load ' + row.dataset.src + ': ' + e.message;
+    }
+  }
+  document.querySelectorAll('table.cov tr[data-src]').forEach(row => row.addEventListener('click', () => {
+    if (!getSelection().toString()) showSource(row);
+  }));
 
   // Run buttons: only when served by `setu_docs.py serve` (it answers /api/ping). It listens on 127.0.0.1 only,
   // so a published site (GitHub Pages) does not ask (a 404 in every page load's network log).
