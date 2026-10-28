@@ -30,7 +30,9 @@ const Param = class.Param;
 ///     - Linux 5.6+ (`IORING_REGISTER_PROBE`), else `RuntimeError`.
 pub fn io_uring_get_probe_ring(ring: *Ring) py.Error!*Object {
     if (c.io_uring_get_probe_ring(try ring.checkedPtr())) |p| return class.ProbeType.new(.{ ._io_uring_probe = p });
+    // coverage-off: Linux 5.6+ always has the probe
     return py.raiseRuntimeError("Linux kernel version does not support `io_uring_get_probe_ring()`", .{});
+    // coverage-on
 }
 
 /// Like `io_uring_get_probe_ring`, without a ring (a temporary one is made for it).
@@ -47,7 +49,9 @@ pub fn io_uring_get_probe_ring(ring: *Ring) py.Error!*Object {
 ///     - Linux 5.6+ (`IORING_REGISTER_PROBE`), else `RuntimeError`.
 pub fn io_uring_get_probe() py.Error!*Object {
     if (c.io_uring_get_probe()) |p| return class.ProbeType.new(.{ ._io_uring_probe = p });
+    // coverage-off: Linux 5.6+ always has the probe
     return py.raiseRuntimeError("Linux kernel version does not support `io_uring_get_probe()`", .{});
+    // coverage-on
 }
 
 /// Free `probe` (it is freed on garbage collection too). Calling it again is harmless.

@@ -355,7 +355,9 @@ pub const OpenHow = struct {
             self._open_how.flags,
             self._open_how.mode,
             self._open_how.resolve,
-        }) catch unreachable; // three u64s fit
+            // coverage-off: three u64s fit `buf`
+        }) catch unreachable;
+        // coverage-on
         return py.new(text);
     }
 

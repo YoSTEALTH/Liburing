@@ -1,6 +1,6 @@
 .{
     .name = .liburing,
-    .version = "2026.10.27",
+    .version = "2026.10.28",
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
         // Setu v2026.10.27-2 (commit 985d2eb).

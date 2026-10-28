@@ -299,7 +299,9 @@ pub fn io_uring_prep_fsync(sqe: *SQE, fd: i32, fsync_flags: ?u32) py.Error!bool 
 ///       `cqe.res` the number allocated.
 pub fn io_uring_prep_files_update(sqe: *SQE, fds: *FileIndex, offset: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     // note: a `FileIndex` (not a list) so the fds stay alive until the kernel reads them.
     c.io_uring_prep_files_update(s, fds.fdSlice().ptr, @intCast(fds._len), offset orelse 0);
     try h.holdUntilCompletion(sqe, null, &.{h.FileIndexType.object(fds)});
@@ -685,7 +687,9 @@ pub fn io_uring_prep_fadvise64(sqe: *SQE, fd: i32, len: c.off_t, advice: i32, of
 ///     - A `buf` over `4 GiB - 1` raises `OSError: EINVAL` on older kernels without 64-bit length support.
 pub fn io_uring_prep_madvise64(sqe: *SQE, buf: py.OwnedWritableBuffer, advice: i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     try h.holdUntilCompletion(sqe, &buf, &.{}); // first: owns the buffer from here, on every path
     c.io_uring_prep_madvise64(s, buf.data.ptr, @intCast(buf.data.len), advice); // cast: a size fits `off_t`
     return true;

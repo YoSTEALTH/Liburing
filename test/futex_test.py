@@ -22,6 +22,10 @@ def test_futex_state():
         _ = futex.val
     with pytest.raises(MemoryError):
         _ = futex.flags
+    with pytest.raises(MemoryError):
+        futex.val = 1
+    with pytest.raises(MemoryError):
+        futex.flags = FUTEX2_SIZE_U32
 
     with pytest.raises(AttributeError):
         futex.private = True

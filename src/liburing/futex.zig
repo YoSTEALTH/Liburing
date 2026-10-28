@@ -169,7 +169,9 @@ pub const Futex = struct {
         );
         if (linux.errno(futex) != .SUCCESS) return py.raiseErrno(@backingInt(linux.errno(futex)));
         const states: [*]u32 = @ptrFromInt(futex);
+        // coverage-off: out of memory only
         errdefer _ = linux.munmap(@ptrCast(states), size);
+        // coverage-on
 
         var waitv: ?[*]c.futex_waitv = null;
         if (_vector) {

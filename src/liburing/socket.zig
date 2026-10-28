@@ -155,7 +155,9 @@ pub const Sockaddr = struct {
                     &buf,
                     "{d}.{d}.{d}.{d}",
                     .{ bytes[0], bytes[1], bytes[2], bytes[3] },
+                    // coverage-off: four u8s fit `buf`
                 ) catch unreachable;
+                // coverage-on
                 return py.new(text);
             },
             AF_INET6 => {
@@ -312,7 +314,9 @@ pub fn getsockopt(sqe: *SQE, sockfd: i32, level: i32, optname: i32, optval: py.O
 ///       a `Sockaddr` holds: truncated); `sockaddr.family`, `.ip`, `.port` / `.path` then read it.
 pub fn getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_cmd_getsockname(
         s,
         fd,

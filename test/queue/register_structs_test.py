@@ -373,9 +373,9 @@ def test_bpf_fields_and_register(ring):
     bpf = Bpf()
     assert (bpf.cmd_type, bpf.cmd_flags, bpf.opcode, bpf.filter_len, bpf.filter) == (1, 0, 0, 0, None)
     assert (bpf.flags, bpf.pdu_size) == (0, 0)
-    bpf.cmd_type, bpf.cmd_flags, bpf.flags = 2, 3, 4
-    assert (bpf.cmd_type, bpf.cmd_flags, bpf.flags) == (2, 3, 4)
-    bpf.cmd_type, bpf.cmd_flags, bpf.flags = 1, 0, 0  # back to a filter, for the register below
+    bpf.cmd_type, bpf.cmd_flags, bpf.flags, bpf.pdu_size = 2, 3, 4, 5
+    assert (bpf.cmd_type, bpf.cmd_flags, bpf.flags, bpf.pdu_size) == (2, 3, 4, 5)
+    bpf.cmd_type, bpf.cmd_flags, bpf.flags, bpf.pdu_size = 1, 0, 0, 0  # back to a filter, for the register below
     program = bytes(16)  # two instructions
     bpf.filter = program
     bpf.opcode = io_uring_op.IORING_OP_NOP

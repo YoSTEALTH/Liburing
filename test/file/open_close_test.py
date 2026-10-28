@@ -27,6 +27,19 @@ def test_open_close(ring, cqe):
     assert entry.user_data == 321
 
 
+def test_open_path_errors(ring):
+    class BytesPath:
+        def __fspath__(self):
+            return b"/tmp"
+
+    sqe = io_uring_get_sqe(ring)
+    with pytest.raises(TypeError):  # an `os.PathLike` giving `bytes`
+        io_uring_prep_open(sqe, BytesPath())
+    with pytest.raises(UnicodeEncodeError):  # a lone surrogate has no UTF-8
+        io_uring_prep_open(sqe, "/tmp/\udcff")
+    io_uring_prep_nop(sqe)  # the slot is still free
+
+
 def test_openat2_close(ring, cqe):
     how = OpenHow(O_TMPFILE | O_WRONLY, 0o777, RESOLVE_IN_ROOT)
     # open

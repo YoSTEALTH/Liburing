@@ -2,6 +2,7 @@
 
 import array
 import errno
+import mmap
 import os
 import select
 import socket
@@ -401,6 +402,10 @@ def test_provide_buffers_arguments(ring):
         io_uring_prep_provide_buffers(sqe, bytearray(8), 0, 1, 0)
     with pytest.raises(ValueError):
         io_uring_prep_provide_buffers(sqe, bytearray(2), 4, 1, 0)
+    big = mmap.mmap(-1, 2**31, flags=mmap.MAP_PRIVATE | mmap.MAP_NORESERVE)  # untouched: no memory used
+    with pytest.raises(OverflowError):  # one buffer of 2 GiB: its length is a C `int`
+        io_uring_prep_provide_buffers(sqe, big, 1, 1, 0)
+    big.close()  # released
 
 
 def test_send_set_addr_udp(ring, cqe):

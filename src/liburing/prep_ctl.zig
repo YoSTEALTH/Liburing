@@ -179,7 +179,9 @@ pub fn io_uring_prep_nop128(sqe: *SQE) py.Error!bool {
 ///     - `IORING_TIMEOUT_IMMEDIATE_ARG` (Linux 7.1+) is not usable here: `ts` is always a `Timespec`.
 pub fn io_uring_prep_timeout(sqe: *SQE, ts: *Timespec, count: u32, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     const _flags = flags orelse 0;
     c.io_uring_prep_timeout(s, ts._timespec, count, _flags);
     try h.holdUntilCompletion(sqe, null, &.{class.TimespecType.object(ts)});
@@ -210,7 +212,9 @@ pub fn io_uring_prep_timeout_remove(sqe: *SQE, user_data: u64, flags: ?u32) py.E
 ///       it is firing, too late to update.
 pub fn io_uring_prep_timeout_update(sqe: *SQE, ts: *Timespec, user_data: u64, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     const _flags = flags orelse 0;
     c.io_uring_prep_timeout_update(s, ts._timespec, user_data, _flags);
     try h.holdUntilCompletion(sqe, null, &.{class.TimespecType.object(ts)});
@@ -305,7 +309,9 @@ pub fn io_uring_prep_cancel_fd(sqe: *SQE, fd: i32, flags: ?u32) py.Error!bool {
 ///       timer expired.
 pub fn io_uring_prep_link_timeout(sqe: *SQE, ts: *Timespec, flags: u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_link_timeout(s, ts._timespec, flags);
     try h.holdUntilCompletion(sqe, null, &.{class.TimespecType.object(ts)});
     return true;
@@ -337,7 +343,9 @@ pub fn io_uring_prep_epoll_wait(sqe: *SQE, fd: i32, events: *EpollEvent, maxeven
 ///     - `cqe.res` is `0`; the errors of `epoll_ctl(2)` raise `OSError`.
 pub fn io_uring_prep_epoll_ctl(sqe: *SQE, epfd: i32, fd: i32, op: i32, ev: *EpollEvent) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_epoll_ctl(s, epfd, fd, op, @ptrCast(&ev._events.?[ev._index]));
     try h.holdUntilCompletion(sqe, null, &.{EpollEventType.object(ev)});
     return true;
@@ -497,7 +505,9 @@ pub fn io_uring_prep_waitid(
     flags: ?u32,
 ) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     const _flags = flags orelse 0;
     c.io_uring_prep_waitid(s, idtype, id, &infop._siginfo_t, options, _flags);
     try h.holdUntilCompletion(sqe, null, &.{class.SiginfoTType.object(infop)});
@@ -520,7 +530,9 @@ pub fn io_uring_prep_futex_wake(
     flags: ?u32,
 ) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_futex_wake(s, @ptrFromInt(futex._futex), val, mask, futex_flags orelse 0, flags orelse 0);
     try h.holdUntilCompletion(sqe, null, &.{FutexType.object(futex)});
     return true;
@@ -545,7 +557,9 @@ pub fn io_uring_prep_futex_wait(
     flags: ?u32,
 ) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_futex_wait(s, @ptrFromInt(futex._futex), val, mask, futex_flags orelse 0, flags orelse 0);
     try h.holdUntilCompletion(sqe, null, &.{FutexType.object(futex)});
     return true;

@@ -270,8 +270,10 @@ pub const Sqe = struct {
         const sqes = std.heap.c_allocator.alloc(c.io_uring_sqe, _no) catch return e.raiseMemoryError("out of memory!");
         @memset(sqes, std.mem.zeroes(c.io_uring_sqe));
         const holds = std.heap.c_allocator.alloc(Ring.Hold, _no) catch {
+            // coverage-off: out of memory only
             std.heap.c_allocator.free(sqes);
             return e.raiseMemoryError("out of memory!");
+            // coverage-on
         };
         @memset(holds, .{});
         const d = SqeType.data(self);
@@ -345,7 +347,9 @@ pub const Sqe = struct {
     /// are in flight (the kernel may still use it through them).
     pub fn replaceHold(self: *Self, target: *Ring.Hold, new: Ring.Hold) py.Error!void {
         if (self._inflight != 0) self._retired.ensureUnusedCapacity(std.heap.c_allocator, 1) catch
+            // coverage-off: out of memory only
             return e.raiseMemoryError("Out of Memory!");
+        // coverage-on
         var old = target.*;
         target.* = new;
         if (old.isEmpty()) return;

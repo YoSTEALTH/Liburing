@@ -139,11 +139,15 @@ pub fn probe() py.Error!*Object {
     const items = @typeInfo(n.io_uring_op).@"enum".field_names;
 
     const p = c.io_uring_get_probe() orelse
+        // coverage-off: Linux 5.6+ always has the probe
         return py.raiseRuntimeError("Linux kernel version does not support `probe()`", .{});
+    // coverage-on
     defer c.io_uring_free_probe(p);
 
     const dict = sc.PyDict_New() orelse return error.PythonError;
+    // coverage-off: out of memory only
     errdefer py.decref(dict);
+    // coverage-on
     inline for (items[0..last]) |name| {
         const op = @backingInt(@field(n.io_uring_op, name));
         const value = if (c.io_uring_opcode_supported(p, op) == 1) py.trueObj() else py.falseObj();
@@ -174,9 +178,13 @@ pub fn timespec(second: f64) py.Error!*Object {
     }
     if (second >= 0x1p63) return py.raiseOverflowError("`timespec(second)` = {d} is out of range", .{second});
     var ts = std.heap.c_allocator.create(c.__kernel_timespec) catch {
+        // coverage-off: out of memory only
         return e.raiseMemoryError("`timespec()` - Out of Memory!");
+        // coverage-on
     };
+    // coverage-off: out of memory only
     errdefer std.heap.c_allocator.destroy(ts);
+    // coverage-on
     // split float to second & nano second
     if (second != 0.0) {
         ts.tv_sec = @trunc(second);
@@ -251,33 +259,32 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
     //    as its `len == 0` thus not try to replace memory by mistake!
     if (sqe._len == 0) return true;
 
-    if (sqe._io_uring_sqe) |_sqe| {
-        try sqe.ownThread(ring._thread); // `checkedPtr`: the calling thread owns `ring`
-        const holds = sqe._holds.?[0..sqe._len];
-        for (holds) |*hold_| {
-            if (!hold_.isEmpty()) break try ring.ensurePending(); // before any copy: no error after one
-        }
-        if (sqe._len == 1) { // single
-            const slot = c.io_uring_get_sqe(io_uring) orelse
-                if (try ring.autoSubmit()) c.io_uring_get_sqe(io_uring) else null;
-            if (slot) |s| {
-                @memcpy(s, _sqe[0..1]);
-                holdTemplate(ring, s, sqe, &holds[0]);
-                return true;
-            }
-        } else if (c.io_uring_sq_space_left(io_uring) >= sqe._len or
-            (try ring.autoSubmit() and c.io_uring_sq_space_left(io_uring) >= sqe._len))
-        { // multiple: all or none, so a chain in the template is never split
-            for (0..sqe._len) |i| {
-                if (c.io_uring_get_sqe(io_uring)) |s| {
-                    @memcpy(s, _sqe[i .. i + 1]);
-                    holdTemplate(ring, s, sqe, &holds[i]);
-                } // else should not trigger since space left is per-checked!
-            }
+    const _sqe = sqe._io_uring_sqe.?; // allocated with its `_len` entries
+    try sqe.ownThread(ring._thread); // `checkedPtr`: the calling thread owns `ring`
+    const holds = sqe._holds.?[0..sqe._len];
+    for (holds) |*hold_| {
+        if (!hold_.isEmpty()) break try ring.ensurePending(); // before any copy: no error after one
+    }
+    if (sqe._len == 1) { // single
+        const slot = c.io_uring_get_sqe(io_uring) orelse
+            if (try ring.autoSubmit()) c.io_uring_get_sqe(io_uring) else null;
+        if (slot) |s| {
+            @memcpy(s, _sqe[0..1]);
+            holdTemplate(ring, s, sqe, &holds[0]);
             return true;
         }
-        return false;
-    } else return false;
+    } else if (c.io_uring_sq_space_left(io_uring) >= sqe._len or
+        (try ring.autoSubmit() and c.io_uring_sq_space_left(io_uring) >= sqe._len))
+    { // multiple: all or none, so a chain in the template is never split
+        for (0..sqe._len) |i| {
+            if (c.io_uring_get_sqe(io_uring)) |s| {
+                @memcpy(s, _sqe[i .. i + 1]);
+                holdTemplate(ring, s, sqe, &holds[i]);
+            } // else should not trigger since space left is per-checked!
+        }
+        return true;
+    }
+    return false;
 }
 
 /// A copy (in the ring's slot `s`) of a template entry that holds something holds the template itself until
@@ -316,7 +323,9 @@ pub fn holdUntilCompletion(sqe: *SQE, buf_ptr: anytype, objs: []const *Object) p
     _ = try sqe.sqePtr(); // ring initialized (and its thread), or a template's thread
     const where = try holdOf(sqe) orelse return;
     var new: Ring.Hold = .{};
+    // coverage-off: out of memory only
     errdefer new.release();
+    // coverage-on
     var bytes: ?*Object = null;
     switch (@typeInfo(B)) {
         .null => {},
@@ -348,7 +357,9 @@ pub fn holdUntilCompletion(sqe: *SQE, buf_ptr: anytype, objs: []const *Object) p
 /// completion of the request `sqe` prepares, like `holdUntilCompletion`.
 pub fn holdVecUntilCompletion(sqe: *SQE, vec: *Ring.Vec) py.Error!void {
     var new: Ring.Hold = .{ .vec = vec };
+    // coverage-off: out of memory only
     errdefer new.release();
+    // coverage-on
     _ = try sqe.sqePtr(); // ring initialized (and its thread), or a template's thread
     const where = try holdOf(sqe) orelse return; // nowhere to hold (no ring, no template): kept, not freed
     if (where.template) |t| return t.replaceHold(where.hold, new);
@@ -411,7 +422,9 @@ inline fn holdOf(sqe: *SQE) py.Error!?HoldPlace {
         const t = SqeType.data(self);
         return .{ .hold = t.holdFor(ptr), .template = t };
     }
+    // coverage-off: every prepped entry belongs to a ring or a template
     return null;
+    // coverage-on
 }
 
 /// A path argument (`str` or `os.PathLike`, not `bytes`): `path` is the UTF-8 of

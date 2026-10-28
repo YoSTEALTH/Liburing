@@ -66,7 +66,9 @@ pub fn io_uring_prep_recvmsg_multishot(sqe: *SQE, fd: i32, msg: *Msghdr, flags: 
 ///     - With `IOSQE_IO_LINK` set `MSG_WAITALL` in `flags`: a short send does not fail the link otherwise.
 pub fn io_uring_prep_sendmsg(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     const _flags = flags orelse 0;
     c.io_uring_prep_sendmsg(s, fd, &msg._msghdr, _flags);
     try h.holdUntilCompletion(sqe, null, &.{MsghdrType.object(msg)});
@@ -86,7 +88,9 @@ pub fn io_uring_prep_sendmsg(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.E
 ///     - `flags` are the `accept4` flags (`SOCK_NONBLOCK`, `SOCK_CLOEXEC`).
 pub fn io_uring_prep_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     // written at the completion
     try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{});
     const _flags = flags orelse 0;
@@ -108,7 +112,9 @@ pub fn io_uring_prep_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) p
 ///     - `SOCK_CLOEXEC` in `flags` gives `OSError: EINVAL`.
 pub fn io_uring_prep_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockaddr, file_index: ?u32, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     // written at the completion
     try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{});
     const _flags = flags orelse 0;
@@ -134,7 +140,9 @@ pub fn io_uring_prep_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockaddr, file_in
 ///     - Every connection overwrites `addr`, possibly before the last one was read: usually leave it `None`.
 pub fn io_uring_prep_multishot_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     // written at the completion
     try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{});
     const _flags = flags orelse 0;
@@ -157,7 +165,9 @@ pub fn io_uring_prep_multishot_accept(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flag
 ///       when it has no free slot. `SOCK_CLOEXEC` in `flags` gives `OSError: EINVAL`.
 pub fn io_uring_prep_multishot_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockaddr, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     // written at the completion
     try h.holdUntilCompletion(sqe, null, if (addr) |a| &.{SockaddrType.object(a)} else &.{});
     const _flags = flags orelse 0;
@@ -177,7 +187,9 @@ pub fn io_uring_prep_multishot_accept_direct(sqe: *SQE, fd: i32, addr: ?*Sockadd
 ///     - Linux 5.5+.
 pub fn io_uring_prep_connect(sqe: *SQE, fd: i32, addr: *Sockaddr) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_connect(s, fd, addr.addrPtr(), addr._socklen);
     try h.holdUntilCompletion(sqe, null, &.{SockaddrType.object(addr)});
     return true;
@@ -189,7 +201,9 @@ pub fn io_uring_prep_connect(sqe: *SQE, fd: i32, addr: *Sockaddr) py.Error!bool 
 ///     - Linux 6.11+.
 pub fn io_uring_prep_bind(sqe: *SQE, fd: i32, addr: *Sockaddr) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_bind(s, fd, addr.addrPtr(), addr._socklen);
     try h.holdUntilCompletion(sqe, null, &.{SockaddrType.object(addr)});
     return true;
@@ -214,7 +228,9 @@ pub fn io_uring_prep_listen(sqe: *SQE, fd: i32, backlog: i32) py.Error!bool {
 ///     - With `IOSQE_IO_LINK` set `MSG_WAITALL` in `flags`: a short send does not fail the link otherwise.
 pub fn io_uring_prep_send(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, flags: ?i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     try h.holdUntilCompletion(sqe, &buf, &.{}); // first: owns the buffer from here, on every path
     const _flags = flags orelse 0;
     c.io_uring_prep_send(s, sockfd, buf.data.ptr, buf.data.len, _flags);
@@ -245,7 +261,9 @@ pub fn io_uring_prep_send_bundle(sqe: *SQE, sockfd: i32, len: ?usize, flags: ?i3
 ///       an unconnected socket.
 pub fn io_uring_prep_send_set_addr(sqe: *SQE, dest_addr: *Sockaddr) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_send_set_addr(s, dest_addr.addrPtr(), @intCast(dest_addr._socklen));
     try h.holdUntilCompletion(sqe, null, &.{SockaddrType.object(dest_addr)});
     return true;
@@ -259,7 +277,9 @@ pub fn io_uring_prep_send_set_addr(sqe: *SQE, dest_addr: *Sockaddr) py.Error!boo
 ///     - `addr` must suit the socket's family.
 pub fn io_uring_prep_sendto(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, addr: *Sockaddr, flags: ?i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     // first: owns the buffer from here, on every path
     try h.holdUntilCompletion(sqe, &buf, &.{SockaddrType.object(addr)});
     c.io_uring_prep_sendto(
@@ -291,7 +311,9 @@ pub fn io_uring_prep_sendto(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, addr: *
 ///     - With `IOSQE_IO_LINK` set `MSG_WAITALL` in `flags`: a short send does not fail the link otherwise.
 pub fn io_uring_prep_send_zc(sqe: *SQE, sockfd: i32, buf: py.OwnedBuffer, flags: ?i32, zc_flags: ?u32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     try h.holdUntilCompletion(sqe, &buf, &.{}); // first: owns the buffer from here, on every path
     c.io_uring_prep_send_zc(s, sockfd, buf.data.ptr, buf.data.len, flags orelse 0, zc_flags orelse 0);
     return true;
@@ -313,7 +335,9 @@ pub fn io_uring_prep_send_zc_fixed(
     zc_flags: ?u32,
 ) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     try h.holdUntilCompletion(sqe, &buf, &.{}); // first: owns the buffer from here, on every path
     c.io_uring_prep_send_zc_fixed(
         s,
@@ -337,7 +361,9 @@ pub fn io_uring_prep_send_zc_fixed(
 ///     - `OSError: ENOMEM` can mean a too low locked memory limit (`ulimit -l`).
 pub fn io_uring_prep_sendmsg_zc(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_sendmsg_zc(s, fd, &msg._msghdr, flags orelse 0);
     try h.holdUntilCompletion(sqe, null, &.{MsghdrType.object(msg)});
     return true;
@@ -352,7 +378,9 @@ pub fn io_uring_prep_sendmsg_zc(sqe: *SQE, fd: i32, msg: *Msghdr, flags: ?u32) p
 ///     - The buffers must be registered with `io_uring_register_buffers`.
 pub fn io_uring_prep_sendmsg_zc_fixed(sqe: *SQE, fd: i32, msg: *Msghdr, buf_index: u32, flags: ?u32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_sendmsg_zc_fixed(s, fd, &msg._msghdr, flags orelse 0, buf_index);
     try h.holdUntilCompletion(sqe, null, &.{MsghdrType.object(msg)});
     return true;
@@ -368,7 +396,9 @@ pub fn io_uring_prep_sendmsg_zc_fixed(sqe: *SQE, fd: i32, msg: *Msghdr, buf_inde
 ///     - `cqe.flags` has `IORING_CQE_F_SOCK_NONEMPTY` (Linux 5.19+) when the socket still had data after the receive.
 pub fn io_uring_prep_recv(sqe: *SQE, sockfd: i32, buf: ?py.OwnedWritableBuffer, flags: ?i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     try h.holdUntilCompletion(sqe, &buf, &.{}); // first: owns the buffer from here, on every path
     if (buf) |b| {
         c.io_uring_prep_recv(s, sockfd, b.data.ptr, b.data.len, flags orelse 0);
@@ -391,7 +421,9 @@ pub fn io_uring_prep_recv(sqe: *SQE, sockfd: i32, buf: ?py.OwnedWritableBuffer, 
 ///       to keep receiving. Return used buffers to the ring promptly.
 pub fn io_uring_prep_recv_multishot(sqe: *SQE, sockfd: i32, buf: ?py.OwnedWritableBuffer, flags: ?i32) py.Error!bool {
     const s = try h.prepSlot(sqe, &buf) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     try h.holdUntilCompletion(sqe, &buf, &.{}); // first: owns the buffer from here, on every path
     if (buf) |b| {
         c.io_uring_prep_recv_multishot(s, sockfd, b.data.ptr, b.data.len, flags orelse 0);
@@ -505,7 +537,9 @@ pub fn io_uring_prep_provide_buffers(
         return releaseFailed(addr, err);
     };
     const s = try h.prepSlot(sqe, &addr) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     try ring.keepProvided(addr.view); // owns the view from here (released if it fails)
     c.io_uring_prep_provide_buffers(s, addr.data.ptr, len, nr, bgid, bid);
     return true;
@@ -658,7 +692,9 @@ pub fn io_uring_prep_cmd_sock(
 ///       (not `ENOTSOCK` like the system calls).
 pub fn io_uring_prep_cmd_getsockname(sqe: *SQE, fd: i32, sockaddr: *Sockaddr, peer: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
+    // coverage-off: out of memory only
     errdefer sqe.undoSlot();
+    // coverage-on
     c.io_uring_prep_cmd_getsockname(
         s,
         fd,

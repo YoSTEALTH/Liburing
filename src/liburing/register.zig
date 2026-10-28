@@ -413,7 +413,9 @@ pub const Query = struct {
 /// A `dict` of the `names` fields of `value`.
 fn structDict(value: anytype, comptime names: anytype) py.Error!*Object {
     const dict = setu.c.PyDict_New() orelse return error.PythonError;
+    // coverage-off: out of memory only
     errdefer py.decref(dict);
+    // coverage-on
     inline for (names) |name| {
         const key = try py.new(name);
         defer py.decref(key);
@@ -889,8 +891,10 @@ pub const BufRing = struct {
         var v = view;
         if (bid >= self._views.items.len) {
             self._views.appendNTimes(std.heap.c_allocator, null, bid + 1 - self._views.items.len) catch {
+                // coverage-off: out of memory only
                 setu.c.PyBuffer_Release(&v);
                 return e.raiseMemoryError("Out of Memory!");
+                // coverage-on
             };
         }
         const slot = &self._views.items[bid];
@@ -1681,15 +1685,21 @@ pub fn io_uring_setup_buf_ring(ring: *Ring, nentries: u32, bgid: i32, flags: u32
     const r = try ring.checkedPtr();
     if (c.io_uring_setup_buf_ring(r, nentries, bgid, flags, &err)) |br| {
         const obj = BufRingType.new(.{ ._io_uring_buf_ring = br, ._bgid = bgid }) catch |fail| {
+            // coverage-off: out of memory only
             _ = c.io_uring_free_buf_ring(r, br, nentries, bgid);
             return fail;
+            // coverage-on
         };
+        // coverage-off: out of memory only
         errdefer py.decref(obj);
+        // coverage-on
         try ring.keepBufRing(obj);
         return obj;
     }
     _ = try py.checkErrno(if (err < 0) err else -err);
+    // coverage-off: liburing sets `err` whenever it fails
     return py.raiseRuntimeError("`io_uring_setup_buf_ring` - could not be initialized!", .{});
+    // coverage-on
 }
 
 /// Unregister and free the buffer ring `br` (`nentries` and `bgid` as for `io_uring_setup_buf_ring`).

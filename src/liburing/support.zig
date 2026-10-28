@@ -67,8 +67,7 @@ fn registerFailed(name: []const u8, op: u32, res: c_int) py.Error {
         name,
         res,
     );
-    _ = try py.checkErrno(res);
-    unreachable; // `res < 0` always raises
+    return py.raiseErrno(-res); // `res` is a negative errno
 }
 
 /// `res` when it is `>= 0`, else `UnsupportedError` when `flags` has an `IORING_SETUP_*` the kernel lacks
@@ -90,8 +89,7 @@ fn setupFailed(res: c_int, flags: u32) py.Error {
             return unsupported(name, res);
         }
     };
-    _ = try py.checkErrno(res);
-    unreachable;
+    return py.raiseErrno(-res);
 }
 
 /// `res` when it is `>= 0`, else `UnsupportedError` when the ring's `features` lack `name` (an
@@ -108,8 +106,7 @@ pub inline fn feature(comptime name: [:0]const u8, features: u32, res: c_int) py
 fn featureFailed(name: []const u8, has: bool, res: c_int) py.Error {
     @branchHint(.cold);
     if (!has) return unsupported(name, res);
-    _ = try py.checkErrno(res);
-    unreachable;
+    return py.raiseErrno(-res);
 }
 
 const EINVAL: c_int = @backingInt(std.os.linux.E.INVAL);

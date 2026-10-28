@@ -215,13 +215,17 @@ pub const Ring = struct {
             const gpa = std.heap.c_allocator;
             const self = gpa.create(Vec) catch return e.raiseMemoryError("Out of Memory!");
             const views = gpa.alloc(setu.c.Buffer, n) catch {
+                // coverage-off: out of memory only
                 gpa.destroy(self);
                 return e.raiseMemoryError("Out of Memory!");
+                // coverage-on
             };
             const iov = gpa.alloc(c.iovec, n) catch {
+                // coverage-off: out of memory only
                 gpa.free(views);
                 gpa.destroy(self);
                 return e.raiseMemoryError("Out of Memory!");
+                // coverage-on
             };
             self.* = .{ .views = views, .iov = iov };
             return self;
@@ -360,9 +364,11 @@ pub const Ring = struct {
             self.releaseCqe(cqe.?);
             c.io_uring_cqe_seen(ring, cqe);
         }
+        // coverage-off: a request that does not complete within a second of its cancel
         if (self._live != 0) for (self._holds.items) |*hold| {
             hold.* = .{}; // still in flight: leaked
         };
+        // coverage-on
     }
 
     /// Releases the registered buffers (after `io_uring_unregister_buffers`, or the exit).
@@ -404,8 +410,10 @@ pub const Ring = struct {
     /// Keeps the `BufRing` `obj` (a new reference taken) until `dropBufRing` or the exit.
     pub fn keepBufRing(self: *Ring, obj: *Object) py.Error!void {
         self._buf_rings.append(std.heap.c_allocator, keep(obj)) catch {
+            // coverage-off: out of memory only
             py.decref(obj);
             return e.raiseMemoryError("Out of Memory!");
+            // coverage-on
         };
     }
 
@@ -438,15 +446,19 @@ pub const Ring = struct {
             }
         }
         self._provided.append(std.heap.c_allocator, v) catch {
+            // coverage-off: out of memory only
             setu.c.PyBuffer_Release(&v);
             return e.raiseMemoryError("Out of Memory!");
+            // coverage-on
         };
     }
 
     /// Room for `src`'s registrations, before a clone: `shareRegistered` after it then can not fail.
     pub fn reserveShared(self: *Ring, src: *const Ring) py.Error!void {
         self._registered.ensureUnusedCapacity(std.heap.c_allocator, src._registered.items.len) catch
+            // coverage-off: out of memory only
             return e.raiseMemoryError("Out of Memory!");
+        // coverage-on
     }
 
     /// After `io_uring_clone_buffers` from `src`: the kernel uses `src`'s registered buffers for this ring too,
@@ -460,8 +472,10 @@ pub const Ring = struct {
     /// Keeps `vec` (registered with the kernel) until `releaseRegistered`; on `MemoryError` it is released.
     pub fn keepRegistered(self: *Ring, vec: *Vec) py.Error!void {
         self._registered.append(std.heap.c_allocator, vec) catch {
+            // coverage-off: out of memory only
             vec.destroy();
             return e.raiseMemoryError("Out of Memory!");
+            // coverage-on
         };
     }
 

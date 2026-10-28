@@ -24,6 +24,10 @@ def test_buf_ring_holds_buffers(ring):
         first.extend(b"x")
     with pytest.raises(TypeError):  # the kernel writes into it
         io_uring_buf_ring_add(br, b"read-only", 1, mask, 0)
+    big = mmap.mmap(-1, 2**32, flags=mmap.MAP_PRIVATE | mmap.MAP_NORESERVE)  # untouched: no memory used
+    with pytest.raises(OverflowError):  # 4 GiB: its length is a C `unsigned int`
+        io_uring_buf_ring_add(br, big, 1, mask, 0)
+    big.close()  # released
     del first, br  # the ring still holds the `BufRing`, which holds the buffer
     gc.collect()
     assert refs[0]() is not None
@@ -46,6 +50,26 @@ def test_buf_ring_readd_replaces(ring):
     del br
     gc.collect()
     assert refs[1]() is None
+
+
+def test_unregister_one_of_two_buf_rings(ring):
+    first, second = io_uring_setup_buf_ring(ring, 2, 1, 0), io_uring_setup_buf_ring(ring, 2, 2, 0)
+    memory = [mmap.mmap(-1, 4096) for _ in range(2)]
+    for bgid, m in zip((3, 4), memory):
+        reg = BufReg()
+        reg.ring, reg.ring_entries, reg.bgid = m, 8, bgid
+        assert io_uring_register_buf_ring(ring, reg) == 0
+    assert io_uring_unregister_buf_ring(ring, 4) == 0  # drops group 4's memory only
+    memory[1].close()  # released
+    with pytest.raises(BufferError):  # group 3's: still held
+        memory[0].close()
+    assert io_uring_unregister_buf_ring(ring, 2) == 0  # drops `second` only
+    assert io_uring_buf_ring_head(ring, 1) == 0
+    assert io_uring_buf_ring_head(ring, 3) == 0
+    assert io_uring_free_buf_ring(ring, first, 2, 1) == 0
+    assert io_uring_unregister_buf_ring(ring, 3) == 0
+    memory[0].close()
+    del second
 
 
 def test_buf_ring_released_at_exit():
@@ -83,6 +107,18 @@ def test_provided_buffers_held_until_exit(cqe):
     io_uring_queue_exit(ring)
     gc.collect()
     assert ref() is None
+
+
+def test_provided_buffers_two_areas(ring):
+    first, second = Buf(32), Buf(32)
+    io_uring_prep_provide_buffers(io_uring_get_sqe(ring), first, 2, 1, 0)
+    io_uring_prep_provide_buffers(io_uring_get_sqe(ring), second, 2, 2, 0)  # not part of `first`: held too
+    assert io_uring_submit_and_wait(ring, 2) == 2
+    io_uring_cq_advance(ring, 2)
+    with pytest.raises(BufferError):
+        first.extend(b"x")
+    with pytest.raises(BufferError):
+        second.extend(b"x")
 
 
 def test_provide_buffers_needs_ring_sqe():
