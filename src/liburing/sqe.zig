@@ -353,7 +353,7 @@ pub const Sqe = struct {
         var old = target.*;
         target.* = new;
         if (old.isEmpty()) return;
-        if (self._inflight != 0) self._retired.appendAssumeCapacity(old) else old.release();
+        if (self._inflight != 0) self._retired.appendAssumeCapacity(old) else old.consume(); // a copy already
     }
 
     /// The hold of the entry `sqe` points into.

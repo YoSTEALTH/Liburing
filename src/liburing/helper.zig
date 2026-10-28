@@ -296,7 +296,7 @@ inline fn holdTemplate(ring: *Ring, s: *c.io_uring_sqe, sqe: *Sqe, entry: *const
     var old = pending.*;
     sqe._inflight += 1;
     pending.* = .{ .template = class.keep(SqeType.object(sqe)) };
-    old.release();
+    old.consume(); // a copy already: no second one
 }
 
 /// Keeps `buf` (a `py.Buffer` / `py.WritableBuffer`, an optional one, or `null`) locked and `objs` alive until
@@ -350,7 +350,7 @@ pub fn holdUntilCompletion(sqe: *SQE, buf_ptr: anytype, objs: []const *Object) p
     }
     var old = where.hold.*;
     where.hold.* = new;
-    old.release();
+    old.consume();
 }
 
 /// Keeps `vec` (a vectored prep's buffers and `struct iovec` array, owned from here on every path) until the
@@ -365,7 +365,7 @@ pub fn holdVecUntilCompletion(sqe: *SQE, vec: *Ring.Vec) py.Error!void {
     if (where.template) |t| return t.replaceHold(where.hold, new);
     var old = where.hold.*;
     where.hold.* = new;
-    old.release();
+    old.consume();
 }
 
 /// A buffer argument for `holdUntilCompletion` (a pointer to it: no copy of the view). An owned one

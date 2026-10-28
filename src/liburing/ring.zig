@@ -545,8 +545,11 @@ pub const Ring = struct {
         const gpa = std.heap.c_allocator;
         const first = self._table.items.len == 0;
         const need = (sq.sqe_tail -% sq.sqe_head) + @as(u32, if (first) reserved else 0);
-        self._table.ensureUnusedCapacity(gpa, need) catch return e.raiseMemoryError("Out of Memory!");
-        self._holds.ensureUnusedCapacity(gpa, need) catch return e.raiseMemoryError("Out of Memory!");
+        // the room is checked here: `ensureUnusedCapacity` is a call (~23 instructions) even when there is room
+        if (self._table.capacity - self._table.items.len < need)
+            self._table.ensureUnusedCapacity(gpa, need) catch return e.raiseMemoryError("Out of Memory!");
+        if (self._holds.capacity - self._holds.items.len < need)
+            self._holds.ensureUnusedCapacity(gpa, need) catch return e.raiseMemoryError("Out of Memory!");
         if (first) {
             self._table.appendNTimesAssumeCapacity(.{}, reserved);
             self._holds.appendNTimesAssumeCapacity(.{}, reserved);

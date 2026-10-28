@@ -214,6 +214,18 @@ pub const Cqe = struct {
         return py.checkErrno(res);
     }
 
+    /// The `user_data` and `res` of `cqe[index]` in one call, without creating an entry object: a server's
+    /// completion loop reads both. `res` is returned as is (a negative `-errno` for a failed request, no
+    /// `OSError`), so the `user_data` of a failed request is not lost to an exception.
+    ///
+    /// Example
+    ///     >>> cqe.user_data_res(0)
+    ///     (1, 0)
+    pub fn user_data_res(self: *const Cqe, index: isize) py.Error!struct { u64, i32 } {
+        const cqe = try self.slotPtr(index);
+        return .{ RingType.data(self._ring.?).userData(cqe.user_data), cqe.res };
+    }
+
     /// The `index`-th completion after `cqe[0]` in the ring's queue (wrapping), checked like `__getitem__`.
     inline fn slotPtr(self: *const Cqe, index: isize) py.Error!*c.io_uring_cqe {
         const first = self._io_uring_cqe orelse return py.raiseIndexError("`Cqe` - out of completed entries", .{});
