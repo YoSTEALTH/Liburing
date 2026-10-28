@@ -48,7 +48,6 @@ python3 tools/setu_build.py --all       # release wheels into dist/ (x86_64 + aa
 This site is built by Setu's `tools/setu_docs.py` (standard library only, plus `zig` for the search's Wasm), with the settings in `pyproject.toml`'s `[tool.setu_docs]`:
 
 ```bash
-python3 docs/gen_guide.py               # docs/guide.md, from docs/guide.template and example/
 python3 tools/setu_docs.py              # the site into site/ (what CI runs)
 python3 tools/setu_docs.py serve        # http://127.0.0.1:8000, with Run buttons on the examples
 python3 tools/setu_docs.py check        # run the docstrings' >>> examples

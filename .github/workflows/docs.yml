@@ -36,9 +36,7 @@ jobs:
         run: zig build develop
 
       - name: Build site
-        run: |
-          python docs/gen_guide.py
-          python tools/setu_docs.py
+        run: python tools/setu_docs.py
 
       - uses: actions/upload-pages-artifact@v4
         with:
