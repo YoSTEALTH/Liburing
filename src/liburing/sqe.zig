@@ -5,7 +5,7 @@ const setu = @import("setu");
 const std = @import("std");
 const claim = @import("class.zig").claim;
 const keep = @import("class.zig").keep;
-const pthread_self = @import("class.zig").pthread_self;
+const threadId = @import("class.zig").threadId;
 const RingType = @import("ring.zig").RingType;
 const Ring = @import("ring.zig").Ring;
 const ringOf = @import("ring.zig").ringOf;
@@ -247,7 +247,7 @@ pub const Sqe = struct {
     _inflight: u32 = 0, // `put_sqe` copies of an entry that holds something, not released yet
     /// Holds a re-prep replaced while copies were in flight: released once `_inflight` is `0`.
     _retired: std.ArrayList(Ring.Hold) = .empty,
-    /// `pthread_self()` of the first prep or `put_sqe`: copies are counted by the thread of their ring, so the
+    /// `threadId()` of the first prep or `put_sqe`: copies are counted by the thread of their ring, so the
     /// template stays with it (`put_sqe` and preps from another thread: `RuntimeError`). `0`: none yet.
     _thread: usize = 0,
 
@@ -322,11 +322,11 @@ pub const Sqe = struct {
     /// `RuntimeError` unless the calling thread is the template's; with none yet, it becomes the template's
     /// (two threads prepping one template at once would replace and release the same holds).
     pub fn checkThread(self: *Self) py.Error!void {
-        if (!claim(&self._thread, pthread_self())) return raiseTemplateThread();
+        if (!claim(&self._thread, threadId())) return raiseTemplateThread();
     }
 
     /// `put_sqe` into a ring owned by `thread` (the calling one: the ring checked it): takes it as the template's,
-    /// or `RuntimeError` for another one. No `pthread_self()` call.
+    /// or `RuntimeError` for another one. No `threadId()` call.
     pub inline fn ownThread(self: *Self, thread: usize) py.Error!void {
         if (!claim(&self._thread, thread)) return raiseTemplateThread();
     }

@@ -7,7 +7,7 @@ const setOwned = @import("class.zig").setOwned;
 const claim = @import("class.zig").claim;
 const raiseNotOwner = @import("class.zig").raiseNotOwner;
 const keep = @import("class.zig").keep;
-const pthread_self = @import("class.zig").pthread_self;
+const threadId = @import("class.zig").threadId;
 const RingType = @import("ring.zig").RingType;
 const Ring = @import("ring.zig").Ring;
 const ringOf = @import("ring.zig").ringOf;
@@ -130,7 +130,7 @@ pub const Cqe = struct {
     _gen: u32 = 0, // `_ring`'s `_gen` when `_io_uring_cqe` was set
     /// `CQE`s handed out by `cqe[i]`, reused once nothing else holds them (see `__getitem__`).
     _reuse: [reuse_len]?*Object = @splat(null),
-    /// `pthread_self()` of the thread that filled it first (`followRing`): the only one that may fill it, so two
+    /// `threadId()` of the thread that filled it first (`followRing`): the only one that may fill it, so two
     /// threads can not swap `_ring` (and `_reuse`) under each other. Reads go through the ring's own check. `0`: none
     /// yet.
     _thread: usize = 0,
@@ -156,7 +156,7 @@ pub const Cqe = struct {
     /// Records `ring_obj` (a `Ring`) and its generation, before `_io_uring_cqe` is set into its queue;
     /// `RuntimeError` from a thread that does not own the `Cqe` (`_thread`).
     pub inline fn followRing(self: *Cqe, ring_obj: *Object) py.Error!void {
-        if (!claim(&self._thread, pthread_self())) return raiseNotOwner("Cqe", "wait or peek");
+        if (!claim(&self._thread, threadId())) return raiseNotOwner("Cqe", "wait or peek");
         setOwned(&self._ring, ring_obj);
         self._gen = RingType.data(ring_obj)._gen;
     }
@@ -288,13 +288,13 @@ pub const CqeBatch = struct {
     _count: u32 = 0, // slots filled by last peek
     _ring: ?*Object = null, // the `Ring` the entries point into (set by `io_uring_peek_batch_cqe`)
     _gen: u32 = 0, // `_ring`'s `_gen` at that peek
-    _thread: usize = 0, // `pthread_self()` of its first peek, the only thread that may fill it (`Cqe._thread`)
+    _thread: usize = 0, // `threadId()` of its first peek, the only thread that may fill it (`Cqe._thread`)
 
     const Self = @This();
 
     /// `RuntimeError` unless the calling thread owns it (or it has no owner yet: then it does).
     pub fn claimThread(self: *Self) py.Error!void {
-        if (!claim(&self._thread, pthread_self())) return raiseNotOwner("CqeBatch", "peek");
+        if (!claim(&self._thread, threadId())) return raiseNotOwner("CqeBatch", "peek");
     }
 
     /// `CqeBatch(no)`: room for `no` completions.

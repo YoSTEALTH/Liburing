@@ -5,7 +5,7 @@ const setu = @import("setu");
 const std = @import("std");
 const writableView = @import("class.zig").writableView;
 const keep = @import("class.zig").keep;
-const pthread_self = @import("class.zig").pthread_self;
+const threadId = @import("class.zig").threadId;
 const BufRingType = @import("register.zig").BufRingType;
 const SqeType = @import("sqe.zig").SqeType;
 
@@ -46,7 +46,7 @@ pub const RingType = setu.Class(Ring, @embedFile("ring.zig"));
 ///     reports `user_data` `0`.
 pub const Ring = struct {
     _io_uring: c.io_uring = std.mem.zeroes(c.io_uring), // lives inside the Python object
-    _thread: usize = 0, // `pthread_self()` of the thread that initialized it: the only one that may use it
+    _thread: usize = 0, // `threadId()` of the thread that initialized it: the only one that may use it
     /// Set up (`io_uring_queue_init*` / `io_uring_queue_mmap` worked) until `io_uring_queue_exit`. `ring_fd` can
     /// not tell: `0` is a valid fd (stdin closed), `-1` a ring reachable only through its registered fd.
     _ready: bool = false,
@@ -889,7 +889,7 @@ pub const Ring = struct {
     pub inline fn checkRing(ring: *c.io_uring) py.Error!*c.io_uring {
         const self: *Ring = @fieldParentPtr("_io_uring", ring);
         if (!self._ready) return raiseNotInitialized();
-        if (self._thread != pthread_self()) return raiseOtherThread();
+        if (self._thread != threadId()) return raiseOtherThread();
         return ring;
     }
 
@@ -912,13 +912,13 @@ pub const Ring = struct {
     /// Marks the calling thread as the owner and starts a new generation (`checkGen`), before an
     /// `io_uring_queue_init*`.
     pub fn ownByCaller(self: *Ring) void {
-        self._thread = pthread_self();
+        self._thread = threadId();
         self._gen +%= 1;
     }
 
     /// `RuntimeError` if the calling thread is not the owner (`ring` initialized).
     pub fn checkThread(self: *const Ring) py.Error!void {
-        if (self._thread != pthread_self()) return raiseOtherThread();
+        if (self._thread != threadId()) return raiseOtherThread();
     }
 
     noinline fn raiseOtherThread() py.Error {

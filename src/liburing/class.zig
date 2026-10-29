@@ -1,4 +1,5 @@
 //! Liburing - io_uring related classes
+const builtin = @import("builtin");
 const c = @import("c");
 const e = @import("error.zig");
 const setu = @import("setu");
@@ -403,8 +404,22 @@ pub fn setOwned(field: *?*Object, obj: *Object) void {
     py.decref(old);
 }
 
-/// The calling thread (libc; the same value in a child after `fork`).
-pub extern fn pthread_self() usize;
+/// The calling thread: its thread pointer (`%fs:0` on x86_64, `tpidr_el0` on aarch64, what `pthread_self()` is
+/// built from), one register read where `pthread_self()` is a call through the PLT. Unique among live threads, the
+/// same in a child after `fork`.
+pub inline fn threadId() usize {
+    return switch (builtin.target.cpu.arch) {
+        .x86_64 => asm ("movq %%fs:0, %[ret]"
+            : [ret] "=r" (-> usize),
+        ),
+        .aarch64 => asm ("mrs %[ret], tpidr_el0"
+            : [ret] "=r" (-> usize),
+        ),
+        else => pthread_self(),
+    };
+}
+
+extern fn pthread_self() usize;
 
 /// Claims `owner` (a `_thread` field, `0`: no owner yet) for `thread`, atomically: two threads using an object
 /// for the first time at once can not both get it. `false` if another thread has it.
