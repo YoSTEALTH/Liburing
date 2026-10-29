@@ -126,7 +126,7 @@ import json
 import sys
 
 files = json.load(open(sys.argv[1], encoding="utf-8"))["files"]
-own = {path: f for path, f in files.items() if not path.startswith("setu/")}
+own = {path: f for path, f in files.items() if not path.startswith(("setu/", "zig-pkg/"))}  # zig-pkg/: a pinned Setu
 covered, lines = sum(f["covered"] for f in own.values()), sum(f["lines"] for f in own.values())
 for path, f in sorted(own.items()):
     if f["covered"] < f["lines"]:

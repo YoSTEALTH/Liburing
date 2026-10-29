@@ -22,7 +22,7 @@ and the model root file (`test/setu_classes.zig`); `test/class_test.py` shows wh
    camelCase `pub fn`s are Zig-only helpers. There is no opt-out: the case picks the audience.
 3. Give an int parameter the exact type the kernel or callee takes (`fd: i32`, `flags: u32`): Setu raises
    `OverflowError` naming the parameter. A value no parameter type can bound goes through
-   `py.narrow(T, v, "`f(x)`")`. Every `@intCast` / `@truncate` carries a `// cast: <why it fits>` comment
+   `` py.narrow(T, v, "`f(x)`") ``. Every `@intCast` / `@truncate` carries a `// cast: <why it fits>` comment
    on its line or the line above (`tools/check.sh` checks).
 4. `?T` is optional: omitted or `None` gives `null`. A positional parameter after one with a default needs a
    default too (compile error); make it keyword-only after `_: py.KwOnly`.
@@ -149,22 +149,62 @@ a literal (`str`), `py.Bytes` (`bytes`), `*Object` (a new reference, taken), tup
 other slices (`list`). `py.toPython(value)` does this conversion by hand (`null` with an exception set on
 failure); `try py.new(value)` the same as `Error!*Object`.
 
+From here on the examples are Setu's test extension `setu_classes` (`test/`): a Zig block is its code, the Python
+block after it a session with it, which `test/guide_test.py` runs on every interpreter. The sessions call the module
+`pkg`, standing for your package (`from pkg import read`).
+
 ```zig
 /// Reads up to `n` bytes (default: all of `buf`) from `fd` into `buf` at `offset`; returns how many.
 ///
 /// Example
+///     >>> import os
+///     >>> fd = os.open('a.txt', os.O_RDWR | os.O_CREAT)
+///     >>> os.write(fd, b'hello world')
+///     11
 ///     >>> b = bytearray(8)
-///     >>> read(fd, b, 4, offset=0)
+///     >>> read(fd, b, 4, offset=6)
 ///     4
-pub fn read(fd: i32, buf: py.WritableBuffer, n: ?usize, _: py.KwOnly, offset: u64) Error!usize {
+///     >>> b
+///     bytearray(b'worl\x00\x00\x00\x00')
+///     >>> os.close(fd)
+pub fn read(fd: i32, buf: py.WritableBuffer, n: ?usize, _: py.KwOnly, offset: i64) Error!usize {
     const want = @min(n orelse buf.data.len, buf.data.len);
     const res: isize = @bitCast(std.os.linux.pread(fd, buf.data.ptr, want, offset)); // cast: a signed word
     return @intCast(try py.checkErrno(res)); // cast: `checkErrno` gave >= 0
 }
 ```
 
-Stub: `def read(fd: int, buf: Buffer, n: int | None = None, *, offset: int) -> int:`. Python:
-`read(fd, b, 4, offset=0)`; `read(fd, b, 4, 0)` is `TypeError: read() takes at most 3 positional arguments`.
+Stub: `def read(fd: int, buf: Buffer, n: int | None = None, *, offset: int) -> int:`. In Python:
+
+```pycon
+>>> import os
+>>> from pkg import read
+>>> fd = os.open('a.txt', os.O_RDWR | os.O_CREAT)
+>>> os.write(fd, b'hello world')
+11
+>>> b = bytearray(8)
+>>> read(fd, b, 4, offset=6)  # n = 4
+4
+>>> b
+bytearray(b'worl\x00\x00\x00\x00')
+>>> read(fd, b, offset=0)  # n omitted: all of b
+8
+>>> b
+bytearray(b'hello wo')
+>>> read(fd, b, 4, 0)  # offset is keyword-only
+Traceback (most recent call last):
+  ...
+TypeError: read() takes at most 3 positional arguments (4 given)
+>>> read(fd, b, -1, offset=0)  # n is a usize
+Traceback (most recent call last):
+  ...
+OverflowError: `read(n)` = -1 is out of range 0..18446744073709551615
+>>> read(-1, b, offset=0)  # py.checkErrno
+Traceback (most recent call last):
+  ...
+OSError: [Errno 9] Bad file descriptor
+>>> os.close(fd)
+```
 
 ## 4. Raising
 
@@ -187,14 +227,50 @@ An exception class of the extension, found by the scan under the `pub const`'s n
 extension's:
 
 ```zig
-/// The kernel does not support the operation.
-pub const UnsupportedError = setu.Exception(.{
-    .doc = "The kernel does not support the operation.",
+/// An `OSError` of the extension's own: `ExtraError(errno, msg)` sets `.errno` / `.strerror`.
+pub const ExtraError = setu.Exception(.{
+    .doc = "An `OSError` of the extension's own: `ExtraError(errno, msg)` sets `.errno` / `.strerror`.",
     .base = .OSError, // a `c.PyExc_*` name; default `.Exception`
 });
 
-return UnsupportedError.raiseWith(.{ -res, "IORING_OP_FUTEX_WAIT" }); // `.errno` set, like `OSError`
-if (UnsupportedError.matches(exc)) ... // an instance or class, subclasses included
+/// A plain `Exception` subclass.
+pub const PlainError = setu.Exception(.{ .doc = "A plain `Exception` subclass." });
+
+/// Raises `ExtraError(errno, msg)` (`raiseWith`).
+pub fn raise_extra(errno: i32, msg: []const u8) Error!void {
+    return ExtraError.raiseWith(.{ errno, msg }); // `.errno` set, like `OSError`
+}
+
+/// Raises `PlainError` with a formatted message (`raise`).
+pub fn raise_plain(n: i64) Error!void {
+    return PlainError.raise("plain {d}", .{n});
+}
+
+/// Is `exc` a `PlainError` (an instance or the class, or a subclass)? (`matches`)
+pub fn is_plain(exc: *c.Object) bool {
+    return PlainError.matches(exc);
+}
+```
+
+In Python:
+
+```pycon
+>>> from pkg import ExtraError, PlainError, is_plain, raise_extra, raise_plain
+>>> raise_extra(95, 'not here')
+Traceback (most recent call last):
+  ...
+pkg.ExtraError: [Errno 95] not here
+>>> try:
+...     raise_extra(2, 'gone')
+... except OSError as e:  # the base catches it
+...     e.errno, e.strerror
+(2, 'gone')
+>>> raise_plain(3)
+Traceback (most recent call last):
+  ...
+pkg.PlainError: plain 3
+>>> is_plain(PlainError('x')), is_plain(ValueError())
+(True, False)
 ```
 
 Two `setu.Exception`s with the same `doc` and `base` are one Zig type: give each its own `doc`.
@@ -202,35 +278,112 @@ Two `setu.Exception`s with the same `doc` and `base` are one Zig type: give each
 ## 5. Classes
 
 ```zig
-/// A point in the plane.
-pub const Point = struct {
+/// A 2D vector with integer coordinates: comparisons, hashing, numbers, pickling.
+pub const Vec = struct {
     x: i64 = 0, // instance data: every field has a default
     y: i64 = 0,
-    label: ?*Object = null, // owned reference: traversed, cleared, dropped by Setu
 
     pub const basetype = true; // Python may subclass it
+    /// How many coordinates a `Vec` has.
+    pub const DIMS = 2; // UPPER_CASE: a class attribute
 
     /// Sets the coordinates.
-    pub fn __init__(self: *Point, a: struct { x: i64 = 0, y: i64 = 0 }) void {
+    pub fn __init__(self: *Vec, a: struct { x: i64 = 0, y: i64 = 0 }) void {
         self.x = a.x;
         self.y = a.y;
     }
 
-    /// The `x` coordinate (a property: `get_x`; add `set_x` for a setter).
-    pub fn get_x(self: *const Point) i64 {
-        return self.x;
+    /// `Vec(x, y)`.
+    pub fn __repr__(self: *const Vec) Error!*Object {
+        var buf: [64]u8 = undefined; // fits 2 x 20 digits
+        const text = std.mem.print(&buf, "Vec({d}, {d})", .{ self.x, self.y }) catch unreachable;
+        return py.new(text);
     }
 
-    /// Distance from the origin, squared.
-    pub fn norm2(self: *const Point) i64 {
+    /// The squared length.
+    pub fn norm2(self: *const Vec) i64 {
         return self.x * self.x + self.y * self.y;
     }
+
+    /// A new vector of the class `cls` (a subclass too).
+    pub fn from_pair(cls: *c.TypeObject, x: i64, y: i64) Error!*Object {
+        const obj = c.PyObject_CallNoArgs(@ptrCast(cls)) orelse return error.PythonError;
+        VecType.data(obj).* = .{ .x = x, .y = y };
+        return obj;
+    }
+
+    /// The dot product of two vectors.
+    pub fn dot(a: *const Vec, b: *const Vec) i64 {
+        return a.x * b.x + a.y * b.y;
+    }
 };
-pub const PointType = setu.Class(Point, @embedFile("point.zig")); // declare once, use this name
+pub const VecType = setu.Class(Vec, @embedFile("classes.zig")); // declare once, use this name
+
+/// A `Vec` with a label: a Setu subclass, pickled with its base's fields.
+pub const Labeled = struct {
+    label: ?*Object = null, // owned reference: traversed, cleared, dropped by Setu
+
+    pub const base = VecType;
+
+    /// Sets the label (the coordinates stay 0).
+    pub fn __init__(self: *Labeled, label: ?*Object) void {
+        if (label) |l| py.incref(l);
+        py.decref(self.label);
+        self.label = label;
+    }
+
+    /// The label.
+    pub fn get_label(self: *const Labeled) *Object {
+        const l = self.label orelse py.none();
+        py.incref(l);
+        return l;
+    }
+
+    /// Sets the label; `None` is refused (a plain Zig error: `RuntimeError: NoLabel`).
+    ///
+    /// Type
+    ///     value: object
+    pub fn set_label(self: *Labeled, value: *Object) error{NoLabel}!void {
+        if (value == py.none()) return error.NoLabel;
+        py.incref(value);
+        py.decref(self.label);
+        self.label = value;
+    }
+};
+pub const LabeledType = setu.Class(Labeled, @embedFile("classes.zig"));
 ```
 
-Stub: `@disjoint_base\nclass Point:` with `def __init__(self, x: int = ..., y: int = ...) -> None:`, the
-property `x: int`, `def norm2(self) -> int:`. Python: `Point(1, y=2).norm2()` is `5`.
+(Cut from `test/classes.zig`, which gives `Vec` more hooks.) Stub: `@disjoint_base\nclass Vec:` with
+`DIMS: ClassVar[int]`, `def __init__(self, x: int = ..., y: int = ...) -> None:`, `def norm2(self) -> int:`,
+`@classmethod def from_pair(cls, x: int, y: int) -> Any:`, `@staticmethod def dot(a: Vec, b: Vec) -> int:`;
+`@final\nclass Labeled(Vec):` with the property `label`. In Python:
+
+```pycon
+>>> from pkg import Labeled, Vec
+>>> v = Vec(3, y=4)  # __init__'s argument struct: positional or keyword
+>>> v, v.norm2(), Vec.DIMS
+(Vec(3, 4), 25, 2)
+>>> Vec(x='a')
+Traceback (most recent call last):
+  ...
+TypeError: 'str' object cannot be interpreted as an integer
+>>> Vec.from_pair(1, 2), Vec.dot(Vec(1, 2), Vec(3, 4))  # a class method, a static method
+(Vec(1, 2), 11)
+>>> class Vec3(Vec):  # basetype
+...     pass
+>>> type(Vec3.from_pair(1, 2)).__name__
+'Vec3'
+>>> l = Labeled('home')
+>>> l.label, isinstance(l, Vec)
+('home', True)
+>>> l.label = 'work'  # set_label
+>>> l.label
+'work'
+>>> l.label = None
+Traceback (most recent call last):
+  ...
+RuntimeError: NoLabel
+```
 
 Settings (`pub const` in the struct): `name` (`"pkg.Name"`; default `<module>.<struct name>`), `base`
 (another `Class`, created first), `basetype`, `instantiable = false` (only Zig creates instances, with
@@ -245,10 +398,10 @@ Methods: a lowercase `pub fn` whose first parameter is named `self` (an instance
 `*const T` or `*Object`. `get_x` / `set_x(self, value: U)` are the property `x`. Parameters and results as in
 section 3; a `py.Rest` right after `self` is `*args`.
 
-What the `Class` gives Zig: `PointType.tp` (the type object, after creation), `PointType.data(obj)` (the
-`*Point` of an instance or subclass instance), `PointType.object(d)` (the object back from its data),
-`PointType.check(obj)`, `try PointType.new(.{ .x = 1 })` (a new instance, also of a type Python can not
-instantiate), `setu.Instance(Point).from(obj)` (`*Point` or `TypeError`).
+What the `Class` gives Zig: `VecType.tp` (the type object, after creation), `VecType.data(obj)` (the
+`*Vec` of an instance or subclass instance), `VecType.object(d)` (the object back from its data),
+`VecType.check(obj)`, `try VecType.new(.{ .x = 1 })` (a new instance, also of a type Python can not
+instantiate), `setu.Instance(Vec).from(obj)` (`*Vec` or `TypeError`).
 
 Hooks, by name (the full list is at the top of `src/class.zig`; `R` is the hook's Zig result, `Error!R` is
 fine everywhere; a hook parameter is converted like a method argument, `*Object` keeps it raw, and a
@@ -319,9 +472,43 @@ Type (locked; released by): use.
 - `py.Path` (n/a (a `bytes` it holds); Setu, after the call): `try p.take()` keeps it
 
 ```zig
-pub fn recv(ring: *Ring, buf: py.OwnedWritableBuffer) void {
-    ring.buf = buf; // `ring.buf.deinit()` at the completion; until then `bytearray.append` is `BufferError`
+/// What `own` keeps.
+var owned: struct {
+    buf: ?py.OwnedWritableBuffer = null,
+    data: ?py.OwnedBuffer = null,
+} = .{};
+
+/// Releases what the last call kept, then keeps `buf` and `data` as they come (`py.OwnedWritableBuffer` /
+/// `py.OwnedBuffer`, no second view): locked until the next call. `own()` only releases; with
+/// `drop=True` the function releases them itself before returning.
+pub fn own(buf: ?py.OwnedWritableBuffer, data: ?py.OwnedBuffer, drop: ?bool) void {
+    if (owned.buf) |b| b.deinit();
+    if (owned.data) |d| d.deinit();
+    owned = .{};
+    if (drop orelse false) {
+        if (buf) |b| b.deinit();
+        if (data) |d| d.deinit();
+        return;
+    }
+    owned = .{ .buf = buf, .data = data };
 }
+```
+
+In Python, a kept `bytearray` is locked (it can not be resized) until the extension releases it:
+
+```pycon
+>>> from pkg import own
+>>> b = bytearray(3)
+>>> own(b)  # kept
+>>> b.append(1)
+Traceback (most recent call last):
+  ...
+BufferError: Existing exports of data: object cannot be re-sized
+>>> b[0] = 7  # writing is fine
+>>> own()  # released
+>>> b.append(1)
+>>> b
+bytearray(b'\x07\x00\x00\x01')
 ```
 
 Rules: when a later argument fails to convert, the function is not called and Setu releases everything,
@@ -338,19 +525,38 @@ docstring). Format: a description, a blank `///` line, then sections, each a hea
 its content indented 4 spaces:
 
 ```zig
-/// Opens `path` relative to `dir_fd`.
+/// `path` encoded like `os.fsencode` (`py.Path`).
 ///
 /// Type
-///     path: str | bytes | os.PathLike
-///     return: int - the file descriptor
+///     return: bytes
 ///
 /// Example
-///     >>> open('a.txt', O_RDONLY)
-///     3
-///
-/// Note
-///     - `dir_fd` defaults to `AT_FDCWD`.
+///     >>> path_bytes('/tmp/x')
+///     b'/tmp/x'
+///     >>> path_bytes(b'/tmp')
+///     b'/tmp'
+///     >>> path_bytes(3)
+///     TypeError: expected str, bytes or os.PathLike object, not int
+pub fn path_bytes(path: py.Path) Error!*Object {
+    return py.new(py.Bytes{ .data = path.path });
+}
 ```
+
+In Python the doc is the function's `__doc__` (what `help()` shows), the stub's docstring and the site's entry;
+`Type` changed the stub's return type from `Any` (a `*Object`) to `bytes`:
+
+```pycon
+>>> import inspect
+>>> from pkg import path_bytes
+>>> path_bytes('/tmp/x'), path_bytes(b'/tmp')
+(b'/tmp/x', b'/tmp')
+>>> path_bytes.__doc__.splitlines()[:4]  # what help() shows
+['`path` encoded like `os.fsencode` (`py.Path`).', '', 'Type', '    return: bytes']
+>>> inspect.signature(path_bytes)
+<Signature (path)>
+```
+
+The stub: `def path_bytes(path: str | bytes | os.PathLike[str] | os.PathLike[bytes]) -> bytes:` with that docstring.
 
 `Type` entries (`name: type  # note` or `name: type - note`; `return:` for the result) replace the Zig-derived
 type in the stub; bare generics get their arguments (`os.PathLike` -> `os.PathLike[str] | os.PathLike[bytes]`,
@@ -372,7 +578,8 @@ note (`IORING_TIMEOUT_ABS  # ts is a point in time`): the site links the name an
 `https://` URL anywhere in a docstring (outside backticks) becomes a link that opens in a new tab; a trailing `.`,
 `,` or `)` stays text unless the `)` closes a `(` in the URL.
 In the site's Markdown pages an `@@path@@` line includes a project file as a code block (an example script, as tested);
-the header's ◐ button opens the theme menu (Nord Day, Nord Night, Tokyo Day, Tokyo Night); `coverage =
+the header's ◐ button opens the theme menu (Nord Day, Nord Night, Tokyo Day, Tokyo Night; until one is picked,
+Tokyo Day, or Nord Night when the system is dark); `coverage =
 'zig-out/coverage.json'` and `profile = 'zig-out/profile.json'` in `[tool.setu_docs]` add the Coverage and Profile pages
 (section 11); the Profile page is local only: `setu_docs.py serve` makes it from the file as it is, `build` (CI, the
 published site) leaves it out, so nothing outside your machine needs `zig build profile`. The site builds from
@@ -486,7 +693,8 @@ What the message says: the cause.
     /opt/python/3.15t/bin/python3 -m pytest # then 3.15, 3.14t, 3.14: the same .so
     tools/check.sh                          # everything, offline, on all four interpreters
     python3 tools/bench.py --ref HEAD       # per-call cost A/B against a commit
-    zig build profile -Doptimize=fast -Dcpu=x86_64_v3   # instructions per call, per line (callgrind)
+    zig build profile -Doptimize=fast -Dcpu=x86_64_v3   # instructions per call, per line (callgrind);
+                                                        # -Drelease with a preferred optimize mode
 
 A project using Setu runs its own `tools/check.sh`, which includes `zig build setu-build-check`,
 `setu-docs-check` and `setu-guide-check` (its copies of Setu's script, docs helpers and this guide match the
@@ -503,9 +711,12 @@ on a file shows its source, Zig highlighted, the missed lines red; a source chan
 flagged `changed`. `.badge = "docs/coverage-badge.json"` also writes the total as a shields.io endpoint file; committed,
 it is a README badge: the image `https://img.shields.io/endpoint?url=<URL>`, `<URL>` the file's
 `raw.githubusercontent.com` address, percent-encoded (run with every `--python` first: the badge shows the merged
-total). In CI it needs kcov, packaged for Ubuntu 25.04+: on GitHub's `ubuntu-26.04` runner the apt package `kcov`, then
-the step with every `--python`; Setu's `.github/workflows/ci.yml` also fails when the committed badge differs from the
-run's (`git diff --exit-code docs/coverage-badge.json`). Notes:
+total). `.history = "docs/coverage-history.json"` also keeps the totals per project version (`build.zig.zon`'s
+`.version`; a run sets its version's entry, one line each); committed, with `coverage_history =
+'docs/coverage-history.json'` in `[tool.setu_docs]` the Coverage page charts them next to the project's donut. In CI it
+needs kcov, packaged for Ubuntu 25.04+: on GitHub's `ubuntu-26.04` runner the apt package `kcov`, then the step with
+every `--python`; Setu's `.github/workflows/ci.yml` also fails when the committed badge or history differs from the
+run's (`git diff --exit-code docs/coverage-badge.json docs/coverage-history.json`). Notes:
 
 - It measures the extension as built, in Debug. The default Debug backend (self-hosted x86_64) pads its line
   tables with ops kcov (elfutils) misreads, so kcov runs a copy with the padding rewritten (the build is not
@@ -546,7 +757,9 @@ Instructions per call: `zig build profile -Doptimize=fast -Dcpu=x86_64_v3 [-- -k
 (the difference over N is one call, Python's startup and the loop taken out), and prints a table per interpreter:
 `total` (everything one call costs) and `ext` (the part in the extension's `.so`: its code, Setu's and std's,
 inlined there); `--lines K` lists each case's K costliest lines with their source. The numbers go to
-`zig-out/profile.json` (per case, file and line; the format is in `tools/check_profile.py`).
+`zig-out/profile.json` (per case, file and line; the format is in `tools/check_profile.py`). Setu's own cases
+include `bench_nop` / `bench_recv` written by hand against the C API (`test/hand.zig`, `hand: ...`): generated
+code costs 4-26 fewer instructions per call than those on every interpreter (2026-10-28).
 
     zig build profile -Doptimize=fast -Dcpu=x86_64_v3 -- --lines 8 -k recv
     cp zig-out/profile.json /tmp/before.json      # then change the code
