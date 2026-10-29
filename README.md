@@ -8,7 +8,8 @@
 [![Zig](https://img.shields.io/badge/zig-0.17.0-orange)](https://ziglang.org/)
 [![License](https://img.shields.io/badge/license-CC0--1.0-green)](https://github.com/YoSTEALTH/Liburing/blob/main/LICENSE.txt)
 [![Test status](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/YoSTEALTH/Liburing/actions/workflows/test.yml)
-[![Docs](https://github.com/YoSTEALTH/Liburing/actions/workflows/docs.yml/badge.svg)](https://yostealth.github.io/Liburing/)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://yostealth.github.io/Liburing/coverage.html)
+[![Docs](https://img.shields.io/badge/docs-yostealth.github.io-blue)](https://yostealth.github.io/Liburing/)
 
 Fast, asynchronous Linux I/O for Python: a Zig-built wrapper around C liburing and the kernel's io_uring interface.
 
