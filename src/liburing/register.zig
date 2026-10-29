@@ -190,6 +190,10 @@ pub const BufReg = struct {
         return if (self._ring) |o| keep(o) else null; // a new reference
     }
 
+    /// Sets `ring`.
+    ///
+    /// Type
+    ///     value: Buffer | None
     pub fn set_ring(self: *Self, value: ?*Object) py.Error!void {
         var cs: setu.c.CriticalSection = undefined; // free-threaded: a get / set / register from another thread waits
         setu.c.PyCriticalSection_Begin(&cs, BufRegType.object(@constCast(self)));
@@ -509,6 +513,10 @@ pub const ZcrxIfqReg = struct {
         return if (self._area_mem) |o| keep(o) else null; // a new reference
     }
 
+    /// Sets `area`.
+    ///
+    /// Type
+    ///     value: Buffer | None
     pub fn set_area(self: *Self, value: ?*Object) py.Error!void {
         var cs: setu.c.CriticalSection = undefined; // free-threaded: a get / set / register from another thread waits
         setu.c.PyCriticalSection_Begin(&cs, ZcrxIfqRegType.object(@constCast(self)));
@@ -530,6 +538,10 @@ pub const ZcrxIfqReg = struct {
         return if (self._region_mem) |o| keep(o) else null; // a new reference
     }
 
+    /// Sets `region`.
+    ///
+    /// Type
+    ///     value: Buffer | None
     pub fn set_region(self: *Self, value: ?*Object) py.Error!void {
         var cs: setu.c.CriticalSection = undefined; // free-threaded: a get / set / register from another thread waits
         setu.c.PyCriticalSection_Begin(&cs, ZcrxIfqRegType.object(@constCast(self)));
@@ -813,6 +825,10 @@ pub const MemRegionReg = struct {
         return if (self._region) |o| keep(o) else null; // a new reference
     }
 
+    /// Sets `region`.
+    ///
+    /// Type
+    ///     value: Buffer | None
     pub fn set_region(self: *Self, value: ?*Object) py.Error!void {
         var cs: setu.c.CriticalSection = undefined; // free-threaded: a get / set / register from another thread waits
         setu.c.PyCriticalSection_Begin(&cs, MemRegionRegType.object(@constCast(self)));
