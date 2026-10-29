@@ -86,6 +86,13 @@ camelCase functions, plain structs, lowercase values, `pub var`s. Filters take P
 `.exclude` (not together; each name must exist), `.prefixes`, `.functions = false`. Classes are created
 bases first; a Python name found twice is a compile error naming both places.
 
+Pin a tag in the project's `build.zig.zon`: `zig fetch --save=setu "git+https://github.com/YoSTEALTH/Setu#v<version>"`,
+the ref after a `#`; it prints `resolved ref "v<version>" to commit ...` and saves
+`.url = "...?ref=v<version>#<commit>"` with its `.hash`. Zig 0.17.0 ignores a `?ref=` in what it is given: it
+fetches the default branch and saves that commit under the tag's name. Remove an old `.path` entry first (`--save`
+writes the URL into it, with no `.hash`). The saved commit should be the tag's: `git ls-remote
+https://github.com/YoSTEALTH/Setu v<version>`.
+
 `build.zig` of the project (`setu` in its `build.zig.zon`):
 
 ```zig
@@ -110,6 +117,9 @@ b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "__init__.pyi").
     .module_name = "liburing",
     .package = true,
     .cases = b.path("tools/bench_cases.py"), // `CASES` + `namespace(module)`, as Setu's tools/bench.py
+});
+@import("setu").addSymbolCheck(b, setu_dep, ext, .{ // zig build check-symbols -Dpython=... (see 11.)
+    .python = b.option([]const u8, "python", "Python for `check-symbols`") orelse "python3",
 });
 ```
 
@@ -575,8 +585,8 @@ Run and run on its own, in a new namespace. Setu numbers repeated headers in the
 the site show `Example #1`, `Example #2`, ... (`setu_docs.py run Sqe:2` runs `Example #2`); write plain `Example`,
 a hand-written `Example #<n>` is a compile error. A `Flags` section lists one name per line, optionally with a
 note (`IORING_TIMEOUT_ABS  # ts is a point in time`): the site links the name and shows the note as text. A bare
-`https://` URL anywhere in a docstring (outside backticks) becomes a link that opens in a new tab; a trailing `.`,
-`,` or `)` stays text unless the `)` closes a `(` in the URL.
+`https://` URL anywhere in a docstring or the site's Markdown pages (outside backticks) becomes a link that opens in a
+new tab; a trailing `.`, `,` or `)` stays text unless the `)` closes a `(` in the URL.
 In the site's Markdown pages an `@@path@@` line includes a project file as a code block (an example script, as tested);
 the header's ◐ button opens the theme menu (Nord Day, Nord Night, Tokyo Day, Tokyo Night; until one is picked,
 Tokyo Day, or Nord Night when the system is dark); `coverage =
@@ -695,10 +705,14 @@ What the message says: the cause.
     python3 tools/bench.py --ref HEAD       # per-call cost A/B against a commit
     zig build profile -Doptimize=fast -Dcpu=x86_64_v3   # instructions per call, per line (callgrind);
                                                         # -Drelease with a preferred optimize mode
+    zig build check-symbols -Dpython=/opt/python/3.14/bin/python3   # CPython symbols, per interpreter
 
 A project using Setu runs its own `tools/check.sh`, which includes `zig build setu-build-check`,
 `setu-docs-check` and `setu-guide-check` (its copies of Setu's script, docs helpers and this guide match the
-Setu it pins). After a Setu bump: `zig build setu-build-sync setu-docs-sync setu-guide-sync`.
+Setu it pins), and `zig build check-symbols -Dpython=<each interpreter>` (`addSymbolCheck`, Setu's
+`tools/check_symbols.py` on the extension as built: every CPython symbol it imports is exported by that interpreter
+and, on 3.15+, in the stable ABI for free-threading (abi3t); needs `nm`, and `cc` on 3.15+).
+After a Setu bump: `zig build setu-build-sync setu-docs-sync setu-guide-sync`.
 
 Line coverage: `zig build coverage [-Dpython=...] [-- --missed --partial pytest args]` (`addCoverageSteps`; kcov 43)
 prints a per-file table, with `--missed` the lines that never ran, with `--partial` the yellow ones, and writes the
@@ -710,13 +724,15 @@ goes to a temporary directory, removed after the run; `-- --html DIR` keeps its 
 on a file shows its source, Zig highlighted, the missed lines red; a source changed since the run (its CRC-32) is
 flagged `changed`. `.badge = "docs/coverage-badge.json"` also writes the total as a shields.io endpoint file; committed,
 it is a README badge: the image `https://img.shields.io/endpoint?url=<URL>`, `<URL>` the file's
-`raw.githubusercontent.com` address, percent-encoded (run with every `--python` first: the badge shows the merged
-total). `.history = "docs/coverage-history.json"` also keeps the totals per project version (`build.zig.zon`'s
-`.version`; a run sets its version's entry, one line each); committed, with `coverage_history =
-'docs/coverage-history.json'` in `[tool.setu_docs]` the Coverage page charts them next to the project's donut. In CI it
-needs kcov, packaged for Ubuntu 25.04+: on GitHub's `ubuntu-26.04` runner the apt package `kcov`, then the step with
-every `--python`; Setu's `.github/workflows/ci.yml` also fails when the committed badge or history differs from the
-run's (`git diff --exit-code docs/coverage-badge.json docs/coverage-history.json`). Notes:
+`raw.githubusercontent.com` address, percent-encoded, linked to the docs site's Coverage page (`<site>/coverage.html`)
+(run with every `--python` first: the badge shows the merged total). `.history = "docs/coverage-history.json"` also
+keeps the totals per project version (`build.zig.zon`'s `.version`; a run sets its version's entry, one line each),
+with the project's own files' (no dependency's) beside them; committed, with `coverage_history =
+'docs/coverage-history.json'` in `[tool.setu_docs]` the Coverage page charts the own lines (the donut's figure) next to
+the project's donut, each point naming the total with dependencies too. In CI it needs kcov, packaged for Ubuntu
+25.04+: on GitHub's `ubuntu-26.04` runner the apt package `kcov`, then the step with every `--python`; Setu's
+`.github/workflows/ci.yml` also fails when the committed badge or history differs from the run's (`git diff
+--exit-code docs/coverage-badge.json docs/coverage-history.json`). Notes:
 
 - It measures the extension as built, in Debug. The default Debug backend (self-hosted x86_64) pads its line
   tables with ops kcov (elfutils) misreads, so kcov runs a copy with the padding rewritten (the build is not
