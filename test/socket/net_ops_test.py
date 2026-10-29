@@ -105,7 +105,7 @@ def test_accept_and_multishot_accept(ring, cqe):
             os.close(cqe[0].res)
             io_uring_cqe_seen(ring, cqe[0])
             got += 1
-        assert one(ring, cqe, io_uring_prep_cancel, 5) == 0
+        assert one(ring, cqe, io_uring_prep_cancel64, 5) == 0
         assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0  # the cancelled multishot accept
         assert cqe[0].user_data == 5
         io_uring_cqe_seen(ring, cqe[0])
@@ -240,14 +240,18 @@ def test_timeout_remove_update_cancel(ring, cqe):
 
 def test_cancel_variants(ring, cqe, pair):
     _, _, conn = pair
-    for prep, arg in ((io_uring_prep_cancel, 3), (io_uring_prep_cancel64, 3)):
+    data = object()
+    for prep, arg in ((io_uring_prep_cancel, data), (io_uring_prep_cancel64, 3)):
         sqe = io_uring_get_sqe(ring)
         io_uring_prep_recv(sqe, conn.fileno(), bytearray(4))
-        sqe.user_data = 3
+        if prep is io_uring_prep_cancel:
+            io_uring_sqe_set_data(sqe, data)  # cancelled by its object
+        else:
+            sqe.user_data = 3
         io_uring_submit(ring)
         assert one(ring, cqe, prep, arg) == 0
         io_uring_wait_cqe(ring, cqe)
-        assert cqe[0].user_data == 3
+        assert cqe[0].user_data == (id(data) if prep is io_uring_prep_cancel else 3)
         io_uring_cqe_seen(ring, cqe[0])  # the cancelled recv: ECANCELED
     # by fd
     sqe = io_uring_get_sqe(ring)
@@ -365,7 +369,7 @@ def test_read_multishot_with_provided_buffers(ring, cqe):
         assert cqe[0].res == 3
         assert cqe[0].flags & IORING_CQE_F_MORE
         io_uring_cqe_seen(ring, cqe[0])
-        assert one(ring, cqe, io_uring_prep_cancel, 1) == 0
+        assert one(ring, cqe, io_uring_prep_cancel64, 1) == 0
         assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0  # the cancelled read
         assert cqe[0].user_data == 1
         io_uring_cqe_seen(ring, cqe[0])
@@ -387,7 +391,7 @@ def test_provide_buffers_are_split_evenly(ring, cqe):
         assert io_uring_wait_cqe_timeout(ring, cqe, timespec(2)) == 0
         assert cqe[0].res == 16  # one buffer, never more: nothing is written past `area`
         io_uring_cqe_seen(ring, cqe[0])
-        io_uring_prep_cancel(io_uring_get_sqe(ring), 1)
+        io_uring_prep_cancel64(io_uring_get_sqe(ring), 1)
         assert io_uring_submit(ring) == 1
         assert io_uring_wait_cqe_nr(ring, cqe, 2) == 0  # the cancel and the cancelled read
         io_uring_cq_advance(ring, 2)

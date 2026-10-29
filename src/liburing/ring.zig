@@ -68,6 +68,9 @@ pub const Ring = struct {
     /// What each SQ slot's prepared request holds until the submit moves it into its entry (`hold`):
     /// `sq.ring_entries` of them, allocated at the first prep that holds something.
     _pending: ?[*]Hold = null,
+    /// Each SQ slot's `io_uring_sqe_set_data` object (owned) until the submit moves it into its entry
+    /// (`Entry.data`): allocated with `_pending`, as long.
+    _pending_data: ?[*]?*Object = null,
     _pending_len: u32 = 0,
     /// The buffers of `io_uring_register_buffers` / `_update_tag`: the kernel pins them until
     /// `io_uring_unregister_buffers` or the exit, so they stay locked until then (`releaseRegistered`).
@@ -98,6 +101,20 @@ pub const Ring = struct {
         prev: u32 = 0, // a member: the one before it in the chain (`0`: the first)
         next: u32 = 0, // a member: the one after it (`0`: the last before `end`); the end: its first member
         held: bool = false, // `_holds` at its index has what the kernel reads or writes until the completion
+        /// `io_uring_sqe_set_data`'s object (owned): `io_uring_cqe_get_data` gives it while `user_data` is still
+        /// its address (`dataOf`).
+        data: ?*Object = null,
+    };
+
+    /// What a freed entry held (`freeEntry`, `bury`), released after the table is updated (may run Python code).
+    pub const Released = struct {
+        hold: Hold,
+        data: ?*Object,
+
+        pub inline fn consume(self: *Released) void {
+            self.hold.consume();
+            py.decref(self.data);
+        }
     };
 
     const link_flags = c.IOSQE_IO_LINK | c.IOSQE_IO_HARDLINK;
@@ -313,7 +330,9 @@ pub const Ring = struct {
     pub fn __traverse__(self: *const Ring, v: *setu.Visit) setu.Visit.Error!void {
         if (self._mem) |m| try v.add(m.view.obj);
         for (self._holds.items) |*hold| try hold.traverse(v);
+        for (self._table.items) |*entry| try v.add(entry.data);
         if (self._pending) |pending| for (pending[0..self._pending_len]) |*hold| try hold.traverse(v);
+        if (self._pending_data) |data| for (data[0..self._pending_len]) |o| try v.add(o);
         for (self._registered.items) |vec| try vec.traverse(v);
         for (self._buf_rings.items) |o| try v.add(o);
         for (self._provided.items) |*view| try v.add(view.obj);
@@ -349,7 +368,7 @@ pub const Ring = struct {
     /// complete (an error, or no completion within a second) is never released: leaked, not freed under the
     /// kernel. Requests prepared but not submitted release theirs.
     pub fn drainRequests(self: *Ring) void {
-        if (self._pending) |pending| for (pending[0..self._pending_len]) |*hold| hold.release();
+        self.releasePending();
         if (self._live == 0 or !self._ready) return;
         const ring = &self._io_uring;
         var reg = std.mem.zeroes(c.io_uring_sync_cancel_reg);
@@ -365,8 +384,9 @@ pub const Ring = struct {
             c.io_uring_cqe_seen(ring, cqe);
         }
         // coverage-off: a request that does not complete within a second of its cancel
-        if (self._live != 0) for (self._holds.items) |*hold| {
+        if (self._live != 0) for (self._holds.items, self._table.items) |*hold, *entry| {
             hold.* = .{}; // still in flight: leaked
+            entry.data = null;
         };
         // coverage-on
     }
@@ -488,12 +508,25 @@ pub const Ring = struct {
         self._table = .empty;
         self._free = 0;
         self._live = 0;
+        self.releasePending();
         if (self._pending) |pending| {
-            for (pending[0..self._pending_len]) |*hold| hold.release();
             std.heap.c_allocator.free(pending[0..self._pending_len]);
+            std.heap.c_allocator.free(self._pending_data.?[0..self._pending_len]);
         }
         self._pending = null;
+        self._pending_data = null;
         self._pending_len = 0;
+    }
+
+    /// Releases what every SQ slot's prepared request holds (not submitted: nothing in flight uses it).
+    fn releasePending(self: *Ring) void {
+        const pending = self._pending orelse return;
+        for (pending[0..self._pending_len], self._pending_data.?[0..self._pending_len]) |*hold, *data| {
+            hold.release();
+            const old = data.*;
+            data.* = null;
+            py.decref(old);
+        }
     }
 
     /// The pending hold of the SQ slot `sqe` points into (allocating them at the first use).
@@ -502,27 +535,69 @@ pub const Ring = struct {
         return self.pendingSlot(sqe);
     }
 
-    /// Allocates the pending holds (`sq.ring_entries`), once.
+    /// Allocates the pending holds and objects (`sq.ring_entries` each), once.
     pub inline fn ensurePending(self: *Ring) py.Error!void {
         if (self._pending != null) return;
         return self.allocPending();
     }
 
     noinline fn allocPending(self: *Ring) py.Error!void {
+        const gpa = std.heap.c_allocator;
         const n = self._io_uring.sq.ring_entries;
-        const holds = std.heap.c_allocator.alloc(Hold, n) catch return e.raiseMemoryError("Out of Memory!");
+        const holds = gpa.alloc(Hold, n) catch return e.raiseMemoryError("Out of Memory!");
+        const data = gpa.alloc(?*Object, n) catch {
+            // coverage-off: out of memory only
+            gpa.free(holds);
+            return e.raiseMemoryError("Out of Memory!");
+            // coverage-on
+        };
         @memset(holds, .{});
+        @memset(data, null);
         self._pending = holds.ptr;
+        self._pending_data = data.ptr;
         self._pending_len = n;
+    }
+
+    /// The index of the SQ slot `sqe` points into.
+    inline fn slotOf(self: *Ring, sqe: *const c.io_uring_sqe) usize {
+        const ring = &self._io_uring;
+        const base: [*]c.io_uring_sqe = ring.sq.sqes;
+        const shift: u5 = @intCast(c.io_uring_sqe_shift(ring)); // cast: 0 or 1
+        return ((@intFromPtr(sqe) - @intFromPtr(base)) / @sizeOf(c.io_uring_sqe)) >> shift;
     }
 
     /// `pendingFor` after `ensurePending`.
     pub inline fn pendingSlot(self: *Ring, sqe: *const c.io_uring_sqe) *Hold {
-        const ring = &self._io_uring;
-        const base: [*]c.io_uring_sqe = ring.sq.sqes;
-        const shift: u5 = @intCast(c.io_uring_sqe_shift(ring)); // cast: 0 or 1
-        const slot = ((@intFromPtr(sqe) - @intFromPtr(base)) / @sizeOf(c.io_uring_sqe)) >> shift;
-        return &self._pending.?[slot];
+        return &self._pending.?[self.slotOf(sqe)];
+    }
+
+    /// `io_uring_sqe_set_data` on the ring's SQ slot `sqe`: keeps `obj` (a new reference) until the submit moves
+    /// it into the request's entry, replacing the slot's earlier one.
+    pub fn setPendingData(self: *Ring, sqe: *const c.io_uring_sqe, obj: *Object) py.Error!void {
+        try self.ensurePending();
+        const slot = &self._pending_data.?[self.slotOf(sqe)];
+        const old = slot.*;
+        slot.* = keep(obj);
+        py.decref(old); // after the store: may run Python code
+    }
+
+    /// Drops what the unsent SQ slot `sqe` holds (an `Sqe(ring)` prep that failed hands its slot back).
+    pub fn releaseSlot(self: *Ring, sqe: *const c.io_uring_sqe) void {
+        if (self._pending == null) return;
+        const i = self.slotOf(sqe);
+        self._pending.?[i].release();
+        const old = self._pending_data.?[i];
+        self._pending_data.?[i] = null;
+        py.decref(old);
+    }
+
+    /// `io_uring_cqe_get_data`: the object (a new reference) of the request whose completion has the kernel
+    /// `user_data` `kernel`, while its `user_data` is that object's address; else `null`.
+    pub fn dataOf(self: *const Ring, kernel: u64) ?*Object {
+        const entry = self.live(kernel) orelse return null;
+        const obj = entry.data orelse return null;
+        if (entry.user_data != @intFromPtr(obj)) return null; // `user_data` set again after `set_data`
+        return keep(obj);
     }
 
     /// The `io_uring` for a submit: `checkedPtr`, then every SQE not handed to the kernel yet
@@ -571,11 +646,16 @@ pub const Ring = struct {
             const index: u32 = @intCast(self.take(u.sqe.user_data)); // cast: an index
             u.sqe.user_data = index;
             const items = self._table.items;
-            if (self._pending) |pending| if (!pending[u.slot].isEmpty()) {
-                self._holds.items[index] = pending[u.slot];
-                pending[u.slot] = .{};
-                items[index].held = true;
-            };
+            if (self._pending) |pending| {
+                if (!pending[u.slot].isEmpty()) {
+                    self._holds.items[index] = pending[u.slot];
+                    pending[u.slot] = .{};
+                    items[index].held = true;
+                }
+                const data = &self._pending_data.?[u.slot];
+                items[index].data = data.*; // kept even if `user_data` changed since: `dataOf` checks
+                data.* = null;
+            }
             if (links and !it.atEnd()) { // a member (a submit ends a chain too)
                 items[index].skips = skips;
                 items[index].breaks = skips and flags & c.IOSQE_IO_HARDLINK == 0;
@@ -618,7 +698,7 @@ pub const Ring = struct {
             if (u.sqe.flags & c.IOSQE_CQE_SKIP_SUCCESS == 0) continue;
             if ((in_chain and !links) or (links and it.atEnd())) return raiseSkipLast(u);
             if (!in_chain and !links) if (self._pending) |pending| {
-                if (!pending[u.slot].isEmpty()) return raiseSkipHolds(u);
+                if (!pending[u.slot].isEmpty() or self._pending_data.?[u.slot] != null) return raiseSkipHolds(u);
             };
         }
     }
@@ -819,23 +899,23 @@ pub const Ring = struct {
     }
 
     /// Frees the live entry `index`, giving what it held (to release).
-    inline fn freeEntry(self: *Ring, index: u32) Hold {
+    inline fn freeEntry(self: *Ring, index: u32) Released {
         const entry = &self._table.items[index];
-        const hold = self.takeHold(index);
+        const released: Released = .{ .hold = self.takeHold(index), .data = entry.data };
         entry.* = .{ .user_data = self._free };
         self._free = index;
         self._live -= 1;
-        return hold;
+        return released;
     }
 
     /// Like `freeEntry`, but the index stays off the free list until a completion for it comes (`freeZombie`):
     /// one that may still post can not name a new request. One that never posts costs an entry (no hold).
-    fn bury(self: *Ring, index: u32) Hold {
+    fn bury(self: *Ring, index: u32) Released {
         const entry = &self._table.items[index];
-        const hold = self.takeHold(index);
+        const released: Released = .{ .hold = self.takeHold(index), .data = entry.data };
         entry.* = .{ .zombie = true };
         self._live -= 1;
-        return hold;
+        return released;
     }
 
     /// What the entry `index` held (empty if nothing), taken out of `_holds`.

@@ -1,9 +1,12 @@
 """Ring-level functions: parameters, waiting with timeouts, eventfd, registration, buffer rings, ..."""
 
+import errno
+import gc
 import mmap
 import os
 import subprocess
 import sys
+import weakref
 import pytest
 from liburing import *
 
@@ -24,8 +27,9 @@ def test_sqe_set_flags_data(ring):
     assert sqe.flags == IOSQE_IO_LINK
     io_uring_sqe_set_data64(sqe, 99)
     assert sqe.user_data == 99
-    io_uring_sqe_set_data(sqe, 98)
-    assert sqe.user_data == 98
+    data = object()
+    io_uring_sqe_set_data(sqe, data)
+    assert sqe.user_data == id(data)  # as in C: the object's address
     io_uring_sqe_set_buf_group(sqe, 5)  # shares `buf_index` with the fixed buffer index
 
 
@@ -33,14 +37,160 @@ def test_cqe_get_data(ring, cqe):
     assert nop(ring, 7) == 1
     assert io_uring_wait_cqe(ring, cqe) == 0
     assert io_uring_cqe_get_data64(cqe[0]) == 7
-    assert io_uring_cqe_get_data(cqe[0]) == 7
+    assert io_uring_cqe_get_data(cqe[0]) is None  # an `int`, no object
+    assert cqe.data_res(0) == (None, 0)
     io_uring_cqe_seen(ring, cqe[0])
-    assert nop(ring, 0) == 1
+
+
+def nop_data(ring, data):
+    sqe = io_uring_get_sqe(ring)
+    io_uring_prep_nop(sqe)
+    io_uring_sqe_set_data(sqe, data)
+    return sqe
+
+
+def test_sqe_set_data_object(ring, cqe):
+    conn = {"fd": 5}
+    before = sys.getrefcount(conn)
+    nop_data(ring, conn)
+    nop_data(ring, conn)
+    assert sys.getrefcount(conn) == before + 2  # each request holds it
+    assert io_uring_submit_and_wait(ring, 2) == 2
+    assert io_uring_wait_cqe_nr(ring, cqe, 2) == 0
+    assert io_uring_cqe_get_data(cqe[0]) is conn
+    assert io_uring_cqe_get_data64(cqe[0]) == id(conn)
+    assert cqe.data_res(1) == (conn, 0)
+    io_uring_cq_advance(ring, 2)
+    assert sys.getrefcount(conn) == before  # released with the completions
+
+
+def test_sqe_set_data_replaced(ring, cqe):
+    first, second = object(), object()
+    before = sys.getrefcount(first)
+    sqe = nop_data(ring, first)
+    io_uring_sqe_set_data(sqe, second)  # the slot's earlier object is dropped
+    assert sys.getrefcount(first) == before
+    assert io_uring_submit_and_wait(ring, 1) == 1
     assert io_uring_wait_cqe(ring, cqe) == 0
-    assert io_uring_cqe_get_data64(cqe[0]) == 0
-    with pytest.raises(ValueError, match="null"):  # a pointer: `0` is none
-        io_uring_cqe_get_data(cqe[0])
+    assert io_uring_cqe_get_data(cqe[0]) is second
     io_uring_cqe_seen(ring, cqe[0])
+
+
+def test_sqe_set_data_then_user_data(ring, cqe):
+    data = object()
+    before = sys.getrefcount(data)
+    sqe = nop_data(ring, data)
+    sqe.user_data = 5  # a later `user_data` wins
+    assert io_uring_submit_and_wait(ring, 1) == 1
+    assert io_uring_wait_cqe(ring, cqe) == 0
+    assert cqe[0].user_data == 5
+    assert io_uring_cqe_get_data(cqe[0]) is None
+    io_uring_cqe_seen(ring, cqe[0])
+    assert sys.getrefcount(data) == before  # still released
+
+
+def test_sqe_set_data_bound(ring, cqe):
+    data = object()
+    sqe = Sqe(ring)
+    assert io_uring_prep_nop(sqe)
+    io_uring_sqe_set_data(sqe, data)
+    assert io_uring_submit_and_wait(ring, 1) == 1
+    assert io_uring_wait_cqe(ring, cqe) == 0
+    assert io_uring_cqe_get_data(cqe[0]) is data
+    io_uring_cqe_seen(ring, cqe[0])
+
+
+def test_sqe_set_data_template(ring, cqe):
+    data = [object(), object()]
+    before = [sys.getrefcount(d) for d in data]
+    sqe = Sqe(2)
+    for i in range(2):
+        io_uring_prep_nop(sqe[i])
+        io_uring_sqe_set_data(sqe[i], data[i])
+    one = Sqe()
+    io_uring_prep_nop(one)
+    io_uring_sqe_set_data(one, data[0])
+    assert put_sqe(ring, sqe) and put_sqe(ring, one)
+    assert sys.getrefcount(data[0]) == before[0] + 2 + 2  # the templates' references, and one per copy
+    del sqe, one  # the copies keep their own
+    assert io_uring_submit_and_wait(ring, 3) == 3
+    assert io_uring_wait_cqe_nr(ring, cqe, 3) == 0
+    assert [cqe.data_res(i)[0] for i in range(3)] == [data[0], data[1], data[0]]
+    io_uring_cq_advance(ring, 3)
+    assert [sys.getrefcount(d) for d in data] == before
+
+
+def test_sqe_set_data_skip_success_alone(ring):
+    sqe = nop_data(ring, object())
+    sqe.flags = IOSQE_CQE_SKIP_SUCCESS  # no completion would release it
+    with pytest.raises(ValueError, match="holds a buffer or object"):
+        io_uring_submit(ring)
+    sqe.flags = 0
+    assert io_uring_submit(ring) == 1
+
+
+def test_sqe_set_data_not_submitted():
+    data = object()
+    before = sys.getrefcount(data)
+    ring = Ring()
+    io_uring_queue_init(8, ring)
+    nop_data(ring, data)
+    io_uring_queue_exit(ring)  # released with the ring
+    assert sys.getrefcount(data) == before
+
+
+def test_sqe_set_data_failed_prep(ring):
+    data = object()
+    before = sys.getrefcount(data)
+    sqe = Sqe(ring)
+    assert io_uring_prep_nop(sqe)
+    io_uring_sqe_set_data(sqe, data)
+    with pytest.raises(OverflowError):
+        io_uring_prep_read(sqe, -1, bytearray(1), -2)  # the next slot: handed back
+    assert sys.getrefcount(data) == before + 1  # its own slot keeps it
+    assert io_uring_submit(ring) == 1
+
+
+class Box:
+    """Weak-referenceable, unlike `Sqe` and `Ring`: tells when a cycle through one was collected."""
+
+
+def test_sqe_set_data_cycles():
+    template = Box()
+    template.sqe = Sqe()
+    io_uring_prep_nop(template.sqe)
+    io_uring_sqe_set_data(template.sqe, template)  # a template holding itself
+    pending, in_flight = Box(), Box()
+    pending.ring = in_flight.ring = Ring()
+    io_uring_queue_init(8, pending.ring)
+    nop_data(pending.ring, in_flight)
+    assert io_uring_submit(pending.ring) == 1
+    nop_data(pending.ring, pending)  # a ring holding itself: in flight, and pending
+    refs = [weakref.ref(b) for b in (template, pending, in_flight)]
+    del template, pending, in_flight
+    gc.collect()
+    assert [r() for r in refs] == [None, None, None]
+
+
+def test_prep_cancel_object(ring, cqe):
+    r, w = os.pipe()
+    try:
+        conn = object()
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_read(sqe, r, bytearray(1))
+        io_uring_sqe_set_data(sqe, conn)
+        sqe = io_uring_get_sqe(ring)
+        io_uring_prep_cancel(sqe, conn)
+        sqe.user_data = 9
+        assert io_uring_submit_and_wait(ring, 2) == 2
+        assert io_uring_wait_cqe_nr(ring, cqe, 2) == 0
+        results = {cqe.user_data_at(i): cqe.data_res(i) for i in range(2)}
+        assert results[9] == (None, 0)  # the cancel found it
+        assert results[id(conn)] == (conn, -errno.ECANCELED)
+        io_uring_cq_advance(ring, 2)
+    finally:
+        os.close(r)
+        os.close(w)
 
 
 # queue state

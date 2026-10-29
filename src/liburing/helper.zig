@@ -262,8 +262,9 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
     const _sqe = sqe._io_uring_sqe.?; // allocated with its `_len` entries
     try sqe.ownThread(ring._thread); // `checkedPtr`: the calling thread owns `ring`
     const holds = sqe._holds.?[0..sqe._len];
+    if (sqe._data != null) try ring.ensurePending(); // before any copy: no error after one
     for (holds) |*hold_| {
-        if (!hold_.isEmpty()) break try ring.ensurePending(); // before any copy: no error after one
+        if (!hold_.isEmpty()) break try ring.ensurePending();
     }
     if (sqe._len == 1) { // single
         const slot = c.io_uring_get_sqe(io_uring) orelse
@@ -271,6 +272,7 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
         if (slot) |s| {
             @memcpy(s, _sqe[0..1]);
             holdTemplate(ring, s, sqe, &holds[0]);
+            copyData(ring, s, sqe.dataAt(0));
             return true;
         }
     } else if (c.io_uring_sq_space_left(io_uring) >= sqe._len or
@@ -280,11 +282,19 @@ pub fn put_sqe(ring: *Ring, sqe: *Sqe) py.Error!bool {
             if (c.io_uring_get_sqe(io_uring)) |s| {
                 @memcpy(s, _sqe[i .. i + 1]);
                 holdTemplate(ring, s, sqe, &holds[i]);
+                copyData(ring, s, sqe.dataAt(i));
             } // else should not trigger since space left is per-checked!
         }
         return true;
     }
     return false;
+}
+
+/// A copy (in the ring's slot `s`) of a template entry with a `set_data` object: the slot gets a reference of its
+/// own (pending objects allocated: `ensurePending`), so the template may change or drop its object meanwhile.
+inline fn copyData(ring: *Ring, s: *c.io_uring_sqe, obj: ?*Object) void {
+    const o = obj orelse return;
+    ring.setPendingData(s, o) catch unreachable; // allocated: no error
 }
 
 /// A copy (in the ring's slot `s`) of a template entry that holds something holds the template itself until
@@ -402,6 +412,17 @@ inline fn releaseOwned(buf: anytype) void {
     if (@typeInfo(@TypeOf(buf.*)) == .optional) {
         if (buf.*) |*b| sc.PyBuffer_Release(@constCast(&b.view));
     } else sc.PyBuffer_Release(@constCast(&buf.view));
+}
+
+/// `io_uring_sqe_set_data`: keeps `obj` (a new reference) for the request `sqe` prepares until its entry is
+/// freed, like `holdUntilCompletion`: in its ring's slot until the submit moves it into the request's entry, or
+/// in its `Sqe` template (each `put_sqe` copy gets a reference of its own).
+pub fn holdData(sqe: *SQE, ptr: *const c.io_uring_sqe, obj: *Object) py.Error!void {
+    if (sqe._owner) |owner| {
+        if (RingType.check(owner)) return RingType.data(owner).setPendingData(ptr, obj);
+        return SqeType.data(owner).setData(ptr, obj); // a template's entry (`tmpl[i]`)
+    }
+    return SqeType.data(SQEType.object(sqe)).setData(ptr, obj); // a template itself
 }
 
 /// Where a prep holds things: its ring's pending slot, or its template's entry (and the template).

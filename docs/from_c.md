@@ -58,7 +58,8 @@ io_uring_queue_exit(ring)
 | `struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);` | `sqe = io_uring_get_sqe(ring)` | `None` instead of `NULL` when the queue is full. |
 | `struct io_uring_cqe *cqe; io_uring_wait_cqe(&ring, &cqe);` | `cqe = Cqe()` once, then `io_uring_wait_cqe(ring, cqe)` | `cqe[0]` is the entry C's pointer points at; `cqe[1]`, `cqe[2]`, ... the ones behind it. |
 | `cqe->res`, `cqe->user_data`, `cqe->flags` | `cqe[0].res`, `cqe[0].user_data`, `cqe[0].flags` | A negative `res` raises the matching `OSError` instead of being returned. |
-| `io_uring_sqe_set_data(sqe, ptr)` / `sqe->user_data = x` | `sqe.user_data = x` | Any 64-bit integer, `0` included. `io_uring_sqe_set_data64` and `io_uring_cqe_get_data64` exist too. |
+| `sqe->user_data = x` / `io_uring_sqe_set_data64(sqe, x)` | `sqe.user_data = x` | Any 64-bit integer, `0` included. `io_uring_cqe_get_data64` and `cqe.user_data_res(i)` read it. |
+| `io_uring_sqe_set_data(sqe, ptr)` + `io_uring_cqe_get_data(cqe)` | the same, with any object | The request keeps the object alive until its completion is consumed; `user_data` is its address (`id(obj)`), and `io_uring_prep_cancel(sqe, obj)` cancels by it. `cqe.data_res(i)` reads the object and `res` in one call. |
 | `sqe->flags \|= IOSQE_IO_LINK` | `sqe.flags = IOSQE_IO_LINK` or `io_uring_sqe_set_flags(sqe, ...)` | Set it after the prep, as in C. |
 | `buf, len` pairs (`io_uring_prep_read(sqe, fd, buf, len, offset)`) | one buffer object (`io_uring_prep_read(sqe, fd, buf, offset)`) | The object's length is the request's length; slice a `memoryview` for less. Reads need a writable buffer. |
 | `struct iovec iov[n]` + `io_uring_prep_readv(sqe, fd, iov, n, offset)` | `io_uring_prep_readv(sqe, fd, [buf1, buf2], offset)` | A list of buffers. |
@@ -82,6 +83,5 @@ io_uring_queue_exit(ring)
 
 ## What is missing
 
-- `io_uring_sqe_set_data` takes an integer, not a pointer: there is no `void *` to store a Python object in. Keep objects in a `dict` or `list` keyed by `user_data`.
 - `io_uring_register_wait_reg` always fails: C liburing dropped it (use `io_uring_register_region` with a `RegWait`).
-- The C macros that touch the ring's memory directly (`io_uring_for_each_cqe`, `io_uring_sqe_set_data` storing a pointer, `io_uring_cqe_get_data` returning one) have the function and loop forms above instead.
+- `io_uring_for_each_cqe`, a C macro that walks the ring's memory directly, has the function and loop forms above instead.

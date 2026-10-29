@@ -10,6 +10,7 @@ const CqeBatch = @import("cqe.zig").CqeBatch;
 const CqeIterType = @import("cqe.zig").CqeIterType;
 const Ring = @import("ring.zig").Ring;
 const RingType = @import("ring.zig").RingType;
+const ringOf = @import("ring.zig").ringOf;
 
 const py = setu.py;
 const Object = setu.c.Object;
@@ -365,18 +366,33 @@ pub fn io_uring_cqe_seen(ring: *Ring, cqe: *CQE) py.Error!void {
     c.io_uring_cqe_seen(r, entry);
 }
 
-/// The `user_data` of `cqe` as an `int` (the pointer value set with `io_uring_sqe_set_data`).
+/// The object `io_uring_sqe_set_data` attached to the request of `cqe`; `None` if it has none (C's `NULL`).
+///
+/// Type
+///     return: Any
 ///
 /// Example
-///     >>> io_uring_cqe_get_data(cqe[0])
+///     >>> conn = {'fd': 5}
+///     >>> sqe = io_uring_get_sqe(ring)
+///     >>> io_uring_prep_nop(sqe)
+///     True
+///     >>> io_uring_sqe_set_data(sqe, conn)
+///     >>> io_uring_submit_and_wait(ring, 1)
 ///     1
+///     >>> io_uring_wait_cqe(ring, cqe)
+///     0
+///     >>> io_uring_cqe_get_data(cqe[0])
+///     {'fd': 5}
+///     >>> io_uring_cqe_seen(ring, cqe[0])
 ///
 /// Note
-///     - `ValueError` if it is `0` (a null pointer).
-pub fn io_uring_cqe_get_data(cqe: *CQE) py.Error!usize {
-    const data = try cqe.get_user_data(); // NOTE: This can return garbage data!
-    if (data != 0) return @intCast(data); // cast: `usize` is 64 bits (Linux x86_64 / aarch64)
-    return py.raiseValueError("`io_uring_cqe_get_data()` - received `null`", .{});
+///     - Valid until the completion is consumed (`io_uring_cqe_seen`, `io_uring_cq_advance`), like `user_data`.
+///     - `None` too when a `user_data` was set after `io_uring_sqe_set_data` (`io_uring_sqe_set_data64`,
+///       `sqe.user_data = ...`): an `int` is not an object.
+pub fn io_uring_cqe_get_data(cqe: *CQE) py.Error!?*Object {
+    const kernel = (try cqe.cqePtr()).user_data;
+    const ring = cqe._ring orelse return null;
+    return ringOf(ring).dataOf(kernel);
 }
 
 /// The 64-bit `user_data` of `cqe` (set with `io_uring_sqe_set_data64`).

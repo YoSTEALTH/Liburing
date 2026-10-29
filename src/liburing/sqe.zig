@@ -98,7 +98,7 @@ pub const SQE = struct {
         self._sqe = null;
         const ring = RingType.data(self._owner.?);
         ring._io_uring.sq.sqe_tail = self._tail;
-        if (ring._pending != null) ring.pendingSlot(s).release();
+        ring.releaseSlot(s);
     }
 
     // GET
@@ -244,6 +244,9 @@ pub const Sqe = struct {
     _io_uring_sqe: ?[*]c.io_uring_sqe = null, // allocated here, `_len` entries
     /// What each entry's prep holds, for the template's lifetime (`put_sqe` copies hold the template).
     _holds: ?[*]Ring.Hold = null,
+    /// Each entry's `io_uring_sqe_set_data` object (owned; `put_sqe` gives each copy a reference of its own):
+    /// `_len` of them, allocated at the first one.
+    _data: ?[*]?*Object = null,
     _inflight: u32 = 0, // `put_sqe` copies of an entry that holds something, not released yet
     /// Holds a re-prep replaced while copies were in flight: released once `_inflight` is `0`.
     _retired: std.ArrayList(Ring.Hold) = .empty,
@@ -286,12 +289,15 @@ pub const Sqe = struct {
     /// GC: the objects its entries hold (and the retired ones), so a cycle through one can be collected.
     pub fn __traverse__(self: *const Self, v: *setu.Visit) setu.Visit.Error!void {
         if (self._holds) |holds| for (holds[0..self._len]) |*hold| try hold.traverse(v);
+        if (self._data) |data| for (data[0..self._len]) |o| try v.add(o);
         for (self._retired.items) |*hold| try hold.traverse(v);
     }
 
     /// GC breaking a cycle: releases what its entries hold, unless `put_sqe` copies are in flight (the kernel may
-    /// still use it: their ring's `__clear__` drains them first, then this template's dealloc releases it).
+    /// still use it: their ring's `__clear__` drains them first, then this template's dealloc releases it). The
+    /// `set_data` objects go either way (each copy has its own reference).
     pub fn __clear__(self: *Self) void {
+        self.releaseData();
         if (self._inflight != 0) return;
         if (self._holds) |holds| for (holds[0..self._len]) |*hold| hold.release();
         self.releaseRetired();
@@ -303,7 +309,42 @@ pub const Sqe = struct {
             for (holds[0..self._len]) |*hold| hold.release();
             std.heap.c_allocator.free(holds[0..self._len]);
         }
+        self.releaseData();
+        if (self._data) |data| std.heap.c_allocator.free(data[0..self._len]);
         self.releaseRetired(); // no copy in flight: each holds the template
+    }
+
+    fn releaseData(self: *Self) void {
+        const data = self._data orelse return;
+        for (data[0..self._len]) |*slot| {
+            const old = slot.*;
+            slot.* = null;
+            py.decref(old);
+        }
+    }
+
+    /// `io_uring_sqe_set_data` on the template's entry `sqe`: keeps `obj` (a new reference), replacing the entry's
+    /// earlier one.
+    pub fn setData(self: *Self, sqe: *const c.io_uring_sqe, obj: *Object) py.Error!void {
+        const data = self._data orelse blk: {
+            const new = std.heap.c_allocator.alloc(?*Object, self._len) catch
+                // coverage-off: out of memory only
+                return e.raiseMemoryError("Out of Memory!");
+            // coverage-on
+            @memset(new, null);
+            self._data = new.ptr;
+            break :blk new.ptr;
+        };
+        const slot = &data[self.indexOf(sqe)];
+        const old = slot.*;
+        slot.* = keep(obj);
+        py.decref(old); // after the store: may run Python code
+    }
+
+    /// The `set_data` object of the template's entry `i` (borrowed), if any.
+    pub inline fn dataAt(self: *const Self, i: usize) ?*Object {
+        const data = self._data orelse return null;
+        return data[i];
     }
 
     /// A copy's hold was released (its completion, or its slot re-prepped / drained).
@@ -326,7 +367,7 @@ pub const Sqe = struct {
     }
 
     /// `put_sqe` into a ring owned by `thread` (the calling one: the ring checked it): takes it as the template's,
-    /// or `RuntimeError` for another one. No `threadId()` call.
+    /// or `RuntimeError` for another one. No `threadId()` read.
     pub inline fn ownThread(self: *Self, thread: usize) py.Error!void {
         if (!claim(&self._thread, thread)) return raiseTemplateThread();
     }
@@ -358,8 +399,12 @@ pub const Sqe = struct {
 
     /// The hold of the entry `sqe` points into.
     pub fn holdFor(self: *Self, sqe: *const c.io_uring_sqe) *Ring.Hold {
-        const i = (@intFromPtr(sqe) - @intFromPtr(self._io_uring_sqe.?)) / @sizeOf(c.io_uring_sqe);
-        return &self._holds.?[i];
+        return &self._holds.?[self.indexOf(sqe)];
+    }
+
+    /// The index of the template's entry `sqe`.
+    inline fn indexOf(self: *const Self, sqe: *const c.io_uring_sqe) usize {
+        return (@intFromPtr(sqe) - @intFromPtr(self._io_uring_sqe.?)) / @sizeOf(c.io_uring_sqe);
     }
 
     /// `Sqe(ring)`: no length (its entries are the ring's free slots).

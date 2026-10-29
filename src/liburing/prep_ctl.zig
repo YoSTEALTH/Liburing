@@ -11,18 +11,44 @@ const Ring = @import("ring.zig").Ring;
 const SQE = @import("sqe.zig").SQE;
 
 const py = setu.py;
+const Object = setu.c.Object;
 const Timespec = class.Timespec;
 const SiginfoT = class.SiginfoT;
 
-/// Sets the `user_data` of `sqe` to the address-sized int `data`; the completion reports it as `cqe.user_data`.
+/// Attaches the object `data` to the request `sqe` prepares: its completion gives it back with
+/// `io_uring_cqe_get_data` (or `cqe.data_res(i)`), so no table of your own maps `user_data` back to it. As in C,
+/// `user_data` becomes the object's address (`id(data)`).
+///
+/// Type
+///     data: object
 ///
 /// Example
-///     >>> io_uring_sqe_set_data(sqe, 98)
+///     >>> conn = {'fd': 5}
+///     >>> sqe = io_uring_get_sqe(ring)
+///     >>> io_uring_prep_nop(sqe)
+///     True
+///     >>> io_uring_sqe_set_data(sqe, conn)
+///     >>> sqe.user_data == id(conn)
+///     True
+///     >>> io_uring_submit_and_wait(ring, 1)
+///     1
+///     >>> io_uring_wait_cqe(ring, cqe)
+///     0
+///     >>> io_uring_cqe_get_data(cqe[0]) is conn
+///     True
+///     >>> io_uring_cqe_seen(ring, cqe[0])
 ///
 /// Note
-///     - Set it on every `sqe` you rely on: one left unset may carry the value of the entry's previous use.
-pub fn io_uring_sqe_set_data(sqe: *SQE, data: usize) py.Error!void {
-    c.io_uring_sqe_set_data(try sqe.sqePtr(), @ptrFromInt(data)); // `data`: an address, as `PyLong_AsVoidPtr` read it
+///     - The request keeps a reference to `data` from here until its completion is consumed (`io_uring_cqe_seen`,
+///       `io_uring_cq_advance`; a multishot request: its last one), so it can not go away in between.
+///     - A `user_data` set after it (`io_uring_sqe_set_data64`, `sqe.user_data = ...`) wins: the completion then
+///       has no object (`io_uring_cqe_get_data` gives `None`).
+///     - `io_uring_prep_cancel(sqe, data)` cancels the request by its object.
+///     - On an `Sqe` template each `put_sqe` copy takes its own reference.
+pub fn io_uring_sqe_set_data(sqe: *SQE, data: *Object) py.Error!void {
+    const s = try sqe.sqePtr();
+    try h.holdData(sqe, s, data);
+    c.io_uring_sqe_set_data(s, data);
 }
 
 /// Sets the `user_data` of `sqe` to the 64-bit `data`; the completion reports it as `cqe.user_data`.
@@ -254,12 +280,17 @@ pub fn io_uring_prep_cancel64(sqe: *SQE, user_data: u64, flags: ?i32) py.Error!b
     return true;
 }
 
-/// Cancels the in-flight request with the address-sized `user_data` (the value you gave it); `flags` (default `0`)
-/// are `IORING_ASYNC_CANCEL_*`. `io_uring_prep_cancel64` takes any 64-bit value and lists the flags and results.
+/// Cancels the in-flight request whose object is `user_data` (`io_uring_sqe_set_data`: its `user_data` is the
+/// object's address); `flags` (default `0`) are `IORING_ASYNC_CANCEL_*`. `io_uring_prep_cancel64` takes an `int`
+/// `user_data` and lists the flags and results.
+///
+/// Type
+///     user_data: object
 ///
 /// Example
+///     >>> conn = {'fd': 5}
 ///     >>> sqe = io_uring_get_sqe(ring)
-///     >>> io_uring_prep_cancel(sqe, 123)
+///     >>> io_uring_prep_cancel(sqe, conn)
 ///     True
 ///
 /// Note
@@ -271,10 +302,10 @@ pub fn io_uring_prep_cancel64(sqe: *SQE, user_data: u64, flags: ?i32) py.Error!b
 ///       none was found, `OSError: EALREADY` when past cancelling: wait for its own completion. The cancelled
 ///       request's `cqe.res` raises `OSError: ECANCELED` (`OSError: EINTR` if it was running); either completion
 ///       may come first.
-pub fn io_uring_prep_cancel(sqe: *SQE, user_data: usize, flags: ?i32) py.Error!bool {
+pub fn io_uring_prep_cancel(sqe: *SQE, user_data: *Object, flags: ?i32) py.Error!bool {
     const s = try sqe.prepSlot(false) orelse return false;
     errdefer sqe.undoSlot();
-    c.io_uring_prep_cancel(s, @ptrFromInt(user_data), flags orelse 0);
+    c.io_uring_prep_cancel(s, user_data, flags orelse 0);
     return true;
 }
 

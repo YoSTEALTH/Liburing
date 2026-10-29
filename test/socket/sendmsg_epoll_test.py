@@ -155,7 +155,7 @@ def test_recvmsg_multishot_with_helpers(ring, cqe, udp):
     assert socket.ntohs(port) == tx.getsockname()[1]
     assert io_uring_recvmsg_cmsg_firsthdr(out, msg) is None  # no control data
 
-    assert one(ring, cqe, io_uring_prep_cancel, 7) == 0
+    assert one(ring, cqe, io_uring_prep_cancel64, 7) == 0
     io_uring_wait_cqe_timeout(ring, cqe, timespec(1))
     io_uring_cq_advance(ring, io_uring_cq_ready(ring))
 

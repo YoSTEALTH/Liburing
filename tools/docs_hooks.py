@@ -121,7 +121,7 @@ def ring(ns):
 
 
 @fixture(
-    'io_uring_sqe_set_data', 'io_uring_sqe_set_data64', 'io_uring_sqe_set_flags', 'io_uring_sqe_set_buf_group',
+    'io_uring_sqe_set_data64', 'io_uring_sqe_set_flags', 'io_uring_sqe_set_buf_group',
     'io_uring_prep_nop', 'io_uring_prep_provide_buffers', 'Futex', 'timespec',
 )  # fmt: skip
 def sqe(ns):
@@ -216,12 +216,19 @@ def done(ns, flags=0):
 
 
 @fixture(
-    'CQE', 'Cqe.res_at', 'Cqe.user_data_at', 'Cqe.user_data_res', 'io_uring_cqe_seen', 'io_uring_cqe_get_data', 'io_uring_cqe_get_data64',
+    'CQE', 'Cqe.res_at', 'Cqe.user_data_at', 'Cqe.user_data_res', 'io_uring_cqe_seen', 'io_uring_cqe_get_data64',
     'io_uring_cqe_nr',
 )  # fmt: skip
 def done_seen(ns):
     '''`done`, with `cqe[0]` the first completion (user_data 1).'''
     io_uring_wait_cqe(done(ns), ns['cqe'])
+
+
+@fixture('io_uring_sqe_set_data', 'io_uring_cqe_get_data', 'Cqe.data_res')
+def ring_cqe(ns):
+    '''An empty ring and an empty `cqe`: the example makes its own request.'''
+    make_ring(ns)
+    ns['cqe'] = Cqe()
 
 
 @fixture('CQE.big_cqe')

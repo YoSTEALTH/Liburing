@@ -2,7 +2,8 @@
 `liburing_bench.c` (translated line by line: `io_uring_sqe_set_data64` as in C, which also measures
 1 ns under the `sqe.user_data` property).
 
-    python3.15t example/bench/liburing_bench.py [port=12345] [--peek | --at] [--defer] [--tmpl] [--ring] [--threads=N]
+    python3.15t example/bench/liburing_bench.py [port=12345] [--peek | --at | --data] [--defer] [--tmpl] [--ring]
+        [--threads=N]
     zig-out/bin/load 12345 64 5 100     # `zig build load`: port, connections, seconds, requests/connection
 
 One thread, one ring, default flags. `--threads=N`: N threads, each this server with its own ring and listening
@@ -13,7 +14,9 @@ the connection when recv or send returns 0 or an error.
 Completions are read in a batch, `cqe[i]` for every ready one, then `io_uring_cq_advance`. `--peek`
 reads them one at a time instead (`io_uring_peek_cqe`, `cqe[0]`, `io_uring_cqe_seen`): the only way
 that works on the old PyOZ build, whose `cqe[i]` reads past the end of the completion queue once it
-wraps around. `--at` reads them with `cqe.user_data_res(i)`: one call, no entry objects.
+wraps around. `--at` reads them with `cqe.user_data_res(i)`: one call, no entry objects. `--data` attaches the
+connection itself to each request (`io_uring_sqe_set_data`, as C attaches a pointer) and reads `(conn, res)` with
+`cqe.data_res(i)`: no `user_data` to encode and no lookup of the connection (not with `--tmpl`).
 `--defer` sets the ring up with `IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN` (default: no flags).
 `--tmpl` prepares each connection's recv and send once, in a `Sqe()` template each, and arms them with
 `put_sqe` (a copy into the ring: no `io_uring_get_sqe`, prep or `user_data` call per request); a partial send
@@ -42,15 +45,18 @@ RESPONSE += b'Hello world!</body></html>'
 
 # user_data: connection id << 2 | operation
 OP_ACCEPT, OP_RECV, OP_SEND, OP_MASK = 0, 1, 2, 3
+ACCEPT = object()  # `--data`: the accept request's object
 
 
 class Conn:
     '''One client: its fd, receive buffer and how much of the response has been sent.'''
 
-    __slots__ = ('buf', 'fd', 'out', 'recv', 'send', 'sent', 'ud_recv', 'ud_send')
+    __slots__ = ('buf', 'cid', 'fd', 'op', 'out', 'recv', 'send', 'sent', 'ud_recv', 'ud_send')
 
     def __init__(self, fd, cid=0, tmpl=False):
         self.fd = fd
+        self.cid = cid
+        self.op = OP_RECV  # `--data`: the operation in flight (one per connection at a time)
         self.buf = bytearray(BUFSIZE)
         self.sent = 0
         self.out = None  # the unsent part of `RESPONSE`, alive until its send completes
@@ -66,7 +72,7 @@ class Conn:
             io_uring_sqe_set_data64(self.send, self.ud_send)
 
 
-def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
+def main(port, peek=False, at=False, data=False, defer=False, tmpl=False, ring_sqe=False):
     ring, cqe = Ring(), Cqe()
     sqe = None  # `--ring`: `Sqe(ring)`, after the init
     conns = {}  # id -> Conn
@@ -89,7 +95,10 @@ def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
         if io_uring_prep_accept(s, listen.fileno(), None, SOCK_CLOEXEC) is False:  # `Sqe(ring)` SQ full: flush, retry
             io_uring_submit(ring)
             io_uring_prep_accept(s, listen.fileno(), None, SOCK_CLOEXEC)
-        io_uring_sqe_set_data64(s, OP_ACCEPT)
+        if data:
+            io_uring_sqe_set_data(s, ACCEPT)
+        else:
+            io_uring_sqe_set_data64(s, OP_ACCEPT)
 
     def arm_recv(c):
         if tmpl:
@@ -98,7 +107,11 @@ def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
         if io_uring_prep_recv(s, c.fd, c.buf) is False:  # `Sqe(ring)` SQ full: flush, retry
             io_uring_submit(ring)
             io_uring_prep_recv(s, c.fd, c.buf)
-        io_uring_sqe_set_data64(s, c.ud_recv)
+        if data:
+            c.op = OP_RECV
+            io_uring_sqe_set_data(s, c)
+        else:
+            io_uring_sqe_set_data64(s, c.ud_recv)
 
     def arm_send(c):
         if tmpl and not c.sent:
@@ -108,7 +121,11 @@ def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
         if io_uring_prep_send(s, c.fd, c.out) is False:  # `Sqe(ring)` SQ full: flush, retry
             io_uring_submit(ring)
             io_uring_prep_send(s, c.fd, c.out)
-        io_uring_sqe_set_data64(s, c.ud_send)
+        if data:
+            c.op = OP_SEND
+            io_uring_sqe_set_data(s, c)
+        else:
+            io_uring_sqe_set_data64(s, c.ud_send)
 
     def close_conn(cid):
         os.close(conns.pop(cid).fd)
@@ -129,8 +146,11 @@ def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
         io_uring_peek_cqe(ring, cqe)  # `cqe[0]` is the oldest completion
         ready = io_uring_cq_ready(ring)
         for i in range(ready):
-            if at:
-                data, res = cqe.user_data_res(i)  # `res` as is: negative for a failed operation
+            if data:
+                c, res = cqe.data_res(i)  # `res` as is: negative for a failed operation
+                op, cid = (OP_ACCEPT, 0) if c is ACCEPT else (c.op, c.cid)
+            elif at:
+                ud, res = cqe.user_data_res(i)
             else:
                 if peek:
                     if i:
@@ -138,12 +158,13 @@ def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
                     entry = cqe[0]
                 else:
                     entry = cqe[i]
-                data = entry.user_data
+                ud = entry.user_data
                 try:
                     res = entry.res
                 except OSError:  # a failed operation
                     res = -1
-            op, cid = data & OP_MASK, data >> 2
+            if not data:
+                op, cid = ud & OP_MASK, ud >> 2
             if op == OP_ACCEPT:
                 if res >= 0:
                     cid, next_id = next_id, next_id + 1
@@ -154,11 +175,13 @@ def main(port, peek=False, at=False, defer=False, tmpl=False, ring_sqe=False):
                 if res <= 0:
                     close_conn(cid)
                 else:
-                    c = conns[cid]
+                    if not data:
+                        c = conns[cid]
                     c.sent = 0
                     arm_send(c)
             else:  # OP_SEND
-                c = conns[cid]
+                if not data:
+                    c = conns[cid]
                 if res <= 0:
                     close_conn(cid)
                 else:
@@ -194,7 +217,7 @@ def run(main, port, threads, *args):
 
 
 if __name__ == '__main__':
-    flags = ('--peek', '--at', '--defer', '--tmpl', '--ring')
+    flags = ('--peek', '--at', '--data', '--defer', '--tmpl', '--ring')
     threads = next((int(a[len('--threads=') :]) for a in sys.argv[1:] if a.startswith('--threads=')), 1)
     args = [a for a in sys.argv[1:] if a not in flags and not a.startswith('--threads=')]
     run(main, int(args[0]) if args else 12345, threads, *(f in sys.argv for f in flags))

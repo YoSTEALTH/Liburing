@@ -33,8 +33,8 @@ def test_send_recv(ring, cqe):
             rbuf,
         )
 
-        io_uring_sqe_set_data(ssqe, user_data1)
-        io_uring_sqe_set_data(rsqe, user_data2)
+        io_uring_sqe_set_data64(ssqe, user_data1)
+        io_uring_sqe_set_data64(rsqe, user_data2)
 
         assert io_uring_submit(ring) == 2
 

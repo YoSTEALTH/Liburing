@@ -226,6 +226,30 @@ pub const Cqe = struct {
         return .{ RingType.data(self._ring.?).userData(cqe.user_data), cqe.res };
     }
 
+    /// The `io_uring_sqe_set_data` object (`None` if none, as `io_uring_cqe_get_data`) and `res` of `cqe[index]` in
+    /// one call, without creating an entry object; `res` as is, like `user_data_res`.
+    ///
+    /// Type
+    ///     return: tuple[Any, int]
+    ///
+    /// Example
+    ///     >>> conn = {'fd': 5}
+    ///     >>> sqe = io_uring_get_sqe(ring)
+    ///     >>> io_uring_prep_nop(sqe)
+    ///     True
+    ///     >>> io_uring_sqe_set_data(sqe, conn)
+    ///     >>> io_uring_submit_and_wait(ring, 1)
+    ///     1
+    ///     >>> io_uring_wait_cqe(ring, cqe)
+    ///     0
+    ///     >>> cqe.data_res(0)
+    ///     ({'fd': 5}, 0)
+    ///     >>> io_uring_cqe_seen(ring, cqe[0])
+    pub fn data_res(self: *const Cqe, index: isize) py.Error!struct { ?*Object, i32 } {
+        const cqe = try self.slotPtr(index);
+        return .{ RingType.data(self._ring.?).dataOf(cqe.user_data), cqe.res };
+    }
+
     /// The `index`-th completion after `cqe[0]` in the ring's queue (wrapping), checked like `__getitem__`.
     inline fn slotPtr(self: *const Cqe, index: isize) py.Error!*c.io_uring_cqe {
         const first = self._io_uring_cqe orelse return py.raiseIndexError("`Cqe` - out of completed entries", .{});
