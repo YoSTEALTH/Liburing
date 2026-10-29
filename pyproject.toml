@@ -89,6 +89,8 @@ hooks = "tools/docs_hooks.py"  # fixtures for the docstring examples (`ring`, `s
 # The Coverage page: a committed snapshot, so the published site has it too; `tools/check.sh` rewrites it (kcov)
 coverage = "docs/coverage.json"
 profile = "zig-out/profile.json"  # the Profile page: live only (`setu_docs.py serve`), from `zig build profile`
+scripts = "example"  # the Example scripts page, with Run boxes
+scripts_skip = ["copy_file.py", "echo_server.py"]  # need arguments / serve until stopped
 
 # The hand-written pages, in nav order.
 [[tool.setu_docs.markdown]]
