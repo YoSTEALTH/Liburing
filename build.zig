@@ -145,6 +145,7 @@ pub fn build(b: *std.Build) void {
         .include = &.{ b.path("src/liburing"), setu_dep.path("src") },
         .stub = pyi,
         .python = python,
+        .history = "docs/coverage-history.json", // the docs site's history chart, a line per `.version`
     });
 
     // `zig build profile -Drelease -Dcpu=x86_64_v3 [-- runner args]`: instructions per call of

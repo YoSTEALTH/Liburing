@@ -88,6 +88,7 @@ edit = "https://github.com/YoSTEALTH/Liburing/edit/dev/"
 hooks = "tools/docs_hooks.py"  # fixtures for the docstring examples (`ring`, `sqe`, `cqe`, `fd`, ...)
 # The Coverage page: a committed snapshot, so the published site has it too; `tools/check.sh` rewrites it (kcov)
 coverage = "docs/coverage.json"
+coverage_history = "docs/coverage-history.json"  # its history chart, a line per version (`zig build coverage`)
 profile = "zig-out/profile.json"  # the Profile page: live only (`setu_docs.py serve`), from `zig build profile`
 scripts = "example"  # the Example scripts page, with Run boxes
 scripts_skip = ["copy_file.py", "echo_server.py"]  # need arguments / serve until stopped

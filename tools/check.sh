@@ -117,7 +117,8 @@ done
 
 step "coverage: Liburing's own Zig code at 100% (zig build coverage, kcov)"
 # Every supported interpreter, merged, into docs/coverage.json (the committed snapshot the docs' Coverage page
-# reads); fails when a line of src/liburing never ran. Setu's lines count on the page, not here.
+# reads) and this version's line of docs/coverage-history.json (its history chart); fails when a line of
+# src/liburing never ran. Setu's lines count on the page, not here.
 if command -v kcov >/dev/null; then
     "$ZIG" build coverage -Dpython="$PY_FT" -- --json docs/coverage.json \
         --python "$PY_GIL" --python "$PY314_FT" --python "$PY314_GIL" "${PYTEST_ARGS[@]}"
