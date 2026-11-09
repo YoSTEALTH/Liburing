@@ -17,7 +17,7 @@
 //!                                callgrind instructions per call of tools/profile_cases.py (zig-out/profile.json)
 //!
 //! Options:
-//!   -Drelease               ReleaseSafe (wheels use it, as PyOZ did); without it, Debug. (A preferred release
+//!   -Drelease               ReleaseFast (wheels and benchmarks use it); without it, Debug. (A preferred release
 //!                           mode leaves no `-Doptimize`.)
 //!   -Dstrip                 drop debug info from the extension (wheels use it)
 //!   -Dext-suffix=...        Python extension suffix (default: Setu's `.so`: one stable-ABI binary for 3.14+)
@@ -45,9 +45,9 @@ const liburing_flags: []const []const u8 = &.{
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    // `-Drelease` (what `tools/setu_build.py` passes) is ReleaseSafe: a bug hit from Python stops the
-    // process instead of corrupting memory.
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .safe });
+    // `-Drelease` (what `tools/setu_build.py` passes) is ReleaseFast, for wheels and benchmarks; new code is
+    // tested in Debug (the default), where a bug stops with a proper error message.
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .fast });
     const strip = b.option(bool, "strip", "Strip debug symbols from the binary") orelse false;
     const ext_suffix = b.option([]const u8, "ext-suffix", "Python extension module suffix") orelse
         @import("setu").ext_suffix;

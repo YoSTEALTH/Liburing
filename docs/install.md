@@ -43,7 +43,7 @@ tools/check.sh                          # every check, on each installed interpr
 python3 tools/setu_build.py --all       # release wheels into dist/ (x86_64 + aarch64)
 ```
 
-`zig build develop` builds a Debug extension and regenerates the type stub `__init__.pyi` from the Zig source; `zig build develop -Drelease` builds the ReleaseSafe one the wheels ship (what the benchmarks use). `tools/check.sh` runs `zig fmt`, ruff, the test suite on 3.15t, 3.15, 3.14t and 3.14 (`/opt/python/<version>/bin/python3` by default; `PY_FT`, `PY_GIL`, `PY314_FT`, `PY314_GIL` point elsewhere), `mypy --strict` and `stubtest`.
+`zig build develop` builds a Debug extension and regenerates the type stub `__init__.pyi` from the Zig source; `zig build develop -Drelease` builds the ReleaseFast one the wheels ship (what the benchmarks use). `tools/check.sh` runs `zig fmt`, ruff, the test suite on 3.15t, 3.15, 3.14t and 3.14 (`/opt/python/<version>/bin/python3` by default; `PY_FT`, `PY_GIL`, `PY314_FT`, `PY314_GIL` point elsewhere), `mypy --strict` and `stubtest`.
 
 This site is built by Setu's `tools/setu_docs.py` (standard library only, plus `zig` for the search's Wasm), with the settings in `pyproject.toml`'s `[tool.setu_docs]`:
 
