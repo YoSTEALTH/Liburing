@@ -20,7 +20,7 @@ pub const EpollEventType = setu.Class(EpollEvent, @embedFile("msghdr.zig"));
 ///
 /// Example
 ///     # send: an address and the buffers to send
-///     >>> msg = Msghdr(Sockaddr(AF_INET, "127.0.0.1", 9000), [b"hello"], flags=0)
+///     >>> msg = Msghdr(Sockaddr(AF_INET, "127.0.0.1", 9000), [b"hi"], flags=0)
 ///     >>> io_uring_prep_sendmsg(sqe, sockfd, msg)
 ///     True
 ///
@@ -228,9 +228,9 @@ pub const Cmsghdr = struct {
 ///     # `buf`: the provided buffer a multishot receive (`msg = Msghdr(namelen=16, controllen=0)`) filled
 ///     >>> out = io_uring_recvmsg_validate(buf, msg)
 ///     >>> out.namelen, out.controllen, out.payloadlen, out.flags
-///     (16, 0, 5, 0)
+///     (16, 0, 2, 0)
 ///     >>> io_uring_recvmsg_payload(out, msg)
-///     b'hello'
+///     b'hi'
 pub const RecvmsgOut = struct {
     _recvmsg_out: ?*c.io_uring_recvmsg_out = null,
     _len: usize = 0, // the size of the buffer it points into

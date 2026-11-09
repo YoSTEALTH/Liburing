@@ -299,7 +299,7 @@ def pending_read(ns):
 
 @fixture('RecvmsgOut')
 def received(ns):
-    '''`buf` and `msg` of a multishot receive (`Msghdr(namelen=16, controllen=0)`) of `b'hello'` over UDP.'''
+    '''`buf` and `msg` of a multishot receive (`Msghdr(namelen=16, controllen=0)`) of `b'hi'` over UDP.'''
     ring = make_ring(ns, entries=8)
     cqe = Cqe()
     rx = keep(ns, socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
@@ -316,7 +316,7 @@ def received(ns):
     sqe.flags = IOSQE_BUFFER_SELECT
     io_uring_sqe_set_buf_group(sqe, 1)
     io_uring_submit(ring)
-    tx.sendto(b'hello', rx.getsockname())
+    tx.sendto(b'hi', rx.getsockname())
     io_uring_wait_cqe_timeout(ring, cqe, timespec(2))
     io_uring_cqe_seen(ring, cqe[0])
     ns['buf'] = area
