@@ -50,7 +50,7 @@ Needs Zig 0.17.0 on the system (or set `ZIG=/path/to/zig`). There are no other b
 ```bash
 git clone --recurse-submodules https://github.com/YoSTEALTH/Liburing
 cd Liburing
-python3 -m pip install .        # builds the wheel with `zig build` (tools/setu_build.py)
+python3 -m pip install .        # builds the wheel with `zig build` (tool/setu_build.py)
 ```
 
 ### Development
@@ -58,9 +58,9 @@ python3 -m pip install .        # builds the wheel with `zig build` (tools/setu_
 ```bash
 zig build develop                       # `__init__.so` + `__init__.pyi` into src/liburing/ (one binary, 3.14+)
 python3.15t -m pytest                   # tests run from the checkout (`pythonpath = ["src"]`)
-tools/check.sh                          # zig fmt, pytest on all four, docstring examples, mypy --strict, stubtest
+tool/check.py                           # zig fmt, pytest on all four, docstring examples, mypy --strict, stubtest
 
-python3.15t tools/setu_build.py --all   # release wheels into dist/ (x86_64 + aarch64)
+python3.15t tool/setu_build.py --all    # release wheels into dist/ (x86_64 + aarch64)
 ```
 
 ## Usage

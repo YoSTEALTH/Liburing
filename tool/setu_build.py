@@ -1,6 +1,7 @@
+#!/usr/bin/env python3
 '''PEP 517 build backend: builds a Zig + Setu extension's wheel with `zig build`, no setuptools.
 
-Kept in Setu (`tools/setu_build.py`) and copied unchanged into each project that uses Setu: the package name
+Kept in Setu (`tool/setu_build.py`) and copied unchanged into each project that uses Setu: the package name
 (`[project].name`, with its sources in `src/<name>/`) and the release matrix (`[tool.setu_build]`) come from
 `pyproject.toml`.
 
@@ -9,16 +10,16 @@ its one extension (`<name>.so`) loads on CPython 3.14, 3.14t, 3.15, 3.15t and la
 `src/capi.zig`). `pip install .` / `pip install git+...` call `build_wheel`, which needs `zig`
 0.17.0 on `PATH` (or `$ZIG`). Release wheels are built from the command line, for any target:
 
-    python3 tools/setu_build.py                                   # native CPU
-    python3 tools/setu_build.py --target aarch64-linux-musl -o dist
-    python3 tools/setu_build.py --all                             # every release wheel -> dist/
+    python3 tool/setu_build.py                                   # native CPU
+    python3 tool/setu_build.py --target aarch64-linux-musl -o dist
+    python3 tool/setu_build.py --all                             # every release wheel -> dist/
 
 A project keeps this file unchanged (Setu tests it, and its tag notes say when it changed). Its
 `build.zig` gets two steps for that (`setu` in its `build.zig.zon`):
 
     const setu_dep = b.dependency("setu", .{});
     @import("setu").addSetuBuildSteps(b, setu_dep);
-    // zig build setu-build-sync    copy the pinned Setu's tools/setu_build.py here (after a bump)
+    // zig build setu-build-sync    copy the pinned Setu's tool/setu_build.py here (after a bump)
     // zig build setu-build-check   fail if this copy differs from it (in the project's checks)
 
 Settings (`[tool.setu_build]` in `pyproject.toml`; anything project-specific goes there, never in this

@@ -7,7 +7,7 @@ The latest benchmark runs, with each run's raw numbers: one server thread (Libur
 - AMD Ryzen 9 9900X (12 cores / 24 threads, 2 CCDs: CPUs 0-5 + 12-17 and 6-11 + 18-23), Linux 7.3.0
 - Zig 0.17.0, Python 3.15.0 / 3.15t, 3.14.8 / 3.14t, C liburing 2.15 (the `lib/liburing` submodule)
 - Liburing built with `zig build develop -Drelease` (ReleaseSafe at the time of these runs; `-Drelease` is ReleaseFast since 2026-11-09, not rerun yet); C with `zig cc -O2`; Zig servers `-OReleaseFast`
-- HTTP load: `tools/load.zig`, `zig-out/bin/load PORT CONNECTIONS 5 100`: a thread per connection, each one connection after another, 100 keep-alive requests per connection, for 5 seconds
+- HTTP load: `tool/load.zig`, `zig-out/bin/load PORT CONNECTIONS 5 100`: a thread per connection, each one connection after another, 100 keep-alive requests per connection, for 5 seconds
 - `net.netfilter.nf_conntrack_max = 262144` (back-to-back runs fill it up: see the note under "Every run" below)
 
 ## Single-threaded, 2026-10-24

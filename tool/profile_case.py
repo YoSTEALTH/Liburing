@@ -1,5 +1,5 @@
 '''The cases `zig build profile` measures: Liburing's hot path, one statement each, run under callgrind by Setu's
-`tools/check_profile.py` (instructions per call, in total and per line of the Zig code; the docs' Profile page).
+`tool/check_profile.py` (instructions per call, in total and per line of the Zig code; the docs' Profile page).
 
     zig build profile -Drelease -Dcpu=x86_64_v3                  # the table; zig-out/profile.json
     zig build profile -Drelease -Dcpu=x86_64_v3 -- -k prep --lines 8

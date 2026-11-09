@@ -1,12 +1,12 @@
 .{
     .name = .liburing,
-    .version = "2026.10.29",
+    .version = "2026.11.9",
     .fingerprint = 0x26de882ff0030dfe,
     .dependencies = .{
-        // Setu v2026.10.29 (commit be64004).
+        // Setu v2026.11.9 (commit f3401d8).
         .setu = .{
-            .url = "git+https://github.com/YoSTEALTH/Setu?ref=v2026.10.29#be64004615ff5d44a1502ce5c0b59ad74a5a1829",
-            .hash = "setu-2026.10.29-f1cYJ7z8CgBvm70hfc_u_stq4ydEjKh33Su8i-fRsaB8",
+            .url = "git+https://github.com/YoSTEALTH/Setu?ref=v2026.11.9#f3401d84b15b7c9b22a450d0d5b7aaf794a7151e",
+            .hash = "setu-2026.11.9-f1cYJ3SgCwBYxKufHZfqaG7HKwCmHMlXlQvelYgTLk2n",
         },
         // .setu = .{ .path = "../../../Setu/Setu/Code" }, // local debug
     },
@@ -15,6 +15,6 @@
         "build.zig.zon",
         "src/liburing",
         "lib/liburing",
-        "tools",
+        "tool",
     },
 }

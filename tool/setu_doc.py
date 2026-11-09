@@ -1,28 +1,29 @@
+#!/usr/bin/env python3
 '''Documentation site for a Zig + Setu extension: static HTML built from the imported module's docstrings (the
 `///` docs Setu turns into them), Markdown pages of the project, and a runner for the `>>>` examples.
 
-Kept in Setu (`tools/setu_docs.py`) and copied unchanged into each project that uses Setu
-(`zig build setu-docs-sync` / `setu-docs-check`, see `addSetuDocsSteps` in Setu's `build.zig`). Project settings
+Kept in Setu (`tool/setu_doc.py`) and copied unchanged into each project that uses Setu
+(`zig build setu-doc-sync` / `setu-doc-check`, see `addSetuDocSteps` in Setu's `build.zig`). Project settings
 go in `pyproject.toml`, never in a copy. Python standard library only; the site's behaviour (search, Run, the ◐ menu,
-Copy, the repository facts, the source views) is Zig compiled to WebAssembly (Setu's `tools/setu_docs_web.zig`, built
-by the project's `zig build docs-web`), and `app.js` is a fixed loop that runs the module's commands. The HTML has
+Copy, the repository facts, the source views) is Zig compiled to WebAssembly (Setu's `tool/setu_doc_web.zig`, built
+by the project's `zig build doc-web`), and `app.js` is a fixed loop that runs the module's commands. The HTML has
 every element those need, hidden, and is the page as it is without the module: `file://` pages can not load
 `.wasm`, so served the site has search, Run and the rest; from disk it is the static HTML.
 
 Usage (after `zig build develop`, from the project root)
-    python3 tools/setu_docs.py                    # build the site into `out` (runs `zig build docs-web`)
-    python3 tools/setu_docs.py build --out DIR    # ... somewhere else
-    python3 tools/setu_docs.py serve              # serve it on http://127.0.0.1:8000, Run buttons enabled
-    python3 tools/setu_docs.py run read           # run the `read` example, print the session
-    python3 tools/setu_docs.py run read:2         # ... only its second `Example` block
-    python3 tools/setu_docs.py run --json File.read
-    python3 tools/setu_docs.py run example/hi.py  # run an example script
-    python3 tools/setu_docs.py check              # run every example, report mismatches
-    python3 tools/setu_docs.py --config other/pyproject.toml build
+    python3 tool/setu_doc.py                    # build the site into `out` (runs `zig build doc-web`)
+    python3 tool/setu_doc.py build --out DIR    # ... somewhere else
+    python3 tool/setu_doc.py serve              # serve it on http://127.0.0.1:8000, Run buttons enabled
+    python3 tool/setu_doc.py run read           # run the `read` example, print the session
+    python3 tool/setu_doc.py run read:2         # ... only its second `Example` block
+    python3 tool/setu_doc.py run --json File.read
+    python3 tool/setu_doc.py run example/hi.py  # run an example script
+    python3 tool/setu_doc.py check              # run every example, report mismatches
+    python3 tool/setu_doc.py --config other/pyproject.toml build
 
 The settings, in `pyproject.toml` (paths relative to it):
 
-    [tool.setu_docs]
+    [tool.setu_doc]
     module = 'pkg.pkg'              # the module documented (imported after `path`)
     path = ['src']                  # optional: put on `sys.path` (and `PYTHONPATH` of Run) first
     stub = 'src/pkg/pkg.pyi'        # optional: typed signatures, and `llms-full.txt`
@@ -30,31 +31,35 @@ The settings, in `pyproject.toml` (paths relative to it):
     version = 'build.zig.zon'       # optional: show its `.version` (default: the module's `__version__`)
     summary = 'io_uring for Python' # optional: the home page's lead and `llms.txt`'s summary
     out = 'site'                    # optional: where the site goes (the default)
-    home = 'docs/index.md'          # optional: the home page's text (default: the module docstring)
-    css = 'docs/extra.css'          # optional: appended to `style.css` (colors: `--accent`, ...)
-    favicon = 'docs/icon.svg'       # optional: the tab icon (`.svg`, `.png`, `.ico`; default: the name's letter)
+    home = 'doc/index.md'          # optional: the home page's text (default: the module docstring)
+    css = 'doc/extra.css'          # optional: appended to `style.css` (colors: `--accent`, ...)
+    favicon = 'doc/icon.svg'       # optional: the tab icon (`.svg`, `.png`, `.ico`; default: the name's letter)
     edit = 'https://github.com/me/pkg/edit/dev/'  # optional: an Edit link on Markdown pages (+ the file)
     repo = 'https://github.com/me/pkg'  # optional: the header's repository link (default: from `[project.urls]`)
     scripts = 'example'             # optional: runnable example scripts, a page of their own
     scripts_skip = ['server.py']    # optional: scripts shown but not run
     featured = 'example/hi.py'      # optional: a script on the home page, with a Run box
     runner = 'asyncio:run'          # optional: runs a coroutine an example statement returns (the default)
-    hooks = 'tools/docs_hooks.py'   # optional: fixtures and tables for the examples (below)
+    hooks = 'tool/doc_hook.py'   # optional: fixtures and tables for the examples (below)
     serial = true                   # optional: the server runs one example at a time (the default)
     timeout = 20                    # optional: seconds an example may take
     coverage = 'zig-out/coverage.json'  # optional: a Coverage page from `zig build coverage`'s result (below)
-    coverage_history = 'docs/coverage-history.json'  # optional: its history chart (`zig build coverage`'s `.history`)
+    coverage_history = 'doc/coverage-history.json'  # optional: its history chart (`zig build coverage`'s `.history`)
+    coverage_runs = false           # optional: no per-interpreter counts under a file where the runs differ (true)
+    session_prompt = 'sh> '         # optional: a plain / `text` code block whose lines start with it is a shell session
+    page_scripts = ['doc/listen.js']  # optional: scripts copied to the site's root, loaded (`defer`) by every page
+    listen = true                   # optional: a Listen bar (read the page aloud) on the home and Markdown pages
     profile = 'zig-out/profile.json'    # optional: a Profile page (`serve` only) from `zig build profile` (below)
 
-    [[tool.setu_docs.markdown]]     # Markdown pages, in nav order
-    file = 'docs/install.md'
+    [[tool.setu_doc.markdown]]     # Markdown pages, in nav order
+    file = 'doc/install.md'
     title = 'Install'
     section = 'Guide'               # optional: a nav heading (consecutive pages with one share it)
     slug = 'install'                # optional: the page name (default: the file's stem)
     split = true                    # optional: a page per `##` chapter (`<slug>-<title>`), listed under this one;
                                     # this page keeps the text before the first `##` and a list of the chapters
 
-    [[tool.setu_docs.pages]]        # API pages, in this order; a name goes on the first that claims it
+    [[tool.setu_doc.pages]]        # API pages, in this order; a name goes on the first that claims it
     slug = 'ring'
     title = 'Ring and setup'
     text = 'Create, configure and tear down a `Ring`.'
@@ -63,13 +68,18 @@ The settings, in `pyproject.toml` (paths relative to it):
     patterns = ['^io_uring_(queue_|setup)']         # `re.search` on function names
     sources = ['src/pkg/ring.zig']                  # the `pub` names (and `setu.Class(Name, ...)`) of files
 
-    [[tool.setu_docs.pages]]
+    [[tool.setu_doc.pages]]
     slug = 'types'
     title = 'Types'
     text = 'Everything else.'
     default = true                  # exactly one: the names no page claims
 
-    [[tool.setu_docs.pages]]
+    [[tool.setu_doc.static]]       # optional: a folder copied into the site as it is (Zig's autodoc output), a nav
+    dir = 'zig-out/docs'            # item under "API reference" linking to its `index.html`; built first
+    at = 'api'                      # where in the site (`api/index.html`)
+    title = 'Zig API'               # the nav item
+
+    [[tool.setu_doc.pages]]
     slug = 'constants'
     title = 'Constants'
     text = 'Grouped by prefix.'
@@ -77,9 +87,13 @@ The settings, in `pyproject.toml` (paths relative to it):
     groups = ['IORING_OP_', 'O_']   # optional: prefixes, first match wins (default: up to the first `_`;
                                     # a group of one goes under `Other`)
 
+A project with no Python module (a Zig one) leaves out `module` and gives `name`: the site is its Markdown pages
+(`home`, `markdown`), `static` folders, Coverage, search and the llms text; no `path`, `stub`, `runner`, `hooks` or
+`pages`. The settings can be any TOML file with this table (`--config doc/site.toml`), not only `pyproject.toml`.
+
 The footer also reads `[project]`: `urls.Homepage` (the name links to it; else to the repository below) and
 `requires-python` (`>=3.14` shows as `CPython 3.14+`); each is left out when missing. The header's top right links
-the repository: `repo = 'https://github.com/me/pkg'` in `[tool.setu_docs]`, else the first GitHub URL of
+the repository: `repo = 'https://github.com/me/pkg'` in `[tool.setu_doc]`, else the first GitHub URL of
 `urls.Repository`, `.Source`, `.Homepage`; a GitHub one shows `me/pkg` with its latest release, stars and forks
 (the page asks GitHub's API, once a session).
 
@@ -93,7 +107,7 @@ code), `--slf` (`self` / `cls` / a dunder), `--attr` (attributes), `--arg` (`nam
 these last five else the text's).
 
 Markdown: headings (with anchors), paragraphs, `-` / `1.` lists, `>` quotes, GFM tables, fenced code (python, pycon, sh
-and c highlighted, zig by `docs.wasm`, every block with a Copy button), inline code, links (`page.md` -> its page),
+and c highlighted, zig by `doc.wasm`, every block with a Copy button), inline code, links (`page.md` -> its page),
 images, `**bold**`, `*em*`, raw HTML blocks. An inline code span naming an export links to its entry. A line `@@path@@`
 is replaced by that file (from the project's root) as a fenced code block, the language from its suffix: a page shows a
 tested example script as it is, with no generated copy.
@@ -122,32 +136,39 @@ again. Setu numbers the headers in the docstring (`help()` shows `Example #1`, `
 `Example`); the page and the Markdown show them as written. `run Sqe` runs every block, `run Sqe:2` the one headed
 `Example #2`.
 
-The Coverage page (`coverage`: the JSON of Setu's `tools/check_coverage.py`, merged over the interpreters it ran)
+The Coverage page (`coverage`: the JSON of Setu's `tool/check_coverage.py`, merged over the interpreters it ran)
 shows the line coverage of the project's Zig code under its tests, a section per owner: the project's files (a
 donut, with `coverage_history` (`check_coverage.py --history`) a chart of its own lines per version beside it,
-a row per file, lowest first, with its missed lines by function: a function Python has links to its entry, one
-none of whose lines ran says `never run`, each range linked to the file on GitHub at the run's `commit` when the run
-was on a tree as committed; where the interpreters ran different lines of a file, each one's count),
-then each dependency's (a file whose path does not
-start with a directory of the project, Setu's `setu/src/args.zig`): how much of it the project's tests run, the
+a row per file, lowest first; where the interpreters ran different lines of a file, each one's count), then each
+dependency's (a file whose path does not
+start with a directory of the project, Setu's `setu/src/arg.zig`): how much of it the project's tests run, the
 total with the project's code, each interpreter's run, its files. A dependency shows as the `name` in the
-`[tool.setu_docs]` of its own `pyproject.toml` (Setu's: `Setu`), else as its package name. A click on a file's row
-shows its source under it, Zig highlighted, covered lines green and missed red (`docs.wasm` renders it; static, on
+`[tool.setu_doc]` of its own `pyproject.toml` (Setu's: `Setu`), else as its package name. A click on a file's row
+shows its source under it, Zig highlighted, covered lines green and missed red (`doc.wasm` renders it; static, on
 any HTTP server, not from `file://`): the site copies each source to `source/<path>`, a dependency's found through
 the project's `build.zig.zon` (`.path`, else `zig-pkg/<.hash>`). A source whose CRC-32 is not the one measured
 (`crc32` in the JSON) is flagged `changed`. Without the file (no kcov in CI) the page is left out.
 
-The Profile page (`profile`: the JSON of Setu's `tools/check_profile.py`) shows the instructions one call of each case
+Listen (`listen = true`): the home and Markdown pages get a bar (Listen / Pause, Stop, a voice, a speed) that reads
+the page aloud with the browser's own speech, sentence by sentence, the sentence and its block highlighted; code,
+navigation and the footer are skipped, a table row is read as `Label: text. Label: text`. All of it is in `doc.wasm`;
+the bar stays hidden without `doc.wasm` or speech voices. `session_prompt` and `page_scripts` are settings for
+projects whose pages need a prompt of their own or a script of their own.
+
+The Profile page (`profile`: the JSON of Setu's `tool/check_profile.py`) shows the instructions one call of each case
 costs (callgrind): a row per case, a bar per interpreter, its dark part the extension's own code. A click on a case
 shows, under it, the extension's files the call runs in, costliest first, each file's source Zig highlighted, every
-costly line with its instructions per call and shaded by them (`docs.wasm` renders it), scrolled to the costliest. It
+costly line with its instructions per call and shaded by them (`doc.wasm` renders it), scrolled to the costliest. It
 is a local tool: only `serve` has it, made per request from the file as it is (rerun `zig build profile`, reload),
 its sources served at `source/<path>`; its nav item shows only on a live page. `build` writes no Profile page, so a
 published site (CI) never needs the file.
 
+Search finds the API's names and every Markdown heading (up to `###`, with the first sentence after it).
+
 The site also gets `llms.txt` (an index of the pages, for AI readers) and, with `stub`, `llms-full.txt` (every
-class, function and constant with its signature and docstring, one Markdown page). A build records what it wrote
-in `.setu-docs-files` in the site's folder; the next one removes what it no longer writes (a page or source gone),
+class, function and constant with its signature and docstring, one Markdown page); without a module, `llms-full.txt`
+is the home page and the Markdown pages, one after the other. A build records what it wrote
+in `.setu-doc-files` in the site's folder; the next one removes what it no longer writes (a page or source gone),
 so an old file is not served or deployed. Files it never wrote stay.
 
 Example
@@ -193,14 +214,18 @@ EXAMPLE = re.compile(r'Example(?: #\d+)?')
 
 KEYS = {'module', 'path', 'stub', 'name', 'version', 'summary', 'out', 'home', 'css', 'favicon', 'edit', 'repo',
         'scripts', 'scripts_skip', 'featured', 'runner', 'hooks', 'serial', 'timeout', 'coverage',
-        'coverage_history', 'profile', 'markdown', 'pages'}  # fmt: skip
+        'coverage_history', 'coverage_runs', 'session_prompt', 'page_scripts', 'listen', 'profile', 'markdown', 'pages',
+        'static'}  # fmt: skip
+NEEDS_MODULE = ('path', 'stub', 'runner', 'hooks', 'pages')  # the API half: settings a module-less site can not have
 FAVICON_TYPES = ('.svg', '.png', '.ico')
 PAGE_KEYS = {'slug', 'title', 'text', 'classes', 'functions', 'patterns', 'sources', 'default', 'constants', 'groups'}
 MARKDOWN_KEYS = {'file', 'title', 'section', 'slug', 'split'}
+STATIC_KEYS = {'dir', 'at', 'title'}
+STATIC_AT = re.compile(r'[\w-]+(?:/[\w-]+)*')  # a folder of the site: `api`, `ref/zig`
 
 
 def fail(msg):
-    raise SystemExit(f'setu_docs: {msg}')
+    raise SystemExit(f'setu_doc: {msg}')
 
 
 def zon_version(path):
@@ -221,16 +246,21 @@ def zon_version(path):
 
 
 def load_config(pyproject='pyproject.toml'):
-    '''`[tool.setu_docs]` of `pyproject`, checked.'''
+    '''`[tool.setu_doc]` of `pyproject`, checked.'''
     path = pathlib.Path(pyproject)
-    config = tomllib.loads(path.read_text()).get('tool', {}).get('setu_docs')
+    config = tomllib.loads(path.read_text()).get('tool', {}).get('setu_doc')
     if config is None:
-        fail(f'no [tool.setu_docs] in {path}')
+        fail(f'no [tool.setu_doc] in {path}')
     if unknown := set(config) - KEYS:
-        fail(f'[tool.setu_docs]: unknown key {sorted(unknown)}')
-    for key in ('module', 'pages'):
-        if key not in config:
-            fail(f'[tool.setu_docs] needs `{key}`')
+        fail(f'[tool.setu_doc]: unknown key {sorted(unknown)}')
+    if 'module' not in config:  # a module-less site (a Zig project's): the Markdown pages, no API half
+        if 'name' not in config:
+            fail('[tool.setu_doc] needs `module`, or `name` for a site of Markdown pages only')
+        if found := [k for k in NEEDS_MODULE if k in config]:
+            fail(f'[tool.setu_doc] without `module`: no {", ".join(f"`{k}`" for k in found)}')
+        config['pages'] = []
+    elif 'pages' not in config:
+        fail('[tool.setu_doc] needs `pages`')
     if 'favicon' in config and pathlib.Path(config['favicon']).suffix not in FAVICON_TYPES:
         fail(f'`favicon` is not one of {", ".join(FAVICON_TYPES)}: {config["favicon"]}')
     pages = config['pages']
@@ -250,7 +280,30 @@ def load_config(pyproject='pyproject.toml'):
         fail('a page slug twice')
     if {'index', 'examples', 'coverage', 'profile'} & set(slugs):
         fail('`index`, `examples`, `coverage` and `profile` are taken (the home page, the example scripts, ...)')
-    if sum(bool(p.get('default')) for p in pages) != 1:
+    for key in ('coverage_runs', 'listen'):
+        if not isinstance(config.get(key, True), bool):
+            fail(f'`{key}` is `true` or `false`')
+    if 'session_prompt' in config and not (
+        isinstance(config['session_prompt'], str)
+        and config['session_prompt'].strip()
+        and config['session_prompt'] != '$ '
+    ):
+        fail('`session_prompt` is a non-blank string other than `$ ` (which a `sh` block has already)')
+    scripts = config.get('page_scripts', [])
+    if not isinstance(scripts, list) or not all(isinstance(x, str) for x in scripts):
+        fail('`page_scripts` is a list of file paths')
+    names = [pathlib.PurePosixPath(x).name for x in scripts]
+    if len(set(names)) != len(names) or {'app.js', 'style.css', 'doc.wasm'} & set(names):
+        fail(f'`page_scripts`: a file name twice, or one the site has (`app.js`, ...): {scripts}')
+    statics = config.get('static', ())
+    for static in statics:
+        if set(static) != STATIC_KEYS:
+            fail(f'every `static` needs exactly `dir`, `at` and `title`: {static}')
+        if not STATIC_AT.fullmatch(static['at']) or static['at'].split('/')[0] == SOURCE_DIR:
+            fail(f'`static` at {static["at"]!r}: not a free folder name of the site (`api`, `ref/zig`)')
+    if len({s['at'] for s in statics}) != len(statics):
+        fail('a `static` `at` twice')
+    if 'module' in config and sum(bool(p.get('default')) for p in pages) != 1:
         fail('exactly one page needs `default = true`')
     if sum(bool(p.get('constants')) for p in pages) > 1:
         fail('at most one page can have `constants = true`')
@@ -285,6 +338,28 @@ def include_files(text, root):
 
 def md_slug(page):
     return page.get('slug') or pathlib.Path(page['file']).stem
+
+
+def first_sentence(lines):
+    '''The first sentence of the paragraph `lines` (Markdown, from a heading on) start with, markup dropped, at most
+    120 characters; '' when they start with no paragraph (a code block, a list, ...).
+
+    Example
+        >>> first_sentence(['', 'The **ring**: see [setup](ring.md). More.', 'x'])
+        'The ring: see setup.'
+    '''
+    text = []
+    for line in lines:
+        if not line.strip():
+            if text:
+                break
+        elif Site.starts_block(line) or HTML_BLOCK.match(line) or line.lstrip().startswith('|'):
+            break
+        else:
+            text.append(line.strip())
+    plain = re.sub(r'!?\[([^\]]*)\]\([^)]*\)', r'\1', ' '.join(text))  # a link or image: its text
+    plain = re.sub(r'<[^>]+>|[`*]', '', plain)
+    return (m.group(1) if (m := re.match(r'(.+?[.!?])(?:\s|$)', plain)) else plain)[:120]
 
 
 def heading_id(title):
@@ -344,8 +419,9 @@ class Project:
         for entry in reversed(self.path):
             if entry not in sys.path:
                 sys.path.insert(0, entry)
-        self.module = importlib.import_module(self.config['module'])
-        self.name = self.config.get('name', self.config['module'].rpartition('.')[2])
+        module = self.config.get('module')
+        self.module = importlib.import_module(module) if module else None  # None: a site of Markdown pages only
+        self.name = self.config.get('name') or module.rpartition('.')[2]
         self.version = getattr(self.module, '__version__', '')
         if 'version' in self.config:  # a `build.zig.zon`: its `.version` (the module may be a test or a stand-in)
             self.version = zon_version(self.root / self.config['version'])
@@ -367,6 +443,9 @@ class Project:
         self.favicon = 'favicon' + pathlib.Path(self.config['favicon']).suffix if 'favicon' in self.config else ''
         if self.favicon and not (self.root / self.config['favicon']).is_file():
             fail(f'`favicon` not found: {self.config["favicon"]}')
+        for script in self.config.get('page_scripts', ()):
+            if not (self.root / script).is_file():
+                fail(f'`page_scripts` not found: {script}')
         hooks = self.load_hooks()
         self.fixtures = getattr(hooks, 'FIXTURES', {})
         self.skip = getattr(hooks, 'SKIP', {})
@@ -379,7 +458,7 @@ class Project:
         if 'hooks' not in self.config:
             return None
         path = self.root / self.config['hooks']
-        spec = importlib.util.spec_from_file_location(f'_setu_docs_hooks_{path.stem}', path)
+        spec = importlib.util.spec_from_file_location(f'_setu_doc_hook_{path.stem}', path)
         hooks = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(hooks)
         return hooks
@@ -410,6 +489,8 @@ class Project:
     # -- the API, grouped by page
 
     def exported(self):
+        if self.module is None:
+            return []
         return [n for n in dir(self.module) if not n.startswith('_') and not inspect.ismodule(getattr(self.module, n))]
 
     def is_constant(self, name):
@@ -652,7 +733,7 @@ def run_example(project, name, example=None):
     ns = {**vars(project.module), **project.namespace, '__name__': '__example__', '_keep': [], '_cleanup': [],
           '_name': name}  # fmt: skip
     fds, cwd = _open_fds(), os.getcwd()
-    work = tempfile.mkdtemp(prefix='setu-docs-')
+    work = tempfile.mkdtemp(prefix='setu-doc-')
     os.chdir(work)
 
     def timeout(signum, frame):
@@ -706,7 +787,7 @@ def _raised(got):
 
 def run_script(project, path, timeout=30):
     '''Run an example script in a new temporary directory; give `(returncode, output)`.'''
-    with tempfile.TemporaryDirectory(prefix='setu-docs-') as work:
+    with tempfile.TemporaryDirectory(prefix='setu-doc-') as work:
         try:
             p = subprocess.run(
                 [sys.executable, str(project.root / path)],
@@ -925,9 +1006,9 @@ class Site:
         self.coverage = None  # `coverage`'s JSON, if there is one
         if 'coverage' in project.config and (path := project.root / project.config['coverage']).is_file():
             self.coverage = json.loads(path.read_text())
-            keys = {'total', 'interpreters', 'files'}
+            keys = {'total', 'interpreters', 'files'}  # and `commit`, which older runs wrote
             if not isinstance(self.coverage, dict) or not keys <= self.coverage.keys() <= keys | {'commit'}:
-                fail(f'`coverage`: {path} is not a result of `tools/check_coverage.py`')
+                fail(f'`coverage`: {path} is not a result of `tool/check_coverage.py`')
             self.coverage_date = datetime.datetime.fromtimestamp(path.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
         self.coverage_history = []  # `coverage_history`'s runs, oldest first
         if (
@@ -943,10 +1024,18 @@ class Site:
                 and ('own' not in r or isinstance(r['own'], list) and len(r['own']) == 2)
                 for r in runs
             ):
-                fail(f'`coverage_history`: {path} is not a `--history` file of `tools/check_coverage.py`')
+                fail(f'`coverage_history`: {path} is not a `--history` file of `tool/check_coverage.py`')
             self.coverage_history = runs
+        self.statics = []  # `static`: (its folder, `at`, `title`)
+        for static in project.config.get('static', ()):
+            folder = project.root / static['dir']
+            if not (folder / 'index.html').is_file():
+                fail(f'`static` {static["dir"]}: no index.html there (build it first)')
+            self.statics.append((folder, static['at'], static['title']))
         self.load_profile()
         self.ids = set()  # the heading ids of the page being written
+        self.headings = []  # its Markdown headings: (id, title, first sentence after it)
+        self.md_entries = []  # the search entries of the Markdown pages written (`search_index`)
 
     def load_profile(self):
         '''Read `profile`'s JSON (`self.profile`; None without the file). The server calls it for each Profile page:
@@ -956,7 +1045,7 @@ class Site:
         if 'profile' in config and (path := self.project.root / config['profile']).is_file():
             self.profile = json.loads(path.read_text())
             if not isinstance(self.profile, dict) or self.profile.keys() != {'number', 'interpreters', 'sources'}:
-                fail(f'`profile`: {path} is not a result of `tools/check_profile.py`')
+                fail(f'`profile`: {path} is not a result of `tool/check_profile.py`')
             self.profile_date = datetime.datetime.fromtimestamp(path.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
 
     # -- inline text
@@ -1049,21 +1138,23 @@ class Site:
                 lines.append(f'<span class="out">{html.escape(line)}</span>')
         return code_box('\n'.join(lines), 'code session')
 
-    def shell(self, code):
+    def shell(self, code, prompt='$ ', notes=False):
         '''A shell block as HTML: `fn` a command, `kw` a keyword, `arg` an option or a `<placeholder>`, `str` a
         string, `bi` a variable, `op` a pipe / `&&` / `;` / redirection, `com` a comment. When a line starts with a
-        `$ ` prompt (a `console` session), the prompt is `pr` and the other lines are output.
+        `prompt` (a `console` session), the prompt is `pr` and the other lines are output (`notes`: a line
+        starting with `#` is a comment, `com`).
         '''
-        session = any(line.startswith('$ ') for line in code.splitlines())
+        session = any(line.startswith(prompt) for line in code.splitlines())
         lines = []
         for line in code.splitlines():
-            if session and not line.startswith('$ '):
-                lines.append(f'<span class="out">{html.escape(line)}</span>' if line else '')
+            if session and not line.startswith(prompt):
+                cls = 'com' if notes and line.startswith('#') else 'out'
+                lines.append(f'<span class="{cls}">{html.escape(line)}</span>' if line else '')
                 continue
             out, pos, command = [], 0, True
             if session:
-                out.append('<span class="pr">$ </span>')
-                pos = 2
+                out.append(f'<span class="pr">{html.escape(prompt)}</span>')
+                pos = len(prompt)
             for m in SH_TOKEN.finditer(line, pos):
                 out.append(html.escape(line[pos : m.start()]))
                 kind, text = m.lastgroup, m.group(0)
@@ -1111,6 +1202,9 @@ class Site:
         lang = lang.lower()
         if lang == 'pycon' or (not lang and code.startswith('>>> ')):
             return self.session(code)
+        prompt = self.project.config.get('session_prompt')
+        if prompt and lang in ('', 'text') and any(line.startswith(prompt) for line in code.splitlines()):
+            return code_box(self.shell(code, prompt, notes=True), 'code session')
         if lang in ('python', 'py', 'python3'):
             body = self.highlight(code)
         elif lang in ('sh', 'bash', 'shell', 'console'):
@@ -1196,11 +1290,27 @@ class Site:
             aligns.append(' style="text-align: center"' if left and right else ' style="text-align: right"'
                           if right else '')  # fmt: skip
 
+        labels = [plain_text(self.inline_md(c, base)) for c in (self.cells(head) + [''] * len(aligns))[: len(aligns)]]
+
+        def say(cells):
+            '''`Label: text. Label: text` of a body row (`listen`: what is read for it), else nothing.'''
+            if not self.project.config.get('listen'):
+                return ''
+            texts = [plain_text(self.inline_md(c, base)) for c in (cells + [''] * len(aligns))[: len(aligns)]]
+            parts = [f'{label}: {text}' if label else text for label, text in zip(labels, texts) if text]
+            return f' data-say="{html.escape(". ".join(parts))}"' if parts else ''
+
         def row(cells, tag):
             cells = (cells + [''] * len(aligns))[: len(aligns)]
+            said = say(cells) if tag == 'td' else ''
+            end = ' class="say-end"' if said else ''  # the cell the Listen button sits in
+            last = len(cells) - 1
             return (
-                '<tr>'
-                + ''.join(f'<{tag}{a}>{self.inline_md(c, base)}</{tag}>' for c, a in zip(cells, aligns))
+                f'<tr{said}>'
+                + ''.join(
+                    f'<{tag}{end if i == last else ""}{a}>{self.inline_md(c, base)}</{tag}>'
+                    for i, (c, a) in enumerate(zip(cells, aligns))
+                )
                 + '</tr>'
             )
 
@@ -1314,6 +1424,8 @@ class Site:
                 anchor = self.anchor(plain)
                 if level in (2, 3):
                     toc.append((anchor, plain))
+                if level <= 3:
+                    self.headings.append((anchor, plain, first_sentence(lines[i + 1 :])))
                 while parts and parts[-1] >= level:
                     out.append('</section>')
                     parts.pop()
@@ -1515,10 +1627,14 @@ class Site:
             items.append(item(md_slug(page), page['title']))
             for slug, title, _text in self.chapters.get(md_slug(page), ('', ()))[1]:
                 items.append(item(slug, re.sub(r'[`*]', '', title), 'sub'))
-        items.append('<div class="nav-h">API reference</div>')
+        if self.pages or self.constants_page or self.statics:
+            items.append('<div class="nav-h">API reference</div>')
         items += [item(page['slug'], page['title']) for page, _names in self.pages]
         if self.constants_page:
             items.append(item(self.constants_page['slug'], self.constants_page['title']))
+        items += [
+            f'<a href="{html.escape(at)}/index.html">{html.escape(title)}</a>' for _dir, at, title in self.statics
+        ]
         if self.project.scripts():
             items.append(item('examples', 'Example scripts'))
         if self.coverage:
@@ -1538,6 +1654,8 @@ class Site:
         url = project.homepage or project.repo
         footer_name = f'<a href="{html.escape(url)}">{name}</a>' if url else name
         python = f' (CPython {html.escape(project.requires)})' if project.requires else ''
+        source = 'docstrings' if project.module else 'Markdown'
+        badge = 'Run buttons need' if project.module else 'Live: served by'
         repo = ''
         if project.repo:
             facts = ''.join(
@@ -1551,6 +1669,10 @@ class Site:
                 f' data-repo="{html.escape(project.repo_name)}">{ICON_GITHUB}<span class="repo-in">'
                 f'<span class="repo-name">{label}</span><span class="facts" hidden>{facts}</span></span></a>'
             )
+        extra_scripts = ''.join(
+            f'\n<script src="{html.escape(pathlib.PurePosixPath(x).name)}" defer></script>'
+            for x in project.config.get('page_scripts', ())
+        )
         page = f'''<!doctype html>
 <html lang="en">
 <head>
@@ -1569,7 +1691,7 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
   <div class="search"><input id="q" type="search" placeholder="Search needs a server" autocomplete="off" disabled>
   <div id="hits" hidden></div></div>
   <div class="tools">
-  <span id="live" class="live" title="Run buttons need `setu_docs.py serve`">static</span>
+  <span id="live" class="live" title="{badge} `setu_doc.py serve`">static</span>
   {THEME_MENU}{repo}
   <button class="menu" aria-label="Menu" onclick="document.body.classList.toggle('nav-open')">{ICON_MENU}</button>
   </div>
@@ -1577,14 +1699,14 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
 <div class="wrap">
 <main>
 {body}
-<footer>Generated by <code>tools/setu_docs.py</code> from the docstrings of {footer_name} {version}{python}.</footer>
+<footer>Generated by <code>tool/setu_doc.py</code> from the {source} of {footer_name} {version}{python}.</footer>
 </main>
 <nav class="side">
 <div class="pages">{self.nav(current)}</div>
 {f'<div class="toc"><div class="toc-h">On this page</div>{toc_html}</div>' if toc_html else ''}
 </nav>
 </div>
-<script src="app.js"></script>
+<script src="app.js"></script>{extra_scripts}
 </body>
 </html>
 '''
@@ -1629,7 +1751,7 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
         body = [
             (
                 f'<h1>Example scripts</h1><p class="lead">The scripts in <code>{folder}/</code>. With '
-                '<code>setu_docs.py serve</code> running, <b>Run</b> starts one in a temporary directory and shows '
+                '<code>setu_doc.py serve</code> running, <b>Run</b> starts one in a temporary directory and shows '
                 'its output.</p>'
             )
         ]
@@ -1708,10 +1830,9 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
     def coverage_table(self, files, root, prefix=''):
         '''`coverage_table` of `files`, each row whose source (`root / path` without `prefix`) is there with what the
         viewer needs; a source whose CRC-32 is not the one `coverage`'s JSON has (changed since the run) is marked
-        `changed`: its line marks can be off. Under each such row the viewer's row, hidden and empty. Its missed
-        lines grouped by the function they are in (`missed_html`), and where the interpreters ran different lines of
-        a file, each one's count (`runs_note`).'''
-        table = coverage_table([f[:4] for f in files])
+        `changed`: its line marks can be off. Under each such row the viewer's row, hidden and empty. Where the
+        interpreters ran different lines of a file, each one's count (`runs_note`).'''
+        table = coverage_table([f[:3] for f in files])
         for path, _covered, _lines, missed, hit in files:
             cell = f'<td><code>{html.escape(path)}</code>'
             if note := self.runs_note(path):
@@ -1722,15 +1843,6 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
                 continue
             crc = self.coverage['files'][path].get('crc32')
             stale = crc is not None and zlib.crc32(source.read_bytes()) != crc
-            if missed:
-                hits = {int(n): h for n, (h, _possible) in self.coverage['files'][path]['hits'].items()}
-                grouped = missed_functions(source.read_text(errors='replace'), hits)
-                url = self.blob_url(path) if not prefix and not stale else None
-                at = table.index(f'<tr>{cell}')
-                plain = f'<td class="missed">{line_ranges(missed)}</td>'
-                end = table.index(plain, at)
-                html_ = self.missed_html(grouped, url)
-                table = table[:end] + f'<td class="missed">{html_}</td>' + table[end + len(plain) :]
             self.sources[path] = source
             flag = ' data-stale="1"' if stale else ''
             data = (
@@ -1740,13 +1852,15 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
             mark = ' <small class="stale" title="Changed since `zig build coverage`">changed</small>' if stale else ''
             at = table.index(f'<tr>{cell}')
             end = table.index('</tr>', at) + len('</tr>')
-            view = '<tr class="src-view" hidden><td colspan="5"><pre class="cov-src"></pre></td></tr>'
+            view = '<tr class="src-view" hidden><td colspan="4"><pre class="cov-src"></pre></td></tr>'
             table = table[:at] + data + cell + mark + table[at + len(f'<tr>{cell}') : end] + view + table[end:]
         return table
 
     def runs_note(self, path):
         '''`<small class="runs">` with each interpreter's lines run of `path` when they differ (one ran a line another
-        did not), else ''.'''
+        did not), else '' (always '' with `coverage_runs = false`).'''
+        if not self.project.config.get('coverage_runs', True):
+            return ''
         runs = {
             name: run['files'][path]
             for name, run in self.coverage['interpreters'].items()
@@ -1760,42 +1874,9 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
         text = ', '.join(f'{html.escape(names[n])}: {c} / {t}' for n, (c, t) in runs.items())
         return f' <small class="runs" title="The interpreters ran different lines of this file">{text}</small>'
 
-    def blob_url(self, path):
-        '''The project's file `path` on GitHub at `coverage`'s `commit` (`<repo>/blob/<commit>/<path in the repo>`),
-        or None: no commit (a run on a changed tree), no GitHub `repo`, or the project not in a git work tree.'''
-        commit, repo = self.coverage.get('commit'), self.project.repo or ''
-        if not commit or not repo.startswith('https://github.com/'):
-            return None
-        if not hasattr(self, 'repo_prefix'):  # the project's folder in the repository (`test/docs/`, or '')
-            git = ['git', '-C', str(self.project.root), 'rev-parse', '--show-prefix']
-            try:
-                run = subprocess.run(git, check=False, capture_output=True, text=True)
-            except OSError:  # no git
-                run = None
-            self.repo_prefix = run.stdout.strip() if run and run.returncode == 0 else None
-        if self.repo_prefix is None:
-            return None
-        return f'{repo.rstrip("/")}/blob/{commit}/{self.repo_prefix}{path}'
-
-    def missed_html(self, grouped, url=None):
-        '''The missed lines of `missed_functions` as HTML: per function its name (linked to its API entry when Python
-        has it) and line ranges (each linked to `url#La-Lb` with a `url`), `never run` when none of its lines ran.'''
-        out = []
-        for name, missed, never in grouped:
-            label = self.link(name) if name in self.where else html.escape(name)
-            head = f'<code>{label}</code> ' if name else ''
-            flag = ' <small class="never">never run</small>' if never else ''
-            ranges = line_ranges(missed)
-            if url:
-                ranges = ', '.join(
-                    f'<a href="{html.escape(url)}#L{r.replace("-", "-L")}">{r}</a>' for r in ranges.split(', ')
-                )
-            out.append(f'<span class="miss-fn">{head}{ranges}{flag}</span>')
-        return ' '.join(out)
-
     def profile_page(self):
         '''A row per case: a bar per interpreter (the instructions per call, the extension's part dark); a click on
-        the case shows its files' sources under it (`profileHtml` in `docs.wasm`), each line with its cost, as on
+        the case shows its files' sources under it (`profileHtml` in `doc.wasm`), each line with its cost, as on
         CPython `names[0]`: under the case's row a hidden row with a heading and an empty `<pre>` per file, the
         `<pre>` with what the view needs (`data-src`, `data-lines`). Only `serve` writes it (`self.sources`: the
         files it serves at `source/<path>`); without the file, a page that says how to make it.'''
@@ -1880,16 +1961,26 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
             out[s] = self.markdown_page(page, s, re.sub(r'[`*]', '', t), text, f'<nav class="pager">{pager}</nav>')
         return out
 
+    def listen_bar(self, body):
+        '''`body` with the Listen bar after its first heading (`listen`), else as it is.'''
+        if not self.project.config.get('listen'):
+            return body
+        at = body.find('</h1>')
+        at = at + 5 if at >= 0 else 0
+        return body[:at] + LISTEN_BAR + body[at:]
+
     def markdown_page(self, page, slug, title, text, end=''):
         '''One page of the Markdown file of `page`: `text` (its Markdown), then the HTML `end`.'''
-        self.ids = set()
+        self.ids, self.headings = set(), []
         path = self.project.root / page['file']
         body, toc = self.markdown(text, path.parent)
         if not body.startswith('<h1'):
             body = f'<h1>{html.escape(title)}</h1>' + body
+            self.headings.insert(0, (None, title, first_sentence(text.splitlines())))
+        self.search_headings(slug, title)
         if edit := self.project.config.get('edit'):
             body = f'<a class="edit" href="{html.escape(edit + page["file"])}">Edit</a>' + body
-        return self.page(slug, title, body + end, toc)
+        return self.page(slug, title, self.listen_bar(body) + end, toc)
 
     def index_page(self):
         self.ids = set()
@@ -1897,18 +1988,28 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
         toc = []
         if 'home' in project.config:
             path = project.root / project.config['home']
+            self.headings = []
             text, toc = self.markdown(include_files(path.read_text(), self.project.root), path.parent)
+            self.search_headings('index', 'Home')
         else:
             text = f'<h1>{html.escape(project.name)}</h1>'
             if summary := project.config.get('summary'):
                 text += f'<p class="lead">{self.inline(summary)}</p>'
-            text += self.paragraphs(project.module.__doc__ or '')
+            text += self.paragraphs(getattr(project.module, '__doc__', None) or '')
         if featured := project.config.get('featured'):
             code = (project.root / featured).read_text()
             text += f'{code_box(self.highlight(code.rstrip()))}{_run_box(featured)}'
-        return self.page('index', 'Home', text, toc)
+        return self.page('index', 'Home', self.listen_bar(text), toc)
+
+    def search_headings(self, slug, title):
+        '''The search entries of the Markdown page `slug` (titled `title`) just rendered: a heading each.'''
+        for anchor, heading, sentence in self.headings:
+            link = f'{slug}.html#{anchor}' if anchor else f'{slug}.html'
+            self.md_entries.append({'n': heading, 'h': link, 'p': title, 's': sentence})
 
     def search_index(self):
+        '''`search.json`: the API's names (members too) and constants, then the Markdown pages' headings (the pages
+        must be written first).'''
         out = []
 
         def summary(obj):
@@ -1926,6 +2027,7 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
             for name in self.constants:
                 value = repr(getattr(self.project.module, name))
                 out.append({'n': name, 'h': self.where[name], 'p': self.constants_page['title'], 's': value})
+        out += self.md_entries
         return json.dumps(out, separators=(',', ':'))
 
     def write(self, out):
@@ -1934,10 +2036,12 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
         css = CSS
         if 'css' in self.project.config:
             css += '\n' + (self.project.root / self.project.config['css']).read_text()
-        files = {'index.html': self.index_page(), 'search.json': self.search_index(), 'style.css': css, 'app.js': JS,
+        self.md_entries = []
+        files = {'index.html': self.index_page(), 'style.css': css, 'app.js': JS,
                  'llms.txt': llms_index(self.project.config, self.chapters)}  # fmt: skip
         for page in self.markdown_pages:
             files.update((f'{slug}.html', text) for slug, text in self.markdown_pages_of(page).items())
+        files['search.json'] = self.search_index()  # after the Markdown pages: their headings
         for page, names in self.pages:
             files[f'{page["slug"]}.html'] = self.api_page(page, names)
         if self.constants_page:
@@ -1949,13 +2053,25 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
             files['coverage.html'] = self.coverage_page()
         if self.project.stub:
             files['llms-full.txt'] = llms_full(self.project.stub, self.project.config['module'])
+        elif self.project.module is None:
+            files['llms-full.txt'] = llms_markdown(self.project)
         for name, text in files.items():
             (out / name).write_text(pretty_html(text) if name.endswith('.html') else text)
-        copied = ['docs.wasm']
+        copied = ['doc.wasm']
         if self.project.favicon:
             shutil.copyfile(self.project.root / self.project.config['favicon'], out / self.project.favicon)
             copied.append(self.project.favicon)
-        build_wasm(self.project.root, out / 'docs.wasm')
+        for script in self.project.config.get('page_scripts', ()):  # `page_scripts`: the site's root
+            name = pathlib.PurePosixPath(script).name
+            shutil.copyfile(self.project.root / script, out / name)
+            copied.append(name)
+        build_wasm(self.project.root, out / 'doc.wasm')
+        for folder, at, _title in self.statics:  # `static`: copied as they are
+            for path in sorted(p for p in folder.rglob('*') if p.is_file()):
+                name = f'{at}/{path.relative_to(folder).as_posix()}'
+                (out / name).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(path, out / name)
+                copied.append(name)
         # the Coverage page's sources, as they are, for its viewer (`source/<path>`); old ones go in `forget_old_files`
         for path, source in self.sources.items():
             dest = out / SOURCE_DIR / path
@@ -1967,7 +2083,7 @@ if (p && {THEME_NAMES!r}.includes(p)) r.dataset.palette = p; }} catch (e) {{}}</
         return written
 
 
-MANIFEST = '.setu-docs-files'  # in the site's folder: the files the last build wrote, one per line
+MANIFEST = '.setu-doc-files'  # in the site's folder: the files the last build wrote, one per line
 
 
 def forget_old_files(out, written):
@@ -2182,13 +2298,13 @@ def dependency_root(root, name):
 
 
 def display_name(root, name):
-    '''A dependency's name as shown: `name` in the `[tool.setu_docs]` of its own `pyproject.toml` (Setu's: `Setu`),
+    '''A dependency's name as shown: `name` in the `[tool.setu_doc]` of its own `pyproject.toml` (Setu's: `Setu`),
     else its package name `name`.'''
     if root is None:
         return name
     try:
         with open(root / 'pyproject.toml', 'rb') as f:
-            shown = tomllib.load(f).get('tool', {}).get('setu_docs', {}).get('name')
+            shown = tomllib.load(f).get('tool', {}).get('setu_doc', {}).get('name')
     except OSError:
         return name
     except tomllib.TOMLDecodeError:
@@ -2277,46 +2393,20 @@ def line_ranges(numbers):
     return ', '.join(f'{a}' if a == b else f'{a}-{b}' for a, b in out)
 
 
-FN_DECL = re.compile(r'^\s*(?:pub\s+)?(?:export\s+)?(?:inline\s+|noinline\s+)?fn\s+(\w+)\s*\(')
-
-
-def missed_functions(source, hits):
-    '''The missed lines of the Zig `source` grouped by the function they are in: `(name, missed, never_run)` per
-    function with one, in order; `name` '' for lines before any function, `never_run` when none of the function's
-    code lines ran. `hits`: each code line's hit count. A line belongs to the last `fn` above it.
-
-    Example
-        >>> missed_functions('fn a() void {\\n  x();\\n}\\nfn b() void {\\n  y();\\n  z();\\n}', {2: 0, 5: 1, 6: 0})
-        [('a', [2], True), ('b', [6], False)]
-    '''
-    starts = [(i + 1, m.group(1)) for i, line in enumerate(source.splitlines()) if (m := FN_DECL.match(line))]
-    groups = {}  # first line of the function -> (name, lines, missed)
-    for n in sorted(hits):
-        start, name = max(((s, fn) for s, fn in starts if s <= n), default=(0, ''))
-        group = groups.setdefault(start, (name, [], []))
-        group[1].append(n)
-        if hits[n] == 0:
-            group[2].append(n)
-    return [
-        (name, missed, bool(name) and len(missed) == len(lines)) for name, lines, missed in groups.values() if missed
-    ]
-
-
 def coverage_table(files):
-    '''A row per `(path, covered, lines, missed)`: the percent in its level's color, a bar, the counts and the missed
-    lines.'''
+    '''A row per `(path, covered, lines)`: the percent in its level's color, a bar and the counts.'''
     rows = []
-    for path, covered, lines, missed in files:
+    for path, covered, lines in files:
         percent = 100 * covered / lines if lines else 100
         level = coverage_level(percent)
         rows.append(
             f'<tr><td><code>{html.escape(path)}</code></td><td class="pct {level}">{percent:.1f}%</td>'
             f'<td><span class="bar"><span class="{level}" style="width:{percent:.1f}%"></span></span></td>'
-            f'<td class="num">{covered} / {lines}</td><td class="missed">{line_ranges(missed)}</td></tr>'
+            f'<td class="num">{covered} / {lines}</td></tr>'
         )
     return (
-        '<table class="cov"><thead><tr><th>File</th><th>Coverage</th><th></th><th>Lines</th><th>Missed lines</th>'
-        f'</tr></thead><tbody>{"".join(rows)}</tbody></table>'
+        '<table class="cov"><thead><tr><th>File</th><th>Coverage</th><th></th><th>Lines</th></tr>'
+        f'</thead><tbody>{"".join(rows)}</tbody></table>'
     )
 
 
@@ -2333,29 +2423,48 @@ def profile_bar(result, top):
 
 
 def build_wasm(root, dest):
-    '''Build the site's Wasm module (`zig build docs-web` in `root`, from Setu's `tools/setu_docs_web.zig`)
+    '''Build the site's Wasm module (`zig build doc-web` in `root`, from Setu's `tool/setu_doc_web.zig`)
     into `dest`.
 
     Note
         - `ZIG=/path/to/zig` picks the compiler (default: `zig` on PATH).
     '''
-    with tempfile.TemporaryDirectory(prefix='setu-docs-') as prefix:
-        zig = [os.environ.get('ZIG', 'zig'), 'build', 'docs-web', '--prefix', prefix]
+    with tempfile.TemporaryDirectory(prefix='setu-doc-') as prefix:
+        zig = [os.environ.get('ZIG', 'zig'), 'build', 'doc-web', '--prefix', prefix]
         subprocess.run(zig, cwd=root, check=True)
-        shutil.copyfile(pathlib.Path(prefix) / 'web' / 'docs.wasm', dest)
+        shutil.copyfile(pathlib.Path(prefix) / 'web' / 'doc.wasm', dest)
 
 
 def src_hints(text):
-    '''The viewer's hint `text` (HTML), hidden, and the one a page without `docs.wasm` (opened from disk) shows instead;
-    `docs.wasm` swaps them.'''
+    '''The viewer's hint `text` (HTML), hidden, and the one a page without `doc.wasm` (opened from disk) shows instead;
+    `doc.wasm` swaps them.'''
     return (
         f'<p class="src-hint" hidden>{text}</p>'
-        '<p class="src-hint">The sources need a server: python3 -m http.server in the site, or setu_docs.py serve.</p>'
+        '<p class="src-hint">The sources need a server: python3 -m http.server in the site, or setu_doc.py serve.</p>'
     )
 
 
+LISTEN_BAR = (
+    '<div class="listen" hidden><button class="play" type="button">Listen</button>'
+    '<button class="stop" type="button" disabled>Stop</button>'
+    '<select class="voice" title="Voice" aria-label="Voice"></select>'
+    '<select class="rate" title="Speed" aria-label="Speed"></select>'
+    '<button class="listen mini" type="button" hidden>Pause</button></div>'
+)  # the bar `listen` writes, hidden: `doc.wasm` shows it once the browser has voices
+
+
+def plain_text(markup):
+    '''The text of the HTML `markup`: tags dropped, entities decoded, whitespace collapsed.
+
+    Example
+        >>> plain_text('a <code>b</code> &amp;  c')
+        'a b & c'
+    '''
+    return ' '.join(html.unescape(re.sub(r'<[^>]+>', '', markup)).split())
+
+
 def code_box(body, cls='code', attrs=''):
-    '''A `<pre>` of the HTML `body` in its `.codebox` with its Copy button, hidden (`docs.wasm` shows it).'''
+    '''A `<pre>` of the HTML `body` in its `.codebox` with its Copy button, hidden (`doc.wasm` shows it).'''
     return (
         f'<div class="codebox"><pre class="{cls}"{attrs}>{body}</pre>'
         '<button class="copy" type="button" hidden>Copy</button></div>'
@@ -2396,7 +2505,7 @@ CSS = '''
 /* Tokyo Night colors (tokyonight.nvim): light = Tokyo Night Day, with Tokyo Night Light's darker text (Day's
    `#3760bf` is hard to read in long text; code keeps it, `--code-fg`); dark = Tokyo Night. A plain `:root`, so the
    dark blocks below (more specific) win in dark mode. Until a theme is picked in the ◐ menu (no `data-theme`) it is
-   Tokyo Day, or Nord Night (`setu_docs_web.zig`'s `default_theme`) when the system is dark. */
+   Tokyo Day, or Nord Night (`setu_doc_web.zig`'s `default_theme`) when the system is dark. */
 :root {
   --bg: #e1e2e7; --panel: #d0d5e3; --line: #c4c8da; --text: #343b58; --muted: #68709a;
   --accent: #2e7de9; --accent-soft: #b7c1e3; --code-bg: #e9e9ed; --ok: #587539; --bad: #f52a65; --warn: #8c6c3e;
@@ -2551,6 +2660,15 @@ pre:has(> .ln) { white-space: normal; } pre > .ln { display: block; white-space:
 pre > .ln:empty::before { content: "\\200b"; }
 pre.code, pre.plain, pre.result { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
   padding: 10px 12px; overflow-x: auto; line-height: 1.5; margin: 6px 0; }
+.listen { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; } .listen[hidden] { display: none; }
+.listen button, .listen select { font: 13px system-ui, sans-serif; padding: 2px 10px; border: 1px solid var(--line);
+  border-radius: 4px; background: var(--panel); color: var(--text); }
+.listen button { cursor: pointer; } .listen button:disabled { opacity: .5; cursor: default; }
+.listening { background: color-mix(in srgb, var(--accent) 12%, transparent); position: relative; }
+.listen.mini { position: absolute; top: 0; right: 0; margin: 0; padding: 0 8px; display: none; }
+.listening:hover .listen.mini, .listening:focus-within .listen.mini { display: block; }
+.listen.mini[hidden] { display: none; }
+::highlight(listen-now) { background: color-mix(in srgb, var(--accent) 35%, transparent); }
 .codebox { position: relative; }
 .codebox .copy { position: absolute; top: 6px; right: 6px; opacity: 0; font: 12px system-ui, sans-serif;
   padding: 1px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--muted);
@@ -2623,9 +2741,7 @@ body.can-run .needs { display: block; }
 .cov-pies figcaption { color: var(--muted); font-size: 13px; } .cov-pies strong { color: var(--text); }
 table.cov td.pct { text-align: right; font-weight: bold; } table.cov td.num { text-align: right; white-space: nowrap; }
 table.cov td.pct.ok { color: var(--ok); } table.cov td.pct.warn { color: var(--warn); }
-table.cov td.pct.bad { color: var(--bad); } table.cov td.missed { color: var(--muted); font-size: 13px; }
-table.cov .miss-fn { white-space: nowrap; margin-right: 10px; } table.cov small.never { color: var(--bad); }
-table.cov small.runs { color: var(--warn); }
+table.cov td.pct.bad { color: var(--bad); } table.cov small.runs { color: var(--warn); }
 table.cov .bar { display: inline-block; width: 160px; height: 9px; border-radius: 3px; background: var(--line);
   overflow: hidden; vertical-align: middle; }
 table.cov .bar > span { display: block; height: 100%; } table.cov .bar > .ok { background: var(--ok); }
@@ -2696,24 +2812,25 @@ THEME_MENU = (
 )
 
 JS = r'''
-// The binding for docs.wasm (Setu's tools/setu_docs_web.zig, `zig build docs-web`), where all of the site's
+// The binding for doc.wasm (Setu's tool/setu_doc_web.zig, `zig build doc-web`), where all of the site's
 // behaviour lives. This is a fixed loop: every call into the module returns a list of commands (its `Op`s, in
 // this order: `ops` below), run here in order; events, fetch answers and timers go back into the module. It knows
-// no element, selector or feature. The page is written for no docs.wasm (opened from disk): without it, nothing
+// no element, selector or feature. The page is written for no doc.wasm (opened from disk): without it, nothing
 // here runs and the page stays as written.
 (async function () {
   let w;
   try {
-    w = (await WebAssembly.instantiateStreaming(fetch('docs.wasm'))).instance.exports;
+    w = (await WebAssembly.instantiateStreaming(fetch('doc.wasm'))).instance.exports;
   } catch (e) {  // opened from disk (file://): browsers do not fetch .wasm there
     return;
   }
   const enc = new TextEncoder(), dec = new TextDecoder();
   const dark = matchMedia('(prefers-color-scheme: dark)');
-  const nodes = new Map([[0, document], [1, document.documentElement], [2, document.body], [3, dark]]);
+  const nodes = new Map([[0, document], [1, document.documentElement], [2, document.body], [3, dark],
+    [4, globalThis]]);
   const areas = [localStorage, sessionStorage];
   const payload = { input: e => e.target.value, keydown: e => e.key, click: () => String(getSelection()),
-    change: e => String(e.matches) };
+    change: e => e.matches === undefined ? e.target.value : String(e.matches) };
   let event = null;  // the event being handled (`prevent`)
 
   // A zero-length Zig slice's pointer is a sentinel (-1 as a wasm32 i32): never view memory through it.
@@ -2722,13 +2839,41 @@ JS = r'''
     const flat = args.flatMap(a => {
       if (typeof a !== 'string') return [a];
       const bytes = enc.encode(a), ptr = w.alloc(bytes.length);
-      if (!ptr && bytes.length) throw new Error('docs.wasm: out of memory');
+      if (!ptr && bytes.length) throw new Error('doc.wasm: out of memory');
       if (bytes.length) new Uint8Array(w.memory.buffer, ptr, bytes.length).set(bytes);
       strings.push([ptr, bytes.length]);
       return [ptr, bytes.length];
     });
     try { fn(...flat); } finally { strings.forEach(([ptr, len]) => w.free(ptr, len)); }
     run(new Uint8Array(new Uint8Array(w.memory.buffer, w.outPtr(), w.outLen())));  // a copy: run may call back
+  }
+
+  // The text of `box` (as `blocks` reads it, the parts matching `drop` left out) from character `start` to `end` as a
+  // Range, or null.
+  function textRange(box, start, end, drop) {
+    const at = [];  // each character kept: its text node and offset
+    let space = true;  // the text so far is empty or ends with a blank
+    const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+    for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+      let left = false;
+      for (let p = t.parentElement; p && p !== box; p = p.parentElement) if (p.matches(drop)) left = true;
+      if (left) continue;
+      for (let k = 0; k < t.data.length; k++) {
+        if (t.data[k].trim() === '') {
+          if (space) continue;
+          space = true;
+        } else {
+          space = false;
+        }
+        at.push([t, k]);
+      }
+    }
+    const last = Math.min(end, at.length);
+    if (start >= last) return null;
+    const range = document.createRange();
+    range.setStart(at[start][0], at[start][1]);
+    range.setEnd(at[last - 1][0], at[last - 1][1] + 1);
+    return range;
   }
 
   async function get(url, id, init) {
@@ -2801,6 +2946,49 @@ JS = r'''
         if (line) box.scrollTop = line.offsetTop - box.clientHeight / 3;
       },
       () => { location.href = s(); },  // go
+      () => {  // blocks: the text of each match not inside `skip`; an `attr` value stands for it, marked
+        const parent = node(), first = n(), id = n(), pick = s(), skip = s(), drop = s(), attr = s();
+        const found = [], texts = [];
+        for (const e of parent.querySelectorAll(pick)) {
+          if (e.closest(skip)) continue;
+          found.push(e);
+          if (e.hasAttribute(attr)) {
+            texts.push('\x1e' + e.getAttribute(attr));
+            continue;
+          }
+          const copy = e.cloneNode(true);
+          for (const x of copy.querySelectorAll(drop)) x.remove();
+          texts.push(copy.textContent.split(/\s+/).join(' ').trim());
+        }
+        found.forEach((e, i) => nodes.set(first + i, e));
+        answers.push(() => send(w.onEvent, id, found.length, texts.join('\x1f')));
+      },
+      () => {  // mark: a highlight (CSS Custom Highlight API; none in older browsers)
+        const box = node(), start = n(), end = n(), drop = s(), name = s();
+        if (!globalThis.CSS?.highlights) return;
+        const range = start < end ? textRange(box, start, end, drop) : null;
+        if (range) CSS.highlights.set(name, new Highlight(range)); else CSS.highlights.delete(name);
+      },
+      () => { node().scrollIntoView({ block: 'center', behavior: 'smooth' }); },  // reveal
+      () => {  // voices: now and whenever they change
+        const id = n(), synth = globalThis.speechSynthesis;
+        const answer = () => {
+          const list = synth ? synth.getVoices() : [];
+          const fields = v => [v.name, v.lang, v.voiceURI, v.default ? '1' : ''];
+          send(w.onEvent, id, list.length, list.flatMap(fields).join('\x1f'));
+        };
+        answers.push(answer);
+        if (synth) synth.addEventListener('voiceschanged', answer);
+      },
+      () => {  // speak: one utterance; its start, end and error go back
+        const id = n(), u = new SpeechSynthesisUtterance(s()), uri = s();
+        u.rate = Number(s()) || 1;
+        for (const v of speechSynthesis.getVoices()) if (v.voiceURI === uri) { u.voice = v; u.lang = v.lang; }
+        for (const type of ['start', 'end', 'error']) u.addEventListener(type, () => send(w.onEvent, id, 0, type));
+        speechSynthesis.speak(u);
+      },
+      () => { globalThis.speechSynthesis?.cancel(); },  // cancel
+      () => { const child = node(); node().append(child); },  // move
     ];
     while (at < bytes.length) ops[bytes[at++]]();
     answers.forEach(answer => answer());
@@ -2904,22 +3092,41 @@ def llms_full(stub, module):
     return '\n'.join(lines).rstrip('\n') + '\n'
 
 
+def llms_markdown(project):
+    '''`llms-full.txt` of a module-less site: the home page's and every Markdown page's text, in nav order.'''
+    lines = [f'# {project.name}', '']
+    if summary := project.config.get('summary'):
+        lines += [f'> {summary}', '']
+    files = [project.config['home']] if 'home' in project.config else []
+    for path in [*files, *(p['file'] for p in project.config.get('markdown', ()))]:
+        lines += [include_files((project.root / path).read_text(), project.root).strip('\n'), '']
+    return '\n'.join(lines)
+
+
 def llms_index(config, chapters=None):
-    '''`llms.txt` (the llms.txt convention): the module, its summary, the pages (`chapters`: `Site.chapters`, a
-    `split` page's) and `llms-full.txt`.'''
-    module = config['module']
-    summary = config.get('summary', f'The Python API of `{module}`.')
-    lines = [f'# {module}', '', f'> {summary}', '']
+    '''`llms.txt` (the llms.txt convention): the module (or the site's `name`), its summary, the pages (`chapters`:
+    `Site.chapters`, a `split` page's), the `static` folders and `llms-full.txt`.'''
+    module = config.get('module')
+    title = module or config['name']
+    summary = config.get('summary', f'The Python API of `{module}`.' if module else f'The documentation of {title}.')
+    lines = [f'# {title}', '', f'> {summary}', '']
     if config.get('markdown'):
         lines += ['## Guide', '']
         for p in config['markdown']:
             lines.append(f'- [{p["title"]}]({md_slug(p)}.html)')
             lines += [f'  - [{t}]({s}.html)' for s, t, _text in (chapters or {}).get(md_slug(p), ('', ()))[1]]
         lines.append('')
-    lines += ['## API reference', '']
-    lines += [f'- [{p["title"]}]({p["slug"]}.html): {p["text"]}' for p in config['pages']]
+    if config['pages'] or config.get('static'):
+        lines += ['## API reference', '']
+        lines += [f'- [{p["title"]}]({p["slug"]}.html): {p["text"]}' for p in config['pages']]
+        lines += [f'- [{s["title"]}]({s["at"]}/index.html)' for s in config.get('static', ())]
+        lines.append('')
     if 'stub' in config:
-        lines += ['', '## Full text', '', '- [llms-full.txt](llms-full.txt): every signature and docstring on one page']
+        lines += ['## Full text', '', '- [llms-full.txt](llms-full.txt): every signature and docstring on one page']
+    elif not module:
+        lines += ['## Full text', '', '- [llms-full.txt](llms-full.txt): every page on one page']
+    while lines[-1] == '':
+        lines.pop()
     return '\n'.join(lines) + '\n'
 
 
@@ -2942,7 +3149,7 @@ PYTHON = f'{sys.version_info.major}.{sys.version_info.minor}{"t" if FREE_THREADE
 
 def serve(project, port):
     '''Serve the site on http://127.0.0.1:`port`; Run buttons `POST /api/run`, which runs the example in a
-    child process (`setu_docs.py run --json <target>`). With `profile`, `/profile.html` is made per request (the
+    child process (`setu_doc.py run --json <target>`). With `profile`, `/profile.html` is made per request (the
     Profile page is live only) and its sources are served at `source/<path>`.
 
     Note
@@ -2956,7 +3163,9 @@ def serve(project, port):
     scripts = re.escape(project.config.get('scripts', 'example'))
     target_rx = re.compile(rf'[A-Za-z_][\w.]{{0,80}}(?::[0-9]{{1,3}})?|{scripts}/[\w-]{{1,80}}\.py')
     lock = threading.Lock() if project.config.get('serial', True) else None
-    ping = json.dumps({'module': project.config['module'], 'version': project.version, 'python': PYTHON}).encode()
+    ping = json.dumps(
+        {'module': project.config.get('module', project.name), 'version': project.version, 'python': PYTHON}
+    ).encode()
     live = Site(project) if 'profile' in project.config else None  # the Profile page, made per request
     live_sources = {}  # what the last Profile page shows at `source/<path>`
     examples = set(project.examples())
@@ -3097,7 +3306,7 @@ def check(project):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Build a Setu project\'s docs site, serve it, or run its examples.')
-    parser.add_argument('--config', default='pyproject.toml', help='the pyproject.toml with [tool.setu_docs]')
+    parser.add_argument('--config', default='pyproject.toml', help='the pyproject.toml with [tool.setu_doc]')
     sub = parser.add_subparsers(dest='cmd')
     build = sub.add_parser('build', help='write the HTML site (the default)')
     build.add_argument('--out', help='the site directory (default: `out` of the settings)')

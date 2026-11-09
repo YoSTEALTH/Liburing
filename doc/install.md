@@ -39,18 +39,18 @@ python3 -m pip install .
 ```bash
 zig build develop                       # __init__.so + __init__.pyi into src/liburing/
 python3 -m pytest                       # the tests import from src/ (pyproject's `pythonpath`)
-tools/check.sh                          # every check, on each installed interpreter
-python3 tools/setu_build.py --all       # release wheels into dist/ (x86_64 + aarch64)
+tool/check.py                           # every check, on each installed interpreter
+python3 tool/setu_build.py --all        # release wheels into dist/ (x86_64 + aarch64)
 ```
 
-`zig build develop` builds a Debug extension and regenerates the type stub `__init__.pyi` from the Zig source; `zig build develop -Drelease` builds the ReleaseFast one the wheels ship (what the benchmarks use). `tools/check.sh` runs `zig fmt`, ruff, the test suite on 3.15t, 3.15, 3.14t and 3.14 (`/opt/python/<version>/bin/python3` by default; `PY_FT`, `PY_GIL`, `PY314_FT`, `PY314_GIL` point elsewhere), `mypy --strict` and `stubtest`.
+`zig build develop` builds a Debug extension and regenerates the type stub `__init__.pyi` from the Zig source; `zig build develop -Drelease` builds the ReleaseFast one the wheels ship (what the benchmarks use). `tool/check.py` runs `zig fmt`, ruff, the test suite on 3.15t, 3.15, 3.14t and 3.14 (`/opt/python/<version>/bin/python3` by default; `PY_FT`, `PY_GIL`, `PY314_FT`, `PY314_GIL` point elsewhere), `mypy --strict` and `stubtest`.
 
-This site is built by Setu's `tools/setu_docs.py` (standard library only, plus `zig` for the search's Wasm), with the settings in `pyproject.toml`'s `[tool.setu_docs]`:
+This site is built by Setu's `tool/setu_doc.py` (standard library only, plus `zig` for the search's Wasm), with the settings in `pyproject.toml`'s `[tool.setu_doc]`:
 
 ```bash
-python3 tools/setu_docs.py              # the site into site/ (what CI runs)
-python3 tools/setu_docs.py serve        # http://127.0.0.1:8000, with Run buttons on the examples
-python3 tools/setu_docs.py check        # run the docstrings' >>> examples
+python3 tool/setu_doc.py                # the site into site/ (what CI runs)
+python3 tool/setu_doc.py serve          # http://127.0.0.1:8000, with Run buttons on the examples
+python3 tool/setu_doc.py check          # run the docstrings' >>> examples
 ```
 
 The API reference is generated from `src/liburing/__init__.pyi`, so run `zig build develop` first.

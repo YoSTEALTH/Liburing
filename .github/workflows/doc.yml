@@ -1,6 +1,6 @@
 name: Docs
 
-# Builds the site (Setu's `tools/setu_docs.py`, standard library + zig) and publishes it to GitHub Pages (Settings > Pages > Source: GitHub Actions).
+# Builds the site (Setu's `tool/setu_doc.py`, standard library + zig) and publishes it to GitHub Pages (Settings > Pages > Source: GitHub Actions).
 # `dev` deploys too: Settings > Environments > github-pages > Deployment branches must allow `dev` (and `main`).
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
         run: zig build develop
 
       - name: Build site
-        run: python tools/setu_docs.py
+        run: python tool/setu_doc.py
 
       - uses: actions/upload-pages-artifact@v4
         with:

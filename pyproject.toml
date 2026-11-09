@@ -37,7 +37,7 @@ classifiers = [
     "Topic :: Software Development"
 ]
 dependencies = []
-dynamic = ["version"]  # from `build.zig.zon` (tools/setu_build.py)
+dynamic = ["version"]  # from `build.zig.zon` (tool/setu_build.py)
 
 [project.urls]
 Homepage = "https://github.com/YoSTEALTH/Liburing"
@@ -47,9 +47,9 @@ Issues = "https://github.com/YoSTEALTH/Liburing/issues"
 test = ["pytest"]
 
 [build-system]
-requires = []  # `zig` 0.17.0 on PATH (or $ZIG); see tools/setu_build.py
+requires = []  # `zig` 0.17.0 on PATH (or $ZIG); see tool/setu_build.py
 build-backend = "setu_build"
-backend-path = ["tools"]
+backend-path = ["tool"]
 
 [tool.pytest.ini_options]
 addopts = "-rs"  # list each skip with its reason (`UnsupportedError`, `skip_linux`, ...)
@@ -62,7 +62,7 @@ faulthandler_exit_on_timeout = true
 
 [tool.ruff]
 line-length = 120
-extend-exclude = ["tools/setu_build.py"]  # Setu's copy, kept unchanged (its `setu_docs.py` passes ruff as is)
+extend-exclude = ["tool/setu_build.py"]  # Setu's copy, kept unchanged (its `setu_doc.py` passes ruff as is)
 
 [tool.ruff.format]
 quote-style = "preserve"
@@ -75,52 +75,53 @@ targets = ["x86_64-linux-gnu.2.28", "aarch64-linux-gnu.2.28"]
 # `--all`: one `cp314.cp315-abi3.abi3t.cp314t.cp315t` wheel (3.14, 3.14t, 3.15, 3.15t and later) for glibc 2.28+
 # on x86_64 and aarch64 (plan.md decision 7).
 
-# The docs site, built by Setu's `tools/setu_docs.py` (`zig build setu-docs-sync`; the settings are documented at its
-# top): `python3 tools/setu_docs.py` writes site/.
-[tool.setu_docs]
+# The docs site, built by Setu's `tool/setu_doc.py` (`zig build setu-doc-sync`; the settings are documented at its
+# top): `python3 tool/setu_doc.py` writes site/.
+[tool.setu_doc]
 stub = "src/liburing/__init__.pyi"
 module = "liburing"
 summary = "io_uring for Python: a thin wrapper around C liburing"
 path = ["src"]
 name = "Liburing"
-home = "docs/index.md"
+home = "doc/index.md"
 edit = "https://github.com/YoSTEALTH/Liburing/edit/dev/"
-hooks = "tools/docs_hooks.py"  # fixtures for the docstring examples (`ring`, `sqe`, `cqe`, `fd`, ...)
-# The Coverage page: a committed snapshot, so the published site has it too; `tools/check.sh` rewrites it (kcov)
-coverage = "docs/coverage.json"
-coverage_history = "docs/coverage-history.json"  # its history chart, a line per version (`zig build coverage`)
-profile = "zig-out/profile.json"  # the Profile page: live only (`setu_docs.py serve`), from `zig build profile`
+hooks = "tool/doc_hook.py"  # fixtures for the docstring examples (`ring`, `sqe`, `cqe`, `fd`, ...)
+# The Coverage page: a committed snapshot, so the published site has it too; `tool/check.py` rewrites it (kcov)
+coverage = "doc/coverage.json"
+coverage_history = "doc/coverage-history.json"  # its history chart, a line per version (`zig build coverage`)
+profile = "zig-out/profile.json"  # the Profile page: live only (`setu_doc.py serve`), from `zig build profile`
 scripts = "example"  # the Example scripts page, with Run boxes
 scripts_skip = ["copy_file.py", "echo_server.py"]  # need arguments / serve until stopped
+listen = true  # a Listen bar (read the page aloud) on the home and Markdown pages
 
 # The hand-written pages, in nav order.
-[[tool.setu_docs.markdown]]
-file = "docs/install.md"
+[[tool.setu_doc.markdown]]
+file = "doc/install.md"
 title = "Install"
 
-[[tool.setu_docs.markdown]]
-file = "docs/concept.md"
+[[tool.setu_doc.markdown]]
+file = "doc/concept.md"
 title = "How it works"
 section = "Guide"
 
-[[tool.setu_docs.markdown]]
-file = "docs/guide.md"  # its `@@example/...@@` lines are the tested scripts, included at build time
+[[tool.setu_doc.markdown]]
+file = "doc/guide.md"  # its `@@example/...@@` lines are the tested scripts, included at build time
 title = "Examples"
 section = "Guide"
 
-[[tool.setu_docs.markdown]]
-file = "docs/from_c.md"
+[[tool.setu_doc.markdown]]
+file = "doc/from_c.md"
 title = "Coming from C liburing"
 section = "Guide"
 
-[[tool.setu_docs.markdown]]
-file = "docs/bench.md"
+[[tool.setu_doc.markdown]]
+file = "doc/bench.md"
 title = "Benchmarks"
 
 # The API pages: which page lists which name. First match wins, in this order; the prep functions are matched by
 # their operation name.
 
-[[tool.setu_docs.pages]]
+[[tool.setu_doc.pages]]
 slug = "ring"
 title = "Ring and setup"
 text = "Create, configure and tear down a `Ring`; probe what the kernel supports."
@@ -135,7 +136,7 @@ patterns = [
     "^(liburing_version_|probe$)",
 ]
 
-[[tool.setu_docs.pages]]
+[[tool.setu_doc.pages]]
 slug = "submission"
 title = "Submission queue"
 text = "Get a submission entry (`SQE` / `Sqe`), set its fields and submit it."
@@ -145,7 +146,7 @@ classes = [
 ]
 patterns = ["^(io_uring_(get_sqe|sqe_|submit|sq_|sqring_|get_events)|put_sqe$)"]
 
-[[tool.setu_docs.pages]]
+[[tool.setu_doc.pages]]
 slug = "completion"
 title = "Completion queue"
 text = "Wait for, peek at and consume completion entries (`CQE` / `Cqe`)."
@@ -158,7 +159,7 @@ classes = [
 ]
 patterns = ["^io_uring_(cqe_|cq_|wait_|peek_)"]
 
-[[tool.setu_docs.pages]]
+[[tool.setu_doc.pages]]
 slug = "prep-file"
 title = "Prep: files"
 text = "Read, write, open, close, stat, rename and the other file-system operations."
@@ -205,7 +206,7 @@ functions = [
     "io_uring_prep_writev_fixed",
 ]
 
-[[tool.setu_docs.pages]]
+[[tool.setu_doc.pages]]
 slug = "prep-net"
 title = "Prep: sockets"
 text = "Accept, connect, send, receive, bind, listen and the other socket operations."
@@ -237,13 +238,13 @@ functions = [
     "io_uring_prep_socket_direct",
 ]
 
-[[tool.setu_docs.pages]]
+[[tool.setu_doc.pages]]
 slug = "prep-other"
 title = "Prep: other"
 text = "Poll, timeout, cancel, futex, `msg_ring`, `nop`, `uring_cmd`, epoll, ..."
 patterns = ["^io_uring_prep_"]
 
-[[tool.setu_docs.pages]]
+[[tool.setu_doc.pages]]
 slug = "register"
 title = "Register and buffers"
 text = "Register files, buffers, rings and restrictions; provided buffer rings."
@@ -265,7 +266,7 @@ classes = [
 ]
 patterns = ["^io_uring_(register|unregister|buf_|setup_buf_ring|free_buf_ring)"]
 
-[[tool.setu_docs.pages]]
+[[tool.setu_doc.pages]]
 slug = "network"
 title = "Network helpers"
 text = "Socket addresses, message headers and socket options."
@@ -277,13 +278,13 @@ classes = [
 ]
 patterns = ["^(io_uring_recvmsg_|setsockopt$|getsockopt$|getsockname$)"]
 
-[[tool.setu_docs.pages]]
+[[tool.setu_doc.pages]]
 slug = "types"
 title = "Types, enums and errors"
 text = "Structures, enums and exceptions the functions take and return."
 default = true
 
-[[tool.setu_docs.pages]]
+[[tool.setu_doc.pages]]
 slug = "constants"
 title = "Constants"
 text = "`IORING_*`, `IOSQE_*`, `O_*`, `SO_*`, ... grouped by prefix."

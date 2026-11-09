@@ -56,13 +56,13 @@ jobs:
           "${{ steps.py314_ft.outputs.python-path }}" -m pip install pytest
           "${{ steps.py314_gil.outputs.python-path }}" -m pip install pytest
 
-      - name: tools/check.sh
+      - name: tool/check.py
         env:
           PY_FT: ${{ steps.py_ft.outputs.python-path }}
           PY_GIL: ${{ steps.py_gil.outputs.python-path }}
           PY314_FT: ${{ steps.py314_ft.outputs.python-path }}
           PY314_GIL: ${{ steps.py314_gil.outputs.python-path }}
-        run: tools/check.sh
+        run: tool/check.py
 
   wheels:
     # Every release wheel ([tool.setu_build] in pyproject.toml); `wheel-test` installs and tests them.
@@ -86,7 +86,7 @@ jobs:
           allow-prereleases: true
 
       - name: Build wheels
-        run: '"${{ steps.py_ft.outputs.python-path }}" tools/setu_build.py --all -o dist'
+        run: '"${{ steps.py_ft.outputs.python-path }}" tool/setu_build.py --all -o dist'
 
       - uses: actions/upload-artifact@v6
         with:

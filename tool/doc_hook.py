@@ -1,5 +1,5 @@
-'''Fixtures for the docstring examples on the docs site (`hooks` in `pyproject.toml`'s `[tool.setu_docs]`): what an
-example reads but does not make itself (`ring`, `sqe`, `cqe`, `fd`, ...). `python3 tools/setu_docs.py check` runs
+'''Fixtures for the docstring examples on the docs site (`hooks` in `pyproject.toml`'s `[tool.setu_doc]`): what an
+example reads but does not make itself (`ring`, `sqe`, `cqe`, `fd`, ...). `python3 tool/setu_doc.py check` runs
 every example, each in a new temporary directory; `fd`s it leaves open are closed after it.'''
 
 import array

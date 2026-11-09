@@ -5,25 +5,29 @@
 //!   zig build develop  also copy the extension and stubs into src/liburing/ (for `pytest` from a checkout)
 //!   zig build stubs    write the type stubs to src/liburing/__init__.pyi
 //!   zig build load     the HTTP load generator for example/bench/liburing_bench.{py,c} into zig-out/bin/
-//!   zig build setu-build-sync    copy the pinned Setu's tools/setu_build.py into tools/ (never edit it)
-//!   zig build setu-build-check   check that tools/setu_build.py is the pinned Setu's copy
-//!   zig build setu-docs-sync     copy the pinned Setu's tools/setu_docs.py into tools/ (never edit it)
-//!   zig build setu-docs-check    check that tools/setu_docs.py is the pinned Setu's copy
-//!   zig build setu-guide-sync    copy the pinned Setu's docs/setu-guide.md into docs/ (never edit it)
-//!   zig build setu-guide-check   check that docs/setu-guide.md is the pinned Setu's copy
-//!   zig build docs-web           the docs site's search (zig-out/web/docs.wasm; tools/setu_docs.py runs it)
+//!   zig build setu-build-sync    copy the pinned Setu's tool/setu_build.py into tool/ (never edit it)
+//!   zig build setu-build-check   check that tool/setu_build.py is the pinned Setu's copy
+//!   zig build setu-doc-sync      copy the pinned Setu's tool/setu_doc.py into tool/ (never edit it)
+//!   zig build setu-doc-check     check that tool/setu_doc.py is the pinned Setu's copy
+//!   zig build setu-guide-sync    copy the pinned Setu's doc/setu-guide.md into doc/ (never edit it)
+//!   zig build setu-guide-check   check that doc/setu-guide.md is the pinned Setu's copy
+//!   zig build doc-web            the docs site's search (zig-out/web/doc.wasm; tool/setu_doc.py runs it)
 //!   zig build coverage           kcov line coverage under pytest (zig-out/coverage.json; `-- --missed`)
 //!   zig build profile -Drelease -Dcpu=x86_64_v3
-//!                                callgrind instructions per call of tools/profile_cases.py (zig-out/profile.json)
+//!                                callgrind instructions per call of tool/profile_case.py (zig-out/profile.json)
+//!   zig build check-symbol -Dpython=...
+//!                                Setu's check that the extension's CPython symbols are exported by that interpreter
+//!                                (and in abi3t on 3.15+)
 //!
 //! Options:
 //!   -Drelease               ReleaseFast (wheels and benchmarks use it); without it, Debug. (A preferred release
 //!                           mode leaves no `-Doptimize`.)
 //!   -Dstrip                 drop debug info from the extension (wheels use it)
 //!   -Dext-suffix=...        Python extension suffix (default: Setu's `.so`: one stable-ABI binary for 3.14+)
-//!   -Dpython=...            the interpreter `coverage` runs pytest with, `profile` the cases (default `python3`)
+//!   -Dpython=...            the interpreter `coverage` runs pytest with, `profile` the cases, `check-symbol`
+//!                           checks against (default `python3`)
 //!
-//! Wheels are built by `tools/setu_build.py` (the PEP 517 backend), not by a step here.
+//! Wheels are built by `tool/setu_build.py` (the PEP 517 backend), not by a step here.
 const std = @import("std");
 const zon = @import("build.zig.zon");
 
@@ -45,8 +49,8 @@ const liburing_flags: []const []const u8 = &.{
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    // `-Drelease` (what `tools/setu_build.py` passes) is ReleaseFast, for wheels and benchmarks; new code is
-    // tested in Debug (the default), where a bug stops with a proper error message.
+    // `-Drelease` (what `tool/setu_build.py` passes) is ReleaseFast, for wheels and benchmarks; new code is tested
+    // in Debug (the default), where a bug stops with a proper error message.
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .fast });
     const strip = b.option(bool, "strip", "Strip debug symbols from the binary") orelse false;
     const ext_suffix = b.option([]const u8, "ext-suffix", "Python extension module suffix") orelse
@@ -118,45 +122,49 @@ pub fn build(b: *std.Build) void {
     });
     b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "__init__.pyi").step);
     // PEP 561 marker: type checkers read `__init__.pyi` only next to it. Installed with the stubs (not
-    // copied by `develop`: `tools/setu_build.py` also packs src/liburing/, which would ship it twice).
+    // copied by `develop`: `tool/setu_build.py` also packs src/liburing/, which would ship it twice).
     const py_typed = b.addWriteFiles().add("py.typed", "");
     b.getInstallStep().dependOn(&b.addInstallFileWithDir(py_typed, .lib, "py.typed").step);
     const pyi_copy = b.addInstallFileWithDir(pyi, .{ .custom = "../src/liburing" }, "__init__.pyi");
     b.step("stubs", "Write the type stubs to src/liburing/__init__.pyi").dependOn(&pyi_copy.step);
 
-    // `zig build setu-build-sync` (copy the pinned Setu's `tools/setu_build.py` into tools/) and
+    // `zig build setu-build-sync` (copy the pinned Setu's `tool/setu_build.py` into tool/) and
     // `zig build setu-build-check` (compare with it, offline).
     @import("setu").addSetuBuildSteps(b, setu_dep);
 
-    // The same for `tools/setu_docs.py` (the docs site builder): `setu-docs-sync` / `setu-docs-check`, plus
-    // `docs-web` (`zig-out/web/docs.wasm`, the site's search; `setu_docs.py` runs it).
-    @import("setu").addSetuDocsSteps(b, setu_dep);
+    // The same for `tool/setu_doc.py` (the docs site builder): `setu-doc-sync` / `setu-doc-check`, plus
+    // `doc-web` (`zig-out/web/doc.wasm`, the site's search; `setu_doc.py` runs it).
+    @import("setu").addSetuDocSteps(b, setu_dep);
 
-    // And for `docs/setu-guide.md` (Setu's guide to writing bindings): `setu-guide-sync` / `setu-guide-check`.
+    // And for `doc/setu-guide.md` (Setu's guide to writing bindings): `setu-guide-sync` / `setu-guide-check`.
     @import("setu").addSetuGuideSteps(b, setu_dep);
 
     // `zig build coverage [-- pytest args]`: kcov line coverage of `src/liburing` (and Setu's code as used here)
     // under pytest, merged over every `--python`, in zig-out/coverage.json (the docs' Coverage page reads it; kcov's
     // HTML with `-- --html DIR`). Needs a Debug, unstripped build (the default).
-    const python = b.option([]const u8, "python", "Python for `coverage` and `profile`") orelse "python3";
+    const python = b.option([]const u8, "python", "Python for `coverage`, `profile`, `check-symbol`") orelse "python3";
     @import("setu").addCoverageSteps(b, setu_dep, ext, .{
         .module_name = "liburing",
         .package = true, // run as `liburing/__init__.so`, like the real package
         .include = &.{ b.path("src/liburing"), setu_dep.path("src") },
         .stub = pyi,
         .python = python,
-        .history = "docs/coverage-history.json", // the docs site's history chart, a line per `.version`
+        .history = "doc/coverage-history.json", // the docs site's history chart, a line per `.version`
     });
 
     // `zig build profile -Drelease -Dcpu=x86_64_v3 [-- runner args]`: instructions per call of
-    // `tools/profile_cases.py` by callgrind, in zig-out/profile.json (the docs' Profile page reads it). Needs an
+    // `tool/profile_case.py` by callgrind, in zig-out/profile.json (the docs' Profile page reads it). Needs an
     // optimized build with debug info, for a CPU without AVX-512 (valgrind runs none).
     @import("setu").addProfileSteps(b, setu_dep, ext, .{
         .module_name = "liburing",
         .package = true,
-        .cases = b.path("tools/profile_cases.py"),
+        .cases = b.path("tool/profile_case.py"),
         .python = python,
     });
+
+    // `zig build check-symbol -Dpython=...`: every CPython symbol the extension imports is exported by that
+    // interpreter and, on 3.15+, in abi3t (Setu's `tool/check_symbol.py`); `tool/check.py` runs it per interpreter.
+    @import("setu").addSymbolCheck(b, setu_dep, ext, .{ .python = python });
 
     const develop = b.step("develop", "Copy the extension and its stubs into src/liburing/");
     develop.dependOn(&b.addInstallFileWithDir(ext.getEmittedBin(), .{ .custom = "../src/liburing" }, ext_name).step);
@@ -166,7 +174,7 @@ pub fn build(b: *std.Build) void {
     const load = b.addExecutable(.{
         .name = "load",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("tools/load.zig"),
+            .root_source_file = b.path("tool/load.zig"),
             .target = target,
             .optimize = .fast,
         }),
@@ -190,13 +198,13 @@ fn cModule(
     translate_c.step.dependOn(configure);
     translate_c.addIncludePath(b.path("lib/liburing/src/include"));
     // Bodies translate-c can not translate (liburing's atomics) become `extern`s from `ffi.c`.
-    const c_externs = b.addRunArtifact(b.addExecutable(.{
-        .name = "c_externs",
-        .root_module = b.createModule(.{ .root_source_file = b.path("tools/c_externs.zig"), .target = b.graph.host }),
+    const c_extern = b.addRunArtifact(b.addExecutable(.{
+        .name = "c_extern",
+        .root_module = b.createModule(.{ .root_source_file = b.path("tool/c_extern.zig"), .target = b.graph.host }),
     }));
-    c_externs.addFileArg(translate_c.getOutput());
+    c_extern.addFileArg(translate_c.getOutput());
     return b.createModule(.{
-        .root_source_file = c_externs.addOutputFileArg2("c.zig", .{}),
+        .root_source_file = c_extern.addOutputFileArg2("c.zig", .{}),
         .target = target,
         .optimize = optimize,
         .link_libc = true,

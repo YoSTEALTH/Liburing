@@ -3,7 +3,7 @@
 //! an `extern` declaration. `ffi.c` (compiled into `liburing-ffi.a`) exports every liburing inline
 //! function, so the symbol exists.
 //!
-//!     c_externs <translated.zig> <out.zig>
+//!     c_extern <translated.zig> <out.zig>
 const std = @import("std");
 
 pub fn main(init: std.process.Init) !void {

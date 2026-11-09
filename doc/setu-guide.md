@@ -10,8 +10,8 @@ here is Setu's current one; Setu refuses what it can not express with a `@compil
 Where things are: `setu.py` (the one namespace to use: references, conversions, raising, the module),
 `setu.c` (the C API, hand-declared, every object opaque), `setu.Class`, `setu.Exception`, `setu.Module`,
 `setu.From`, `setu.CallArgs`, `setu.Visit`, `setu.Send`, `setu.Poll`. The test extension `test/` of Setu
-has one class per hook family (`test/classes.zig`), one function per parameter type (`test/functions.zig`)
-and the model root file (`test/setu_classes.zig`); `test/class_test.py` shows what each does from Python.
+has one class per hook family (`test/class.zig`), one function per parameter type (`test/function.zig`)
+and the model root file (`test/setu_class.zig`); `test/class_test.py` shows what each does from Python.
 
 ## 1. The ten rules
 
@@ -23,7 +23,7 @@ and the model root file (`test/setu_classes.zig`); `test/class_test.py` shows wh
 3. Give an int parameter the exact type the kernel or callee takes (`fd: i32`, `flags: u32`): Setu raises
    `OverflowError` naming the parameter. A value no parameter type can bound goes through
    `` py.narrow(T, v, "`f(x)`") ``. Every `@intCast` / `@truncate` carries a `// cast: <why it fits>` comment
-   on its line or the line above (`tools/check.sh` checks).
+   on its line or the line above (`tool/check.py` checks).
 4. `?T` is optional: omitted or `None` gives `null`. A positional parameter after one with a default needs a
    default too (compile error); make it keyword-only after `_: py.KwOnly`.
 5. Return `Error!R` and raise with `return py.raise*(...)`. `error.PythonError` means "an exception is
@@ -39,11 +39,11 @@ and the model root file (`test/setu_classes.zig`); `test/class_test.py` shows wh
    `Flags`, ...) as a header on its own line with content indented 4 spaces. `Type` entries override the
    stub's types (`return: Iterator[T]`); `Example` is a real `>>>` session, each result on the next line.
 10. Hot paths: generated code must benchmark like hand-written code. Fill arguments in place, keep slow
-    paths out of line, measure before and after with `tools/bench.py` (section 9).
+    paths out of line, measure before and after with `tool/bench.py` (section 9).
 
 ## 2. The module
 
-The root file (`test/setu_classes.zig` is the model):
+The root file (`test/setu_class.zig` is the model):
 
 ```zig
 const setu = @import("setu");
@@ -103,9 +103,9 @@ const pyi = @import("setu").addStubs(b, setu_dep, .{
     .imports = &.{.{ .name = "build_options", .module = options.createModule() }}, // what the root imports
 });
 b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "__init__.pyi").step); // next to __init__.so
-@import("setu").addSetuBuildSteps(b, setu_dep); // tools/setu_build.py: setu-build-sync / -check
-@import("setu").addSetuDocsSteps(b, setu_dep); // tools/setu_docs.py: setu-docs-sync / -check, docs-web
-@import("setu").addSetuGuideSteps(b, setu_dep); // docs/setu-guide.md: setu-guide-sync / -check
+@import("setu").addSetuBuildSteps(b, setu_dep); // tool/setu_build.py: setu-build-sync / -check
+@import("setu").addSetuDocSteps(b, setu_dep); // tool/setu_doc.py: setu-doc-sync / -check, doc-web
+@import("setu").addSetuGuideSteps(b, setu_dep); // doc/setu-guide.md: setu-guide-sync / -check
 @import("setu").addCoverageSteps(b, setu_dep, ext, .{ // zig build coverage: kcov over pytest (see 11.)
     .module_name = "liburing", // the name the tests import the extension by
     .package = true, // it is `liburing/__init__.so`
@@ -116,16 +116,16 @@ b.getInstallStep().dependOn(&b.addInstallFileWithDir(pyi, .lib, "__init__.pyi").
 @import("setu").addProfileSteps(b, setu_dep, ext, .{ // zig build profile: callgrind over the cases (see 11.)
     .module_name = "liburing",
     .package = true,
-    .cases = b.path("tools/bench_cases.py"), // `CASES` + `namespace(module)`, as Setu's tools/bench.py
+    .cases = b.path("tool/bench_cases.py"), // `CASES` + `namespace(module)`, as Setu's tool/bench.py
 });
-@import("setu").addSymbolCheck(b, setu_dep, ext, .{ // zig build check-symbols -Dpython=... (see 11.)
-    .python = b.option([]const u8, "python", "Python for `check-symbols`") orelse "python3",
+@import("setu").addSymbolCheck(b, setu_dep, ext, .{ // zig build check-symbol -Dpython=... (see 11.)
+    .python = b.option([]const u8, "python", "Python for `check-symbol`") orelse "python3",
 });
 ```
 
 The extension is the package itself, `<name>/__init__.so` next to `__init__.pyi` and `py.typed` (section 7), or a
 plain `<name>.so` (`@import("setu").ext_suffix`); the wheel `cp314.cp315-abi3.abi3t.cp314t.cp315t`
-(`tools/setu_build.py`, a PEP 517 backend each project keeps a byte-identical copy of).
+(`tool/setu_build.py`, a PEP 517 backend each project keeps a byte-identical copy of).
 
 ## 3. Functions
 
@@ -159,7 +159,7 @@ a literal (`str`), `py.Bytes` (`bytes`), `*Object` (a new reference, taken), tup
 other slices (`list`). `py.toPython(value)` does this conversion by hand (`null` with an exception set on
 failure); `try py.new(value)` the same as `Error!*Object`.
 
-From here on the examples are Setu's test extension `setu_classes` (`test/`): a Zig block is its code, the Python
+From here on the examples are Setu's test extension `setu_class` (`test/`): a Zig block is its code, the Python
 block after it a session with it, which `test/guide_test.py` runs on every interpreter. The sessions call the module
 `pkg`, standing for your package (`from pkg import read`).
 
@@ -327,7 +327,7 @@ pub const Vec = struct {
         return a.x * b.x + a.y * b.y;
     }
 };
-pub const VecType = setu.Class(Vec, @embedFile("classes.zig")); // declare once, use this name
+pub const VecType = setu.Class(Vec, @embedFile("class.zig")); // declare once, use this name
 
 /// A `Vec` with a label: a Setu subclass, pickled with its base's fields.
 pub const Labeled = struct {
@@ -360,10 +360,10 @@ pub const Labeled = struct {
         self.label = value;
     }
 };
-pub const LabeledType = setu.Class(Labeled, @embedFile("classes.zig"));
+pub const LabeledType = setu.Class(Labeled, @embedFile("class.zig"));
 ```
 
-(Cut from `test/classes.zig`, which gives `Vec` more hooks.) Stub: `@disjoint_base\nclass Vec:` with
+(Cut from `test/class.zig`, which gives `Vec` more hooks.) Stub: `@disjoint_base\nclass Vec:` with
 `DIMS: ClassVar[int]`, `def __init__(self, x: int = ..., y: int = ...) -> None:`, `def norm2(self) -> int:`,
 `@classmethod def from_pair(cls, x: int, y: int) -> Any:`, `@staticmethod def dot(a: Vec, b: Vec) -> int:`;
 `@final\nclass Labeled(Vec):` with the property `label`. In Python:
@@ -578,11 +578,11 @@ os.PathLike[...]`, buffers -> `Buffer`, `py.Sequence(T)` -> `Sequence[T]`, slice
 (rename a Zig helper camelCase, or add the entry). The stub imports only the names it uses, is laid out as
 `ruff format` would, leaves out `__repr__` / `__str__` (`object` declares them), and passes `mypy --strict`,
 `stubtest` and ruff's flake8-pyi rules (`PYI`, apart from `PYI021`: the docstrings stay) in Setu's checks.
-`tools/setu_docs.py` turns the same docstrings into a static HTML site (and `llms.txt` / `llms-full.txt` for AI
-readers), and runs every `Example` to check that its output is what the doc says (`setu_docs.py check`). A
+`tool/setu_doc.py` turns the same docstrings into a static HTML site (and `llms.txt` / `llms-full.txt` for AI
+readers), and runs every `Example` to check that its output is what the doc says (`setu_doc.py check`). A
 repeated `Example` header starts another block (one per call form: `Sqe()`, then `Sqe(2)`), shown with its own
 Run and run on its own, in a new namespace. Setu numbers repeated headers in the docstring: `help()`, the stub and
-the site show `Example #1`, `Example #2`, ... (`setu_docs.py run Sqe:2` runs `Example #2`); write plain `Example`,
+the site show `Example #1`, `Example #2`, ... (`setu_doc.py run Sqe:2` runs `Example #2`); write plain `Example`,
 a hand-written `Example #<n>` is a compile error. A `Flags` section lists one name per line, optionally with a
 note (`IORING_TIMEOUT_ABS  # ts is a point in time`): the site links the name and shows the note as text. A bare
 `https://` URL anywhere in a docstring or the site's Markdown pages (outside backticks) becomes a link that opens in a
@@ -590,16 +590,19 @@ new tab; a trailing `.`, `,` or `)` stays text unless the `)` closes a `(` in th
 In the site's Markdown pages an `@@path@@` line includes a project file as a code block (an example script, as tested);
 the header's ◐ button opens the theme menu (Nord Day, Nord Night, Tokyo Day, Tokyo Night; until one is picked,
 Tokyo Day, or Nord Night when the system is dark); `coverage =
-'zig-out/coverage.json'` and `profile = 'zig-out/profile.json'` in `[tool.setu_docs]` add the Coverage and Profile pages
-(section 11); the Profile page is local only: `setu_docs.py serve` makes it from the file as it is, `build` (CI, the
+'zig-out/coverage.json'` and `profile = 'zig-out/profile.json'` in `[tool.setu_doc]` add the Coverage and Profile pages
+(section 11); the Profile page is local only: `setu_doc.py serve` makes it from the file as it is, `build` (CI, the
 published site) leaves it out, so nothing outside your machine needs `zig build profile`. The site builds from
-`setu_docs.py` alone: no wrapper script, no copied CSS (a `css` file only for the project's own colors).
+`setu_doc.py` alone: no wrapper script, no copied CSS (a `css` file only for the project's own colors). Search finds
+the API's names and every Markdown heading. A Zig project with no Python module gets the same site from its Markdown
+pages: leave out `module`, give `name`, and copy Zig's autodoc output in with `[[tool.setu_doc.static]]` (the keys
+are in `setu_doc.py`'s docstring).
 
 Ship the extension as its package's `__init__.so`, with the stub as `__init__.pyi` and a `py.typed` (PEP 561 marks
 packages only, so a bare top-level `liburing.so` gets no typing): `import liburing` loads the extension itself, a
 package (`__path__`), on every supported interpreter; `from liburing import *` gives its public names, and its
 classes' `__module__` is the import name. No `__init__.py`: next to an `__init__.so` it never runs (extensions are
-found first), and `tools/setu_build.py` refuses to ship one. Python code goes in submodules (`liburing/util.py`).
+found first), and `tool/setu_build.py` refuses to ship one. Python code goes in submodules (`liburing/util.py`).
 The stub must be `__init__.pyi`: a `liburing.pyi` next to `__init__.so` types a `liburing.liburing` that is not
 there, and `liburing` itself gets no types. Moving from the
 submodule layout below: `liburing.liburing` no longer exists (use `liburing`), delete the old `liburing.so` /
@@ -628,12 +631,12 @@ del TYPE_CHECKING
 type's range, also past 64 bits. So the parameter type is the check: `fd: i32`, `len: u32`, `offset: u64`.
 When one value is read as two types or checked against state, `const index = try py.narrow(u32, fd,
 "`close(fd)` with `direct=True`");`. `@intCast` / `@truncate` are for values the code itself bounds, each
-with a `// cast: <why it fits>` comment (`tools/check.sh` rejects one without). Constants wider than
+with a `// cast: <why it fits>` comment (`tool/check.py` rejects one without). Constants wider than
 `c_long` are fine (`pub const ALL_ONES: u64 = maxInt(u64)`).
 
 ## 9. Performance
 
-Measured facts from Setu's notes (ns per call, `tools/bench.py`, A/B interleaved, best of several runs, on
+Measured facts from Setu's notes (ns per call, `tool/bench.py`, A/B interleaved, best of several runs, on
 all four interpreters):
 
 - Most per-call cost was store-forwarding stalls: a value written in small parts (CPython filling a
@@ -643,14 +646,14 @@ all four interpreters):
 - Whether a copy happens depends on LLVM's inlining, so identical source can run 2x apart between builds:
   compare A/B builds with `objdump -d`, interleaved, best of several runs.
 - `inline` changes nothing in `fast` builds (`-Doptimize=fast`): LLVM inlines the call path anyway. A moved
-  trampoline can read ~1 ns slower with identical code (placement). `tools/bench.py --so a --so b` can read the
+  trampoline can read ~1 ns slower with identical code (placement). `tool/bench.py --so a --so b` can read the
   second build 1-1.5 ns slower on the cheapest call (`bench_nop`): swap the order before believing such a gap.
 - A flag on an argument (marking a `take`n copy) cost 6-8 ns per buffer argument; `take` takes a second view
   instead. `OwnedBuffer` saves that view (24-43 ns in Liburing's buffer preps).
 - Reference points: Shakti's `loop_bench` nop serial ~204 ns, batch ~129 ns, `SQE()` ~48 ns; Liburing's
   `prep_recv(sqe, -1, bytearray)` ~22 ns.
 
-When touching `src/class.zig` / `src/export.zig` / `src/convert.zig` / `src/args.zig`: `python3 tools/bench.py
+When touching `src/class.zig` / `src/export.zig` / `src/convert.zig` / `src/arg.zig`: `python3 tool/bench.py
 --ref HEAD` before claiming a change is neutral, and `zig build profile` (section 11) before and after: instructions
 per call are exact on every run, so a change of one instruction shows, and `--lines` says which line it is on. Time
 and instructions together tell a change that saves work from one that only moves it (a stall costs time, not
@@ -699,40 +702,40 @@ What the message says: the cause.
 ## 11. Checks
 
     zig build test                          # type-check every declaration + comptime unit tests
-    zig build develop                       # test/setu_classes.so (every interpreter) + setu_classes.pyi
+    zig build develop                       # test/setu_class.so (every interpreter) + setu_class.pyi
     /opt/python/3.15t/bin/python3 -m pytest # then 3.15, 3.14t, 3.14: the same .so
-    tools/check.sh                          # everything, offline, on all four interpreters
-    python3 tools/bench.py --ref HEAD       # per-call cost A/B against a commit
+    tool/check.py                           # everything, offline, on all four interpreters
+    python3 tool/bench.py --ref HEAD        # per-call cost A/B against a commit
     zig build profile -Doptimize=fast -Dcpu=x86_64_v3   # instructions per call, per line (callgrind);
                                                         # -Drelease with a preferred optimize mode
-    zig build check-symbols -Dpython=/opt/python/3.14/bin/python3   # CPython symbols, per interpreter
+    zig build check-symbol -Dpython=/opt/python/3.14/bin/python3   # CPython symbols, per interpreter
 
-A project using Setu runs its own `tools/check.sh`, which includes `zig build setu-build-check`,
-`setu-docs-check` and `setu-guide-check` (its copies of Setu's script, docs helpers and this guide match the
-Setu it pins), and `zig build check-symbols -Dpython=<each interpreter>` (`addSymbolCheck`, Setu's
-`tools/check_symbols.py` on the extension as built: every CPython symbol it imports is exported by that interpreter
+A project using Setu runs its own `tool/check.sh`, which includes `zig build setu-build-check`,
+`setu-doc-check` and `setu-guide-check` (its copies of Setu's script, docs helpers and this guide match the
+Setu it pins), and `zig build check-symbol -Dpython=<each interpreter>` (`addSymbolCheck`, Setu's
+`tool/check_symbol.py` on the extension as built: every CPython symbol it imports is exported by that interpreter
 and, on 3.15+, in the stable ABI for free-threading (abi3t); needs `nm`, and `cc` on 3.15+).
-After a Setu bump: `zig build setu-build-sync setu-docs-sync setu-guide-sync`.
+After a Setu bump: `zig build setu-build-sync setu-doc-sync setu-guide-sync`.
 
 Line coverage: `zig build coverage [-Dpython=...] [-- --missed --partial pytest args]` (`addCoverageSteps`; kcov 43)
 prints a per-file table, with `--missed` the lines that never ran, with `--partial` the yellow ones, and writes the
 numbers to `zig-out/coverage.json` (totals, per interpreter, per file and line, each file's CRC-32; the format is in
-`tools/check_coverage.py`). Files are named relative to the project, a dependency's as `<package>/<path>`
-(`setu/src/args.zig`), wherever it lives. kcov's own output (an HTML report, XML, JSON: some 70 files per interpreter)
+`tool/check_coverage.py`). Files are named relative to the project, a dependency's as `<package>/<path>`
+(`setu/src/arg.zig`), wherever it lives. kcov's own output (an HTML report, XML, JSON: some 70 files per interpreter)
 goes to a temporary directory, removed after the run; `-- --html DIR` keeps its HTML report. On the docs site (`coverage
 = 'zig-out/coverage.json'`) the Coverage page has a section per owner (the project, then each dependency), and a click
 on a file shows its source, Zig highlighted, the missed lines red; a source changed since the run (its CRC-32) is
-flagged `changed`. `.badge = "docs/coverage-badge.json"` also writes the total as a shields.io endpoint file; committed,
+flagged `changed`. `.badge = "doc/coverage-badge.json"` also writes the total as a shields.io endpoint file; committed,
 it is a README badge: the image `https://img.shields.io/endpoint?url=<URL>`, `<URL>` the file's
 `raw.githubusercontent.com` address, percent-encoded, linked to the docs site's Coverage page (`<site>/coverage.html`)
-(run with every `--python` first: the badge shows the merged total). `.history = "docs/coverage-history.json"` also
+(run with every `--python` first: the badge shows the merged total). `.history = "doc/coverage-history.json"` also
 keeps the totals per project version (`build.zig.zon`'s `.version`; a run sets its version's entry, one line each),
 with the project's own files' (no dependency's) beside them; committed, with `coverage_history =
-'docs/coverage-history.json'` in `[tool.setu_docs]` the Coverage page charts the own lines (the donut's figure) next to
+'doc/coverage-history.json'` in `[tool.setu_doc]` the Coverage page charts the own lines (the donut's figure) next to
 the project's donut, each point naming the total with dependencies too. In CI it needs kcov, packaged for Ubuntu
 25.04+: on GitHub's `ubuntu-26.04` runner the apt package `kcov`, then the step with every `--python`; Setu's
 `.github/workflows/ci.yml` also fails when the committed badge or history differs from the run's (`git diff
---exit-code docs/coverage-badge.json docs/coverage-history.json`). Notes:
+--exit-code doc/coverage-badge.json doc/coverage-history.json`). Notes:
 
 - It measures the extension as built, in Debug. The default Debug backend (self-hosted x86_64) pads its line
   tables with ops kcov (elfutils) misreads, so kcov runs a copy with the padding rewritten (the build is not
@@ -740,7 +743,7 @@ the project's donut, each point naming the total with dependencies too. In CI it
   (`.use_llvm = true`, aarch64) folds a line like `orelse return ...` into the one above (its error path shows as
   run) and marks some comment and `fn` lines red (a jump nothing takes).
 - kcov records nothing from a shared library loaded once about 24 are mapped, and `import pytest` maps more, so
-  `tools/check_coverage.py` loads the extension first, as `.module_name`; a test importing another copy fails.
+  `tool/check_coverage.py` loads the extension first, as `.module_name`; a test importing another copy fails.
 - Zig compiles only referenced code: a function nothing calls is not counted as missed.
 - kcov's colours (`--html`; the runner's terms too): green ran, red never ran, yellow ran at some of its addresses
   only (counted as covered). In Zig, yellow is mostly a generic line (`fromPython(T)`, a trampoline) whose instance
@@ -773,7 +776,7 @@ Instructions per call: `zig build profile -Doptimize=fast -Dcpu=x86_64_v3 [-- -k
 (the difference over N is one call, Python's startup and the loop taken out), and prints a table per interpreter:
 `total` (everything one call costs) and `ext` (the part in the extension's `.so`: its code, Setu's and std's,
 inlined there); `--lines K` lists each case's K costliest lines with their source. The numbers go to
-`zig-out/profile.json` (per case, file and line; the format is in `tools/check_profile.py`). Setu's own cases
+`zig-out/profile.json` (per case, file and line; the format is in `tool/check_profile.py`). Setu's own cases
 include `bench_nop` / `bench_recv` written by hand against the C API (`test/hand.zig`, `hand: ...`): generated
 code costs 4-26 fewer instructions per call than those on every interpreter (2026-10-28).
 
@@ -785,9 +788,9 @@ code costs 4-26 fewer instructions per call than those on every interpreter (202
   than `--tolerance` (default 2).
 - The build must be optimized, with debug info, for a CPU valgrind runs (no AVX-512): the step fails otherwise.
 - `.cases` is a Python file with `CASES`, a list of `(label, statement)`, and `namespace(module)`, which returns
-  the names the statements use; Setu's `tools/bench.py` is one, so `bench.py` times the cases `profile` counts.
+  the names the statements use; Setu's `tool/bench.py` is one, so `bench.py` times the cases `profile` counts.
 - A line `0` is code the compiler added (no source line).
-- `profile = 'zig-out/profile.json'` in `[tool.setu_docs]` adds a Profile page to the docs site: a row per case with
+- `profile = 'zig-out/profile.json'` in `[tool.setu_doc]` adds a Profile page to the docs site: a row per case with
   a bar per interpreter (the extension's part dark); a click on a case shows its files' sources, each costly line
   with its instructions per call, shaded by them.
 
