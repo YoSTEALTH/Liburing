@@ -12,7 +12,7 @@ empty `deque` and the read is never seen (the wait sleeps on the new value).
 `io_uring_prep_msg_ring` also posts on another ring, but carries only `data` (below 2**63) and `len`: use it
 for a small value or to pass a registered file (`io_uring_prep_msg_ring_fd`).
 
-    python3.15t example/futex_messages.py
+    python3.15t example/futex_message.py
 '''
 
 import collections

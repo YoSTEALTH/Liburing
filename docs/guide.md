@@ -1,6 +1,6 @@
 # Examples
 
-Complete programs, included straight from the `example/` directory: the test suite runs every one of them, so the code below always matches what works. [How it works](concepts.md) explains the pieces they are made of.
+Complete programs, included straight from the `example/` directory: the test suite runs every one of them, so the code below always matches what works. [How it works](concept.md) explains the pieces they are made of.
 
 ## Which operations does the kernel support?
 
@@ -45,7 +45,7 @@ nc localhost 8000
 
 Each thread has its own ring (a ring belongs to the thread that set it up). The receiver arms an `io_uring_prep_futex_wait` on its ring and the sender, after putting a message in a shared `deque`, wakes it with `io_uring_prep_futex_wake` from its own. Any Python object travels this way; `io_uring_prep_msg_ring` is the alternative when a 64-bit value is enough.
 
-@@example/futex_messages.py@@
+@@example/futex_message.py@@
 
 ## Four ways to fill the submission queue
 
@@ -56,4 +56,4 @@ Each thread has its own ring (a ring belongs to the thread that set it up). The 
 
 The [benchmark](bench.md) measures the first three on an HTTP server.
 
-@@example/sqe_styles.py@@
+@@example/sqe_style.py@@

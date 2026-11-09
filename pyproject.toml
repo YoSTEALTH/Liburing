@@ -99,7 +99,7 @@ file = "docs/install.md"
 title = "Install"
 
 [[tool.setu_docs.markdown]]
-file = "docs/concepts.md"
+file = "docs/concept.md"
 title = "How it works"
 section = "Guide"
 

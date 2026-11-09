@@ -383,7 +383,7 @@ if __name__ == "__main__":
 ```
 
 More under [`example/`](https://github.com/YoSTEALTH/Liburing/tree/main/example): the four ways to fill the
-submission queue (`sqe_styles.py`), vectored reads and writes, messages between threads' rings through a futex,
+submission queue (`sqe_style.py`), vectored reads and writes, messages between threads' rings through a futex,
 and the HTTP servers of the [benchmark](https://yostealth.github.io/Liburing/bench.html) (`bench/`).
 
 ## Note

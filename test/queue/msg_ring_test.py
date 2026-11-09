@@ -125,12 +125,12 @@ def test_cqe_skip_message(ring, cqe):
 
 
 @pytest.mark.requires_op("IORING_OP_FUTEX_WAIT", "IORING_OP_FUTEX_WAKE")
-def test_futex_messages_example(capsys):
-    # `example/futex_messages.py`: the futex way to pass rich messages between threads' rings
+def test_futex_message_example(capsys):
+    # `example/futex_message.py`: the futex way to pass rich messages between threads' rings
     import pathlib
     import runpy
 
-    path = pathlib.Path(__file__).parents[2] / "example" / "futex_messages.py"
+    path = pathlib.Path(__file__).parents[2] / "example" / "futex_message.py"
     runpy.run_path(str(path), run_name="__main__")
     lines = capsys.readouterr().out.splitlines()
     assert lines == [str({"id": i, "text": f"message {i}"}) for i in range(5)]

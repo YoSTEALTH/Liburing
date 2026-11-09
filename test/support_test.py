@@ -114,7 +114,7 @@ def test_pytest_skips_unsupported():
     # `conftest.py` turns `UnsupportedError` into a skip: `test_Query` needs no marker.
     r = run_without_query("""
         import sys, pytest
-        test = "test/queue/register_structs_test.py::test_Query"
+        test = "test/queue/register_struct_test.py::test_Query"
         sys.exit(pytest.main(["-q", "-rs", "-p", "no:cacheprovider", test]))
     """)
     assert r.returncode == 0, r.stdout + r.stderr

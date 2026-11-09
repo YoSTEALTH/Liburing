@@ -29,8 +29,8 @@ def test_readv_writev_example(capsys):
     ]
 
 
-def test_sqe_styles_example(capsys):
-    runpy.run_path(str(EXAMPLE / "sqe_styles.py"), run_name="__main__")
+def test_sqe_style_example(capsys):
+    runpy.run_path(str(EXAMPLE / "sqe_style.py"), run_name="__main__")
     assert capsys.readouterr().out.splitlines() == [
         "get_sqe(): [0, 1, 2]",
         "Sqe():     [7, 7, 7]",
